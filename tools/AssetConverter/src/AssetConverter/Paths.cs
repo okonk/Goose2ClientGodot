@@ -9,6 +9,8 @@ public static class Paths
     public const string UnitySpritesheets =
         "/home/agent/workspace/Goose2Client/Assets/Spritesheets";
 
+    public static string CompiledEnc => Path.Combine(IllutiaData, "compiled.enc");
+
     public static string Adf(int fileNumber) => Path.Combine(IllutiaData, $"{fileNumber}.adf");
     public static string UnityPng(int fileNumber) =>
         Path.Combine(UnitySpritesheets, $"{fileNumber}.png");
