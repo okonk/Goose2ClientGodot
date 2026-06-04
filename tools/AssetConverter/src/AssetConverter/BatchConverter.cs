@@ -1,6 +1,7 @@
 using Goose2.AssetConverter.Adf;
 using Goose2.AssetConverter.Gif;
 using Goose2.AssetConverter.Png;
+using SixLabors.ImageSharp;
 
 namespace Goose2.AssetConverter;
 
@@ -36,8 +37,8 @@ public static class BatchConverter
                     continue;
                 }
 
-                var rgba = GifLoader.Load(adf.FileData, out int w, out int h);
-                PngWriter.Write(rgba, w, h, Path.Combine(outDir, $"{fileNumber}.png"));
+                var outPath = Path.Combine(outDir, $"{fileNumber}.png");
+                DecodeGraphicPayload(adf.FileData, outPath);
                 ok++;
             }
             catch (Exception e)
@@ -48,5 +49,35 @@ public static class BatchConverter
         }
 
         return new BatchResult(ok, fail, failures);
+    }
+
+    /// <summary>Decodes a graphic ADF payload to PNG, dispatching on payload format.</summary>
+    /// <param name="payload">The decoded file data from the ADF.</param>
+    /// <param name="outPath">Path to write the PNG.</param>
+    /// <exception cref="NotSupportedException">When the payload format is not GIF or BMP.</exception>
+    private static void DecodeGraphicPayload(byte[] payload, string outPath)
+    {
+        if (payload.Length < 3)
+            throw new NotSupportedException("Payload too short to determine format");
+
+        // GIF: signature starts with "GIF" (GIF87a / GIF89a)
+        if (payload[0] == 'G' && payload[1] == 'I' && payload[2] == 'F')
+        {
+            var rgba = GifLoader.Load(payload, out int w, out int h);
+            PngWriter.Write(rgba, w, h, outPath);
+            return;
+        }
+
+        // BMP: signature starts with "BM"
+        if (payload[0] == 'B' && payload[1] == 'M')
+        {
+            using var image = Image.Load(payload);
+            Directory.CreateDirectory(Path.GetDirectoryName(outPath)!);
+            image.SaveAsPng(outPath);
+            return;
+        }
+
+        throw new NotSupportedException(
+            $"Unsupported graphic payload format (bytes: 0x{payload[0]:X2} 0x{payload[1]:X2} 0x{payload[2]:X2}). Expected GIF or BMP.");
     }
 }
