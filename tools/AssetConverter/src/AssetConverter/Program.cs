@@ -1,4 +1,20 @@
 using Goose2.AssetConverter;
+using Goose2.AssetConverter.SpriteFrames;
+
+if (args.Length >= 1 && args[0] == "animations")
+{
+    string outRoot = args.Length >= 2
+        ? args[1]
+        : Path.GetFullPath(Path.Combine("..", ".."));
+
+    var result = AnimationBatchConverter.Convert(
+        Paths.IllutiaData, Paths.CompiledEnc, outRoot);
+
+    Console.WriteLine($"Wrote {result.ResourcesWritten} animation resources, {result.Failed} failures -> {outRoot}");
+    foreach (var w in result.Warnings) Console.WriteLine($"  WARN {w}");
+    foreach (var f in result.Failures) Console.WriteLine($"  FAIL {f}");
+    return;
+}
 
 if (args.Length >= 1 && args[0] == "batch")
 {
@@ -25,4 +41,4 @@ if (args.Length >= 2 && args[0] == "frames")
     return;
 }
 
-Console.WriteLine("Usage: AssetConverter batch [outDir] | frames <id>");
+Console.WriteLine("Usage: AssetConverter batch [outDir] | frames <id> | animations [outRoot]");
