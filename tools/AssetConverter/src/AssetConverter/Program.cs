@@ -12,4 +12,17 @@ if (args.Length >= 1 && args[0] == "batch")
     return;
 }
 
-Console.WriteLine("Usage: AssetConverter batch [outDir]");
+if (args.Length >= 2 && args[0] == "frames")
+{
+    int id = int.Parse(args[1]);
+    var adf = new Goose2.AssetConverter.Adf.AdfFile(Paths.Adf(id));
+    string tres = Goose2.AssetConverter.SpriteFrames.SpriteFramesWriter.Build(
+        adf, $"res://Assets/Sprites/sheets/{id}.png");
+    string outPath = Path.GetFullPath(Path.Combine("..", "..", "Assets", "Sprites", "sheets", $"{id}.frames.tres"));
+    Directory.CreateDirectory(Path.GetDirectoryName(outPath)!);
+    File.WriteAllText(outPath, tres);
+    Console.WriteLine($"Wrote {outPath}");
+    return;
+}
+
+Console.WriteLine("Usage: AssetConverter batch [outDir] | frames <id>");
