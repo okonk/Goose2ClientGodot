@@ -4,6 +4,7 @@ using Xunit;
 
 namespace AssetConverter.Tests;
 
+[Collection("AdfFileCollection")]
 public class AdfFileTests
 {
     [Fact]
