@@ -1,0 +1,28 @@
+# ---- Godot 4+ ----
+.godot/
+/android/
+# Exported / packed builds
+/build/
+/export/
+*.translation
+
+# ---- .NET / C# (Godot C# game project + tools/AssetConverter) ----
+bin/
+obj/
+*.user
+*.suo
+.vs/
+.idea/
+mono_crash.*
+
+# ---- Generated assets (regenerated from ~/code/Illutia via tools/AssetConverter) ----
+# Decoded spritesheets and their Godot SpriteFrames are derived output; regenerate with
+# `dotnet run --project tools/AssetConverter/src/AssetConverter -- batch`. Drop this section
+# if you later decide to commit them for reproducible builds without the source data.
+/Assets/Sprites/sheets/
+
+# ---- OS / editor cruft ----
+.DS_Store
+Thumbs.db
+*.swp
+*~
