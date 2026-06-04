@@ -45,6 +45,11 @@ public class SpriteFramesWriterTests
         Assert.Contains("path=\"res://Assets/Sprites/sheets/115.png\"", tres);
         Assert.Contains("path=\"res://Assets/Sprites/sheets/116.png\"", tres);
         Assert.Equal(2, System.Text.RegularExpressions.Regex.Matches(tres, "ext_resource type=\"Texture2D\"").Count);
+        // ext_resource ids must match ExtResource references
+        Assert.Contains("id=\"Tex_0\"", tres);
+        Assert.Contains("id=\"Tex_1\"", tres);
+        Assert.Contains("ExtResource(\"Tex_0\")", tres);
+        Assert.Contains("ExtResource(\"Tex_1\")", tres);
         Assert.Contains("region = Rect2(0, 0, 24, 48)", tres);
         Assert.Contains("region = Rect2(0, 48, 24, 48)", tres);
         Assert.Contains("\"name\": &\"walk-left\"", tres);

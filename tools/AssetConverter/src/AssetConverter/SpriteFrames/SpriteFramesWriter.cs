@@ -78,19 +78,15 @@ public static class SpriteFramesWriter
         sb.AppendLine("[gd_resource type=\"SpriteFrames\" format=3]");
         sb.AppendLine();
 
-        // Emit ext_resources
-        for (int i = 0; i < texturePaths.Count; i++)
-        {
-            sb.AppendLine($"[ext_resource type=\"Texture2D\" path=\"{texturePaths[i]}\" id=\"{i + 1}\"]");
-        }
-        sb.AppendLine();
-
-        // Map texture path -> ext_resource id
+        // Emit ext_resources with deterministic ids matching ExtResource references
         var pathToId = new Dictionary<string, string>();
         for (int i = 0; i < texturePaths.Count; i++)
         {
-            pathToId[texturePaths[i]] = $"Tex_{i}";
+            string id = $"Tex_{i}";
+            pathToId[texturePaths[i]] = id;
+            sb.AppendLine($"[ext_resource type=\"Texture2D\" path=\"{texturePaths[i]}\" id=\"{id}\"]");
         }
+        sb.AppendLine();
 
         // Emit AtlasTexture sub-resources (one per frame occurrence, no dedup)
         int atlasIndex = 0;
