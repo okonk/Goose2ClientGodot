@@ -119,29 +119,8 @@ public static class AnimationBatchConverter
             {
                 var mergedFirstFrames = AnimationMetadataWriter.MergeFirstFrames(
                     allResources.Select(r => r.AnimationToFirstFrame));
-
-                // Height merge: alias names like "walk-no-equip-left" are shared across
-                // character parts and may have different heights. Use first-wins strategy
-                // with a warning instead of failing on conflict.
-                var mergedHeights = new Dictionary<string, int>();
-                foreach (var resource in allResources)
-                {
-                    foreach (var kvp in resource.AnimationHeights)
-                    {
-                        if (mergedHeights.TryGetValue(kvp.Key, out int existing))
-                        {
-                            if (existing != kvp.Value)
-                            {
-                                warnings.Add($"Height conflict for \"{kvp.Key}\": " +
-                                    $"{existing} vs {kvp.Value} (keeping first)");
-                            }
-                        }
-                        else
-                        {
-                            mergedHeights[kvp.Key] = kvp.Value;
-                        }
-                    }
-                }
+                var mergedHeights = AnimationMetadataWriter.MergeHeights(
+                    allResources.Select(r => r.AnimationHeights));
 
                 string resourcesDir = Path.Combine(outRoot, "Assets", "Resources");
                 AnimationMetadataWriter.Write(resourcesDir, mergedFirstFrames, mergedHeights);
