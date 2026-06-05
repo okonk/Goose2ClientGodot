@@ -9,5 +9,6 @@
   <ItemGroup>
     <Compile Remove="tools/**" />
     <Compile Remove=".godot/**" />
+    <Compile Remove="tests/**" />
   </ItemGroup>
 </Project>
