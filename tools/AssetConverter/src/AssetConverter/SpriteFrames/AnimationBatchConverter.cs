@@ -9,6 +9,7 @@ namespace Goose2.AssetConverter.SpriteFrames;
 /// <summary>Result of a batch animation conversion run.</summary>
 public sealed record AnimationBatchResult(
     int ResourcesWritten,
+    int EffectsWritten,
     int Failed,
     IReadOnlyList<string> Warnings,
     IReadOnlyList<string> Failures);
@@ -28,16 +29,21 @@ public static class AnimationBatchConverter
     /// <param name="compiledEncPath">Path to <c>compiled.enc</c>.</param>
     /// <param name="outRoot">Root directory under which resources and metadata are written.</param>
     /// <param name="only">Optional predicate to select which compiled animations to process.</param>
+    /// <param name="includeEffects">When true, also convert uncompiled ADF animations as effect resources.</param>
+    /// <param name="onlyEffectsFromSheets">Optional filter: only process effects from these sheet file numbers.</param>
     /// <returns>Result with counts of resources written, failures, warnings, and failure details.</returns>
     public static AnimationBatchResult Convert(
         string dataDir,
         string compiledEncPath,
         string outRoot,
-        Func<CompiledAnimation, bool>? only = null)
+        Func<CompiledAnimation, bool>? only = null,
+        bool includeEffects = false,
+        int[]? onlyEffectsFromSheets = null)
     {
         var warnings = new List<string>();
         var failures = new List<string>();
         int resourcesWritten = 0;
+        int effectsWritten = 0;
         int failed = 0;
 
         // 1. Load all ADFs into a dictionary by FileNumber
@@ -63,8 +69,14 @@ public static class AnimationBatchConverter
         }
         catch (Exception ex)
         {
-            return new AnimationBatchResult(0, 1, warnings, new[] { $"Failed to parse compiled.enc: {ex.Message}" });
+            return new AnimationBatchResult(0, 0, 1, warnings, new[] { $"Failed to parse compiled.enc: {ex.Message}" });
         }
+
+        // 2b. Build set of all compiled animation ids (non-zero) to avoid duplicating as effects
+        var compiledAnimationIds = compiled.CompiledAnimations
+            .SelectMany(c => c.AnimationIndexes)
+            .Where(id => id != 0)
+            .ToHashSet();
 
         // 3. For each compiled animation, build a resource
         var allResources = new List<CompiledSpriteFramesResource>();
@@ -112,15 +124,69 @@ public static class AnimationBatchConverter
             }
         }
 
-        // 5. Merge and write metadata (only after all resources are built)
-        if (allResources.Any(r => r.Animations.Count > 0))
+        // 5. Process effect animations (uncompiled ADF animations not in compiled set)
+        var effectHeights = new Dictionary<string, int>();
+        if (includeEffects)
+        {
+            var onlySheets = onlyEffectsFromSheets is not null ? new HashSet<int>(onlyEffectsFromSheets) : null;
+
+            foreach (var adf in adfs.Values)
+            {
+                if (adf.Type != AdfType.Graphic || adf.Animations is null)
+                    continue;
+
+                if (onlySheets is not null && !onlySheets.Contains(adf.FileNumber))
+                    continue;
+
+                foreach (var kvp in adf.Animations)
+                {
+                    int animationId = kvp.Key;
+                    Animation animation = kvp.Value;
+
+                    // Skip if this animation id is already compiled
+                    if (compiledAnimationIds.Contains(animationId))
+                        continue;
+
+                    string effectId = animationId.ToString();
+                    string texturePath = $"res://Assets/Sprites/sheets/{adf.FileNumber}.png";
+                    string relativePath = $"Assets/Sprites/Effects/{effectId}/animations.tres";
+                    string fullPath = Path.Combine(outRoot, relativePath);
+
+                    try
+                    {
+                        var spec = SpriteFramesAnimationSpec.FromFrames(effectId, adf.FileNumber, texturePath, animation.Frames);
+                        Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
+                        string tres = SpriteFramesWriter.Build(new[] { spec });
+                        File.WriteAllText(fullPath, tres);
+                        effectsWritten++;
+
+                        // Record height metadata if max frame height != 64
+                        int maxHeight = animation.Frames.Max(f => f.H);
+                        if (maxHeight != 64)
+                        {
+                            effectHeights[effectId] = maxHeight;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        failed++;
+                        failures.Add($"Effect {effectId}: failed to write {relativePath}: {ex.Message}");
+                    }
+                }
+            }
+        }
+
+        // 6. Merge and write metadata (only after all resources are built)
+        if (allResources.Any(r => r.Animations.Count > 0) || effectHeights.Count > 0)
         {
             try
             {
                 var mergedFirstFrames = AnimationMetadataWriter.MergeFirstFrames(
                     allResources.Select(r => r.AnimationToFirstFrame));
-                var mergedHeights = AnimationMetadataWriter.MergeHeights(
+                var characterHeights = AnimationMetadataWriter.MergeHeights(
                     allResources.Select(r => r.AnimationHeights));
+                var mergedHeights = AnimationMetadataWriter.MergeHeights(
+                    new[] { characterHeights, effectHeights });
 
                 string resourcesDir = Path.Combine(outRoot, "Assets", "Resources");
                 AnimationMetadataWriter.Write(resourcesDir, mergedFirstFrames, mergedHeights);
@@ -132,6 +198,6 @@ public static class AnimationBatchConverter
             }
         }
 
-        return new AnimationBatchResult(resourcesWritten, failed, warnings, failures);
+        return new AnimationBatchResult(resourcesWritten, effectsWritten, failed, warnings, failures);
     }
 }

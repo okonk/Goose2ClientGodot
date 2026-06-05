@@ -8,7 +8,7 @@ if (args.Length >= 1 && args[0] == "animations")
         : Path.GetFullPath(Path.Combine("..", ".."));
 
     var result = AnimationBatchConverter.Convert(
-        Paths.IllutiaData, Paths.CompiledEnc, outRoot);
+        Paths.IllutiaData, Paths.CompiledEnc, outRoot, includeEffects: true);
 
     Console.WriteLine($"Wrote {result.ResourcesWritten} animation resources, {result.Failed} failures -> {outRoot}");
     foreach (var w in result.Warnings) Console.WriteLine($"  WARN {w}");
