@@ -29,6 +29,9 @@ namespace Goose2Client.Network
 
         public void Connect(string address, int port)
         {
+            if (recvThread != null && recvThread.IsAlive)
+                Disconnect();
+
             try
             {
                 packetBuffer = "";
