@@ -4,6 +4,110 @@ using System.IO;
 
 namespace Goose2.AssetConverter.Adf;
 
+public enum AnimationDirection
+{
+    Left,
+    Down,
+    Right,
+    Up
+}
+
+public enum AnimationOrder
+{
+    WalkingNoEquip = 0,
+    WalkingEquip,
+    AttackNoEquip,
+    Attack1Hand,
+    AttackStaff,
+    Attack2Hand,
+    AttackBow,
+    SpellCast,
+    Knealing,
+    Death,
+    Mounted,
+}
+
+public enum AnimationType
+{
+    Body,
+    Hair,
+    Eyes,
+    Chest,
+    Helm,
+    Legs,
+    Feet,
+    Hand
+}
+
+public class CompiledAnimation
+{
+    public AnimationType Type { get; set; }
+    public int Id { get; set; }
+
+    public int[] AnimationIndexes { get; set; }
+
+    public int[] AnimationFiles { get; set; }
+
+    public CompiledAnimation(AnimationType type, int id)
+    {
+        this.Type = type;
+        this.Id = id;
+        this.AnimationIndexes = new int[4 * 11];
+        this.AnimationFiles = new int[11];
+    }
+}
+
+public class CompiledEnc
+{
+    public List<CompiledAnimation> CompiledAnimations { get; private set; }
+    public Dictionary<int, CompiledAnimation> SheetToAnimation { get; private set; }
+
+    public CompiledEnc(string file)
+    {
+        this.CompiledAnimations = new List<CompiledAnimation>();
+        this.SheetToAnimation = new Dictionary<int, CompiledAnimation>();
+
+        using (BinaryReader reader = new BinaryReader(File.Open(file, FileMode.Open)))
+        {
+            while (reader.BaseStream.Position < reader.BaseStream.Length)
+            {
+                AnimationType type = (AnimationType)(reader.ReadInt16() - 1);
+                int id = reader.ReadInt32();
+
+                var animation = new CompiledAnimation(type, id);
+
+                int length = 4;
+                // directions
+                for (int i = 0; i < length; i++)
+                {
+                    for (int k = 0; k < 11; k++)
+                    {
+                        animation.AnimationIndexes[i * 11 + k] = reader.ReadInt32();
+                    }
+                }
+                // files
+                for (int j = 0; j < 11; j++)
+                {
+                    int fileNumber = reader.ReadInt32();
+                    if (fileNumber != 0)
+                    {
+                        this.SheetToAnimation[fileNumber] = animation;
+                    }
+                    animation.AnimationFiles[j] = fileNumber;
+                }
+
+                this.CompiledAnimations.Add(animation);
+            }
+        }
+    }
+
+    public CompiledEnc()
+    {
+        this.CompiledAnimations = new List<CompiledAnimation>();
+        this.SheetToAnimation = new Dictionary<int, CompiledAnimation>();
+    }
+}
+
 public enum AdfType
 {
     Graphic = 1,

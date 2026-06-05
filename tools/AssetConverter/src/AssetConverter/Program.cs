@@ -1,4 +1,21 @@
 using Goose2.AssetConverter;
+using Goose2.AssetConverter.Maps;
+using Goose2.AssetConverter.SpriteFrames;
+
+if (args.Length >= 1 && args[0] == "animations")
+{
+    string outRoot = args.Length >= 2
+        ? args[1]
+        : Path.GetFullPath(Path.Combine("..", ".."));
+
+    var result = AnimationBatchConverter.Convert(
+        Paths.IllutiaData, Paths.CompiledEnc, outRoot, includeEffects: true);
+
+    Console.WriteLine($"Wrote {result.ResourcesWritten} animation resources, {result.Failed} failures -> {outRoot}");
+    foreach (var w in result.Warnings) Console.WriteLine($"  WARN {w}");
+    foreach (var f in result.Failures) Console.WriteLine($"  FAIL {f}");
+    return;
+}
 
 if (args.Length >= 1 && args[0] == "batch")
 {
@@ -25,4 +42,36 @@ if (args.Length >= 2 && args[0] == "frames")
     return;
 }
 
-Console.WriteLine("Usage: AssetConverter batch [outDir] | frames <id>");
+if (args.Length >= 1 && args[0] == "maps")
+{
+    string outDir = args.Length >= 2
+        ? args[1]
+        : Path.GetFullPath(Path.Combine("..", "..", "Assets", "Maps"));
+
+    var result = MapCopyConverter.Convert(Paths.IllutiaMaps, outDir);
+    Console.WriteLine($"Copied {result.Copied} maps -> {outDir}");
+    foreach (var f in result.Failures) Console.WriteLine($"  FAIL {f}");
+    return;
+}
+
+if (args.Length >= 1 && args[0] == "all")
+{
+    string repoRoot = args.Length >= 2
+        ? args[1]
+        : Path.GetFullPath(Path.Combine("..", ".."));
+
+    var sheetsDir = Path.Combine(repoRoot, "Assets", "Sprites", "sheets");
+    var mapsDir = Path.Combine(repoRoot, "Assets", "Maps");
+
+    var sheets = BatchConverter.Convert(Paths.IllutiaData, sheetsDir);
+    var animations = AnimationBatchConverter.Convert(
+        Paths.IllutiaData, Paths.CompiledEnc, repoRoot, includeEffects: true);
+    var maps = MapCopyConverter.Convert(Paths.IllutiaMaps, mapsDir);
+
+    Console.WriteLine($"Sheets: {sheets.Succeeded} ok, {sheets.Failed} failed");
+    Console.WriteLine($"Animations: {animations.ResourcesWritten} character, {animations.EffectsWritten} effects, {animations.Failed} failed");
+    Console.WriteLine($"Maps: {maps.Copied} copied, {maps.Failures.Count} failed");
+    return;
+}
+
+Console.WriteLine("Usage: AssetConverter batch [outDir] | frames <id> | animations [repoRoot] | maps [outDir] | all [repoRoot]");
