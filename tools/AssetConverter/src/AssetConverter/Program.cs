@@ -1,4 +1,5 @@
 using Goose2.AssetConverter;
+using Goose2.AssetConverter.Maps;
 using Goose2.AssetConverter.SpriteFrames;
 
 if (args.Length >= 1 && args[0] == "animations")
@@ -41,4 +42,16 @@ if (args.Length >= 2 && args[0] == "frames")
     return;
 }
 
-Console.WriteLine("Usage: AssetConverter batch [outDir] | frames <id> | animations [outRoot]");
+if (args.Length >= 1 && args[0] == "maps")
+{
+    string outDir = args.Length >= 2
+        ? args[1]
+        : Path.GetFullPath(Path.Combine("..", "..", "Assets", "Maps"));
+
+    var result = MapCopyConverter.Convert(Paths.IllutiaMaps, outDir);
+    Console.WriteLine($"Copied {result.Copied} maps -> {outDir}");
+    foreach (var f in result.Failures) Console.WriteLine($"  FAIL {f}");
+    return;
+}
+
+Console.WriteLine("Usage: AssetConverter batch [outDir] | frames <id> | animations [outRoot] | maps [outDir]");
