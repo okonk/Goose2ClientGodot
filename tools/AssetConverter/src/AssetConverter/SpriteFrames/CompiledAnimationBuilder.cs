@@ -22,6 +22,7 @@ public static class CompiledAnimationBuilder
 
         string typeFolder = AnimationNaming.TypeFolder(compiledAnimation.Type);
         string relativePath = $"Assets/Sprites/{typeFolder}/{compiledAnimation.Id}/animations.tres";
+        string heightPrefix = $"{compiledAnimation.Type}-{compiledAnimation.Id}-";
 
         for (int animationNumber = 0; animationNumber < 11; animationNumber++)
         {
@@ -70,11 +71,11 @@ public static class CompiledAnimationBuilder
                 var spec = SpriteFramesAnimationSpec.FromFrames(clipName, fileNumber, texturePath, frames);
                 animations.Add(spec);
 
-                // Record height metadata if not 64
+                // Record height metadata if not 64 (scoped by Type-Id for global uniqueness)
                 int maxHeight = frames.Max(f => f.H);
                 if (maxHeight != 64)
                 {
-                    animationHeights[clipName] = maxHeight;
+                    animationHeights[$"{heightPrefix}{clipName}"] = maxHeight;
                 }
 
                 // Add compatibility aliases
@@ -85,7 +86,7 @@ public static class CompiledAnimationBuilder
                     animations.Add(aliasSpec);
                     if (maxHeight != 64)
                     {
-                        animationHeights[alias] = maxHeight;
+                        animationHeights[$"{heightPrefix}{alias}"] = maxHeight;
                     }
                 }
 
@@ -108,7 +109,7 @@ public static class CompiledAnimationBuilder
                     int idleHeight = firstFrame.H;
                     if (idleHeight != 64)
                     {
-                        animationHeights[idleName] = idleHeight;
+                        animationHeights[$"{heightPrefix}{idleName}"] = idleHeight;
                     }
 
                     // Simple idle compatibility alias for WalkingNoEquip only
@@ -119,7 +120,7 @@ public static class CompiledAnimationBuilder
                         animations.Add(simpleIdleSpec);
                         if (idleHeight != 64)
                         {
-                            animationHeights[simpleIdleName] = idleHeight;
+                            animationHeights[$"{heightPrefix}{simpleIdleName}"] = idleHeight;
                         }
                     }
                 }

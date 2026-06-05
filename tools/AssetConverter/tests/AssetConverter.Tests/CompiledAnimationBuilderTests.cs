@@ -29,8 +29,8 @@ public class CompiledAnimationBuilderTests
         Assert.Equal("Body-1", first.Key);
         Assert.Equal(new AnimationFrameInfo(115, 3205, 24, 48), first.Value);
 
-        Assert.Equal(48, result.AnimationHeights["walk-no-equip-left"]);
-        Assert.Equal(48, result.AnimationHeights["idle-no-equip-left"]);
+        Assert.Equal(48, result.AnimationHeights["Body-1-walk-no-equip-left"]);
+        Assert.Equal(48, result.AnimationHeights["Body-1-idle-no-equip-left"]);
         Assert.DoesNotContain(result.AnimationHeights, kvp => kvp.Value == 64);
     }
 
