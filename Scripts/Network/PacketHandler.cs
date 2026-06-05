@@ -1,12 +1,15 @@
 using System;
-using System.Collections;
 using System.Collections.Generic;
 
 namespace Goose2Client.Network
 {
     public abstract class PacketHandler
     {
+        public abstract string Prefix { get; }
+
         public List<Action<object>> Observers = new();
+
+        public abstract object Parse(PacketParser p);
 
         public virtual void CallObservers(object obj)
         {
