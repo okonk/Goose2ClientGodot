@@ -54,4 +54,24 @@ if (args.Length >= 1 && args[0] == "maps")
     return;
 }
 
-Console.WriteLine("Usage: AssetConverter batch [outDir] | frames <id> | animations [outRoot] | maps [outDir]");
+if (args.Length >= 1 && args[0] == "all")
+{
+    string repoRoot = args.Length >= 2
+        ? args[1]
+        : Path.GetFullPath(Path.Combine("..", ".."));
+
+    var sheetsDir = Path.Combine(repoRoot, "Assets", "Sprites", "sheets");
+    var mapsDir = Path.Combine(repoRoot, "Assets", "Maps");
+
+    var sheets = BatchConverter.Convert(Paths.IllutiaData, sheetsDir);
+    var animations = AnimationBatchConverter.Convert(
+        Paths.IllutiaData, Paths.CompiledEnc, repoRoot, includeEffects: true);
+    var maps = MapCopyConverter.Convert(Paths.IllutiaMaps, mapsDir);
+
+    Console.WriteLine($"Sheets: {sheets.Succeeded} ok, {sheets.Failed} failed");
+    Console.WriteLine($"Animations: {animations.ResourcesWritten} character, {animations.EffectsWritten} effects, {animations.Failed} failed");
+    Console.WriteLine($"Maps: {maps.Copied} copied, {maps.Failures.Count} failed");
+    return;
+}
+
+Console.WriteLine("Usage: AssetConverter batch [outDir] | frames <id> | animations [repoRoot] | maps [outDir] | all [repoRoot]");
