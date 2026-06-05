@@ -107,17 +107,22 @@ public static class SpriteFramesWriter
 
         // Emit resource with animations
         sb.AppendLine("[resource]");
-        sb.AppendLine("animations = [{");
+        sb.Append("animations = [");
 
         int frameCursor = 0;
         for (int a = 0; a < animList.Count; a++)
         {
             var anim = animList[a];
-            if (a > 0) sb.Append(",");
-            sb.AppendLine();
-            sb.Append("{");
-            sb.Append("\"frames\": [");
+            if (a == 0)
+            {
+                sb.Append("{");
+            }
+            else
+            {
+                sb.Append("}, {");
+            }
 
+            sb.Append("\"frames\": [");
             for (int f = 0; f < anim.Frames.Count; f++)
             {
                 if (f > 0) sb.Append(", ");
@@ -125,16 +130,13 @@ public static class SpriteFramesWriter
                 sb.Append($"{{\"duration\": 1.0, \"texture\": SubResource(\"{atlasId}\")}}");
                 frameCursor++;
             }
-
-            sb.AppendLine("],");
-            sb.AppendLine($"\"loop\": {(anim.Loop ? "true" : "false")},");
-            sb.AppendLine($"\"name\": &\"{anim.Name}\",");
-            sb.AppendLine($"\"speed\": {anim.Speed:0.0}");
-            sb.Append("}");
+            sb.Append("],");
+            sb.Append($"\"loop\": {(anim.Loop ? "true" : "false")},");
+            sb.Append($"\"name\": &\"{anim.Name}\",");
+            sb.Append($"\"speed\": {anim.Speed:0.0}");
         }
 
-        sb.AppendLine();
-        sb.AppendLine("]");
+        sb.AppendLine("}]");
 
         return sb.ToString();
     }

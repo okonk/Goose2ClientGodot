@@ -55,6 +55,14 @@ public class SpriteFramesWriterTests
         Assert.Contains("\"name\": &\"walk-left\"", tres);
         Assert.Contains("\"name\": &\"walk-down\"", tres);
         Assert.Contains("\"name\": &\"walk-equip-left\"", tres);
+
+        // Assert valid multi-animation array syntax: no malformed double-open braces
+        Assert.DoesNotContain("animations = [{\n\n{", tres);
+        Assert.DoesNotContain("animations = [{\n{", tres);
+        // Must have exactly 3 animation name entries (one per animation object)
+        Assert.Equal(3, System.Text.RegularExpressions.Regex.Matches(tres, "\"name\": &\"").Count);
+        // The resource section should end with "}]" (valid array close)
+        Assert.EndsWith("}]\n", tres);
     }
 
     [Fact]
