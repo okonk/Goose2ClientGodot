@@ -259,7 +259,7 @@ animation frame sequences, and maps. **Split it: keep the parsing, replace the U
 | `SpriteAtlas` | Sprite lookup by id | `AtlasTexture` regions over spritesheet PNGs |
 | `Animator` / `AnimatorOverrideController` | Character animation | `AnimatedSprite2D` + `SpriteFrames` + C# state logic |
 | Tilemap modules | Map layers | `TileMapLayer` + `TileSet` |
-| `com.unity.nuget.newtonsoft-json` | JSON (settings, item data) | Keep Newtonsoft via NuGet, **or** Godot `Json`/`System.Text.Json` |
+| `com.unity.nuget.newtonsoft-json` | JSON (settings, item data) | `System.Text.Json` — **note**: `Dictionary<string,object>` values deserialize to `JsonElement` (not boxed primitives); reads must convert via `JsonElement` |
 
 ---
 
