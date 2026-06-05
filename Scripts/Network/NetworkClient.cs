@@ -29,8 +29,12 @@ namespace Goose2Client.Network
 
         public void Connect(string address, int port)
         {
-            if (recvThread != null && recvThread.IsAlive)
-                Disconnect();
+            // Always tear down any prior connection first. This is unconditional (not gated on
+            // recvThread.IsAlive) because a receive thread that exited on its own (e.g. the server
+            // closed the connection -> Receive returned 0) leaves the old socket open; calling
+            // Disconnect() here closes it and prevents a socket/FD leak across reconnects.
+            // Disconnect() is idempotent and safe when there is nothing to tear down.
+            Disconnect();
 
             try
             {
@@ -115,9 +119,13 @@ namespace Goose2Client.Network
             {
                 if (running)   // only surface errors that aren't from our own Disconnect()
                 {
-                    GD.Print($"Network Exception: {e}");
-                    // marshal the error event to the main thread
-                    Callable.From(() => SocketError?.Invoke(e)).CallDeferred();
+                    // marshal the log + error event to the main thread (the receive thread must not
+                    // touch Godot APIs like GD.Print directly)
+                    Callable.From(() =>
+                    {
+                        GD.Print($"Network Exception: {e}");
+                        SocketError?.Invoke(e);
+                    }).CallDeferred();
                 }
             }
         }
