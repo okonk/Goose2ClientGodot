@@ -1,211 +1,344 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene load_steps=3 format=3]
 
 [ext_resource type="Script" path="res://Scripts/UI/CharacterWindow.cs" id="1_cw"]
+[ext_resource type="Theme" path="res://Assets/UI/GameTheme.tres" id="theme"]
+[ext_resource type="Texture2D" path="res://Assets/UI/character.png" id="bg_tex"]
+[ext_resource type="Texture2D" path="res://Assets/UI/exitbutton.png" id="close_icon"]
 
 [node name="CharacterWindow" type="Control"]
 script = ExtResource("1_cw")
+theme = ExtResource("theme")
 layout_mode = 3
-offset_left = 100.0
-offset_top = 100.0
-offset_right = 380.0
-offset_bottom = 520.0
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 400.0
+offset_bottom = 222.0
 WindowName = "Character"
 
-[node name="Background" type="Panel" parent="."]
+[node name="Background" type="TextureRect" parent="."]
 layout_mode = 2
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
+texture = ExtResource("bg_tex")
+mouse_filter = 2
 
-[node name="TitleBar" type="Panel" parent="."]
-layout_mode = 2
-anchors_preset = 10
-anchor_right = 1.0
-offset_bottom = 24.0
-mouse_filter = 0
-
-[node name="TitleLabel" type="Label" parent="TitleBar"]
+[node name="TitleBar" type="Control" parent="."]
 layout_mode = 2
 anchors_preset = 10
 anchor_right = 0.0
-offset_left = 4.0
-offset_top = 2.0
-offset_bottom = 22.0
-mouse_filter = 1
-text = "Character"
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 400.0
+offset_bottom = 19.0
+mouse_filter = 0
 
 [node name="CloseButton" type="Button" parent="TitleBar"]
 layout_mode = 2
-anchors_preset = 6
-anchor_bottom = 1.0
-offset_left = -18.0
-offset_top = 2.0
-offset_right = -2.0
-offset_bottom = 22.0
-text = "X"
+anchors_preset = 0
+offset_left = 384.0
+offset_top = 1.0
+offset_right = 400.0
+offset_bottom = 17.0
+flat = true
+icon = ExtResource("close_icon")
+expand_icon = true
 
 [node name="Content" type="Control" parent="."]
 layout_mode = 2
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_top = 24.0
 mouse_filter = 1
 
-[node name="SlotGrid" type="GridContainer" parent="Content"]
+[node name="SlotGrid" type="Control" parent="Content"]
 layout_mode = 2
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 mouse_filter = 1
-columns = 7
 
 [node name="NameText" type="Label" parent="Content"]
 layout_mode = 2
-anchors_preset = 10
-anchor_right = 1.0
-offset_top = 240.0
-offset_bottom = 256.0
+anchors_preset = 0
+offset_left = 204.0
+offset_top = 29.0
+offset_right = 305.0
+offset_bottom = 40.0
 mouse_filter = 1
 text = "—"
 horizontal_alignment = 1
 
 [node name="LevelClassText" type="Label" parent="Content"]
 layout_mode = 2
-anchors_preset = 10
-anchor_right = 1.0
-offset_top = 256.0
-offset_bottom = 272.0
+anchors_preset = 0
+offset_left = 204.0
+offset_top = 40.0
+offset_right = 306.0
+offset_bottom = 51.0
 mouse_filter = 1
 text = "Level 1"
 horizontal_alignment = 1
 
 [node name="GuildText" type="Label" parent="Content"]
 layout_mode = 2
-anchors_preset = 10
-anchor_right = 1.0
-offset_top = 272.0
-offset_bottom = 288.0
+anchors_preset = 0
+offset_left = 204.0
+offset_top = 51.0
+offset_right = 288.0
+offset_bottom = 63.0
 mouse_filter = 1
 text = "No Guild"
 horizontal_alignment = 1
 
+[node name="ExperienceLabel" type="Label" parent="Content"]
+layout_mode = 2
+anchors_preset = 0
+offset_left = 204.0
+offset_top = 74.0
+offset_right = 276.0
+offset_bottom = 85.0
+mouse_filter = 1
+text = "Experience"
+
 [node name="ExperienceText" type="Label" parent="Content"]
 layout_mode = 2
-anchors_preset = 10
-anchor_right = 1.0
-offset_top = 288.0
-offset_bottom = 304.0
+anchors_preset = 0
+offset_left = 304.0
+offset_top = 74.0
+offset_right = 360.0
+offset_bottom = 85.0
 mouse_filter = 1
 text = "0"
-horizontal_alignment = 1
+horizontal_alignment = 2
+
+[node name="ExperienceSoldLabel" type="Label" parent="Content"]
+layout_mode = 2
+anchors_preset = 0
+offset_left = 204.0
+offset_top = 85.0
+offset_right = 300.0
+offset_bottom = 96.0
+mouse_filter = 1
+text = "Exp Sold"
 
 [node name="ExperienceSoldText" type="Label" parent="Content"]
 layout_mode = 2
-anchors_preset = 10
-anchor_right = 1.0
-offset_top = 304.0
-offset_bottom = 320.0
+anchors_preset = 0
+offset_left = 304.0
+offset_top = 85.0
+offset_right = 399.0
+offset_bottom = 96.0
 mouse_filter = 1
 text = "0"
-horizontal_alignment = 1
+horizontal_alignment = 2
+
+[node name="StrengthLabel" type="Label" parent="Content"]
+layout_mode = 2
+anchors_preset = 0
+offset_left = 204.0
+offset_top = 107.0
+offset_right = 264.0
+offset_bottom = 118.0
+mouse_filter = 1
+text = "Strength"
 
 [node name="StrengthText" type="Label" parent="Content"]
 layout_mode = 2
-anchors_preset = 10
-anchor_right = 1.0
-offset_top = 320.0
-offset_bottom = 336.0
+anchors_preset = 0
+offset_left = 264.0
+offset_top = 107.0
+offset_right = 294.0
+offset_bottom = 118.0
 mouse_filter = 1
 text = "0"
-horizontal_alignment = 1
+horizontal_alignment = 2
+
+[node name="StaminaLabel" type="Label" parent="Content"]
+layout_mode = 2
+anchors_preset = 0
+offset_left = 204.0
+offset_top = 118.0
+offset_right = 264.0
+offset_bottom = 129.0
+mouse_filter = 1
+text = "Stamina"
 
 [node name="StaminaText" type="Label" parent="Content"]
 layout_mode = 2
-anchors_preset = 10
-anchor_right = 1.0
-offset_top = 336.0
-offset_bottom = 352.0
+anchors_preset = 0
+offset_left = 264.0
+offset_top = 118.0
+offset_right = 294.0
+offset_bottom = 129.0
 mouse_filter = 1
 text = "0"
-horizontal_alignment = 1
+horizontal_alignment = 2
+
+[node name="IntelligenceLabel" type="Label" parent="Content"]
+layout_mode = 2
+anchors_preset = 0
+offset_left = 204.0
+offset_top = 130.0
+offset_right = 264.0
+offset_bottom = 141.0
+mouse_filter = 1
+text = "Intelligence"
 
 [node name="IntelligenceText" type="Label" parent="Content"]
 layout_mode = 2
-anchors_preset = 10
-anchor_right = 1.0
-offset_top = 352.0
-offset_bottom = 368.0
+anchors_preset = 0
+offset_left = 264.0
+offset_top = 130.0
+offset_right = 294.0
+offset_bottom = 141.0
 mouse_filter = 1
 text = "0"
-horizontal_alignment = 1
+horizontal_alignment = 2
+
+[node name="DexterityLabel" type="Label" parent="Content"]
+layout_mode = 2
+anchors_preset = 0
+offset_left = 204.0
+offset_top = 141.0
+offset_right = 264.0
+offset_bottom = 152.0
+mouse_filter = 1
+text = "Dexterity"
 
 [node name="DexterityText" type="Label" parent="Content"]
 layout_mode = 2
-anchors_preset = 10
-anchor_right = 1.0
-offset_top = 368.0
-offset_bottom = 384.0
+anchors_preset = 0
+offset_left = 264.0
+offset_top = 141.0
+offset_right = 294.0
+offset_bottom = 152.0
 mouse_filter = 1
 text = "0"
-horizontal_alignment = 1
+horizontal_alignment = 2
+
+[node name="ArmorLabel" type="Label" parent="Content"]
+layout_mode = 2
+anchors_preset = 0
+offset_left = 204.0
+offset_top = 152.0
+offset_right = 264.0
+offset_bottom = 163.0
+mouse_filter = 1
+text = "Armor"
 
 [node name="ACText" type="Label" parent="Content"]
 layout_mode = 2
-anchors_preset = 10
-anchor_right = 1.0
-offset_top = 384.0
-offset_bottom = 400.0
+anchors_preset = 0
+offset_left = 264.0
+offset_top = 152.0
+offset_right = 294.0
+offset_bottom = 163.0
 mouse_filter = 1
 text = "0"
-horizontal_alignment = 1
+horizontal_alignment = 2
+
+[node name="FireLabel" type="Label" parent="Content"]
+layout_mode = 2
+anchors_preset = 0
+offset_left = 304.0
+offset_top = 107.0
+offset_right = 364.0
+offset_bottom = 118.0
+mouse_filter = 1
+text = "Fire"
 
 [node name="FireResistText" type="Label" parent="Content"]
 layout_mode = 2
-anchors_preset = 10
-anchor_right = 1.0
-offset_top = 400.0
-offset_bottom = 416.0
+anchors_preset = 0
+offset_left = 364.0
+offset_top = 107.0
+offset_right = 394.0
+offset_bottom = 118.0
 mouse_filter = 1
 text = "0"
-horizontal_alignment = 1
+horizontal_alignment = 2
+
+[node name="WaterLabel" type="Label" parent="Content"]
+layout_mode = 2
+anchors_preset = 0
+offset_left = 304.0
+offset_top = 118.0
+offset_right = 364.0
+offset_bottom = 129.0
+mouse_filter = 1
+text = "Water"
 
 [node name="WaterResistText" type="Label" parent="Content"]
 layout_mode = 2
-anchors_preset = 10
-anchor_right = 1.0
-offset_top = 416.0
-offset_bottom = 432.0
+anchors_preset = 0
+offset_left = 364.0
+offset_top = 118.0
+offset_right = 394.0
+offset_bottom = 129.0
 mouse_filter = 1
 text = "0"
-horizontal_alignment = 1
+horizontal_alignment = 2
+
+[node name="EarthLabel" type="Label" parent="Content"]
+layout_mode = 2
+anchors_preset = 0
+offset_left = 304.0
+offset_top = 130.0
+offset_right = 364.0
+offset_bottom = 141.0
+mouse_filter = 1
+text = "Earth"
 
 [node name="EarthResistText" type="Label" parent="Content"]
 layout_mode = 2
-anchors_preset = 10
-anchor_right = 1.0
-offset_top = 432.0
-offset_bottom = 448.0
+anchors_preset = 0
+offset_left = 364.0
+offset_top = 130.0
+offset_right = 394.0
+offset_bottom = 141.0
 mouse_filter = 1
 text = "0"
-horizontal_alignment = 1
+horizontal_alignment = 2
+
+[node name="AirLabel" type="Label" parent="Content"]
+layout_mode = 2
+anchors_preset = 0
+offset_left = 304.0
+offset_top = 141.0
+offset_right = 364.0
+offset_bottom = 152.0
+mouse_filter = 1
+text = "Air"
 
 [node name="AirResistText" type="Label" parent="Content"]
 layout_mode = 2
-anchors_preset = 10
-anchor_right = 1.0
-offset_top = 448.0
-offset_bottom = 464.0
+anchors_preset = 0
+offset_left = 364.0
+offset_top = 141.0
+offset_right = 394.0
+offset_bottom = 152.0
 mouse_filter = 1
 text = "0"
-horizontal_alignment = 1
+horizontal_alignment = 2
+
+[node name="SpiritLabel" type="Label" parent="Content"]
+layout_mode = 2
+anchors_preset = 0
+offset_left = 304.0
+offset_top = 152.0
+offset_right = 364.0
+offset_bottom = 163.0
+mouse_filter = 1
+text = "Spirit"
 
 [node name="SpiritResistText" type="Label" parent="Content"]
 layout_mode = 2
-anchors_preset = 10
-anchor_right = 1.0
-offset_top = 464.0
-offset_bottom = 480.0
+anchors_preset = 0
+offset_left = 364.0
+offset_top = 152.0
+offset_right = 394.0
+offset_bottom = 163.0
 mouse_filter = 1
 text = "0"
-horizontal_alignment = 1
+horizontal_alignment = 2
