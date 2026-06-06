@@ -3,6 +3,7 @@ using Godot;
 using Goose2Client.Map;
 using Goose2Client.Network;
 using Goose2Client.Network.Packets;
+using Goose2Client.UI;
 
 namespace Goose2Client
 {
@@ -42,6 +43,9 @@ namespace Goose2Client
 
         /// <summary>The active MapManager node, set/cleared by MapManager itself.</summary>
         public MapManager CurrentMapManager { get; set; }
+
+        /// <summary>The persistent HUD root, instantiated once under UiLayer.</summary>
+        public GameHud Hud { get; private set; }
 
         public override void _EnterTree()
         {
@@ -157,6 +161,14 @@ namespace Goose2Client
 
         /// <summary>Quit the game (used by Toolbar Exit button).</summary>
         public void Quit() => GetTree().Quit();
+
+        /// <summary>Instantiate the persistent HUD under the UI layer once; survives map swaps.</summary>
+        public void EnsureHud()
+        {
+            if (Hud != null && GodotObject.IsInstanceValid(Hud)) return;
+            Hud = GD.Load<PackedScene>("res://Scenes/UI/GameHud.tscn").Instantiate<GameHud>();
+            UiLayer.AddChild(Hud);
+        }
 
         public override void _ExitTree()
         {

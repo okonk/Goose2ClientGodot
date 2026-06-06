@@ -65,6 +65,7 @@ public partial class MapManager : Node2D
         _listenersRegistered = true;
 
         GameManager.Instance.CurrentMapManager = this;
+        GameManager.Instance.EnsureHud();
     }
 
     public override void _ExitTree()
