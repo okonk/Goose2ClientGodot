@@ -178,6 +178,22 @@ public partial class MapManager : Node2D
         }
     }
 
+    public override void _UnhandledInput(InputEvent @event)
+    {
+        if (@event is not InputEventMouseButton mb || !mb.Pressed) return;
+        if (mb.ButtonIndex != MouseButton.Left && mb.ButtonIndex != MouseButton.Right) return;
+
+        var (tx, ty) = MapCoords.WorldToTile(GetGlobalMousePosition());
+
+        // Clicking a character lands on its tile, so the server resolves it by coords (same as a map-tile click).
+        // TODO(step8): sprite-accurate character body hit-testing + map-item hover tooltip
+        // (deferred: MapItem doesn't carry ItemStats and the Control-parent tooltip lifetime doesn't fit world Sprite2Ds).
+        if (mb.ButtonIndex == MouseButton.Left)
+            GameManager.Instance.NetworkClient.LeftClick(tx, ty);
+        else
+            GameManager.Instance.NetworkClient.RightClick(tx, ty);
+    }
+
     private void CenterCameraOn(int x, int y)
     {
         _camera.GlobalPosition = MapCoords.TileCenter(x, y);
