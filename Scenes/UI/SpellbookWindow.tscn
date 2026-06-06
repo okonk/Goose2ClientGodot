@@ -1,84 +1,88 @@
-[gd_scene load_steps=3 format=3]
+[gd_scene load_steps=8 format=3]
 
 [ext_resource type="Script" path="res://Scripts/UI/SpellbookWindow.cs" id="1_sb"]
 [ext_resource type="Script" path="res://Scripts/UI/SpellbookButton.cs" id="2_sbb"]
+[ext_resource type="Theme" path="res://Assets/UI/GameTheme.tres" id="theme"]
+[ext_resource type="Texture2D" path="res://Assets/UI/spellbook-background.png" id="bg_tex"]
+[ext_resource type="Texture2D" path="res://Assets/UI/exitbutton.png" id="close_icon"]
+[ext_resource type="Texture2D" path="res://Assets/UI/spellbook-back.png" id="back_icon"]
+[ext_resource type="Texture2D" path="res://Assets/UI/spellbook-next.png" id="next_icon"]
 
 [node name="SpellbookWindow" type="Control"]
 script = ExtResource("1_sb")
+theme = ExtResource("theme")
 layout_mode = 3
-offset_left = 100.0
-offset_top = 100.0
-offset_right = 360.0
-offset_bottom = 440.0
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 128.0
+offset_bottom = 196.0
 WindowName = "Spellbook"
 
-[node name="Background" type="Panel" parent="."]
+[node name="Background" type="TextureRect" parent="."]
 layout_mode = 2
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
+texture = ExtResource("bg_tex")
+mouse_filter = 2
 
-[node name="TitleBar" type="Panel" parent="."]
-layout_mode = 2
-anchors_preset = 10
-anchor_right = 1.0
-offset_bottom = 24.0
-mouse_filter = 0
-
-[node name="TitleLabel" type="Label" parent="TitleBar"]
+[node name="TitleBar" type="Control" parent="."]
 layout_mode = 2
 anchors_preset = 10
 anchor_right = 0.0
-offset_left = 4.0
-offset_top = 2.0
-offset_bottom = 22.0
-mouse_filter = 1
-text = "Spellbook"
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 128.0
+offset_bottom = 19.0
+mouse_filter = 0
 
 [node name="CloseButton" type="Button" parent="TitleBar"]
 layout_mode = 2
-anchors_preset = 6
-anchor_bottom = 1.0
-offset_left = -18.0
+anchors_preset = 0
+offset_left = 111.0
 offset_top = 2.0
-offset_right = -2.0
-offset_bottom = 22.0
-text = "X"
+offset_right = 127.0
+offset_bottom = 18.0
+flat = true
+icon = ExtResource("close_icon")
+expand_icon = true
 
 [node name="Content" type="Control" parent="."]
 layout_mode = 2
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_top = 24.0
 mouse_filter = 1
 
 [node name="Pages" type="Control" parent="Content"]
 layout_mode = 2
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
+anchors_preset = 0
+offset_left = 1.0
+offset_top = 19.0
+offset_right = 127.0
+offset_bottom = 195.0
 mouse_filter = 1
 
 [node name="BackButton" type="Button" parent="Content"]
 script = ExtResource("2_sbb")
 layout_mode = 2
-anchors_preset = 7
-anchor_bottom = 1.0
-offset_left = 4.0
-offset_top = -24.0
-offset_right = 44.0
-offset_bottom = -4.0
-text = "<"
+anchors_preset = 0
+offset_left = 2.0
+offset_top = 170.0
+offset_right = 26.0
+offset_bottom = 194.0
+flat = true
+icon = ExtResource("back_icon")
+expand_icon = true
 
 [node name="NextButton" type="Button" parent="Content"]
 script = ExtResource("2_sbb")
 layout_mode = 2
-anchors_preset = 3
-anchor_right = 1.0
-anchor_bottom = 1.0
-offset_left = -44.0
-offset_top = -24.0
-offset_right = -4.0
-offset_bottom = -4.0
-text = ">"
+anchors_preset = 0
+offset_left = 102.0
+offset_top = 170.0
+offset_right = 126.0
+offset_bottom = 194.0
+flat = true
+icon = ExtResource("next_icon")
+expand_icon = true
