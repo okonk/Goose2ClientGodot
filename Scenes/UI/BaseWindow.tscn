@@ -10,13 +10,14 @@ offset_top = 100.0
 offset_right = 320.0
 offset_bottom = 260.0
 
-[node name="Background" type="Panel" parent="."]
+[node name="Background" type="TextureRect" parent="."]
 layout_mode = 2
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
+mouse_filter = 2
 
-[node name="TitleBar" type="Panel" parent="."]
+[node name="TitleBar" type="Control" parent="."]
 layout_mode = 2
 anchors_preset = 10
 anchor_right = 1.0
