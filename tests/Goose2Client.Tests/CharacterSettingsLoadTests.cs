@@ -5,6 +5,20 @@ namespace Goose2Client.Tests
     public class CharacterSettingsLoadTests
     {
         [Fact]
+        public void FromJson_NullInput_DoesNotThrowAndReturnsDefaults()
+        {
+            // Act
+            var result = CharacterSettings.FromJson(null!);
+
+            // Assert — no throw, all fields defaulted
+            Assert.NotNull(result);
+            Assert.NotNull(result.Hotkeys);
+            Assert.InRange(result.Hotkeys.Length, 30, int.MaxValue);
+            Assert.NotNull(result.WindowSettings);
+            Assert.NotNull(result.Options);
+        }
+
+        [Fact]
         public void FromJson_CorruptJson_DoesNotThrowAndReturnsDefaults()
         {
             // Act

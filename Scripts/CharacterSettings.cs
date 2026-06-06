@@ -104,7 +104,7 @@ namespace Goose2Client
         {
             CharacterSettings result;
             try { result = JsonSerializer.Deserialize<CharacterSettings>(json, JsonOptions); }
-            catch (JsonException) { result = null; }
+            catch (System.Exception) { result = null; }
             result ??= new CharacterSettings();
             result.ApplyDefaults();
             return result;
