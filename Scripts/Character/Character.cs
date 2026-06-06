@@ -137,17 +137,48 @@ namespace Goose2Client.Character
             PlayCurrent();
         }
 
-        // Default stubs replaced in Task 7 (IsMoving) and Task 8 (AttackLocked); keep compilable.
-        protected bool IsMoving => false;
+        private Vector2 _targetPosition;
+        private bool _moving;
+        protected bool IsMoving => _moving;   // replaces the Task 6 stub
         protected bool AttackLocked => false;
 
-        // TEMPORARY: standalone placeholder for Task 6 only. Task 7 will REPLACE this with the
-        // real TeleportTo (and add _targetPosition/_moving/_Process). Keep the signature identical.
-        private void TeleportTo(int x, int y)
+        /// <summary>Server (or local prediction) says this character stepped to (x,y).</summary>
+        public void MoveTo(int x, int y)
+        {
+            if (x != X) Facing = x > X ? Direction.Right : Direction.Left;
+            else if (y != Y) Facing = y > Y ? Direction.Down : Direction.Up;
+            X = x; Y = y;
+            _targetPosition = Goose2Client.Map.MapCoords.TileBottomCenter(x, y);
+            _moving = true;
+            ApplyDrawOrder();   // facing may have changed -> reorder shield/weapon
+            PlayState();
+        }
+
+        /// <summary>Instant placement (spawn / SUP teleport) — no walk animation.</summary>
+        public void TeleportTo(int x, int y)
         {
             X = x; Y = y;
             Position = Goose2Client.Map.MapCoords.TileBottomCenter(x, y);
+            _targetPosition = Position;
+            _moving = false;
         }
+
+        public override void _Process(double delta)
+        {
+            if (_moving)
+            {
+                float speed = CharacterMotion.PixelsPerSecond(MoveSpeed);
+                Position = Position.MoveToward(_targetPosition, speed * (float)delta);
+                if (Position.IsEqualApprox(_targetPosition))
+                {
+                    _moving = false;
+                    PlayState();   // back to idle/mounted-idle
+                }
+            }
+            TickAttackLock(delta);   // defined in Task 8
+        }
+
+        protected virtual void TickAttackLock(double delta) { }
 
         /// <summary>Fan the current state out to every slot. The Mount slot itself always plays its
         /// own non-mounted pose (Unity forces the mount to BodyState 3); rider slots use mounted-*.</summary>
