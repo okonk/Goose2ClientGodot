@@ -14,6 +14,8 @@ namespace Goose2Client.Character
         public int MoveSpeed { get; private set; } = 250;
         public bool IsMounted { get; private set; }
         public bool IsLocalPlayer { get; set; }
+        public float HPPercent { get; private set; } = 1f;
+        public float MPPercent { get; private set; } = 1f;
         // Server body state: 3 = unarmed (no-equip), 4=1hand, 5=staff, 6=2hand, 7=bow. Drives whether
         // slots play their -equip vs -no-equip idle/walk and which attack-<type> clip they swing.
         public int BodyState { get; private set; } = 3;
@@ -42,6 +44,8 @@ namespace Goose2Client.Character
         /// <summary>Update the HP bar (and accept MP for future use). hpPercent/mpPercent are 0..1.</summary>
         public void SetVitals(float hpPercent, float mpPercent)
         {
+            HPPercent = hpPercent;
+            MPPercent = mpPercent;
             EnsureBars();
             _hpBar.Size = new Vector2(32 * Mathf.Clamp(hpPercent, 0f, 1f), 3);
             _hpBar.Color = hpPercent > 0.66f ? Colors.Green : hpPercent > 0.33f ? Colors.Orange : Colors.Red;
