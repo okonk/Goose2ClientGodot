@@ -1,0 +1,84 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://Scripts/UI/BankWindow.cs" id="1_bnk"]
+
+[node name="BankWindow" type="Control"]
+script = ExtResource("1_bnk")
+layout_mode = 3
+offset_left = 100.0
+offset_top = 100.0
+offset_right = 360.0
+offset_bottom = 440.0
+WindowName = "Bank"
+
+[node name="Background" type="Panel" parent="."]
+layout_mode = 2
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+
+[node name="TitleBar" type="Panel" parent="."]
+layout_mode = 2
+anchors_preset = 10
+anchor_right = 1.0
+offset_bottom = 24.0
+mouse_filter = 0
+
+[node name="TitleLabel" type="Label" parent="TitleBar"]
+layout_mode = 2
+anchors_preset = 10
+anchor_right = 0.0
+offset_left = 4.0
+offset_top = 2.0
+offset_bottom = 22.0
+mouse_filter = 1
+text = "Bank"
+
+[node name="CloseButton" type="Button" parent="TitleBar"]
+layout_mode = 2
+anchors_preset = 6
+anchor_bottom = 1.0
+offset_left = -18.0
+offset_top = 2.0
+offset_right = -2.0
+offset_bottom = 22.0
+text = "X"
+
+[node name="Content" type="Control" parent="."]
+layout_mode = 2
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = 24.0
+mouse_filter = 1
+
+[node name="SlotGrid" type="GridContainer" parent="Content"]
+layout_mode = 2
+anchors_preset = 14
+anchor_right = 1.0
+anchor_bottom = 0.85
+offset_bottom = 0.0
+mouse_filter = 1
+columns = 5
+
+[node name="BackButton" type="Button" parent="Content"]
+layout_mode = 2
+anchors_preset = 7
+anchor_top = 0.85
+anchor_bottom = 1.0
+offset_left = 4.0
+offset_top = 0.0
+offset_right = 64.0
+offset_bottom = 0.0
+text = "<"
+
+[node name="NextButton" type="Button" parent="Content"]
+layout_mode = 2
+anchors_preset = 7
+anchor_top = 0.85
+anchor_bottom = 1.0
+offset_left = 72.0
+offset_top = 0.0
+offset_right = 132.0
+offset_bottom = 0.0
+text = ">"
