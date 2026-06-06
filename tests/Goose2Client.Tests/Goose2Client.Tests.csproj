@@ -30,5 +30,6 @@
     <Compile Include="../../Scripts/ItemStats.cs" />
     <Compile Include="../../Scripts/Network/Packets/SpellbookSlotPacket.cs" />
     <Compile Include="../../Scripts/SpellInfo.cs" />
+    <Compile Include="../../Scripts/Helpers.cs" />
   </ItemGroup>
 </Project>
