@@ -1,0 +1,34 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://Scripts/UI/SpellSlot.cs" id="1_spells"]
+
+[node name="SpellSlot" type="Panel"]
+script = ExtResource("1_spells")
+layout_mode = 0
+mouse_filter = 0
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 40.0
+offset_bottom = 40.0
+
+[node name="Icon" type="TextureRect" parent="."]
+layout_mode = 0
+mouse_filter = 2
+expand_mode = 1
+stretch_mode = 2
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 40.0
+offset_bottom = 40.0
+
+[node name="CooldownOverlay" type="TextureProgressBar" parent="."]
+layout_mode = 0
+mouse_filter = 2
+max_value = 1.0
+value = 0.0
+fill_mode = 4
+tint_progress = Color(0, 0, 0, 0.5)
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 40.0
+offset_bottom = 40.0
