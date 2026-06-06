@@ -44,6 +44,15 @@ public partial class InventoryWindow : BaseWindow, IWindow
         GameManager.Instance.PacketManager.Listen<ClearInventorySlotPacket>(OnClearInventorySlot);
         GameManager.Instance.PacketManager.Listen<StatusInfoPacket>(OnStatusInfo);
         _listenersRegistered = true;
+
+        // First-login default: closed (toggle with I/C/B). Restore saved visibility if present.
+        if (WindowName != null)
+        {
+            if (GameManager.Instance.CharacterSettings.GetWindowSettings(WindowName)?.Visible is not bool savedVisible)
+                Visible = false;
+            else
+                Visible = savedVisible;
+        }
     }
 
     public override void _ExitTree()
