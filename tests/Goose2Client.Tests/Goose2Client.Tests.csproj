@@ -28,5 +28,7 @@
     <Compile Include="../../Scripts/Network/Packets/InventorySlotPacket.cs" />
     <Compile Include="../../Scripts/Network/Packets/MapObjectPacket.cs" />
     <Compile Include="../../Scripts/ItemStats.cs" />
+    <Compile Include="../../Scripts/Network/Packets/SpellbookSlotPacket.cs" />
+    <Compile Include="../../Scripts/SpellInfo.cs" />
   </ItemGroup>
 </Project>
