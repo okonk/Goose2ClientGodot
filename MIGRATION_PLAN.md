@@ -329,13 +329,10 @@ consuming layer lands:
   `SocketError`/disconnect event is marshaled to the main thread. Fine for connect-and-exit
   validation, but the **reconnect / session layer** will have no hook to react to a dropped
   connection. Add a main-thread "Disconnected" event on the `received == 0` path then.
-- **`Pause` drops packets instead of queue-and-replay.** `GameManager.HandlePacket` does
-  `if (NetworkClient.Pause) return;`, so any packet received while paused is discarded. Nothing
-  sets `Pause = true` yet, so this is inert today. But the Unity design used `Pause` to defer
-  packets *during map transitions* (`GameManager:90-127`); silently dropping
-  `MapObject`/`UpdateCharacter`/inventory packets while paused would desync game state.
-  **Before the map-transition layer sets `Pause`**, change this to queue-and-replay (buffer
-  while paused, drain on unpause).
+- **`Pause` drops packets instead of queue-and-replay.** ✅ Resolved (Step 4). `GameManager` now
+  uses `PausablePacketQueue` to buffer packets FIFO while paused and drain on unpause via
+  `GameManager.SetPaused(bool)`. See `Scripts/Network/PausablePacketQueue.cs` +
+  `tests/Goose2Client.Tests/PauseQueueTests.cs`.
 - **`CharacterSettings.Load()` is not defensive against corrupt/partial JSON.** A settings file
   that deserializes with `Hotkeys == null` makes the `(string)` ctor throw `NullReferenceException`
   at the `Hotkeys.Length` check. Faithful to the Unity source today; add a null-guard when the

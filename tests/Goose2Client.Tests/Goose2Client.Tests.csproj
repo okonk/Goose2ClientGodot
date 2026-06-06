@@ -12,6 +12,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="../../Scripts/Network/PacketParser.cs" />
+    <Compile Include="../../Scripts/Network/PausablePacketQueue.cs" />
     <Compile Include="../../Scripts/CharacterSettings.cs" />
   </ItemGroup>
 </Project>
