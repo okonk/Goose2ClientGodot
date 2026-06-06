@@ -295,7 +295,13 @@ Each step is independently testable; the order front-loads the foundations the r
 3. **Network + packets (§1)** — `NetworkClient`, `PacketManager`, all packets. Validate by
    connecting to the server and logging parsed packets. *(medium, near-verbatim)*
 4. **GameManager + scene flow (§2, §3)** — autoloads, Login → Loading → Map skeleton with
-   persistent-UI CanvasLayer. *(medium)*
+   persistent-UI CanvasLayer. *(medium)* — ✅ **Landed (2026-06-06).** Interactive Login scene
+   drives the full `LOGIN → LCNT → SCM → DLM` handshake into the Map placeholder; persistent
+   `GameManager.UiLayer` CanvasLayer; `Pause` queue-and-replay (`GameManager.SetPaused` +
+   `PausablePacketQueue`). Live-validated against the server: login succeeds, 161 gameplay
+   packets buffer during the transition and drain in order on unpause; login-fail and
+   connection-error paths surface the message and re-enable retry. The boot AssetBundle
+   `LoadingScene` is dropped. (Map rendering itself is Step 5.)
 5. **Map rendering (§4)** — `MapFile`, `TileMapLayer` build, camera, tile updates. First
    pixels on screen. *(large)*
 6. **Characters + animation (§5)** — the hardest redesign; do it after the atlas/SpriteFrames
