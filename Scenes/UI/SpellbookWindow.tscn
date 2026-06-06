@@ -1,0 +1,84 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://Scripts/UI/SpellbookWindow.cs" id="1_sb"]
+[ext_resource type="Script" path="res://Scripts/UI/SpellbookButton.cs" id="2_sbb"]
+
+[node name="SpellbookWindow" type="Control"]
+script = ExtResource("1_sb")
+layout_mode = 3
+offset_left = 100.0
+offset_top = 100.0
+offset_right = 360.0
+offset_bottom = 440.0
+WindowName = "Spellbook"
+
+[node name="Background" type="Panel" parent="."]
+layout_mode = 2
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+
+[node name="TitleBar" type="Panel" parent="."]
+layout_mode = 2
+anchors_preset = 10
+anchor_right = 1.0
+offset_bottom = 24.0
+mouse_filter = 0
+
+[node name="TitleLabel" type="Label" parent="TitleBar"]
+layout_mode = 2
+anchors_preset = 10
+anchor_right = 0.0
+offset_left = 4.0
+offset_top = 2.0
+offset_bottom = 22.0
+mouse_filter = 1
+text = "Spellbook"
+
+[node name="CloseButton" type="Button" parent="TitleBar"]
+layout_mode = 2
+anchors_preset = 6
+anchor_bottom = 1.0
+offset_left = -18.0
+offset_top = 2.0
+offset_right = -2.0
+offset_bottom = 22.0
+text = "X"
+
+[node name="Content" type="Control" parent="."]
+layout_mode = 2
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = 24.0
+mouse_filter = 1
+
+[node name="Pages" type="Control" parent="Content"]
+layout_mode = 2
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 1
+
+[node name="BackButton" type="Button" parent="Content"]
+script = ExtResource("2_sbb")
+layout_mode = 2
+anchors_preset = 7
+anchor_bottom = 1.0
+offset_left = 4.0
+offset_top = -24.0
+offset_right = 44.0
+offset_bottom = -4.0
+text = "<"
+
+[node name="NextButton" type="Button" parent="Content"]
+script = ExtResource("2_sbb")
+layout_mode = 2
+anchors_preset = 3
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -44.0
+offset_top = -24.0
+offset_right = -4.0
+offset_bottom = -4.0
+text = ">"
