@@ -14,6 +14,7 @@ public partial class MapManager : Node2D
     private readonly MapLayer[] _layers = new MapLayer[5];
     private Node2D _objects;     // dropped-item container
     private Camera2D _camera;
+    private readonly System.Collections.Generic.Dictionary<int, MapItem> _mapObjects = new();
     private bool _listenersRegistered;
 
     public override void _Ready()
@@ -71,6 +72,29 @@ public partial class MapManager : Node2D
     }
 
     private void OnTileUpdate(object packetObj) { /* Task 9 */ }
-    private void OnMapObject(object packetObj) { /* Task 8 */ }
-    private void OnEraseObject(object packetObj) { /* Task 8 */ }
+
+    private int ItemKey(int x, int y) => y * _map.Height + x;
+
+    private void OnMapObject(object packetObj)
+    {
+        var p = (MapObjectPacket)packetObj;
+        var tex = _cache.Get(p.GraphicFile, p.GraphicId);   // sheet=GraphicFile, graphic=GraphicId
+        if (tex == null) return;
+
+        if (_mapObjects.TryGetValue(ItemKey(p.TileX, p.TileY), out var existing))
+            existing.QueueFree();
+
+        var item = new MapItem { Name = $"{p.Name} ({p.GraphicId})" };
+        _objects.AddChild(item);
+        item.Setup(tex, p.TileX, p.TileY,
+            new Color(p.GraphicR / 255f, p.GraphicG / 255f, p.GraphicB / 255f, p.GraphicA / 255f));
+        _mapObjects[ItemKey(p.TileX, p.TileY)] = item;
+    }
+
+    private void OnEraseObject(object packetObj)
+    {
+        var p = (EraseObjectPacket)packetObj;
+        if (_mapObjects.Remove(ItemKey(p.TileX, p.TileY), out var item))
+            item.QueueFree();
+    }
 }
