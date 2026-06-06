@@ -82,21 +82,25 @@ Files: `MapManager.cs`, `MapFile.cs`, `MapItem.cs`, prefabs `Camera`, `Lighting`
 
 - `MapFile` parses the map `.bytes` (tile/flags grid) — pure C#, port verbatim. Map source
   `.map` files at `~/code/Illutia/maps` (the converter copies them to `M*.bytes`).
-- Unity **`Grid` + 5 `Tilemap` layers** with runtime `SetTile`/`GetTile<Tile>` and
-  `ScriptableObject.CreateInstance<Tile>()` → Godot **`TileMapLayer`** nodes (Godot 4.3+;
-  `TileMap` is deprecated). Build one `TileSet` whose atlas sources are the spritesheet PNGs;
-  runtime updates become `TileMapLayer.SetCell(coords, sourceId, atlasCoords)`. The
-  `TileUpdatePacket` handler maps directly.
-- **Roof layer** toggle (`SetActive`) → set the roof `TileMapLayer.Visible`.
-- `SpriteRenderer.sortingOrder` for depth → `Node2D.YSortEnabled` on the entity container
-  plus `z_index` for explicit layers.
-- **Camera**: Cinemachine `CinemachineVirtualCamera.Follow` → a `Camera2D` (child of the
-  player node, or a script that sets `Camera2D.GlobalPosition` to the follow target).
-  Drop Cinemachine entirely.
-- ⚠️ **Coordinate system**: Unity is Y-up, Godot 2D is Y-down. The code already bakes
-  `map.Height - y` offsets and `pixelsPerUnit = 32`. Pick a world scale up front (1 tile =
-  32 px is natural) and centralize all tile↔world conversion in one helper so the Y-flip is
-  done in exactly one place.
+- Unity **`Grid` + 5 `Tilemap` layers** → **NOT `TileMapLayer`/`TileSet`** (revised 2026-06-06,
+  Step 5). The source frames are **arbitrary-rect and bottom-center-anchored** (a tree/roof
+  sprite is taller than its 32 px tile); Godot's `TileSetAtlasSource` is grid-locked, so honoring
+  the original §4 would force repacking every tile into a uniform grid and authoring per-tile
+  `texture_origin`. Instead each of the 5 layers is a `MapLayer : Node2D` that **draws its tiles in
+  `_Draw`** by blitting `AtlasTexture` regions straight off the original sheet PNGs, via a runtime
+  `SpriteCache` (the Godot replacement for Unity's `ResourceManager.LoadSprite("{sheet}-{graphic}")`
+  / `Helpers.GetSprite`) backed by a converter-emitted **frame-rect manifest** (`manifest.json`:
+  `sheet → {graphic → [x,y,w,h]}`). Lossless, no repacking, y-sorts naturally with Step 6 entities.
+- **Runtime tile updates** (`TileUpdatePacket`): mutate the in-memory `MapFile` cell
+  (graphic/sheet, `sheet == 0` ⇒ clear) + `Flags`, then `QueueRedraw()` the affected `MapLayer`.
+- **Roof layer** toggle (`SetActive`) → set the roof layer's `Visible` (`MapLayer[4].Visible = !IsRoof`).
+- `SpriteRenderer.sortingOrder` for depth → `Node2D.YSortEnabled` plus per-layer `z_index`.
+- **Camera**: Cinemachine `CinemachineVirtualCamera.Follow` → a `Camera2D` whose `GlobalPosition`
+  is centred on the player's spawn tile from `SetYourPositionPacket`. Drop Cinemachine entirely.
+- ✅ **Coordinate system (resolved 2026-06-06)**: Godot 2D is **Y-down like the server's tile rows**,
+  so there is **NO Y-flip** — tile `(x,y)` maps to world `(x,y)`. Unity's pervasive `map.Height - y`
+  existed only to reach Unity's Y-up world and is intentionally absent. All tile↔world math lives in
+  one helper, `MapCoords` (`TileSize = 32`, bottom-center anchoring); the flip is simply not there.
 
 ### 5. Characters & world entities — 🔴 (animation is the hardest part)
 Files: `Character/Character.cs`, `PlayerController.cs`, `CharacterAnimation.cs`, `CharacterAnimationStateBehaviour.cs`, `CharacterHealthBar.cs`, `BattleText*.cs`, `ChatBubble.cs`, `SpellAnimation.cs`, `EmoteAnimation.cs`, `SpellTarget.cs`, `AnimationSlot.cs`, `CharacterSettings.cs`
@@ -258,7 +262,7 @@ animation frame sequences, and maps. **Split it: keep the parsing, replace the U
 | `*.assetbundle` / StreamingAssets | Packaged graphics/anims | **Removed** — Godot-native atlases/`SpriteFrames` (§8) |
 | `SpriteAtlas` | Sprite lookup by id | `AtlasTexture` regions over spritesheet PNGs |
 | `Animator` / `AnimatorOverrideController` | Character animation | `AnimatedSprite2D` + `SpriteFrames` + C# state logic |
-| Tilemap modules | Map layers | `TileMapLayer` + `TileSet` |
+| Tilemap modules | Map layers | 5 `MapLayer` `Node2D`s drawing `AtlasTexture` regions off sheet PNGs (no `TileMapLayer`/`TileSet` — art is arbitrary-rect + bottom-center-anchored) |
 | `com.unity.nuget.newtonsoft-json` | JSON (settings, item data) | `System.Text.Json` — **note**: `Dictionary<string,object>` values deserialize to `JsonElement` (not boxed primitives); reads must convert via `JsonElement` |
 
 ---
@@ -302,8 +306,12 @@ Each step is independently testable; the order front-loads the foundations the r
    packets buffer during the transition and drain in order on unpause; login-fail and
    connection-error paths surface the message and re-enable retry. The boot AssetBundle
    `LoadingScene` is dropped. (Map rendering itself is Step 5.)
-5. **Map rendering (§4)** — `MapFile`, `TileMapLayer` build, camera, tile updates. First
-   pixels on screen. *(large)*
+5. **Map rendering (§4)** — ✅ **Landed (2026-06-06).** `MapFile` binary parser (golden-tested vs
+   real maps); 5-layer rendering via `MapLayer` `_Draw` + `AtlasTexture` regions off sheet PNGs
+   (`SpriteCache` + frame-rect manifest, **no `TileMapLayer`/`TileSet`**); dropped map items with
+   tint (`Modulate`); runtime `TileUpdatePacket` repaint; roof toggle; spawn-centred `Camera2D`;
+   **no Y-flip** (single `MapCoords` helper). Converter extended to emit `manifest.json`. Character
+   rendering and movement remain **Step 6**.
 6. **Characters + animation (§5)** — the hardest redesign; do it after the atlas/SpriteFrames
    exist and one map renders. **Template: `~/code/3dMMO-Server/client/Assets/Scripts/Entity/Character.cs`.**
    *(large, 🔴 — but de-risked by the reference)*
