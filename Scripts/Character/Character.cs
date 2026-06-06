@@ -137,13 +137,13 @@ namespace Goose2Client.Character
 
             // Underwear defaults when slots are empty (Unity SetUnderwear).
             int uwLegs = CharacterLayout.UnderwearLegs(bodyId, legsId);
-            if (uwLegs != 0) { legsId = uwLegs; el = Colors.White; }
+            if (uwLegs != 0) { legsId = uwLegs; el = NoTint; }
             int uwChest = CharacterLayout.UnderwearChest(bodyId, chestId);
-            if (uwChest != 0) { chestId = uwChest; ec = Colors.White; }
+            if (uwChest != 0) { chestId = uwChest; ec = NoTint; }
 
             ApplySlot(CharacterSlot.Body, bodyId, RgbaColor(bodyR, bodyG, bodyB, bodyA));
             ApplySlot(CharacterSlot.Hair, hairId, RgbaColor(hairR, hairG, hairB, hairA));
-            ApplySlot(CharacterSlot.Eyes, faceId, Colors.White);
+            ApplySlot(CharacterSlot.Eyes, faceId, NoTint);
             ApplySlot(CharacterSlot.Chest, chestId, ec);
             ApplySlot(CharacterSlot.Helm, helmId, eh);
             ApplySlot(CharacterSlot.Legs, legsId, el);
@@ -153,12 +153,16 @@ namespace Goose2Client.Character
             ApplySlot(CharacterSlot.Mount, mountId, em);
         }
 
+        // The slot tint shader reads the alpha as a BLEND FACTOR (lerp texture->tint), NOT opacity
+        // (faithful to Unity's CharacterAnimation shader). So "no tint" is alpha 0, never white.
+        private static Color NoTint => new Color(0f, 0f, 0f, 0f);
+
         private static Color RgbaColor(int r, int g, int b, int a)
-            => a > 0 ? new Color(r / 255f, g / 255f, b / 255f, a / 255f) : Colors.White;
+            => a > 0 ? new Color(r / 255f, g / 255f, b / 255f, a / 255f) : NoTint;
 
         private static int Equip(int[][] eq, int i, out Color color)
         {
-            color = Colors.White;
+            color = NoTint;
             if (eq == null || i >= eq.Length || eq[i] == null || eq[i].Length < 5) return 0;
             if (eq[i][4] > 0) color = new Color(eq[i][1] / 255f, eq[i][2] / 255f, eq[i][3] / 255f, eq[i][4] / 255f);
             return eq[i][0];
@@ -176,14 +180,28 @@ namespace Goose2Client.Character
                 {
                     Name = slot.ToString(),
                     TextureFilter = CanvasItem.TextureFilterEnum.Nearest,
+                    Material = new ShaderMaterial { Shader = TintShader },
                 } };
                 AddChild(s.Sprite);
                 _slots[slot] = s;
             }
             s.GraphicId = graphicId;
             s.Sprite.SpriteFrames = GD.Load<SpriteFrames>(path);
-            s.Sprite.SelfModulate = tint;
+            ((ShaderMaterial)s.Sprite.Material).SetShaderParameter("tint", tint);
         }
+
+        // Faithful port of Unity Custom/CharacterAnimation: tint.a lerps the texture rgb toward the
+        // tint rgb; final opacity is always the texture's own alpha, so a tint never fades the sprite.
+        private static Shader _tintShader;
+        private static Shader TintShader => _tintShader ??= new Shader
+        {
+            Code = @"shader_type canvas_item;
+uniform vec4 tint : source_color = vec4(0.0);
+void fragment() {
+    vec4 tex = texture(TEXTURE, UV);
+    COLOR = vec4(mix(tex.rgb, tint.rgb, tint.a), tex.a) * COLOR;
+}"
+        };
 
         private void RemoveSlot(CharacterSlot slot)
         {
