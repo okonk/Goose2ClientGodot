@@ -29,12 +29,11 @@ public partial class BaseWindow : Control
         Content = GetNodeOrNull<Control>("Content");
         Background = GetNodeOrNull<TextureRect>("Background");
 
-        // Restore persisted position
+        // Restore persisted position (or first-run default)
         if (WindowName != null)
         {
             var ws = GameManager.Instance.CharacterSettings.GetWindowSettings(WindowName);
-            if (ws != null)
-                Position = ws.Position;
+            Position = ws != null ? ws.Position : DefaultWindowLayout.For(WindowName);
         }
 
         // Title-bar drag
