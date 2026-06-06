@@ -295,7 +295,13 @@ Each step is independently testable; the order front-loads the foundations the r
 3. **Network + packets (§1)** — `NetworkClient`, `PacketManager`, all packets. Validate by
    connecting to the server and logging parsed packets. *(medium, near-verbatim)*
 4. **GameManager + scene flow (§2, §3)** — autoloads, Login → Loading → Map skeleton with
-   persistent-UI CanvasLayer. *(medium)*
+   persistent-UI CanvasLayer. *(medium)* — ✅ **Landed (2026-06-06).** Interactive Login scene
+   drives the full `LOGIN → LCNT → SCM → DLM` handshake into the Map placeholder; persistent
+   `GameManager.UiLayer` CanvasLayer; `Pause` queue-and-replay (`GameManager.SetPaused` +
+   `PausablePacketQueue`). Live-validated against the server: login succeeds, 161 gameplay
+   packets buffer during the transition and drain in order on unpause; login-fail and
+   connection-error paths surface the message and re-enable retry. The boot AssetBundle
+   `LoadingScene` is dropped. (Map rendering itself is Step 5.)
 5. **Map rendering (§4)** — `MapFile`, `TileMapLayer` build, camera, tile updates. First
    pixels on screen. *(large)*
 6. **Characters + animation (§5)** — the hardest redesign; do it after the atlas/SpriteFrames
@@ -329,13 +335,10 @@ consuming layer lands:
   `SocketError`/disconnect event is marshaled to the main thread. Fine for connect-and-exit
   validation, but the **reconnect / session layer** will have no hook to react to a dropped
   connection. Add a main-thread "Disconnected" event on the `received == 0` path then.
-- **`Pause` drops packets instead of queue-and-replay.** `GameManager.HandlePacket` does
-  `if (NetworkClient.Pause) return;`, so any packet received while paused is discarded. Nothing
-  sets `Pause = true` yet, so this is inert today. But the Unity design used `Pause` to defer
-  packets *during map transitions* (`GameManager:90-127`); silently dropping
-  `MapObject`/`UpdateCharacter`/inventory packets while paused would desync game state.
-  **Before the map-transition layer sets `Pause`**, change this to queue-and-replay (buffer
-  while paused, drain on unpause).
+- **`Pause` drops packets instead of queue-and-replay.** ✅ Resolved (Step 4). `GameManager` now
+  uses `PausablePacketQueue` to buffer packets FIFO while paused and drain on unpause via
+  `GameManager.SetPaused(bool)`. See `Scripts/Network/PausablePacketQueue.cs` +
+  `tests/Goose2Client.Tests/PauseQueueTests.cs`.
 - **`CharacterSettings.Load()` is not defensive against corrupt/partial JSON.** A settings file
   that deserializes with `Hotkeys == null` makes the `(string)` ctor throw `NullReferenceException`
   at the `Hotkeys.Length` check. Faithful to the Unity source today; add a null-guard when the
