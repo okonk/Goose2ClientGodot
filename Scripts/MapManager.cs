@@ -118,7 +118,11 @@ public partial class MapManager : Node2D
     private void OnEraseCharacter(object packetObj)
     {
         var p = (EraseCharacterPacket)packetObj;
-        if (_characters.Remove(p.LoginId, out var c)) c.QueueFree();
+        if (_characters.Remove(p.LoginId, out var c))
+        {
+            if (c == _localPlayer) _localPlayer = null;
+            c.QueueFree();
+        }
     }
 
     private void OnAttack(object packetObj)
@@ -137,7 +141,8 @@ public partial class MapManager : Node2D
     private void OnSetYourPosition(object packetObj)
     {
         var p = (SetYourPositionPacket)packetObj;
-        _localPlayer?.TeleportTo(p.MapX, p.MapY);
+        if (_localPlayer != null && GodotObject.IsInstanceValid(_localPlayer))
+            _localPlayer.TeleportTo(p.MapX, p.MapY);
         CenterCameraOn(p.MapX, p.MapY);
     }
 
