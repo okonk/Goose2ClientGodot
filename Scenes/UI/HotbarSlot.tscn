@@ -1,0 +1,52 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://Scripts/UI/HotbarSlot.cs" id="1_hotbar"]
+
+[node name="HotbarSlot" type="Panel"]
+script = ExtResource("1_hotbar")
+layout_mode = 0
+mouse_filter = 0
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 40.0
+offset_bottom = 40.0
+
+[node name="Icon" type="TextureRect" parent="."]
+layout_mode = 0
+mouse_filter = 2
+expand_mode = 1
+stretch_mode = 2
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 40.0
+offset_bottom = 40.0
+
+[node name="CooldownOverlay" type="TextureProgressBar" parent="."]
+layout_mode = 0
+mouse_filter = 2
+visible = false
+max_value = 1.0
+value = 0.0
+fill_mode = 4
+tint_progress = Color(0, 0, 0, 0.5)
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 40.0
+offset_bottom = 40.0
+
+[node name="Count" type="Label" parent="."]
+layout_mode = 0
+mouse_filter = 2
+visible = false
+anchors_preset = 2
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -35.0
+offset_top = -35.0
+offset_right = -2.0
+offset_bottom = -2.0
+grow_horizontal = 2
+grow_vertical = 2
+horizontal_alignment = 1

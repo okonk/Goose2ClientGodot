@@ -33,5 +33,6 @@
     <Compile Include="../../Scripts/Helpers.cs" />
     <Compile Include="../../Scripts/SpellCooldownManager.cs" />
     <Compile Include="../../Scripts/UI/ItemTooltipText.cs" />
+    <Compile Include="../../Scripts/UI/HotbarSwap.cs" />
   </ItemGroup>
 </Project>
