@@ -7,6 +7,9 @@
 Source (Unity): `~/code/Goose2Client`
 Target (Godot 4.6, C#/.NET): `~/code/Goose2ClientGodot`
 Original game data: `~/code/Illutia/{data,maps}` (4,956 `.adf`, `compiled.enc`, 114 `.map`)
+Live server (for testing): `scyther.local:2006` — override the client via the `GOOSE_HOST` /
+`GOOSE_PORT` env vars (default `game.illutia.net:2006`). Saved credentials live at
+`user://login.cfg`.
 
 ## Locked-in strategy decisions
 
@@ -96,7 +99,12 @@ Files: `MapManager.cs`, `MapFile.cs`, `MapItem.cs`, prefabs `Camera`, `Lighting`
 - **Roof layer** toggle (`SetActive`) → set the roof layer's `Visible` (`MapLayer[4].Visible = !IsRoof`).
 - `SpriteRenderer.sortingOrder` for depth → `Node2D.YSortEnabled` plus per-layer `z_index`.
 - **Camera**: Cinemachine `CinemachineVirtualCamera.Follow` → a `Camera2D` whose `GlobalPosition`
-  is centred on the player's spawn tile from `SetYourPositionPacket`. Drop Cinemachine entirely.
+  is centred on the player's spawn tile. **Corrected 2026-06-06:** the server does **not** send
+  `SetYourPositionPacket` (SUP) on map entry — only on warps / rejected moves / `/refresh`. At entry
+  it sends `MakeCharacter` (MKC, carries each character's tile) then `SetYourCharacter` (SUC, which
+  `LoginId` is you), so the camera reads the player's spawn tile from MKC+SUC (camera bootstrap
+  only — no `Character` node; full character rendering is Step 6). SUP still recentres on
+  warp/refresh. Drop Cinemachine entirely.
 - ✅ **Coordinate system (resolved 2026-06-06)**: Godot 2D is **Y-down like the server's tile rows**,
   so there is **NO Y-flip** — tile `(x,y)` maps to world `(x,y)`. Unity's pervasive `map.Height - y`
   existed only to reach Unity's Y-up world and is intentionally absent. All tile↔world math lives in
@@ -309,8 +317,12 @@ Each step is independently testable; the order front-loads the foundations the r
 5. **Map rendering (§4)** — ✅ **Landed (2026-06-06).** `MapFile` binary parser (golden-tested vs
    real maps); 5-layer rendering via `MapLayer` `_Draw` + `AtlasTexture` regions off sheet PNGs
    (`SpriteCache` + frame-rect manifest, **no `TileMapLayer`/`TileSet`**); dropped map items with
-   tint (`Modulate`); runtime `TileUpdatePacket` repaint; roof toggle; spawn-centred `Camera2D`;
-   **no Y-flip** (single `MapCoords` helper). Converter extended to emit `manifest.json`. Character
+   tint (`Modulate`); runtime `TileUpdatePacket` repaint; roof toggle; `Camera2D` centred on the
+   spawn tile read from `MakeCharacter`+`SetYourCharacter` (the server sends no `SUP` at entry);
+   **no Y-flip** (single `MapCoords` helper). Converter extended to emit `manifest.json`.
+   Live-validated against `scyther.local:2006`: real map (Map2, 500×215) parses, sheet `AtlasTexture`s
+   resolve, and the camera centres on the real spawn tile. `GameManager.LoadMap` resolves the
+   server's `MapFileName` (e.g. `Map2.map`) to `Assets/Maps/Map2.bytes` by basename. Character
    rendering and movement remain **Step 6**.
 6. **Characters + animation (§5)** — the hardest redesign; do it after the atlas/SpriteFrames
    exist and one map renders. **Template: `~/code/3dMMO-Server/client/Assets/Scripts/Entity/Character.cs`.**
