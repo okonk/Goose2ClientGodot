@@ -180,14 +180,24 @@ namespace Goose2Client.Character
                 {
                     Name = slot.ToString(),
                     TextureFilter = CanvasItem.TextureFilterEnum.Nearest,
-                    Material = new ShaderMaterial { Shader = TintShader },
                 } };
                 AddChild(s.Sprite);
                 _slots[slot] = s;
             }
             s.GraphicId = graphicId;
             s.Sprite.SpriteFrames = GD.Load<SpriteFrames>(path);
-            ((ShaderMaterial)s.Sprite.Material).SetShaderParameter("tint", tint);
+            // Only dyed slots get the tint shader; untinted slots use the default canvas path so they
+            // render byte-identically to pre-shader behaviour (no global color-management shift).
+            if (tint.A > 0f)
+            {
+                if (s.Sprite.Material is not ShaderMaterial mat)
+                    s.Sprite.Material = mat = new ShaderMaterial { Shader = TintShader };
+                mat.SetShaderParameter("tint", tint);
+            }
+            else
+            {
+                s.Sprite.Material = null;
+            }
         }
 
         // Faithful port of Unity Custom/CharacterAnimation: tint.a lerps the texture rgb toward the
