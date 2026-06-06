@@ -327,9 +327,17 @@ Each step is independently testable; the order front-loads the foundations the r
    resolve, and the camera centres on the real spawn tile. `GameManager.LoadMap` resolves the
    server's `MapFileName` (e.g. `Map2.map`) to `Assets/Maps/Map2.bytes` by basename. Character
    rendering and movement remain **Step 6**.
-6. **Characters + animation (§5)** — the hardest redesign; do it after the atlas/SpriteFrames
-   exist and one map renders. **Template: `~/code/3dMMO-Server/client/Assets/Scripts/Entity/Character.cs`.**
-   *(large, 🔴 — but de-risked by the reference)*
+6. **Characters + animation (§5)** — ✅ **Landed (2026-06-06).** 10-slot node-per-`AnimatedSprite2D`
+   paper-doll (`Character : Node2D`; mount = body, shield + weapon = hands) loading per-graphic
+   `SpriteFrames` `.tres`; per-direction shield/weapon z-order via sibling order; tile-bottom anchor
+   so feet sit on the tile; `MapManager` `LoginId→Character` registry routing
+   MKC/MOC/CHH/CHP/ERC/ATT/VPU; predictive local-player input (move/face/attack) gated by SUC;
+   attack-lock timed off the body clip; **`BodyState`-driven equip/no-equip + weapon-type attack
+   clips** (1hand/staff/2hand/bow); name label + HP bar; **tint via a faithful `_Tint`-equivalent
+   shader** (alpha = blend factor, dyed slots only). Pure logic (anchor, layout, underwear,
+   motion-state, animation names/heights) is Godot-free and unit-tested (106 tests). Live-validated
+   against `scyther.local:2006`: players/monsters/NPCs spawn and assemble (up to 9 stacked slots)
+   with zero runtime errors; equipped NPCs resolve `idle-equip`/`attack-1hand`.
 7. **UI windows (§6)** — base window + slot + drag/drop primitives first, then fan out the
    ~40 windows (parallelizable). *(largest by volume)*
 8. **Polish** — tooltips, emotes, spell/battle-text overlays, lighting, settings persistence.
@@ -343,9 +351,11 @@ Each step is independently testable; the order front-loads the foundations the r
   surfaces an actual frame-lock/z-order problem.
 - **Threaded networking** — ✅ **Decided & implemented**: background receive thread +
   `CallDeferred` marshaling (see §1). Packet handlers run on the main thread; no further work.
-- **Exact tint/blend** — ✅ **Decided (2026-06-06): assume `Modulate` is sufficient.** Use
-  `Modulate`/`SelfModulate` per slot; only reach for a `ShaderMaterial` if a visible mismatch
-  with the Unity `_Tint` shader shows up in practice.
+- **Exact tint/blend** — ✅ **Resolved (2026-06-06): `ShaderMaterial` after all.** `Modulate`'s
+  alpha is opacity, but the Unity `_Tint` shader treats tint alpha as a *blend factor* (lerp
+  texture→tint, leaving opacity = the texture's own alpha). Ported that as a per-slot canvas
+  shader, applied **only to dyed slots** — untinted slots keep the default canvas path to avoid a
+  global color-management shift. "No tint" is therefore alpha 0, never white.
 - **Coordinate scale** — ✅ Resolved: "1 tile = 32 px", single `MapCoords` helper (see §4).
 
 ## Known follow-ups / deferred hardening (surfaced during Phase 1 network port)
@@ -367,3 +377,22 @@ consuming layer lands:
   that deserializes with `Hotkeys == null` makes the `(string)` ctor throw `NullReferenceException`
   at the `Hotkeys.Length` check. Faithful to the Unity source today; add a null-guard when the
   settings/UI layer actually reads/writes these files.
+
+### Step 6 deferred
+
+Surfaced during the Step 6 characters port; none block Step 6 itself:
+
+- **Occupancy check in `IsValidMove`.** Local-player prediction only blocks on map-blocked tiles;
+  it does not reject tiles occupied by another character yet. Add a `_characters` occupancy test
+  when the collision/combat layer needs it.
+- **Missing converter assets (e.g. `Hair/16`).** The live server sends graphic ids the converter
+  didn't emit (`Assets/Sprites/Hair/16/animations.tres` is absent; ids 1–15, 17–28 exist). The
+  slot is skipped gracefully (renders bald). Regenerate assets / fix converter coverage.
+- **MP bar.** `SetVitals` receives MP and the vitals packet (VPU) carries it, but only the HP bar
+  renders today. Add the MP bar when the vitals HUD is built.
+- **Dyed-gear color space.** The tint shader mixes in whatever space Godot samples; if dyed gear
+  looks slightly off vs Unity, revisit sRGB/linear handling (the `source_color` hint / mix space).
+- **Staff / 2h / bow attack clips (BodyState 5/6/7).** Implemented from the `BodyState`→weapon-type
+  mapping, but only 1hand (state 4) was live-verified — confirm the others when such a character
+  is available.
+- **Step-8 overlays.** Chat bubble, battle text, spell/emote overlays (out of Step 6 scope).
