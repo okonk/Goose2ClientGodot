@@ -20,6 +20,25 @@ namespace Goose2Client.Character
         private readonly Dictionary<CharacterSlot, Slot> _slots = new();
         private static AnimationHeights _heights;
 
+        private Label _nameLabel;
+
+        private void EnsureNameLabel()
+        {
+            if (_nameLabel != null) return;
+            _nameLabel = new Label
+            {
+                Text = CharacterName,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                ZIndex = 20,
+                Position = new Vector2(-50, -64),
+                Size = new Vector2(100, 16),
+            };
+            _nameLabel.AddThemeFontSizeOverride("font_size", 12);
+            _nameLabel.AddThemeConstantOverride("outline_size", 4);
+            _nameLabel.AddThemeColorOverride("font_outline_color", new Color(0, 0, 0, 0.9f));
+            AddChild(_nameLabel);
+        }
+
         // The converter's height-prefix uses its AnimationType name, which differs from the
         // asset folder for Mount/Shield/Weapon (those reuse Body/Hand art). Map slot -> prefix.
         private static string HeightPrefix(CharacterSlot slot) => slot switch
@@ -56,6 +75,9 @@ namespace Goose2Client.Character
             TeleportTo(p.MapX, p.MapY);   // no walk anim
             ApplyDrawOrder();
             PlayState();
+
+            EnsureNameLabel();
+            _nameLabel.Text = CharacterName;
         }
 
         /// <summary>Appearance-only rebuild from a CHP packet. Keeps current position/facing/name;
