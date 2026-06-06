@@ -14,6 +14,7 @@ public partial class MapManager : Node2D
     private readonly MapLayer[] _layers = new MapLayer[5];
     private Node2D _objects;     // dropped-item container
     private Camera2D _camera;
+    private bool _listenersRegistered;
 
     public override void _Ready()
     {
@@ -38,10 +39,12 @@ public partial class MapManager : Node2D
         pm.Listen<MapObjectPacket>(OnMapObject);
         pm.Listen<EraseObjectPacket>(OnEraseObject);
         pm.Listen<SetYourPositionPacket>(OnSetYourPosition);
+        _listenersRegistered = true;
     }
 
     public override void _ExitTree()
     {
+        if (!_listenersRegistered) return;
         var pm = GameManager.Instance.PacketManager;
         pm.Remove<TileUpdatePacket>(OnTileUpdate);
         pm.Remove<MapObjectPacket>(OnMapObject);
@@ -51,7 +54,7 @@ public partial class MapManager : Node2D
 
     /// <summary>Bounds + blocked check (Unity IsValidMove, map-only part; occupancy is Step 6).</summary>
     public bool IsValidMove(int x, int y)
-        => x >= 0 && y >= 0 && x < _map.Width && y < _map.Height && !_map[x, y].IsBlocked;
+        => _map != null && x >= 0 && y >= 0 && x < _map.Width && y < _map.Height && !_map[x, y].IsBlocked;
 
     private void OnSetYourPosition(object packetObj)
     {
