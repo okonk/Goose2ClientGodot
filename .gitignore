@@ -16,12 +16,15 @@ obj/
 mono_crash.*
 
 # ---- Generated assets (regenerated from ~/code/Illutia via tools/AssetConverter) ----
-# Decoded spritesheets and their Godot SpriteFrames are derived output; regenerate with
-# `dotnet run --project tools/AssetConverter/src/AssetConverter -- batch`. Drop this section
+# Everything under Assets/ is derived output (decoded spritesheets, per-id SpriteFrames
+# .tres, Maps, and the AnimationHeights/AnimationToFirstFrame metadata). Regenerate with
+# `dotnet run --project tools/AssetConverter/src/AssetConverter -- batch`. Drop this line
 # if you later decide to commit them for reproducible builds without the source data.
-/Assets/Sprites/sheets/
-/Assets/Maps/
-/Assets/Sprites/manifest.json
+/Assets/
+
+# ---- Local editor/agent config ----
+.claude/
+*.csproj.old
 
 # ---- OS / editor cruft ----
 .DS_Store

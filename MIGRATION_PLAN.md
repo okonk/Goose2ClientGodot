@@ -41,10 +41,13 @@ Files: `Network/NetworkClient.cs`, `PacketManager.cs`, `PacketParser.cs`, `Packe
 
 - `NetworkClient` is a plain C# class using `System.Net.Sockets.Socket` — **no Unity
   dependency**. Copy verbatim. Only `Debug.Log` → `GD.Print`.
-- It is currently polled from `GameManager.Update()`. In Godot, poll from the GameManager
-  autoload's `_Process`, **or** move the blocking `Socket.Select`/`Receive` to a background
-  `System.Threading` thread and marshal parsed packets back via `CallDeferred` (recommended —
-  the current `Select(..., 500)` blocks the main thread for up to 500µs per frame).
+- ✅ **Decided & implemented (background thread).** The Unity version polled from
+  `GameManager.Update()`. The Godot port moves the blocking `Receive` to a background
+  `System.Threading` thread (`NetworkClient.ReceiveLoop`, `IsBackground`) and marshals every
+  parsed packet to the main thread via `dispatcher.CallDeferred("HandlePacket", ...)`. The
+  receive thread touches only the socket + `packetBuffer`; all Godot/scene-tree access (incl.
+  `GD.Print` and the `SocketError` event) is marshaled. The old `Select(..., 500)` poll is gone.
+  Step 6 character packet handlers therefore run on the main thread already — no extra marshaling.
 - `PacketManager` pub/sub (`Listen<T>` / `Remove<T>` / `Handle`) is plain C#; keep as-is.
 - Every `*Packet` class is a pure parser/POCO. Copy verbatim.
 
@@ -333,16 +336,17 @@ Each step is independently testable; the order front-loads the foundations the r
 
 ## Open questions / risks to resolve before Phase 2
 
-- **Animation redesign (§5)** — approach now **de-risked** by the `~/code/3dMMO-Server/client`
-  reference (per-slot `AnimatedSprite2D` + `SpriteFrames` + C# state logic). Remaining unknown
-  is the *layering*: prototype one character (body + one equipment layer, idle+walk×4 dirs)
-  to confirm multiple stacked `AnimatedSprite2D`s stay frame-locked and z-order correctly,
-  *before* committing to all 8 slots.
-- **Threaded networking** — decide thread-vs-`_Process` polling now; it affects how packet
-  handlers marshal back to the scene tree.
-- **Exact tint/blend** — confirm whether `Modulate` reproduces the Unity `_Tint` shader, or
-  if a `ShaderMaterial` is needed.
-- **Coordinate scale** — lock "1 tile = 32 px" and a single tile↔world helper before §4/§5.
+- **Animation redesign (§5)** — approach **de-risked** by the `~/code/3dMMO-Server/client`
+  reference (per-slot `AnimatedSprite2D` + `SpriteFrames` + C# state logic). ✅ **Decided
+  (2026-06-06): skip the layering prototype** — assume stacked `AnimatedSprite2D`s stay
+  frame-locked and z-order correctly, and build all 8 slots directly. Revisit only if Step 6
+  surfaces an actual frame-lock/z-order problem.
+- **Threaded networking** — ✅ **Decided & implemented**: background receive thread +
+  `CallDeferred` marshaling (see §1). Packet handlers run on the main thread; no further work.
+- **Exact tint/blend** — ✅ **Decided (2026-06-06): assume `Modulate` is sufficient.** Use
+  `Modulate`/`SelfModulate` per slot; only reach for a `ShaderMaterial` if a visible mismatch
+  with the Unity `_Tint` shader shows up in practice.
+- **Coordinate scale** — ✅ Resolved: "1 tile = 32 px", single `MapCoords` helper (see §4).
 
 ## Known follow-ups / deferred hardening (surfaced during Phase 1 network port)
 
