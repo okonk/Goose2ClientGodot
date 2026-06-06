@@ -112,7 +112,7 @@ public partial class ChatWindow : Control
 
     public void AddChatLine(string message, ChatType chatType)
     {
-        message = message.Replace('`', '\u2665');
+        message = message.Replace("[", "[lb]").Replace('`', '\u2665');
         var color = _chatColors.TryGetValue(chatType, out var c) ? c : Colors.White;
         _chatLog.AppendText($"[color=#{color.ToHtml(false)}]{message}[/color]\n");
     }
