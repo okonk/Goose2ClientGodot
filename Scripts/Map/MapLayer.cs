@@ -17,7 +17,7 @@ public partial class MapLayer : Node2D
         _map = map;
         _layer = layer;
         _cache = cache;
-        ZIndex = layer;          // 0 ground … 4 roof, painter order
+        ZIndex = layer * 10;     // 0,10,20,30,40 — room for items at z=35
         QueueRedraw();
     }
 

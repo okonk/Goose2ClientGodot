@@ -15,6 +15,8 @@ public partial class MapManager : Node2D
     private Node2D _objects;     // dropped-item container
     private Camera2D _camera;
     private readonly System.Collections.Generic.Dictionary<int, MapItem> _mapObjects = new();
+    private int _myLoginId = -1;
+    private readonly System.Collections.Generic.Dictionary<int, (int x, int y)> _charSpawns = new();
     private bool _listenersRegistered;
 
     public override void _Ready()
@@ -40,6 +42,8 @@ public partial class MapManager : Node2D
         pm.Listen<MapObjectPacket>(OnMapObject);
         pm.Listen<EraseObjectPacket>(OnEraseObject);
         pm.Listen<SetYourPositionPacket>(OnSetYourPosition);
+        pm.Listen<MakeCharacterPacket>(OnMakeCharacter);
+        pm.Listen<SetYourCharacterPacket>(OnSetYourCharacter);
         _listenersRegistered = true;
     }
 
@@ -51,6 +55,8 @@ public partial class MapManager : Node2D
         pm.Remove<MapObjectPacket>(OnMapObject);
         pm.Remove<EraseObjectPacket>(OnEraseObject);
         pm.Remove<SetYourPositionPacket>(OnSetYourPosition);
+        pm.Remove<MakeCharacterPacket>(OnMakeCharacter);
+        pm.Remove<SetYourCharacterPacket>(OnSetYourCharacter);
     }
 
     /// <summary>Bounds + blocked check (Unity IsValidMove, map-only part; occupancy is Step 6).</summary>
@@ -60,8 +66,32 @@ public partial class MapManager : Node2D
     private void OnSetYourPosition(object packetObj)
     {
         var p = (SetYourPositionPacket)packetObj;
-        _camera.GlobalPosition = MapCoords.TileCenter(p.MapX, p.MapY);
-        UpdateRoofVisibility(p.MapX, p.MapY);
+        CenterCameraOn(p.MapX, p.MapY);
+    }
+
+    // Step 5 camera bootstrap ONLY. The server sends MKC (positions) + SUC (which LoginId is you)
+    // on map entry — never SUP — so we read the player's spawn tile from these to centre the camera.
+    // Full character rendering/movement is Step 6; this deliberately creates no Character nodes.
+    private void OnMakeCharacter(object packetObj)
+    {
+        var p = (MakeCharacterPacket)packetObj;
+        _charSpawns[p.LoginId] = (p.MapX, p.MapY);
+        if (p.LoginId == _myLoginId)
+            CenterCameraOn(p.MapX, p.MapY);
+    }
+
+    private void OnSetYourCharacter(object packetObj)
+    {
+        var p = (SetYourCharacterPacket)packetObj;
+        _myLoginId = p.LoginId;
+        if (_charSpawns.TryGetValue(p.LoginId, out var pos))
+            CenterCameraOn(pos.x, pos.y);
+    }
+
+    private void CenterCameraOn(int x, int y)
+    {
+        _camera.GlobalPosition = MapCoords.TileCenter(x, y);
+        UpdateRoofVisibility(x, y);
     }
 
     /// <summary>Roof layer hides when the player stands under it (Unity roofLayer.SetActive(!IsRoof)).</summary>
