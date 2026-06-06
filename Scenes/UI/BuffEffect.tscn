@@ -1,0 +1,22 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://Scripts/UI/BuffEffect.cs" id="1_buff"]
+
+[node name="BuffEffect" type="Panel"]
+script = ExtResource("1_buff")
+layout_mode = 0
+mouse_filter = 0
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 28.0
+offset_bottom = 28.0
+
+[node name="Icon" type="TextureRect" parent="."]
+layout_mode = 0
+mouse_filter = 2
+expand_mode = 1
+stretch_mode = 2
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 28.0
+offset_bottom = 28.0
