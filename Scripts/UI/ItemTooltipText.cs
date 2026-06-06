@@ -40,12 +40,12 @@ namespace Goose2Client.UI
 
             if (s.MaxDamage != 0)
                 lines.Add((
-                    $"{s.MinDamage:N0}-{s.MaxDamage:N0} Damage / {s.Delay / 10.0f:F1}s Delay",
+                    $"{s.MinDamage.ToString("N0", Inv)}-{s.MaxDamage.ToString("N0", Inv)} Damage / {(s.Delay / 10.0f).ToString("F1", Inv)}s Delay",
                     ItemTooltipColor.WeaponDamage));
 
             if (s.AC != 0)
                 lines.Add((
-                    $"{s.AC:N0} Armor",
+                    $"{s.AC.ToString("N0", Inv)} Armor",
                     ItemTooltipColor.AC));
 
             if (s.HP != 0)
@@ -160,7 +160,7 @@ namespace Goose2Client.UI
             {
                 var currency = s.Flags.HasFlag(ItemFlags.Donation) ? "credits" : "gold";
                 lines.Add((
-                    $"Value: {s.Value:N0} {currency}",
+                    $"Value: {s.Value.ToString("N0", Inv)} {currency}",
                     ItemTooltipColor.Value));
             }
 
