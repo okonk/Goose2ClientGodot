@@ -16,5 +16,6 @@
     <Compile Include="../../Scripts/CharacterSettings.cs" />
     <Compile Include="../../Scripts/MapFile.cs" />
     <Compile Include="../../Scripts/Map/MapCoords.cs" />
+    <Compile Include="../../Scripts/Map/SpriteManifest.cs" />
   </ItemGroup>
 </Project>
