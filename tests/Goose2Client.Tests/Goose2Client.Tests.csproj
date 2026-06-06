@@ -23,5 +23,10 @@
     <Compile Include="../../Scripts/Map/MapCoords.cs" />
     <Compile Include="../../Scripts/Map/SpriteManifest.cs" />
     <Compile Include="../../Scripts/Character/CharacterMotion.cs" />
+    <Compile Include="../../Scripts/Constants.cs" />
+    <Compile Include="../../Scripts/Network/PacketHandler.cs" />
+    <Compile Include="../../Scripts/Network/Packets/InventorySlotPacket.cs" />
+    <Compile Include="../../Scripts/Network/Packets/MapObjectPacket.cs" />
+    <Compile Include="../../Scripts/ItemStats.cs" />
   </ItemGroup>
 </Project>
