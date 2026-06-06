@@ -283,7 +283,7 @@ animation frame sequences, and maps. **Split it: keep the parsing, replace the U
 | `IEnumerator` coroutine + `yield` | `async`/`await` + `ToSignal` / `Tween` |
 | C# `event Action` | keep, or `[Signal]` |
 | `Resources.Load` | `GD.Load` / `ResourceLoader` / `preload` |
-| `Vector3` (Y-up) | `Vector2` (Y-down) — flip Y |
+| `Vector3` (Y-up) | `Vector2` (Y-down) — flip Y *(except map tiles: no flip, see §4 / `MapCoords`)* |
 
 ---
 
