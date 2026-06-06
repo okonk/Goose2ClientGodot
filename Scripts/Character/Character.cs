@@ -21,6 +21,28 @@ namespace Goose2Client.Character
         private static AnimationHeights _heights;
 
         private Label _nameLabel;
+        private ColorRect _hpBar;
+
+        private void EnsureBars()
+        {
+            if (_hpBar != null) return;
+            _hpBar = new ColorRect
+            {
+                Position = new Vector2(-16, -58),   // centered 32px-wide bar, above the name origin
+                Size = new Vector2(32, 3),
+                Color = Colors.Green,
+                ZIndex = 20,
+            };
+            AddChild(_hpBar);
+        }
+
+        /// <summary>Update the HP bar (and accept MP for future use). hpPercent/mpPercent are 0..1.</summary>
+        public void SetVitals(float hpPercent, float mpPercent)
+        {
+            EnsureBars();
+            _hpBar.Size = new Vector2(32 * Mathf.Clamp(hpPercent, 0f, 1f), 3);
+            _hpBar.Color = hpPercent > 0.66f ? Colors.Green : hpPercent > 0.33f ? Colors.Orange : Colors.Red;
+        }
 
         private void EnsureNameLabel()
         {
@@ -78,6 +100,7 @@ namespace Goose2Client.Character
 
             EnsureNameLabel();
             _nameLabel.Text = CharacterName;
+            SetVitals(p.HPPercent, 1f);
         }
 
         /// <summary>Appearance-only rebuild from a CHP packet. Keeps current position/facing/name;

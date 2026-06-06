@@ -52,6 +52,7 @@ public partial class MapManager : Node2D
         pm.Listen<UpdateCharacterPacket>(OnUpdateCharacter);
         pm.Listen<EraseCharacterPacket>(OnEraseCharacter);
         pm.Listen<AttackPacket>(OnAttack);
+        pm.Listen<VitalsPercentagePacket>(OnVitals);
         _listenersRegistered = true;
     }
 
@@ -70,6 +71,7 @@ public partial class MapManager : Node2D
         pm.Remove<UpdateCharacterPacket>(OnUpdateCharacter);
         pm.Remove<EraseCharacterPacket>(OnEraseCharacter);
         pm.Remove<AttackPacket>(OnAttack);
+        pm.Remove<VitalsPercentagePacket>(OnVitals);
     }
 
     /// <summary>Bounds + blocked check (Unity IsValidMove, map-only part; occupancy is Step 6).</summary>
@@ -129,6 +131,12 @@ public partial class MapManager : Node2D
     {
         var p = (AttackPacket)packetObj;
         if (_characters.TryGetValue(p.LoginId, out var c)) c.TriggerAttack();
+    }
+
+    private void OnVitals(object packetObj)
+    {
+        var p = (VitalsPercentagePacket)packetObj;
+        if (_characters.TryGetValue(p.LoginId, out var c)) c.SetVitals(p.HPPercentage, p.MPPercentage);
     }
 
     private void AttachLocalPlayer(Character.Character c)
