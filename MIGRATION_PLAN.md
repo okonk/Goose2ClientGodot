@@ -338,8 +338,25 @@ Each step is independently testable; the order front-loads the foundations the r
    motion-state, animation names/heights) is Godot-free and unit-tested (106 tests). Live-validated
    against `scyther.local:2006`: players/monsters/NPCs spawn and assemble (up to 9 stacked slots)
    with zero runtime errors; equipped NPCs resolve `idle-equip`/`attack-1hand`.
-7. **UI windows (§6)** — base window + slot + drag/drop primitives first, then fan out the
-   ~40 windows (parallelizable). *(largest by volume)*
+7. **UI windows (§6)** — ✅ **Landed (2026-06-06).** All ~40 uGUI windows ported to Godot
+   `Control` nodes. Shared primitives first: `BaseWindow` (title-bar drag + hover transparency +
+   persisted position, replacing Unity `TitleBar`/`WindowTransparency`), `ItemSlot`/`SpellSlot`/
+   `HotbarSlot` using Godot's **built-in `_GetDragData`/`_CanDropData`/`_DropData`** (replacing the
+   custom `DragIcon`/`DropTarget`/`DropTargetManager` plumbing; drag payload = `{kind, slot}` dict),
+   `TooltipManager` + 4 tooltips, `Icon` tint helper (reuses the `_Tint` blend shader), `WorldDropTarget`
+   + `DestroyButton`. Then every window: Vitals (HP **+ MP** bars + level), Inventory (gold + move/
+   split/vendor/cross-window drops), Character (equipped 31+i + stats/resists/exp), Spellbook (8×30
+   paged, cast/move/auto-place), Hotbar (3×10 + XP bar + mount tracking + debounced save + hotkey
+   repeat) + Toolbar, Chat (BBCode log + command parser + history; movement suppressed while typing),
+   Vendor/Bank/CombineBag (server-spawned), Party, BuffEffects, Quest/Info (multi-window manager),
+   Options, Debug, plus map/character click→`LeftClick`/`RightClick` in `MapManager._UnhandledInput`.
+   Assembled under a persistent `GameHud` (mounted on `GameManager.UiLayer` on map entry, wires
+   input toggles + cross-refs). **Pure logic is Godot-free and unit-tested (144 tests):** item-tooltip
+   text, chat command parsing, stack-split, spell paging, hotbar swap, spell-cooldown, settings
+   null-guarding. All 23 UI scenes load headless; the **full HUD (18 nodes / all windows) assembles
+   at runtime with zero errors** (headless smoke test). **Not yet done in this environment:** live
+   in-game E2E (interactive drag/drop, vendor/bank/combine flows, chat round-trip, screenshots) —
+   blocked by no display/Xvfb, no `run` skill, and no test credentials; see Step 7 deferred.
 8. **Polish** — tooltips, emotes, spell/battle-text overlays, lighting, settings persistence.
 
 ## Open questions / risks to resolve before Phase 2
@@ -373,10 +390,10 @@ consuming layer lands:
   uses `PausablePacketQueue` to buffer packets FIFO while paused and drain on unpause via
   `GameManager.SetPaused(bool)`. See `Scripts/Network/PausablePacketQueue.cs` +
   `tests/Goose2Client.Tests/PauseQueueTests.cs`.
-- **`CharacterSettings.Load()` is not defensive against corrupt/partial JSON.** A settings file
-  that deserializes with `Hotkeys == null` makes the `(string)` ctor throw `NullReferenceException`
-  at the `Hotkeys.Length` check. Faithful to the Unity source today; add a null-guard when the
-  settings/UI layer actually reads/writes these files.
+- **`CharacterSettings.Load()` is not defensive against corrupt/partial JSON.** ✅ **Resolved
+  (Step 7).** `ApplyDefaults()` null-guards `Hotkeys`/`WindowSettings`/`Options`, `Load()` guards a
+  null deserialization result, and `FromJson(string)` degrades to defaults on **any** parse failure.
+  Unit-tested (corrupt/empty/explicit-null/partial/null-input) in `CharacterSettingsLoadTests.cs`.
 
 ### Step 6 deferred
 
@@ -388,11 +405,42 @@ Surfaced during the Step 6 characters port; none block Step 6 itself:
 - **Missing converter assets (e.g. `Hair/16`).** The live server sends graphic ids the converter
   didn't emit (`Assets/Sprites/Hair/16/animations.tres` is absent; ids 1–15, 17–28 exist). The
   slot is skipped gracefully (renders bald). Regenerate assets / fix converter coverage.
-- **MP bar.** `SetVitals` receives MP and the vitals packet (VPU) carries it, but only the HP bar
-  renders today. Add the MP bar when the vitals HUD is built.
+- **MP bar.** ✅ **Resolved (Step 7).** `VitalsWindow` renders both HP and MP bars from
+  `StatusInfoPacket`. (`Character.SetVitals` also now stores `HPPercent`/`MPPercent` for the party UI.)
 - **Dyed-gear color space.** The tint shader mixes in whatever space Godot samples; if dyed gear
   looks slightly off vs Unity, revisit sRGB/linear handling (the `source_color` hint / mix space).
 - **Staff / 2h / bow attack clips (BodyState 5/6/7).** Implemented from the `BodyState`→weapon-type
   mapping, but only 1hand (state 4) was live-verified — confirm the others when such a character
   is available.
 - **Step-8 overlays.** Chat bubble, battle text, spell/emote overlays (out of Step 6 scope).
+
+### Step 7 deferred
+
+Surfaced during the Step 7 UI-windows port; none block Step 7 itself:
+
+- **Live in-game E2E + screenshots not performed.** Build is clean, 144 unit tests pass, all 23 UI
+  scenes load headless, and the full `GameHud` (18 nodes / every window) assembles at runtime with
+  zero errors (headless smoke test). But interactive validation against `scyther.local:2006`
+  (drag inventory→inventory/hotbar/world/destroy, hotbar use + paging, spellbook cast + cooldown,
+  vendor buy/sell, bank deposit/withdraw, combine, chat send + `/`-commands + tell/reply + history,
+  party vitals, buff add/remove, options persistence, window-drag persistence across relog) and a
+  screenshot were **not** done — the environment has no display/Xvfb, no `run` skill, and no test
+  credentials. Run this manually on a desktop with `GOOSE_HOST=scyther.local GOOSE_PORT=2006`.
+- **`SpellTargetManager` is a stub.** Targeted spell casting + on-screen targeting is Step 8;
+  `SpellbookWindow.UseSpell` wires the call but it no-ops (`// TODO(step8)`).
+- **`VitalsCharacterDisplay` is a stub.** Renders no paper-doll yet; resolves the local player and
+  defers the static idle-down render to Step 8 (`// TODO(step8)`).
+- **Sprite-accurate character clicks + map-item hover tooltip.** `MapManager._UnhandledInput`
+  resolves clicks by tile (clicking a character's foot tile targets them via server coords), but
+  pixel-accurate body hit-testing and the on-hover map-item tooltip are deferred to Step 8
+  (`MapItem` doesn't carry `ItemStats`, and the Control-parent tooltip lifetime doesn't fit a
+  world-space `Sprite2D`).
+- **BBCode chat injection hardened.** Player chat is escaped (`[`→`[lb]`) before rendering in the
+  BBCode log, preventing markup/URL injection — noted here as a security decision, not a gap.
+- **Slot counts are reasonable defaults, tune live.** Inventory 30, equipped 14, spellbook 8×30,
+  hotbar 3×10, vendor 40, bank 30, combine 10, party 8, buffs 20 — all bounds-guarded; confirm
+  against the live server's actual ranges during the manual E2E and adjust the consts if needed.
+- **Window default positions/visibility.** Positions persist via `CharacterSettings.WindowSettings`;
+  per-window saved *visibility* isn't persisted yet (only Position). Add if desired.
+- **TextureProgressBar visuals.** HP/MP/XP/cooldown bars drive the correct `Value`, but render
+  nothing without a `texture_progress` asset assigned — wire art during polish.
