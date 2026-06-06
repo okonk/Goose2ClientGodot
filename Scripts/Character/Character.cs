@@ -28,7 +28,7 @@ namespace Goose2Client.Character
             if (_hpBar != null) return;
             _hpBar = new ColorRect
             {
-                Position = new Vector2(-16, -58),   // centered 32px-wide bar, above the name origin
+                Position = new Vector2(-16, -56),   // centered 32px-wide bar, just below the name label
                 Size = new Vector2(32, 3),
                 Color = Colors.Green,
                 ZIndex = 20,
@@ -52,7 +52,7 @@ namespace Goose2Client.Character
                 Text = CharacterName,
                 HorizontalAlignment = HorizontalAlignment.Center,
                 ZIndex = 20,
-                Position = new Vector2(-50, -64),
+                Position = new Vector2(-50, -74),   // name sits on top; HP bar (-56) below it, no overlap
                 Size = new Vector2(100, 16),
             };
             _nameLabel.AddThemeFontSizeOverride("font_size", 12);

@@ -58,6 +58,15 @@ public class CharacterLayoutTests
         => Assert.Equal(8, CharacterLayout.UnderwearChest(bodyId: 11, equippedChestId: 0));
 
     [Fact]
-    public void Underwear_falls_back_to_legs_4_for_other_bodies()
-        => Assert.Equal(4, CharacterLayout.UnderwearLegs(bodyId: 99, equippedLegsId: 0));
+    public void Underwear_gives_female_default_legs_when_empty()
+        => Assert.Equal(4, CharacterLayout.UnderwearLegs(bodyId: 11, equippedLegsId: 0));
+
+    [Fact]
+    public void Underwear_none_for_monsters_and_other_bodies()
+    {
+        Assert.Equal(0, CharacterLayout.UnderwearLegs(bodyId: 99, equippedLegsId: 0));
+        Assert.Equal(0, CharacterLayout.UnderwearLegs(bodyId: 123, equippedLegsId: 0));
+        Assert.Equal(0, CharacterLayout.UnderwearChest(bodyId: 99, equippedChestId: 0));
+        Assert.Equal(0, CharacterLayout.UnderwearChest(bodyId: 1, equippedChestId: 0)); // male chest untouched
+    }
 }

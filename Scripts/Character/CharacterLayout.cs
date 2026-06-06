@@ -51,13 +51,14 @@ namespace Goose2Client.Character
             _ => "Bodies",
         };
 
-        // Unity Character.SetUnderwear: male body 1 -> legs 3; female body 11 -> chest 8;
-        // otherwise default legs 4. Returns 0 to mean "keep whatever is equipped".
+        // Unity Character.SetUnderwear: male body 1 -> legs 3; female body 11 -> chest 8 + legs 4.
+        // Every other body (monsters, NPCs) gets NO underwear. Returns 0 = "keep whatever is equipped".
         public static int UnderwearLegs(int bodyId, int equippedLegsId)
         {
             if (equippedLegsId != 0) return 0;
-            if (bodyId == 1) return 3;
-            return 4;
+            if (bodyId == 1) return 3;    // male
+            if (bodyId == 11) return 4;   // female
+            return 0;
         }
 
         public static int UnderwearChest(int bodyId, int equippedChestId)
