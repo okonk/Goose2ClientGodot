@@ -21,6 +21,15 @@ public partial class MapManager : Node2D
     private Character.Character _localPlayer;
     private bool _listenersRegistered;
 
+    /// <summary>The login ID of the local player.</summary>
+    public int MyLoginId => _myLoginId;
+
+    /// <summary>Look up a character node by login ID.</summary>
+    public Character.Character GetCharacter(int loginId) => _characters.TryGetValue(loginId, out var c) ? c : null;
+
+    /// <summary>The local player's character node (if alive).</summary>
+    public Character.Character LocalPlayer => GetCharacter(_myLoginId);
+
     public override void _Ready()
     {
         _map = GameManager.Instance.CurrentMap;
@@ -54,10 +63,16 @@ public partial class MapManager : Node2D
         pm.Listen<AttackPacket>(OnAttack);
         pm.Listen<VitalsPercentagePacket>(OnVitals);
         _listenersRegistered = true;
+
+        GameManager.Instance.CurrentMapManager = this;
     }
 
     public override void _ExitTree()
     {
+        // Always clear the back-reference, even if listeners were never registered.
+        if (GameManager.Instance != null && GameManager.Instance.CurrentMapManager == this)
+            GameManager.Instance.CurrentMapManager = null;
+
         if (!_listenersRegistered) return;
         var pm = GameManager.Instance.PacketManager;
         pm.Remove<TileUpdatePacket>(OnTileUpdate);

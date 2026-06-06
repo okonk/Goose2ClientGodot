@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using Godot;
+using Goose2Client.Map;
 using Goose2Client.Network;
 using Goose2Client.Network.Packets;
 
@@ -27,6 +28,21 @@ namespace Goose2Client
         /// <summary>The parsed map for the scene currently being entered. Set in ChangeMap, read by MapManager._Ready.</summary>
         public MapFile CurrentMap { get; set; }
 
+        /// <summary>Shared UI/icon sprite cache used by HUD windows.</summary>
+        public SpriteCache Sprites { get; private set; }
+
+        /// <summary>Tracks per-slot spell cooldown timers.</summary>
+        public SpellCooldownManager SpellCooldownManager { get; } = new();
+
+        /// <summary>Manages on-screen spell targeting (stub until step 8).</summary>
+        public SpellTargetManager SpellTargetManager { get; private set; }
+
+        /// <summary>Whether the player is currently in spell-targeting mode.</summary>
+        public bool IsTargeting => SpellTargetManager?.IsTargeting ?? false;
+
+        /// <summary>The active MapManager node, set/cleared by MapManager itself.</summary>
+        public MapManager CurrentMapManager { get; set; }
+
         public override void _EnterTree()
         {
             instance = this;
@@ -45,6 +61,9 @@ namespace Goose2Client
 
             // Listen for class table updates for the lifetime of the app.
             PacketManager.Listen<ClassUpdatePacket>(OnClassUpdate);
+
+            Sprites = new SpriteCache();
+            SpellTargetManager = new SpellTargetManager();
         }
 
         /// <summary>
@@ -135,6 +154,9 @@ namespace Goose2Client
             }
             return new MapFile(f.GetBuffer((long)f.GetLength()));
         }
+
+        /// <summary>Quit the game (used by Toolbar Exit button).</summary>
+        public void Quit() => GetTree().Quit();
 
         public override void _ExitTree()
         {
