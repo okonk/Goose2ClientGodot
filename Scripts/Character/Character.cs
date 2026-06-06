@@ -309,6 +309,7 @@ void fragment() {
         private void ProcessLocalInput(double delta)
         {
             if (!IsLocalPlayer) return;
+            if (GetViewport().GuiGetFocusOwner() is LineEdit) return;   // ignore movement/attack while typing in chat
             _moveCooldown -= delta;
 
             if (Input.IsActionJustPressed("Attack")) { TriggerAttack(); GameManager.Instance.NetworkClient.Attack(); }

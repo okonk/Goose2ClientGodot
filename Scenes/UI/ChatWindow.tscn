@@ -1,0 +1,35 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://Scripts/UI/ChatWindow.cs" id="1_chat"]
+
+[node name="ChatWindow" type="Control"]
+script = ExtResource("1_chat")
+layout_mode = 0
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 360.0
+offset_bottom = 180.0
+
+[node name="Panel" type="Panel" parent="."]
+layout_mode = 0
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 360.0
+offset_bottom = 180.0
+
+[node name="ChatLog" type="RichTextLabel" parent="."]
+layout_mode = 0
+mouse_filter = 2
+bbcode_enabled = true
+scroll_following = true
+offset_left = 4.0
+offset_top = 4.0
+offset_right = 356.0
+offset_bottom = 154.0
+
+[node name="Input" type="LineEdit" parent="."]
+layout_mode = 0
+offset_left = 4.0
+offset_top = 156.0
+offset_right = 356.0
+offset_bottom = 176.0

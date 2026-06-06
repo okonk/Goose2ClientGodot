@@ -35,5 +35,6 @@
     <Compile Include="../../Scripts/UI/ItemTooltipText.cs" />
     <Compile Include="../../Scripts/UI/HotbarSwap.cs" />
     <Compile Include="../../Scripts/UI/SpellbookPaging.cs" />
+    <Compile Include="../../Scripts/UI/ChatCommandParser.cs" />
   </ItemGroup>
 </Project>
