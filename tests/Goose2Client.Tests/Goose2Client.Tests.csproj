@@ -14,5 +14,6 @@
     <Compile Include="../../Scripts/Network/PacketParser.cs" />
     <Compile Include="../../Scripts/Network/PausablePacketQueue.cs" />
     <Compile Include="../../Scripts/CharacterSettings.cs" />
+    <Compile Include="../../Scripts/MapFile.cs" />
   </ItemGroup>
 </Project>

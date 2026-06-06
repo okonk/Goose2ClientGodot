@@ -20,6 +20,8 @@ mono_crash.*
 # `dotnet run --project tools/AssetConverter/src/AssetConverter -- batch`. Drop this section
 # if you later decide to commit them for reproducible builds without the source data.
 /Assets/Sprites/sheets/
+/Assets/Maps/
+/Assets/Sprites/manifest.json
 
 # ---- OS / editor cruft ----
 .DS_Store
