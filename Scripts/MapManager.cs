@@ -16,7 +16,9 @@ public partial class MapManager : Node2D
     private Camera2D _camera;
     private readonly System.Collections.Generic.Dictionary<int, MapItem> _mapObjects = new();
     private int _myLoginId = -1;
-    private readonly System.Collections.Generic.Dictionary<int, (int x, int y)> _charSpawns = new();
+    private readonly System.Collections.Generic.Dictionary<int, Character.Character> _characters = new();
+    private Node2D _characterRoot;
+    private Character.Character _localPlayer;
     private bool _listenersRegistered;
 
     public override void _Ready()
@@ -24,6 +26,7 @@ public partial class MapManager : Node2D
         _map = GameManager.Instance.CurrentMap;
         _cache = new SpriteCache();
         _objects = GetNode<Node2D>("Objects");
+        _characterRoot = GetNode<Node2D>("Characters");
         _camera = GetNode<Camera2D>("Camera2D");
 
         if (_map == null) { GD.PushError("MapManager: CurrentMap is null"); return; }
@@ -44,6 +47,11 @@ public partial class MapManager : Node2D
         pm.Listen<SetYourPositionPacket>(OnSetYourPosition);
         pm.Listen<MakeCharacterPacket>(OnMakeCharacter);
         pm.Listen<SetYourCharacterPacket>(OnSetYourCharacter);
+        pm.Listen<MoveCharacterPacket>(OnMoveCharacter);
+        pm.Listen<ChangeHeadingPacket>(OnChangeHeading);
+        pm.Listen<UpdateCharacterPacket>(OnUpdateCharacter);
+        pm.Listen<EraseCharacterPacket>(OnEraseCharacter);
+        pm.Listen<AttackPacket>(OnAttack);
         _listenersRegistered = true;
     }
 
@@ -57,35 +65,89 @@ public partial class MapManager : Node2D
         pm.Remove<SetYourPositionPacket>(OnSetYourPosition);
         pm.Remove<MakeCharacterPacket>(OnMakeCharacter);
         pm.Remove<SetYourCharacterPacket>(OnSetYourCharacter);
+        pm.Remove<MoveCharacterPacket>(OnMoveCharacter);
+        pm.Remove<ChangeHeadingPacket>(OnChangeHeading);
+        pm.Remove<UpdateCharacterPacket>(OnUpdateCharacter);
+        pm.Remove<EraseCharacterPacket>(OnEraseCharacter);
+        pm.Remove<AttackPacket>(OnAttack);
     }
 
     /// <summary>Bounds + blocked check (Unity IsValidMove, map-only part; occupancy is Step 6).</summary>
     public bool IsValidMove(int x, int y)
         => _map != null && x >= 0 && y >= 0 && x < _map.Width && y < _map.Height && !_map[x, y].IsBlocked;
 
-    private void OnSetYourPosition(object packetObj)
-    {
-        var p = (SetYourPositionPacket)packetObj;
-        CenterCameraOn(p.MapX, p.MapY);
-    }
-
-    // Step 5 camera bootstrap ONLY. The server sends MKC (positions) + SUC (which LoginId is you)
-    // on map entry — never SUP — so we read the player's spawn tile from these to centre the camera.
-    // Full character rendering/movement is Step 6; this deliberately creates no Character nodes.
     private void OnMakeCharacter(object packetObj)
     {
         var p = (MakeCharacterPacket)packetObj;
-        _charSpawns[p.LoginId] = (p.MapX, p.MapY);
-        if (p.LoginId == _myLoginId)
-            CenterCameraOn(p.MapX, p.MapY);
+        if (_characters.Remove(p.LoginId, out var existing))
+            existing.QueueFree();
+
+        var c = new Character.Character { Name = $"Char_{p.LoginId}" };
+        _characterRoot.AddChild(c);
+        c.SetAppearance(p);
+        _characters[p.LoginId] = c;
+
+        if (p.LoginId == _myLoginId) AttachLocalPlayer(c);
     }
 
     private void OnSetYourCharacter(object packetObj)
     {
         var p = (SetYourCharacterPacket)packetObj;
         _myLoginId = p.LoginId;
-        if (_charSpawns.TryGetValue(p.LoginId, out var pos))
-            CenterCameraOn(pos.x, pos.y);
+        if (_characters.TryGetValue(p.LoginId, out var c)) AttachLocalPlayer(c);
+    }
+
+    private void OnMoveCharacter(object packetObj)
+    {
+        var p = (MoveCharacterPacket)packetObj;
+        if (_characters.TryGetValue(p.LoginId, out var c)) c.MoveTo(p.MapX, p.MapY);
+    }
+
+    private void OnChangeHeading(object packetObj)
+    {
+        var p = (ChangeHeadingPacket)packetObj;
+        if (_characters.TryGetValue(p.LoginId, out var c)) c.SetFacing(p.Direction);
+    }
+
+    private void OnUpdateCharacter(object packetObj)
+    {
+        var p = (UpdateCharacterPacket)packetObj;
+        if (_characters.TryGetValue(p.LoginId, out var c)) c.SetAppearance(p);
+    }
+
+    private void OnEraseCharacter(object packetObj)
+    {
+        var p = (EraseCharacterPacket)packetObj;
+        if (_characters.Remove(p.LoginId, out var c)) c.QueueFree();
+    }
+
+    private void OnAttack(object packetObj)
+    {
+        var p = (AttackPacket)packetObj;
+        if (_characters.TryGetValue(p.LoginId, out var c)) c.TriggerAttack();
+    }
+
+    private void AttachLocalPlayer(Character.Character c)
+    {
+        _localPlayer = c;
+        c.IsLocalPlayer = true;
+        CenterCameraOn(c.X, c.Y);
+    }
+
+    private void OnSetYourPosition(object packetObj)
+    {
+        var p = (SetYourPositionPacket)packetObj;
+        _localPlayer?.TeleportTo(p.MapX, p.MapY);
+        CenterCameraOn(p.MapX, p.MapY);
+    }
+
+    public override void _Process(double delta)
+    {
+        if (_localPlayer != null && GodotObject.IsInstanceValid(_localPlayer))
+        {
+            CenterCameraOn(_localPlayer.X, _localPlayer.Y);   // roof toggle keyed on tile
+            _camera.GlobalPosition = _localPlayer.Position;   // smooth-follow the lerped position
+        }
     }
 
     private void CenterCameraOn(int x, int y)

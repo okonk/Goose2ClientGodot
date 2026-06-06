@@ -41,7 +41,7 @@ namespace Goose2Client.Character
                 ProjectSettings.GlobalizePath("res://Assets/Resources/AnimationHeights.txt"));
         }
 
-        /// <summary>(Re)build every slot from an MKC/CHP-shaped appearance.</summary>
+        /// <summary>(Re)build every slot from an MKC spawn packet (position + appearance).</summary>
         public void SetAppearance(MakeCharacterPacket p)
         {
             LoginId = p.LoginId;
@@ -49,7 +49,33 @@ namespace Goose2Client.Character
             MoveSpeed = p.MoveSpeed <= 0 ? 250 : p.MoveSpeed;
             X = p.MapX; Y = p.MapY; Facing = p.Facing;
 
-            var eq = p.DisplayedEquipment;
+            ApplyAppearance(p.BodyId, p.BodyR, p.BodyG, p.BodyB, p.BodyA,
+                            p.HairId, p.HairR, p.HairG, p.HairB, p.HairA,
+                            p.FaceId, p.DisplayedEquipment);
+
+            TeleportTo(p.MapX, p.MapY);   // no walk anim
+            ApplyDrawOrder();
+            PlayState();
+        }
+
+        /// <summary>Appearance-only rebuild from a CHP packet. Keeps current position/facing/name;
+        /// does NOT teleport (CHP carries no coordinates).</summary>
+        public void SetAppearance(UpdateCharacterPacket p)
+        {
+            if (p.MoveSpeed > 0) MoveSpeed = p.MoveSpeed;   // keep existing speed if CHP omits it
+
+            ApplyAppearance(p.BodyId, p.BodyR, p.BodyG, p.BodyB, p.BodyA,
+                            p.HairId, p.HairR, p.HairG, p.HairB, p.HairA,
+                            p.FaceId, p.DisplayedEquipment);
+
+            ApplyDrawOrder();
+            PlayState();
+        }
+
+        private void ApplyAppearance(int bodyId, int bodyR, int bodyG, int bodyB, int bodyA,
+                                     int hairId, int hairR, int hairG, int hairB, int hairA,
+                                     int faceId, int[][] eq)
+        {
             int chestId = Equip(eq, 0, out var ec);
             int helmId  = Equip(eq, 1, out var eh);
             int legsId  = Equip(eq, 2, out var el);
@@ -60,14 +86,14 @@ namespace Goose2Client.Character
             IsMounted = mountId != 0;
 
             // Underwear defaults when slots are empty (Unity SetUnderwear).
-            int uwLegs = CharacterLayout.UnderwearLegs(p.BodyId, legsId);
+            int uwLegs = CharacterLayout.UnderwearLegs(bodyId, legsId);
             if (uwLegs != 0) { legsId = uwLegs; el = Colors.White; }
-            int uwChest = CharacterLayout.UnderwearChest(p.BodyId, chestId);
+            int uwChest = CharacterLayout.UnderwearChest(bodyId, chestId);
             if (uwChest != 0) { chestId = uwChest; ec = Colors.White; }
 
-            ApplySlot(CharacterSlot.Body, p.BodyId, RgbaColor(p.BodyR, p.BodyG, p.BodyB, p.BodyA));
-            ApplySlot(CharacterSlot.Hair, p.HairId, RgbaColor(p.HairR, p.HairG, p.HairB, p.HairA));
-            ApplySlot(CharacterSlot.Eyes, p.FaceId, Colors.White);
+            ApplySlot(CharacterSlot.Body, bodyId, RgbaColor(bodyR, bodyG, bodyB, bodyA));
+            ApplySlot(CharacterSlot.Hair, hairId, RgbaColor(hairR, hairG, hairB, hairA));
+            ApplySlot(CharacterSlot.Eyes, faceId, Colors.White);
             ApplySlot(CharacterSlot.Chest, chestId, ec);
             ApplySlot(CharacterSlot.Helm, helmId, eh);
             ApplySlot(CharacterSlot.Legs, legsId, el);
@@ -75,10 +101,6 @@ namespace Goose2Client.Character
             ApplySlot(CharacterSlot.Shield, shieldId, es);
             ApplySlot(CharacterSlot.Weapon, weaponId, ew);
             ApplySlot(CharacterSlot.Mount, mountId, em);
-
-            TeleportTo(p.MapX, p.MapY);   // sets Position + _targetPosition (Task 7), no walk anim
-            ApplyDrawOrder();
-            PlayState();
         }
 
         private static Color RgbaColor(int r, int g, int b, int a)
