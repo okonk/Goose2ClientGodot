@@ -82,7 +82,17 @@ public partial class BaseWindow : Control
 
     private void OnMouseExited() => Modulate = new Color(1, 1, 1, 0.7f);
 
-    public void Toggle() => Visible = !Visible;
+    public void Toggle()
+    {
+        Visible = !Visible;
+        if (WindowName != null)
+            GameManager.Instance.CharacterSettings.SetWindowSetting(WindowName, Position, Visible);
+    }
 
-    protected virtual void OnClosePressed() => Hide();
+    protected virtual void OnClosePressed()
+    {
+        Hide();
+        if (WindowName != null)
+            GameManager.Instance.CharacterSettings.SetWindowSetting(WindowName, Position, false);
+    }
 }
