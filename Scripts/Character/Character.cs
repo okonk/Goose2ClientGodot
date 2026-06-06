@@ -140,7 +140,29 @@ namespace Goose2Client.Character
         private Vector2 _targetPosition;
         private bool _moving;
         protected bool IsMoving => _moving;   // replaces the Task 6 stub
-        protected bool AttackLocked => false;
+        private bool _attackLocked;
+        private double _attackTimer;
+        protected bool AttackLocked => _attackLocked;   // replaces the Task 6 stub
+
+        public void TriggerAttack()
+        {
+            _attackLocked = true;
+            _attackTimer = AttackDuration(AnimationNames.Clip("attack", Facing));
+            PlayCurrent();   // CharacterMotion.State returns "attack" while locked -> all slots swing
+        }
+
+        private double AttackDuration(string clip)
+        {
+            // Read timing from the Body slot's SpriteFrames; fallback 0.5s (reference Character.cs:436).
+            if (_slots.TryGetValue(CharacterSlot.Body, out var body) &&
+                body.Sprite.SpriteFrames is { } frames && frames.HasAnimation(clip))
+            {
+                int n = frames.GetFrameCount(clip);
+                float fps = (float)frames.GetAnimationSpeed(clip);
+                if (fps > 0) return n / fps;
+            }
+            return 0.5;
+        }
 
         /// <summary>Server (or local prediction) says this character stepped to (x,y).</summary>
         public void MoveTo(int x, int y)
@@ -178,7 +200,16 @@ namespace Goose2Client.Character
             TickAttackLock(delta);   // defined in Task 8
         }
 
-        protected virtual void TickAttackLock(double delta) { }
+        protected void TickAttackLock(double delta)
+        {
+            if (!_attackLocked) return;
+            _attackTimer -= delta;
+            if (_attackTimer <= 0)
+            {
+                _attackLocked = false;
+                PlayCurrent();   // resume walk/idle/mounted-*
+            }
+        }
 
         /// <summary>Fan the current state out to every slot. The Mount slot itself always plays its
         /// own non-mounted pose (Unity forces the mount to BodyState 3); rider slots use mounted-*.</summary>
