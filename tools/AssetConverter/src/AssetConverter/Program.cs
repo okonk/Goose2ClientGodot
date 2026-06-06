@@ -1,4 +1,5 @@
 using Goose2.AssetConverter;
+using Goose2.AssetConverter.Manifest;
 using Goose2.AssetConverter.Maps;
 using Goose2.AssetConverter.SpriteFrames;
 
@@ -54,6 +55,17 @@ if (args.Length >= 1 && args[0] == "maps")
     return;
 }
 
+if (args.Length >= 1 && args[0] == "manifest")
+{
+    string outPath = args.Length >= 2
+        ? args[1]
+        : Path.GetFullPath(Path.Combine("..", "..", "Assets", "Sprites", "manifest.json"));
+    Directory.CreateDirectory(Path.GetDirectoryName(outPath)!);
+    File.WriteAllText(outPath, FrameManifestBuilder.Build(Paths.IllutiaData));
+    Console.WriteLine($"Wrote {outPath}");
+    return;
+}
+
 if (args.Length >= 1 && args[0] == "all")
 {
     string repoRoot = args.Length >= 2
@@ -68,10 +80,15 @@ if (args.Length >= 1 && args[0] == "all")
         Paths.IllutiaData, Paths.CompiledEnc, repoRoot, includeEffects: true);
     var maps = MapCopyConverter.Convert(Paths.IllutiaMaps, mapsDir);
 
+    string manifestPath = Path.Combine(repoRoot, "Assets", "Sprites", "manifest.json");
+    Directory.CreateDirectory(Path.GetDirectoryName(manifestPath)!);
+    File.WriteAllText(manifestPath, FrameManifestBuilder.Build(Paths.IllutiaData));
+
     Console.WriteLine($"Sheets: {sheets.Succeeded} ok, {sheets.Failed} failed");
     Console.WriteLine($"Animations: {animations.ResourcesWritten} character, {animations.EffectsWritten} effects, {animations.Failed} failed");
     Console.WriteLine($"Maps: {maps.Copied} copied, {maps.Failures.Count} failed");
+    Console.WriteLine($"Manifest: {manifestPath}");
     return;
 }
 
-Console.WriteLine("Usage: AssetConverter batch [outDir] | frames <id> | animations [repoRoot] | maps [outDir] | all [repoRoot]");
+Console.WriteLine("Usage: AssetConverter batch [outDir] | frames <id> | animations [repoRoot] | maps [outDir] | manifest [outPath] | all [repoRoot]");
