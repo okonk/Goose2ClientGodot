@@ -113,7 +113,8 @@ namespace Goose2Client
             if (what == NotificationWMCloseRequest)
             {
                 CharacterSettings?.Save();
-                NetworkClient?.Disconnect();
+                NetworkClient?.Quit();         // notify the server with a graceful QUIT (mirrors Unity OnApplicationQuit)
+                NetworkClient?.Disconnect();   // then tear down the socket + join the receive thread
             }
         }
 
