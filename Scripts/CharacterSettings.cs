@@ -72,7 +72,19 @@ namespace Goose2Client
                 return false;
 
             var fileContents = File.ReadAllText(filePath);
-            var deserialized = JsonSerializer.Deserialize<CharacterSettings>(fileContents, JsonOptions);
+
+            CharacterSettings deserialized;
+            try
+            {
+                deserialized = JsonSerializer.Deserialize<CharacterSettings>(fileContents, JsonOptions);
+            }
+            catch (Exception e)
+            {
+                // Corrupt/partial settings file (e.g. a truncated write) must never crash login;
+                // fall back to defaults. (FromJson covers the non-file path with the same guarantee.)
+                GD.PushWarning($"Settings load failed for {filePath}, using defaults: {e.Message}");
+                return false;
+            }
 
             if (deserialized == null) return false;
 
