@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using Godot;
 using Goose2Client.Network;
@@ -76,20 +75,25 @@ namespace Goose2Client
         public async void ChangeMap(string mapFile, string mapName)
         {
             SetPaused(true);   // buffer gameplay packets during the transition (drained on unpause)
+            try
+            {
+                GetTree().ChangeSceneToPacked(GD.Load<PackedScene>("res://Scenes/LoadingMap.tscn"));
+                await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
 
-            GetTree().ChangeSceneToPacked(GD.Load<PackedScene>("res://Scenes/LoadingMap.tscn"));
-            await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+                if (GetTree().CurrentScene is LoadingMapScene loading)
+                    loading.SetMapName(mapName);
 
-            if (GetTree().CurrentScene is LoadingMapScene loading)
-                loading.SetMapName(mapName);
+                // Step 5 hook: build the TileMapLayer world from `mapFile` here. Placeholder for now.
 
-            // Step 5 hook: build the TileMapLayer world from `mapFile` here. Placeholder for now.
+                GetTree().ChangeSceneToPacked(GD.Load<PackedScene>("res://Scenes/Map.tscn"));
+                await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
 
-            GetTree().ChangeSceneToPacked(GD.Load<PackedScene>("res://Scenes/Map.tscn"));
-            await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
-
-            NetworkClient.DoneLoadingMap();   // "DLM" — tells the server we are in the world
-            SetPaused(false);                 // drain queued gameplay packets in order
+                NetworkClient.DoneLoadingMap();   // "DLM" — tells the server we are in the world
+            }
+            finally
+            {
+                SetPaused(false);   // always drain queued gameplay packets, even if the transition throws
+            }
         }
 
         /// <summary>Load (or create default) settings for the given character.</summary>
