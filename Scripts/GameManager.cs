@@ -24,6 +24,9 @@ namespace Goose2Client
         /// <summary>Class ID → class name lookup, populated by ClassUpdatePacket.</summary>
         public Dictionary<int, string> Classes { get; } = new();
 
+        /// <summary>The parsed map for the scene currently being entered. Set in ChangeMap, read by MapManager._Ready.</summary>
+        public MapFile CurrentMap { get; set; }
+
         public override void _EnterTree()
         {
             instance = this;
@@ -83,7 +86,7 @@ namespace Goose2Client
                 if (GetTree().CurrentScene is LoadingMapScene loading)
                     loading.SetMapName(mapName);
 
-                // Step 5 hook: build the TileMapLayer world from `mapFile` here. Placeholder for now.
+                CurrentMap = LoadMap(mapFile);
 
                 GetTree().ChangeSceneToPacked(GD.Load<PackedScene>("res://Scenes/Map.tscn"));
                 await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
@@ -116,6 +119,18 @@ namespace Goose2Client
                 NetworkClient?.Quit();         // notify the server with a graceful QUIT (mirrors Unity OnApplicationQuit)
                 NetworkClient?.Disconnect();   // then tear down the socket + join the receive thread
             }
+        }
+
+        private MapFile LoadMap(string mapFile)
+        {
+            var path = $"res://Assets/Maps/{mapFile}.bytes";
+            using var f = Godot.FileAccess.Open(path, Godot.FileAccess.ModeFlags.Read);
+            if (f == null)
+            {
+                GD.PushError($"LoadMap: cannot open {path} (err {Godot.FileAccess.GetOpenError()})");
+                return null;
+            }
+            return new MapFile(f.GetBuffer((long)f.GetLength()));
         }
 
         public override void _ExitTree()
