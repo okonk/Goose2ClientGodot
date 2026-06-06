@@ -71,6 +71,15 @@ public partial class SpellbookWindow : BaseWindow, IWindow
         _listenersRegistered = true;
 
         UpdatePageButtons();
+
+        // First-login default: closed (toggle with I/C/B). Restore saved visibility if present.
+        if (WindowName != null)
+        {
+            if (GameManager.Instance.CharacterSettings.GetWindowSettings(WindowName)?.Visible is not bool savedVisible)
+                Visible = false;
+            else
+                Visible = savedVisible;
+        }
     }
 
     public override void _ExitTree()

@@ -17,7 +17,7 @@ public partial class BaseWindow : Control
 
     protected Label TitleLabel { get; private set; }
     protected Control Content { get; private set; }
-    protected Panel Background { get; private set; }
+    protected TextureRect Background { get; private set; }
 
     public string Title { set { if (TitleLabel != null) TitleLabel.Text = value; } }
 
@@ -27,14 +27,13 @@ public partial class BaseWindow : Control
         _closeButton = GetNodeOrNull<Button>("TitleBar/CloseButton");
         TitleLabel = GetNodeOrNull<Label>("TitleBar/TitleLabel");
         Content = GetNodeOrNull<Control>("Content");
-        Background = GetNodeOrNull<Panel>("Background");
+        Background = GetNodeOrNull<TextureRect>("Background");
 
-        // Restore persisted position
+        // Restore persisted position (or first-run default)
         if (WindowName != null)
         {
             var ws = GameManager.Instance.CharacterSettings.GetWindowSettings(WindowName);
-            if (ws != null)
-                Position = ws.Position;
+            Position = ws != null ? ws.Position : DefaultWindowLayout.For(WindowName);
         }
 
         // Title-bar drag
@@ -83,7 +82,17 @@ public partial class BaseWindow : Control
 
     private void OnMouseExited() => Modulate = new Color(1, 1, 1, 0.7f);
 
-    public void Toggle() => Visible = !Visible;
+    public void Toggle()
+    {
+        Visible = !Visible;
+        if (WindowName != null)
+            GameManager.Instance.CharacterSettings.SetWindowSetting(WindowName, Position, Visible);
+    }
 
-    protected virtual void OnClosePressed() => Hide();
+    protected virtual void OnClosePressed()
+    {
+        Hide();
+        if (WindowName != null)
+            GameManager.Instance.CharacterSettings.SetWindowSetting(WindowName, Position, false);
+    }
 }

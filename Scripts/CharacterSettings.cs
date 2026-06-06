@@ -29,6 +29,7 @@ namespace Goose2Client
     public class WindowSettings
     {
         public Vector2 Position;
+        public bool Visible;
     }
 
     public class CharacterSettings
@@ -157,7 +158,7 @@ namespace Goose2Client
             return null;
         }
 
-        public void SetWindowSetting(string windowName, Vector2? position = null)
+        private WindowSettings GetOrCreateWindowSettings(string windowName)
         {
             var settings = GetWindowSettings(windowName);
             if (settings == null)
@@ -165,11 +166,23 @@ namespace Goose2Client
                 settings = new WindowSettings();
                 WindowSettings[windowName] = settings;
             }
+            return settings;
+        }
 
+        public void SetWindowSetting(string windowName, Vector2? position = null)
+        {
+            var settings = GetOrCreateWindowSettings(windowName);
             if (position.HasValue)
                 settings.Position = position.Value;
+            Save();
+        }
 
-            // Direct save — debounced SaveSettingsDelayed() deferred to a later plan
+        public void SetWindowSetting(string windowName, Vector2? position, bool visible)
+        {
+            var settings = GetOrCreateWindowSettings(windowName);
+            if (position.HasValue)
+                settings.Position = position.Value;
+            settings.Visible = visible;
             Save();
         }
 

@@ -1,0 +1,23 @@
+[gd_resource type="Theme" load_steps=7 format=3]
+
+[ext_resource type="FontFile" path="res://Assets/UI/Fonts/LiberationSans.ttf" id="font"]
+[ext_resource type="Texture2D" path="res://Assets/UI/button-normal.png" id="btn_n"]
+[ext_resource type="Texture2D" path="res://Assets/UI/button-pressed.png" id="btn_p"]
+
+[sub_resource type="StyleBoxTexture" id="sb_btn_n"]
+texture = ExtResource("btn_n")
+
+[sub_resource type="StyleBoxTexture" id="sb_btn_p"]
+texture = ExtResource("btn_p")
+
+[sub_resource type="StyleBoxEmpty" id="sb_empty"]
+
+[resource]
+default_font = ExtResource("font")
+default_font_size = 10
+Label/colors/font_color = Color(1, 1, 1, 1)
+Button/styles/normal = SubResource("sb_btn_n")
+Button/styles/hover = SubResource("sb_btn_n")
+Button/styles/pressed = SubResource("sb_btn_p")
+Button/colors/font_color = Color(1, 1, 1, 1)
+Panel/styles/panel = SubResource("sb_empty")

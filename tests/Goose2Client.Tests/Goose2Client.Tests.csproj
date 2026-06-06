@@ -36,5 +36,7 @@
     <Compile Include="../../Scripts/UI/HotbarSwap.cs" />
     <Compile Include="../../Scripts/UI/SpellbookPaging.cs" />
     <Compile Include="../../Scripts/UI/ChatCommandParser.cs" />
+    <Compile Include="../../Scripts/UI/UnityRect.cs" />
+    <Compile Include="../../Scripts/UI/DefaultWindowLayout.cs" />
   </ItemGroup>
 </Project>

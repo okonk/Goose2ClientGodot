@@ -8,8 +8,8 @@ layout_mode = 0
 mouse_filter = 0
 offset_left = 0.0
 offset_top = 0.0
-offset_right = 40.0
-offset_bottom = 40.0
+offset_right = 32.0
+offset_bottom = 32.0
 
 [node name="Icon" type="TextureRect" parent="."]
 layout_mode = 0
@@ -18,8 +18,8 @@ expand_mode = 1
 stretch_mode = 2
 offset_left = 0.0
 offset_top = 0.0
-offset_right = 40.0
-offset_bottom = 40.0
+offset_right = 32.0
+offset_bottom = 32.0
 
 [node name="Count" type="Label" parent="."]
 layout_mode = 0
@@ -30,8 +30,8 @@ anchor_left = 1.0
 anchor_top = 1.0
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = -35.0
-offset_top = -35.0
+offset_left = -30.0
+offset_top = -30.0
 offset_right = -2.0
 offset_bottom = -2.0
 grow_horizontal = 2

@@ -455,7 +455,9 @@ All Step-7 deferrals are scoped as explicit tasks in
   hotbar 3×10, vendor 40, bank 30, combine 10, party 8, buffs 20 — all bounds-guarded; confirm
   against the live server's actual ranges during the manual E2E and adjust the consts if needed.
 - **Window default positions/visibility.** Positions persist via `CharacterSettings.WindowSettings`;
-  per-window saved *visibility* isn't persisted yet (only Position). Add if desired. → **task D1**.
+  per-window saved *visibility* now persists too (`WindowSettings.Visible`, saved on toggle/close,
+  restored in `_Ready`). → **task D1 ✅ Resolved (UI windows overhaul Part 1).** The Step 8 D1 item
+  is satisfied here.
 - **TextureProgressBar visuals.** HP/MP/XP/cooldown bars drive the correct `Value`, but render
   nothing without a `texture_progress` asset assigned — wire art during polish. → **task C2**.
 - **Live in-game E2E + screenshots** (top of this list) → **task E1**.
