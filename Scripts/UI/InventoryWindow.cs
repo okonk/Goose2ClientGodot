@@ -11,8 +11,11 @@ public partial class InventoryWindow : BaseWindow, IWindow
 {
     public const int InventorySize = 30;
 
+    private static readonly PackedScene SlotScene = GD.Load<PackedScene>("res://Scenes/UI/ItemSlot.tscn");
+
     private ItemSlot[] _slots;
     private Label _goldText;
+    private bool _listenersRegistered;
 
     public int WindowId => (int)WindowFrame;
     public WindowFrames WindowFrame => WindowFrames.Inventory;
@@ -25,11 +28,10 @@ public partial class InventoryWindow : BaseWindow, IWindow
 
         _slots = new ItemSlot[InventorySize];
         var grid = GetNode<GridContainer>("Content/SlotGrid");
-        var slotScene = GD.Load<PackedScene>("res://Scenes/UI/ItemSlot.tscn");
 
         for (int i = 0; i < InventorySize; i++)
         {
-            var slot = slotScene.Instantiate<ItemSlot>();
+            var slot = SlotScene.Instantiate<ItemSlot>();
             grid.AddChild(slot);
             slot.SlotNumber = i;
             slot.Window = this;
@@ -41,10 +43,12 @@ public partial class InventoryWindow : BaseWindow, IWindow
         GameManager.Instance.PacketManager.Listen<InventorySlotPacket>(OnInventorySlot);
         GameManager.Instance.PacketManager.Listen<ClearInventorySlotPacket>(OnClearInventorySlot);
         GameManager.Instance.PacketManager.Listen<StatusInfoPacket>(OnStatusInfo);
+        _listenersRegistered = true;
     }
 
     public override void _ExitTree()
     {
+        if (!_listenersRegistered) return;
         GameManager.Instance.PacketManager.Remove<InventorySlotPacket>(OnInventorySlot);
         GameManager.Instance.PacketManager.Remove<ClearInventorySlotPacket>(OnClearInventorySlot);
         GameManager.Instance.PacketManager.Remove<StatusInfoPacket>(OnStatusInfo);
