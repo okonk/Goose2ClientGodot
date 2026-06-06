@@ -259,7 +259,7 @@ animation frame sequences, and maps. **Split it: keep the parsing, replace the U
 | `SpriteAtlas` | Sprite lookup by id | `AtlasTexture` regions over spritesheet PNGs |
 | `Animator` / `AnimatorOverrideController` | Character animation | `AnimatedSprite2D` + `SpriteFrames` + C# state logic |
 | Tilemap modules | Map layers | `TileMapLayer` + `TileSet` |
-| `com.unity.nuget.newtonsoft-json` | JSON (settings, item data) | Keep Newtonsoft via NuGet, **or** Godot `Json`/`System.Text.Json` |
+| `com.unity.nuget.newtonsoft-json` | JSON (settings, item data) | `System.Text.Json` — **note**: `Dictionary<string,object>` values deserialize to `JsonElement` (not boxed primitives); reads must convert via `JsonElement` |
 
 ---
 
@@ -317,3 +317,26 @@ Each step is independently testable; the order front-loads the foundations the r
 - **Exact tint/blend** — confirm whether `Modulate` reproduces the Unity `_Tint` shader, or
   if a `ShaderMaterial` is needed.
 - **Coordinate scale** — lock "1 tile = 32 px" and a single tile↔world helper before §4/§5.
+
+## Known follow-ups / deferred hardening (surfaced during Phase 1 network port)
+
+These are real issues identified during the network-layer port + review. None block Phase 1
+(they live on paths that are out of scope for it), but each must be addressed when the relevant
+consuming layer lands:
+
+- **`NetworkClient` graceful remote-close surfaces no event.** When the server closes the
+  connection, `ReceiveLoop`'s blocking `Receive` returns 0 and the loop just exits — no
+  `SocketError`/disconnect event is marshaled to the main thread. Fine for connect-and-exit
+  validation, but the **reconnect / session layer** will have no hook to react to a dropped
+  connection. Add a main-thread "Disconnected" event on the `received == 0` path then.
+- **`Pause` drops packets instead of queue-and-replay.** `GameManager.HandlePacket` does
+  `if (NetworkClient.Pause) return;`, so any packet received while paused is discarded. Nothing
+  sets `Pause = true` yet, so this is inert today. But the Unity design used `Pause` to defer
+  packets *during map transitions* (`GameManager:90-127`); silently dropping
+  `MapObject`/`UpdateCharacter`/inventory packets while paused would desync game state.
+  **Before the map-transition layer sets `Pause`**, change this to queue-and-replay (buffer
+  while paused, drain on unpause).
+- **`CharacterSettings.Load()` is not defensive against corrupt/partial JSON.** A settings file
+  that deserializes with `Hotkeys == null` makes the `(string)` ctor throw `NullReferenceException`
+  at the `Hotkeys.Length` check. Faithful to the Unity source today; add a null-guard when the
+  settings/UI layer actually reads/writes these files.
