@@ -15,10 +15,19 @@ public partial class BaseWindow : Control
     private Button _closeButton;
     private bool _dragging;
 
+    protected Label TitleLabel { get; private set; }
+    protected Control Content { get; private set; }
+    protected Panel Background { get; private set; }
+
+    public string Title { set { if (TitleLabel != null) TitleLabel.Text = value; } }
+
     public override void _Ready()
     {
         _titleBar = GetNodeOrNull<Control>("TitleBar");
         _closeButton = GetNodeOrNull<Button>("TitleBar/CloseButton");
+        TitleLabel = GetNodeOrNull<Label>("TitleBar/TitleLabel");
+        Content = GetNodeOrNull<Control>("Content");
+        Background = GetNodeOrNull<Panel>("Background");
 
         // Restore persisted position
         if (WindowName != null)
@@ -59,6 +68,13 @@ public partial class BaseWindow : Control
         }
         else if (@event is InputEventMouseMotion motion && _dragging)
         {
+            if (!Input.IsMouseButtonPressed(MouseButton.Left))
+            {
+                _dragging = false;
+                if (WindowName != null)
+                    GameManager.Instance.CharacterSettings.SetWindowSetting(WindowName, Position);
+                return;
+            }
             Position += motion.Relative;
         }
     }
