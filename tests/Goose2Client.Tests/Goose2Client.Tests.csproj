@@ -15,6 +15,7 @@
     <Compile Include="../../Scripts/Character/AnimationNames.cs" />
     <Compile Include="../../Scripts/Character/AnimationHeights.cs" />
     <Compile Include="../../Scripts/Character/CharacterAnchor.cs" />
+    <Compile Include="../../Scripts/Character/CharacterLayout.cs" />
     <Compile Include="../../Scripts/Network/PacketParser.cs" />
     <Compile Include="../../Scripts/Network/PausablePacketQueue.cs" />
     <Compile Include="../../Scripts/CharacterSettings.cs" />
