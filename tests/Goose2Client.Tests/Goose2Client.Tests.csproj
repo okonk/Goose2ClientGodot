@@ -11,6 +11,8 @@
     <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="../../Scripts/Direction.cs" />
+    <Compile Include="../../Scripts/Character/AnimationNames.cs" />
     <Compile Include="../../Scripts/Network/PacketParser.cs" />
     <Compile Include="../../Scripts/Network/PausablePacketQueue.cs" />
     <Compile Include="../../Scripts/CharacterSettings.cs" />
