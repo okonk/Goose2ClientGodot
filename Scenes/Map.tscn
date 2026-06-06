@@ -1,0 +1,10 @@
+[gd_scene format=3]
+
+[node name="Map" type="Node2D"]
+
+[node name="StatusLabel" type="Label" parent="."]
+offset_left = 10.0
+offset_top = 10.0
+offset_right = 300.0
+offset_bottom = 40.0
+text = "Map: (rendering lands in Step 5)"
