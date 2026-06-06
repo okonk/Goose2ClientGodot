@@ -14,6 +14,9 @@ namespace Goose2Client.Character
         public int MoveSpeed { get; private set; } = 250;
         public bool IsMounted { get; private set; }
         public bool IsLocalPlayer { get; set; }
+        // Server body state: 3 = unarmed (no-equip), 4=1hand, 5=staff, 6=2hand, 7=bow. Drives whether
+        // slots play their -equip vs -no-equip idle/walk and which attack-<type> clip they swing.
+        public int BodyState { get; private set; } = 3;
 
         // Per-slot live sprite + the graphic id it was built from (needed for the height lookup).
         private sealed class Slot { public AnimatedSprite2D Sprite; public int GraphicId; }
@@ -87,6 +90,7 @@ namespace Goose2Client.Character
         {
             LoginId = p.LoginId;
             CharacterName = p.Name;
+            BodyState = p.BodyState;
             MoveSpeed = p.MoveSpeed <= 0 ? 250 : p.MoveSpeed;
             X = p.MapX; Y = p.MapY; Facing = p.Facing;
 
@@ -108,6 +112,7 @@ namespace Goose2Client.Character
         public void SetAppearance(UpdateCharacterPacket p)
         {
             if (p.MoveSpeed > 0) MoveSpeed = p.MoveSpeed;   // keep existing speed if CHP omits it
+            BodyState = p.BodyState;
 
             ApplyAppearance(p.BodyId, p.BodyR, p.BodyG, p.BodyB, p.BodyA,
                             p.HairId, p.HairR, p.HairG, p.HairB, p.HairA,
@@ -214,15 +219,16 @@ namespace Goose2Client.Character
         public void TriggerAttack()
         {
             _attackLocked = true;
-            _attackTimer = AttackDuration(AnimationNames.Clip("attack", Facing));
+            _attackTimer = AttackDuration();
             PlayCurrent();   // CharacterMotion.State returns "attack" while locked -> all slots swing
         }
 
-        private double AttackDuration(string clip)
+        private double AttackDuration()
         {
-            // Read timing from the Body slot's SpriteFrames; fallback 0.5s (reference Character.cs:436).
+            // Time the lock to the Body's actual attack clip (weapon-type aware); fallback 0.5s.
             if (_slots.TryGetValue(CharacterSlot.Body, out var body) &&
-                body.Sprite.SpriteFrames is { } frames && frames.HasAnimation(clip))
+                ResolveClip(body, "attack", BodyState) is { } clip &&
+                body.Sprite.SpriteFrames is { } frames)
             {
                 int n = frames.GetFrameCount(clip);
                 float fps = (float)frames.GetAnimationSpeed(clip);
@@ -331,17 +337,26 @@ namespace Goose2Client.Character
             foreach (var (slot, s) in _slots)
             {
                 bool slotMounted = IsMounted && slot != CharacterSlot.Mount;
-                string state = CharacterMotion.State(IsMoving, AttackLocked, slotMounted);
-                string clip = AnimationNames.Clip(state, Facing);
-                var frames = s.Sprite.SpriteFrames;
-                if (frames == null || !frames.HasAnimation(clip))
-                    clip = AnimationNames.Clip(IsMoving ? "walk" : "idle", Facing);   // fallback to generic
-                if (frames == null || !frames.HasAnimation(clip)) continue;
+                string motion = CharacterMotion.State(IsMoving, AttackLocked, slotMounted);
+                // The mount itself always animates as an unmounted walking body (Unity forces state 3).
+                int state = slot == CharacterSlot.Mount ? 3 : BodyState;
+                if (ResolveClip(s, motion, state) is not { } clip) continue;
 
                 int h = _heights.GetHeight($"{HeightPrefix(slot)}-{s.GraphicId}-{clip}");
                 s.Sprite.Offset = new Vector2(0, CharacterAnchor.OffsetY(h));
                 s.Sprite.Play(clip);
             }
+        }
+
+        /// <summary>First candidate clip (per BodyState/equip/weapon-type) that this slot's
+        /// SpriteFrames actually contains, or null if none match.</summary>
+        private string ResolveClip(Slot s, string motion, int state)
+        {
+            var frames = s.Sprite.SpriteFrames;
+            if (frames == null) return null;
+            foreach (var cand in AnimationNames.Candidates(motion, state, Facing))
+                if (frames.HasAnimation(cand)) return cand;
+            return null;
         }
     }
 }
