@@ -357,7 +357,12 @@ Each step is independently testable; the order front-loads the foundations the r
    at runtime with zero errors** (headless smoke test). **Not yet done in this environment:** live
    in-game E2E (interactive drag/drop, vendor/bank/combine flows, chat round-trip, screenshots) —
    blocked by no display/Xvfb, no `run` skill, and no test credentials; see Step 7 deferred.
-8. **Polish** — tooltips, emotes, spell/battle-text overlays, lighting, settings persistence.
+8. **Polish** — character paper-doll portrait (`VitalsCharacterDisplay`), on-screen spell
+   **targeting** (`SpellTargetManager`), sprite-accurate character clicks + map-item hover tooltip,
+   world-space **overlays** (chat bubble, battle text, emote, spell animation), 2D lighting,
+   `TextureProgressBar` art, window-visibility persistence, and the **live end-to-end validation
+   pass** Step 7 couldn't run headless. Every Step-6/7 deferral below is scoped as an explicit task
+   in **`docs/plans/2026-06-06-step8-polish-overlays.md`** so nothing falls through the cracks.
 
 ## Open questions / risks to resolve before Phase 2
 
@@ -386,6 +391,7 @@ consuming layer lands:
   `SocketError`/disconnect event is marshaled to the main thread. Fine for connect-and-exit
   validation, but the **reconnect / session layer** will have no hook to react to a dropped
   connection. Add a main-thread "Disconnected" event on the `received == 0` path then.
+  → **Step 8 task D2** (`docs/plans/2026-06-06-step8-polish-overlays.md`).
 - **`Pause` drops packets instead of queue-and-replay.** ✅ Resolved (Step 4). `GameManager` now
   uses `PausablePacketQueue` to buffer packets FIFO while paused and drain on unpause via
   `GameManager.SetPaused(bool)`. See `Scripts/Network/PausablePacketQueue.cs` +
@@ -401,18 +407,21 @@ Surfaced during the Step 6 characters port; none block Step 6 itself:
 
 - **Occupancy check in `IsValidMove`.** Local-player prediction only blocks on map-blocked tiles;
   it does not reject tiles occupied by another character yet. Add a `_characters` occupancy test
-  when the collision/combat layer needs it.
+  when the collision/combat layer needs it. → **Step 8 task D3**.
 - **Missing converter assets (e.g. `Hair/16`).** The live server sends graphic ids the converter
   didn't emit (`Assets/Sprites/Hair/16/animations.tres` is absent; ids 1–15, 17–28 exist). The
   slot is skipped gracefully (renders bald). Regenerate assets / fix converter coverage.
+  → **Step 8 task D4** (may belong to the asset pipeline, not the UI branch).
 - **MP bar.** ✅ **Resolved (Step 7).** `VitalsWindow` renders both HP and MP bars from
   `StatusInfoPacket`. (`Character.SetVitals` also now stores `HPPercent`/`MPPercent` for the party UI.)
 - **Dyed-gear color space.** The tint shader mixes in whatever space Godot samples; if dyed gear
   looks slightly off vs Unity, revisit sRGB/linear handling (the `source_color` hint / mix space).
+  → **Step 8 task C3**.
 - **Staff / 2h / bow attack clips (BodyState 5/6/7).** Implemented from the `BodyState`→weapon-type
   mapping, but only 1hand (state 4) was live-verified — confirm the others when such a character
-  is available.
+  is available. → **Step 8 task D5/E1** (`docs/plans/2026-06-06-step8-polish-overlays.md`).
 - **Step-8 overlays.** Chat bubble, battle text, spell/emote overlays (out of Step 6 scope).
+  → **Step 8 tasks B1–B4**.
 
 ### Step 7 deferred
 
@@ -426,21 +435,27 @@ Surfaced during the Step 7 UI-windows port; none block Step 7 itself:
   party vitals, buff add/remove, options persistence, window-drag persistence across relog) and a
   screenshot were **not** done — the environment has no display/Xvfb, no `run` skill, and no test
   credentials. Run this manually on a desktop with `GOOSE_HOST=scyther.local GOOSE_PORT=2006`.
+All Step-7 deferrals are scoped as explicit tasks in
+**`docs/plans/2026-06-06-step8-polish-overlays.md`** (task ids in brackets below).
+
 - **`SpellTargetManager` is a stub.** Targeted spell casting + on-screen targeting is Step 8;
-  `SpellbookWindow.UseSpell` wires the call but it no-ops (`// TODO(step8)`).
-- **`VitalsCharacterDisplay` is a stub.** Renders no paper-doll yet; resolves the local player and
-  defers the static idle-down render to Step 8 (`// TODO(step8)`).
+  `SpellbookWindow.UseSpell` wires the call but it no-ops (`// TODO(step8)`). → **task A2**.
+- **`VitalsCharacterDisplay` is a stub.** Resolves the local player but renders nothing, and is
+  **not yet instantiated in any scene**. The Unity original is a static layered portrait (body/
+  hair/eyes/chest/helmet), not an animation — needs `Character` to expose appearance data first.
+  → **task A1** (incl. the Character-appearance-accessor prerequisite).
 - **Sprite-accurate character clicks + map-item hover tooltip.** `MapManager._UnhandledInput`
   resolves clicks by tile (clicking a character's foot tile targets them via server coords), but
   pixel-accurate body hit-testing and the on-hover map-item tooltip are deferred to Step 8
   (`MapItem` doesn't carry `ItemStats`, and the Control-parent tooltip lifetime doesn't fit a
-  world-space `Sprite2D`).
+  world-space `Sprite2D`). → **task A3**.
 - **BBCode chat injection hardened.** Player chat is escaped (`[`→`[lb]`) before rendering in the
   BBCode log, preventing markup/URL injection — noted here as a security decision, not a gap.
 - **Slot counts are reasonable defaults, tune live.** Inventory 30, equipped 14, spellbook 8×30,
   hotbar 3×10, vendor 40, bank 30, combine 10, party 8, buffs 20 — all bounds-guarded; confirm
   against the live server's actual ranges during the manual E2E and adjust the consts if needed.
 - **Window default positions/visibility.** Positions persist via `CharacterSettings.WindowSettings`;
-  per-window saved *visibility* isn't persisted yet (only Position). Add if desired.
+  per-window saved *visibility* isn't persisted yet (only Position). Add if desired. → **task D1**.
 - **TextureProgressBar visuals.** HP/MP/XP/cooldown bars drive the correct `Value`, but render
-  nothing without a `texture_progress` asset assigned — wire art during polish.
+  nothing without a `texture_progress` asset assigned — wire art during polish. → **task C2**.
+- **Live in-game E2E + screenshots** (top of this list) → **task E1**.
