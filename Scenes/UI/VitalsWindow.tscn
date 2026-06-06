@@ -1,58 +1,150 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene load_steps=9 format=3]
 
 [ext_resource type="Script" path="res://Scripts/UI/VitalsWindow.cs" id="1_vitals"]
+[ext_resource type="Script" path="res://Scripts/UI/VitalsCharacterDisplay.cs" id="2_char"]
+[ext_resource type="Theme" path="res://Assets/UI/GameTheme.tres" id="theme"]
+[ext_resource type="Texture2D" path="res://Assets/UI/vitals-outline.png" id="bg_tex"]
+[ext_resource type="Texture2D" path="res://Assets/UI/vitals-hp-bar.png" id="hp_tex"]
+[ext_resource type="Texture2D" path="res://Assets/UI/vitals-mp-bar.png" id="mp_tex"]
+[ext_resource type="Texture2D" path="res://Assets/UI/vitals-character-circle.png" id="circle_tex"]
 
 [node name="VitalsWindow" type="Control"]
 script = ExtResource("1_vitals")
+theme = ExtResource("theme")
+layout_mode = 0
+offset_left = 8.0
+offset_top = 8.0
+offset_right = 191.0
+offset_bottom = 63.0
+
+[node name="Background" type="TextureRect" parent="."]
 layout_mode = 0
 offset_left = 0.0
 offset_top = 0.0
-offset_right = 160.0
-offset_bottom = 60.0
+offset_right = 183.0
+offset_bottom = 55.0
+texture = ExtResource("bg_tex")
+mouse_filter = 2
 
 [node name="HpBar" type="TextureProgressBar" parent="."]
 layout_mode = 0
+offset_left = 49.0
+offset_top = 10.0
+offset_right = 182.0
+offset_bottom = 27.0
+texture_progress = ExtResource("hp_tex")
+fill_mode = 0
 mouse_filter = 0
 max_value = 1.0
-tint_progress = Color( 1, 0, 0, 1 )
-offset_left = 2.0
-offset_top = 2.0
-offset_right = 158.0
-offset_bottom = 14.0
-
-[node name="HpText" type="Label" parent="."]
-layout_mode = 0
-mouse_filter = 2
-offset_left = 2.0
-offset_top = 2.0
-offset_right = 158.0
-offset_bottom = 14.0
-horizontal_alignment = 1
 
 [node name="MpBar" type="TextureProgressBar" parent="."]
 layout_mode = 0
+offset_left = 49.0
+offset_top = 28.0
+offset_right = 157.0
+offset_bottom = 45.0
+texture_progress = ExtResource("mp_tex")
+fill_mode = 0
 mouse_filter = 0
 max_value = 1.0
-tint_progress = Color( 0, 0, 1, 1 )
-offset_left = 2.0
-offset_top = 18.0
-offset_right = 158.0
-offset_bottom = 30.0
+
+[node name="HpText" type="Label" parent="."]
+layout_mode = 0
+offset_left = 49.0
+offset_top = 10.0
+offset_right = 182.0
+offset_bottom = 27.0
+mouse_filter = 2
+horizontal_alignment = 1
+vertical_alignment = 1
 
 [node name="MpText" type="Label" parent="."]
 layout_mode = 0
+offset_left = 49.0
+offset_top = 28.0
+offset_right = 157.0
+offset_bottom = 45.0
 mouse_filter = 2
-offset_left = 2.0
-offset_top = 18.0
-offset_right = 158.0
-offset_bottom = 30.0
 horizontal_alignment = 1
+vertical_alignment = 1
 
 [node name="LevelText" type="Label" parent="."]
 layout_mode = 0
-mouse_filter = 0
-offset_left = 2.0
-offset_top = 34.0
-offset_right = 158.0
+offset_left = 37.0
+offset_top = 36.0
+offset_right = 56.0
 offset_bottom = 56.0
+mouse_filter = 0
 horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Portrait" type="Control" parent="."]
+script = ExtResource("2_char")
+layout_mode = 0
+offset_left = 1.0
+offset_top = 1.0
+offset_right = 54.0
+offset_bottom = 54.0
+mouse_filter = 2
+
+[node name="Mask" type="Control" parent="Portrait"]
+layout_mode = 0
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 53.0
+offset_bottom = 53.0
+mouse_filter = 2
+
+[node name="Body" type="TextureRect" parent="Portrait/Mask"]
+layout_mode = 0
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 53.0
+offset_bottom = 53.0
+mouse_filter = 2
+expand_mode = 1
+
+[node name="Eyes" type="TextureRect" parent="Portrait/Mask"]
+layout_mode = 0
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 53.0
+offset_bottom = 53.0
+mouse_filter = 2
+expand_mode = 1
+
+[node name="Hair" type="TextureRect" parent="Portrait/Mask"]
+layout_mode = 0
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 53.0
+offset_bottom = 53.0
+mouse_filter = 2
+expand_mode = 1
+
+[node name="Chest" type="TextureRect" parent="Portrait/Mask"]
+layout_mode = 0
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 53.0
+offset_bottom = 53.0
+mouse_filter = 2
+expand_mode = 1
+
+[node name="Helmet" type="TextureRect" parent="Portrait/Mask"]
+layout_mode = 0
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 53.0
+offset_bottom = 53.0
+mouse_filter = 2
+expand_mode = 1
+
+[node name="CircleFrame" type="TextureRect" parent="Portrait"]
+layout_mode = 0
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 53.0
+offset_bottom = 53.0
+texture = ExtResource("circle_tex")
+mouse_filter = 2
