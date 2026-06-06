@@ -209,6 +209,8 @@ namespace Goose2Client.Character
 
         public override void _Process(double delta)
         {
+            ProcessLocalInput(delta);
+
             if (_moving)
             {
                 float speed = CharacterMotion.PixelsPerSecond(MoveSpeed);
@@ -221,6 +223,50 @@ namespace Goose2Client.Character
             }
             TickAttackLock(delta);   // defined in Task 8
         }
+
+        private const double MoveRepeatDelay = 0.12;   // Unity used ~0.1s debounce
+        private double _moveCooldown;
+
+        private void ProcessLocalInput(double delta)
+        {
+            if (!IsLocalPlayer) return;
+            _moveCooldown -= delta;
+
+            if (Input.IsActionJustPressed("Attack")) { TriggerAttack(); GameManager.Instance.NetworkClient.Attack(); }
+
+            if (_moving || _moveCooldown > 0) return;
+
+            Direction? dir = null;
+            if (Input.IsActionPressed("MoveUp")) dir = Direction.Up;
+            else if (Input.IsActionPressed("MoveDown")) dir = Direction.Down;
+            else if (Input.IsActionPressed("MoveLeft")) dir = Direction.Left;
+            else if (Input.IsActionPressed("MoveRight")) dir = Direction.Right;
+            if (dir == null) return;
+
+            var (dx, dy) = Delta(dir.Value);
+            int nx = X + dx, ny = Y + dy;
+            var map = GetParent()?.GetParent() as Goose2Client.MapManager;   // Characters -> Map(MapManager)
+            if (map != null && map.IsValidMove(nx, ny))
+            {
+                MoveTo(nx, ny);
+                GameManager.Instance.NetworkClient.Move(dir.Value);
+            }
+            else if (Facing != dir.Value)
+            {
+                SetFacing(dir.Value);
+                GameManager.Instance.NetworkClient.Face(dir.Value);
+            }
+            _moveCooldown = MoveRepeatDelay;
+        }
+
+        private static (int dx, int dy) Delta(Direction d) => d switch
+        {
+            Direction.Up => (0, -1),
+            Direction.Down => (0, 1),
+            Direction.Left => (-1, 0),
+            Direction.Right => (1, 0),
+            _ => (0, 0),
+        };
 
         protected void TickAttackLock(double delta)
         {
