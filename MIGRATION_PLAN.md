@@ -404,6 +404,31 @@ Each step is independently testable; the order front-loads the foundations the r
    visual acceptance checklist (drag/tooltips/cast/hotbar/toolbar against `scyther.local:2006`)
    needs a desktop display + the live server + credentials — the same environment gap as the
    Part 1/2 Task 10 pass — so it is owned by the user's live run, not landed headless here.
+
+   **UI Window Overhaul — Part 4: interaction & visual fixes (2026-06-07).** ✅ **Landed** (branch
+   `fix/ui-windows-part4`). Fixed the round-2 bugs found after Part 3: (1) **tooltips render above
+   all windows** — moved them onto a dedicated high `CanvasLayer` (Layer 100) instead of being
+   GameHud siblings that windows occluded (mirrors Unity's tooltip canvas `sortingOrder 10000`);
+   (2) **tooltips have a solid black background** — added a `StyleBoxFlat` Panel as the first child
+   of each tooltip, with the item tooltip sized to its content each frame so the full-rect panel
+   covers icon + text; (3) **window drag + exit button work on every window incl. Character** —
+   `BaseWindow._Ready` now raises the `TitleBar` to the topmost sibling (`MoveChild`) so its drag
+   region and `CloseButton` always win even under a full-rect `Content` child (CharacterWindow's
+   `SlotGrid`); (4) **vitals HP/MP numbers left-aligned**; (5) **inventory stack count moved to the
+   slot's top-right, right-aligned** (shared `ItemSlot.tscn`, so vendor/bank/combine/character match);
+   (6) **hotbar slots gained frames, 1–0 number labels, and full-size icons** — added a slot
+   background + a `SlotNumber` label driven by a new unit-tested pure helper
+   `HotbarSlot.SlotLabel(index)` (9→"0", else index+1), and fixed the `stretch_mode = KEEP` icon bug
+   on `HotbarSlot`/`ItemSlot`/`SpellSlot` (now `SCALE`, fills the cell); (7) **party slots hidden
+   until a real `GroupUpdate`** — `Content` defaults `visible = false` in the scene + a defensive
+   `_Ready` guard, revealed by the existing `OnGroupUpdate` toggle. Build clean (0 errors); unit
+   tests now **160** (added 4 `HotbarSlot.SlotLabel` cases via TDD); the test project's `Compile`
+   list was switched to a `Scripts/**/*.cs` glob so `HotbarSlot` (which transitively needs
+   `GameManager`) compiles into the test assembly. **Carry-forward:** on-screen spell *targeting*
+   (`SpellTargetManager` is still a stub) is deliberately out of scope here — it's a gameplay system
+   tracked as Step 8 Task 9 (A2); self-cast spells already work. **Deferred:** the live in-game
+   visual acceptance checklist (tooltips/drag/close/hotbar/party against `scyther.local:2006`) needs
+   a desktop display + live server, so it is owned by the user's live run, not landed headless here.
 8. **Polish** — character paper-doll portrait (`VitalsCharacterDisplay`), on-screen spell
    **targeting** (`SpellTargetManager`), sprite-accurate character clicks + map-item hover tooltip,
    world-space **overlays** (chat bubble, battle text, emote, spell animation), 2D lighting,
