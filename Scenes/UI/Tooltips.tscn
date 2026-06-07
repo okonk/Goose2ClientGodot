@@ -80,17 +80,21 @@ visible = false
 
 [node name="Background" type="Panel" parent="SpellTooltip"]
 layout_mode = 0
-offset_right = 200.0
-offset_bottom = 24.0
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
 mouse_filter = 2
 theme_override_styles/panel = SubResource("sb_tooltip_bg")
 
 [node name="Label" type="Label" parent="SpellTooltip"]
 layout_mode = 0
-offset_left = 0.0
-offset_top = 0.0
-offset_right = 200.0
-offset_bottom = 24.0
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 4.0
+offset_top = 2.0
+offset_right = -4.0
+offset_bottom = -2.0
 
 [node name="TextTooltip" type="Control" parent="."]
 script = ExtResource("4_text")
@@ -100,17 +104,21 @@ visible = false
 
 [node name="Background" type="Panel" parent="TextTooltip"]
 layout_mode = 0
-offset_right = 200.0
-offset_bottom = 24.0
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
 mouse_filter = 2
 theme_override_styles/panel = SubResource("sb_tooltip_bg")
 
 [node name="Label" type="Label" parent="TextTooltip"]
 layout_mode = 0
-offset_left = 0.0
-offset_top = 0.0
-offset_right = 200.0
-offset_bottom = 24.0
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 4.0
+offset_top = 2.0
+offset_right = -4.0
+offset_bottom = -2.0
 
 [node name="MapItemTooltip" type="Control" parent="."]
 script = ExtResource("5_mapitem")
@@ -120,23 +128,24 @@ visible = false
 
 [node name="Background" type="Panel" parent="MapItemTooltip"]
 layout_mode = 0
-offset_right = 200.0
-offset_bottom = 40.0
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
 mouse_filter = 2
 theme_override_styles/panel = SubResource("sb_tooltip_bg")
 
 [node name="Name" type="Label" parent="MapItemTooltip"]
 layout_mode = 0
-offset_left = 0.0
-offset_top = 0.0
-offset_right = 200.0
-offset_bottom = 24.0
+offset_left = 4.0
+offset_top = 2.0
+offset_right = 400.0
+offset_bottom = 20.0
 
 [node name="Bind" type="Label" parent="MapItemTooltip"]
 layout_mode = 0
-offset_left = 0.0
+offset_left = 4.0
 offset_top = 24.0
-offset_right = 200.0
+offset_right = 400.0
 offset_bottom = 40.0
 text = "Bound"
 theme_override_colors/font_color = Color(0.7, 0.5, 0.3, 1)

@@ -27,6 +27,9 @@ namespace Goose2Client.UI
                 return;
             }
 
+            // Size to the label's content (+padding) so the full-rect Background wraps the text.
+            Size = _label.GetCombinedMinimumSize() + new Vector2(8f, 4f);
+
             PositionTooltip();
         }
 

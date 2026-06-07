@@ -37,6 +37,14 @@ namespace Goose2Client.UI
                 return;
             }
 
+            // Size to content so the full-rect Background wraps the name (+ bind line when shown).
+            // The Bind label sits at a fixed y=24, so the height is one or two fixed rows.
+            float width = _nameLabel.GetCombinedMinimumSize().X;
+            if (_bindLabel.Visible)
+                width = Mathf.Max(width, _bindLabel.GetCombinedMinimumSize().X);
+            float height = _bindLabel.Visible ? 40f : 24f;
+            Size = new Vector2(width + 8f, height);
+
             PositionTooltip();
         }
 
