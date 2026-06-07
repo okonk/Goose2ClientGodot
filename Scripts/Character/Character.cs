@@ -29,6 +29,7 @@ namespace Goose2Client.Character
 
         private Label _nameLabel;
         private ColorRect _hpBar;
+        private Goose2Client.Overlays.BattleText _battleText;
 
         private void EnsureBars()
         {
@@ -422,6 +423,18 @@ void fragment() {
             foreach (var cand in AnimationNames.Candidates(motion, state, Facing))
                 if (frames.HasAnimation(cand)) return cand;
             return null;
+        }
+
+        public void AddBattleText(Goose2Client.Overlays.BattleTextType type, string text)
+        {
+            _battleText ??= new Goose2Client.Overlays.BattleText
+            {
+                Name = "BattleText",
+                Position = new Vector2(0, -40),   // above the character, adjusted by Part 2
+                ZIndex = 20,
+            };
+            if (_battleText.GetParent() != this) AddChild(_battleText);
+            _battleText.AddText(type, text, Height);
         }
     }
 }
