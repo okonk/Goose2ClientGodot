@@ -1,45 +1,62 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene load_steps=6 format=3]
 
 [ext_resource type="Script" path="res://Scripts/UI/PartyMember.cs" id="1_pm"]
+[ext_resource type="Theme" path="res://Assets/UI/GameTheme.tres" id="theme"]
+[ext_resource type="Texture2D" path="res://Assets/UI/party-frame.png" id="frame_tex"]
+[ext_resource type="Texture2D" path="res://Assets/UI/party-hp-bar.png" id="hp_tex"]
+[ext_resource type="Texture2D" path="res://Assets/UI/party-mp-bar.png" id="mp_tex"]
 
 [node name="PartyMember" type="Control"]
 script = ExtResource("1_pm")
+theme = ExtResource("theme")
 layout_mode = 0
 offset_left = 0.0
 offset_top = 0.0
-offset_right = 180.0
-offset_bottom = 24.0
+offset_right = 87.0
+offset_bottom = 33.0
 
 [node name="Content" type="Control" parent="."]
 layout_mode = 0
 offset_left = 0.0
 offset_top = 0.0
-offset_right = 180.0
-offset_bottom = 24.0
+offset_right = 87.0
+offset_bottom = 33.0
+
+[node name="Background" type="TextureRect" parent="Content"]
+layout_mode = 0
+offset_left = 0.0
+offset_top = 10.0
+offset_right = 87.0
+offset_bottom = 33.0
+texture = ExtResource("frame_tex")
+mouse_filter = 2
 
 [node name="NameText" type="Label" parent="Content"]
 layout_mode = 0
-offset_left = 2.0
-offset_top = 1.0
-offset_right = 70.0
-offset_bottom = 23.0
+offset_left = 1.0
+offset_top = 0.0
+offset_right = 86.0
+offset_bottom = 11.0
+horizontal_alignment = 1
 
 [node name="HpBar" type="TextureProgressBar" parent="Content"]
 layout_mode = 0
+offset_left = 1.0
+offset_top = 11.0
+offset_right = 86.0
+offset_bottom = 21.0
+texture_progress = ExtResource("hp_tex")
+fill_mode = 0
 mouse_filter = 2
 max_value = 1.0
-tint_progress = Color( 1, 0, 0, 1 )
-offset_left = 72.0
-offset_top = 1.0
-offset_right = 134.0
-offset_bottom = 12.0
 
 [node name="MpBar" type="TextureProgressBar" parent="Content"]
 layout_mode = 0
+offset_left = 1.0
+offset_top = 22.0
+offset_right = 69.0
+offset_bottom = 32.0
+texture_progress = ExtResource("mp_tex")
+fill_mode = 0
 mouse_filter = 2
 max_value = 1.0
-tint_progress = Color( 0, 0, 1, 1 )
-offset_left = 72.0
-offset_top = 13.0
-offset_right = 134.0
-offset_bottom = 24.0

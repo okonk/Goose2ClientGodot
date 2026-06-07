@@ -8,8 +8,8 @@ layout_mode = 0
 mouse_filter = 0
 offset_left = 0.0
 offset_top = 0.0
-offset_right = 28.0
-offset_bottom = 28.0
+offset_right = 20.0
+offset_bottom = 20.0
 
 [node name="Icon" type="TextureRect" parent="."]
 layout_mode = 0
@@ -18,5 +18,5 @@ expand_mode = 1
 stretch_mode = 2
 offset_left = 0.0
 offset_top = 0.0
-offset_right = 28.0
-offset_bottom = 28.0
+offset_right = 20.0
+offset_bottom = 20.0
