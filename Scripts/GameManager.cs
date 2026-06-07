@@ -72,6 +72,7 @@ namespace Goose2Client
 
             Sprites = new SpriteCache();
             SpellTargetManager = new SpellTargetManager();
+            AddChild(SpellTargetManager);
         }
 
         /// <summary>
