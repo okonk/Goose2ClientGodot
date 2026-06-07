@@ -43,8 +43,14 @@ public partial class GameHud : Control
         drop.SetAnchorsPreset(LayoutPreset.FullRect);
         AddChild(drop);
 
-        // 3. Tooltips (sets TooltipManager.Instance).
-        Add<Control>("res://Scenes/UI/Tooltips.tscn");
+        // 3. Tooltips on a dedicated high CanvasLayer so they always render above every
+        //    window (mirrors Unity's tooltip Canvas sortingOrder 10000). The HUD itself
+        //    sits in GameManager.UiLayer (Layer 1); 100 guarantees tooltips win even over
+        //    runtime-created windows (Info/Quest). TooltipManager._Ready still sets Instance.
+        var tooltipLayer = new CanvasLayer { Layer = 100 };
+        AddChild(tooltipLayer);
+        var tooltips = GD.Load<PackedScene>("res://Scenes/UI/Tooltips.tscn").Instantiate<Control>();
+        tooltipLayer.AddChild(tooltips);
 
         // 4. Instantiate each window scene.
         Vitals = Add<VitalsWindow>("res://Scenes/UI/VitalsWindow.tscn");
