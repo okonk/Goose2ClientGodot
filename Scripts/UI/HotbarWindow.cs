@@ -51,12 +51,12 @@ public partial class HotbarWindow : BaseWindow, IWindow
         _xpBar.MaxValue = 1;
         _xpText = GetNode<Label>("Content/XpText");
 
-        // XP bar tooltip
+        // XP bar tooltip. The XpText label overlaps the bar and (mouse_filter=Pass) eats the
+        // hover, so wire the label too — otherwise hovering the number wouldn't show the tooltip.
         _xpBar.MouseEntered += () => TooltipManager.Instance.ShowTextTooltip(_xpTooltip, _xpBar);
-        _xpBar.MouseExited += () =>
-        {
-            TooltipManager.Instance.HideTextTooltip();
-        };
+        _xpBar.MouseExited += () => TooltipManager.Instance.HideTextTooltip();
+        _xpText.MouseEntered += () => TooltipManager.Instance.ShowTextTooltip(_xpTooltip, _xpText);
+        _xpText.MouseExited += () => TooltipManager.Instance.HideTextTooltip();
 
         // Back / Next buttons
         _backButton.Pressed += OnBackClicked;
@@ -191,7 +191,14 @@ public partial class HotbarWindow : BaseWindow, IWindow
     private void OnExperienceBar(object o)
     {
         var p = (ExperienceBarPacket)o;
-        _xpBar.Value = p.Percentage;
+
+        // Fill the green bar by the fraction of the current level that is complete:
+        // Experience (earned into this level) / (Experience + ExperienceToNextLevel = level total).
+        // This matches the tooltip's "{Experience} / {Experience + ExperienceToNextLevel}" math and
+        // is robust to the server's Percentage field being on an unexpected scale. At max level
+        // (no XP to next) total collapses to Experience, giving a full bar.
+        long total = p.Experience + p.ExperienceToNextLevel;
+        _xpBar.Value = total <= 0 ? 1.0 : Math.Clamp((double)p.Experience / total, 0.0, 1.0);
         _xpText.Text = p.ExperienceToNextLevel.ToString("N0");
 
         if (p.Percentage == 1 && p.Experience == p.ExperienceToNextLevel)
