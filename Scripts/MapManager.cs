@@ -68,6 +68,7 @@ public partial class MapManager : Node2D
         pm.Listen<AttackPacket>(OnAttack);
         pm.Listen<VitalsPercentagePacket>(OnVitals);
         pm.Listen<WeaponSpeedPacket>(OnWeaponSpeed);
+        pm.Listen<BattleTextPacket>(OnBattleText);
         _listenersRegistered = true;
 
         GameManager.Instance.CurrentMapManager = this;
@@ -95,6 +96,7 @@ public partial class MapManager : Node2D
         pm.Remove<AttackPacket>(OnAttack);
         pm.Remove<VitalsPercentagePacket>(OnVitals);
         pm.Remove<WeaponSpeedPacket>(OnWeaponSpeed);
+        pm.Remove<BattleTextPacket>(OnBattleText);
     }
 
     /// <summary>Bounds + blocked + occupancy check (Unity IsValidMove).</summary>
@@ -228,6 +230,12 @@ public partial class MapManager : Node2D
     }
 
     private void OnWeaponSpeed(object packetObj) => WeaponSpeed = ((WeaponSpeedPacket)packetObj).Speed;
+
+    private void OnBattleText(object packetObj)
+    {
+        var p = (BattleTextPacket)packetObj;
+        GetCharacter(p.LoginId)?.AddBattleText(p.BattleTextType, p.Text);
+    }
 
     private void OnTileUpdate(object packetObj)
     {

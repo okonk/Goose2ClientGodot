@@ -425,7 +425,7 @@ void fragment() {
             return null;
         }
 
-        public void AddBattleText(Goose2Client.Overlays.BattleTextType type, string text)
+        public void AddBattleText(BattleTextType type, string text)
         {
             _battleText ??= new Goose2Client.Overlays.BattleText
             {
