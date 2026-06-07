@@ -1,6 +1,7 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene load_steps=3 format=3]
 
 [ext_resource type="Script" path="res://Scripts/UI/SpellSlot.cs" id="1_spells"]
+[ext_resource type="Texture2D" path="res://Assets/UI/cooldown-fill.tres" id="cooldown_fill"]
 
 [node name="SpellSlot" type="Panel"]
 script = ExtResource("1_spells")
@@ -29,6 +30,7 @@ max_value = 1.0
 value = 0.0
 fill_mode = 4
 tint_progress = Color(0, 0, 0, 0.5)
+texture_progress = ExtResource("cooldown_fill")
 offset_left = 0.0
 offset_top = 0.0
 offset_right = 24.0

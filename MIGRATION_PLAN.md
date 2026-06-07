@@ -269,7 +269,7 @@ animation frame sequences, and maps. **Split it: keep the parsing, replace the U
 | `com.unity.inputsystem` (`.inputactions`, `PlayerInput`) | Input | Godot `InputMap` + `Input`/`_UnhandledInput` |
 | `com.unity.textmeshpro` | Text | `Label`/`RichTextLabel` + `FontFile` |
 | `com.unity.ugui` (Canvas) | UI | `Control` nodes + `Theme` |
-| `com.unity.render-pipelines.universal` (URP, 2D lights) | Rendering/lighting | Godot 2D renderer + `PointLight2D`/`CanvasModulate` |
+| `com.unity.render-pipelines.universal` (URP, 2D lights) | Rendering/lighting | Godot 2D renderer — **C1 intentionally skipped**: Unity used a single static global white `Light2D` (no gameplay lighting packets from server); no lighting node needed. At most a fixed-ambient `CanvasModulate` could be added later if E1 live diff requires it. |
 | `*.assetbundle` / StreamingAssets | Packaged graphics/anims | **Removed** — Godot-native atlases/`SpriteFrames` (§8) |
 | `SpriteAtlas` | Sprite lookup by id | `AtlasTexture` regions over spritesheet PNGs |
 | `Animator` / `AnimatorOverrideController` | Character animation | `AnimatedSprite2D` + `SpriteFrames` + C# state logic |
@@ -486,9 +486,9 @@ Surfaced during the Step 6 characters port; none block Step 6 itself:
   → **Step 8 task D4** (may belong to the asset pipeline, not the UI branch).
 - **MP bar.** ✅ **Resolved (Step 7).** `VitalsWindow` renders both HP and MP bars from
   `StatusInfoPacket`. (`Character.SetVitals` also now stores `HPPercent`/`MPPercent` for the party UI.)
-- **Dyed-gear color space.** The tint shader mixes in whatever space Godot samples; if dyed gear
-  looks slightly off vs Unity, revisit sRGB/linear handling (the `source_color` hint / mix space).
-  → **Step 8 task C3**.
+- **Dyed-gear color space (C3).** **Conditional, deferred to live E1 (Task 10).** The `_Tint` shader
+  mixes in Godot's sample space; only revisit the `source_color` hint / sRGB-vs-linear mix if E1
+  shows dyed gear looks off vs Unity. No code change now (may be a no-op).
 - **Staff / 2h / bow attack clips (BodyState 5/6/7).** Implemented from the `BodyState`→weapon-type
   mapping, but only 1hand (state 4) was live-verified — confirm the others when such a character
   is available. → **Step 8 task D5/E1** (`docs/plans/2026-06-06-step8-polish-overlays.md`).
@@ -532,6 +532,8 @@ All Step-7 deferrals are scoped as explicit tasks in
   per-window saved *visibility* now persists too (`WindowSettings.Visible`, saved on toggle/close,
   restored in `_Ready`). → **task D1 ✅ Resolved (UI windows overhaul Part 1).** The Step 8 D1 item
   is satisfied here.
-- **TextureProgressBar visuals.** HP/MP/XP/cooldown bars drive the correct `Value`, but render
-  nothing without a `texture_progress` asset assigned — wire art during polish. → **task C2**.
+- **TextureProgressBar visuals (C2).** ✅ **Resolved (Step 8).** HP/MP bars (`VitalsWindow.tscn`) and
+  XP bar (`HotbarWindow.tscn`) already had `texture_progress` art. Cooldown-bar radial overlay now
+  has `Assets/UI/cooldown-fill.tres` (solid-white GradientTexture2D) assigned to `CooldownOverlay`
+  in both `SpellSlot.tscn` and `HotbarSlot.tscn`. Full visual confirmation is part of live E1 / Task 10.
 - **Live in-game E2E + screenshots** (top of this list) → **task E1**.
