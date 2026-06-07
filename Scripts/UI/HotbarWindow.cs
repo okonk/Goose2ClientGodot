@@ -192,13 +192,8 @@ public partial class HotbarWindow : BaseWindow, IWindow
     {
         var p = (ExperienceBarPacket)o;
 
-        // Fill the green bar by the fraction of the current level that is complete:
-        // Experience (earned into this level) / (Experience + ExperienceToNextLevel = level total).
-        // This matches the tooltip's "{Experience} / {Experience + ExperienceToNextLevel}" math and
-        // is robust to the server's Percentage field being on an unexpected scale. At max level
-        // (no XP to next) total collapses to Experience, giving a full bar.
-        long total = p.Experience + p.ExperienceToNextLevel;
-        _xpBar.Value = total <= 0 ? 1.0 : Math.Clamp((double)p.Experience / total, 0.0, 1.0);
+        // Server-provided fill fraction (GetInt32()/100 => 0..1), matching the Unity client.
+        _xpBar.Value = p.Percentage;
         _xpText.Text = p.ExperienceToNextLevel.ToString("N0");
 
         if (p.Percentage == 1 && p.Experience == p.ExperienceToNextLevel)
