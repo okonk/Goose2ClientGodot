@@ -21,6 +21,10 @@ public partial class BaseWindow : Control
 
     public string Title { set { if (TitleLabel != null) TitleLabel.Text = value; } }
 
+    /// <summary>When true, BaseWindow leaves Position alone so the scene's anchors govern
+    /// placement. Used by always-docked, non-draggable windows like the Hotbar.</summary>
+    protected virtual bool UseFixedDockLayout => false;
+
     public override void _Ready()
     {
         _titleBar = GetNodeOrNull<Control>("TitleBar");
@@ -37,8 +41,9 @@ public partial class BaseWindow : Control
         if (Content != null)
             Content.MouseFilter = MouseFilterEnum.Ignore;
 
-        // Restore persisted position (or first-run default)
-        if (WindowName != null)
+        // Restore persisted position (or first-run default). Skipped for fixed-dock windows
+        // (e.g. the Hotbar), which anchor themselves in their scene and aren't draggable.
+        if (WindowName != null && !UseFixedDockLayout)
         {
             var ws = GameManager.Instance.CharacterSettings.GetWindowSettings(WindowName);
             Position = ws != null ? ws.Position : DefaultWindowLayout.For(WindowName);

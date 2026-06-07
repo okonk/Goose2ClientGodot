@@ -38,6 +38,8 @@ public partial class HotbarWindow : BaseWindow, IWindow
     public int WindowId => (int)WindowFrame;
     public WindowFrames WindowFrame => WindowFrames.Hotbar;
 
+    protected override bool UseFixedDockLayout => true;
+
     public override void _Ready()
     {
         base._Ready();
