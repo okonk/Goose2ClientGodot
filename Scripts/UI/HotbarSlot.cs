@@ -12,12 +12,22 @@ namespace Goose2Client.UI
     {
         private TextureRect _icon;
         private Label _count;
+        private Label _slotNumberLabel;
         private TextureProgressBar _cooldownOverlay;
 
         public Action<int> OnUseSlot { get; set; }
         public Action OnSaveSlots { get; set; }
 
-        public int SlotNumber { get; set; }
+        private int _slotNumber;
+        public int SlotNumber
+        {
+            get => _slotNumber;
+            set { _slotNumber = value; if (_slotNumberLabel != null) _slotNumberLabel.Text = SlotLabel(value); }
+        }
+
+        /// <summary>Hotkey digit for a 0-based slot index: 9 → "0", otherwise index + 1.
+        /// Matches the hotkey action mapping in HotbarWindow._Process.</summary>
+        public static string SlotLabel(int index) => index == 9 ? "0" : (index + 1).ToString();
         public IWindow Window { get; set; }
 
         public int ItemSlotIndex = -1;
@@ -44,6 +54,8 @@ namespace Goose2Client.UI
         {
             _icon = GetNode<TextureRect>("Icon");
             _count = GetNode<Label>("Count");
+            _slotNumberLabel = GetNode<Label>("SlotNumber");
+            _slotNumberLabel.Text = SlotLabel(_slotNumber);
             _cooldownOverlay = GetNode<TextureProgressBar>("CooldownOverlay");
 
             MouseEntered += OnMouseEntered;

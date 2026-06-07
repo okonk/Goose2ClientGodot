@@ -11,33 +11,6 @@
     <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="../../Scripts/Direction.cs" />
-    <Compile Include="../../Scripts/Character/AnimationNames.cs" />
-    <Compile Include="../../Scripts/Character/AnimationHeights.cs" />
-    <Compile Include="../../Scripts/Character/CharacterAnchor.cs" />
-    <Compile Include="../../Scripts/Character/CharacterLayout.cs" />
-    <Compile Include="../../Scripts/Network/PacketParser.cs" />
-    <Compile Include="../../Scripts/Network/PausablePacketQueue.cs" />
-    <Compile Include="../../Scripts/CharacterSettings.cs" />
-    <Compile Include="../../Scripts/MapFile.cs" />
-    <Compile Include="../../Scripts/Map/MapCoords.cs" />
-    <Compile Include="../../Scripts/Map/SpriteManifest.cs" />
-    <Compile Include="../../Scripts/Character/CharacterMotion.cs" />
-    <Compile Include="../../Scripts/Constants.cs" />
-    <Compile Include="../../Scripts/Network/PacketHandler.cs" />
-    <Compile Include="../../Scripts/Network/Packets/InventorySlotPacket.cs" />
-    <Compile Include="../../Scripts/Network/Packets/MapObjectPacket.cs" />
-    <Compile Include="../../Scripts/ItemStats.cs" />
-    <Compile Include="../../Scripts/Network/Packets/SpellbookSlotPacket.cs" />
-    <Compile Include="../../Scripts/SpellInfo.cs" />
-    <Compile Include="../../Scripts/Helpers.cs" />
-    <Compile Include="../../Scripts/SpellCooldownManager.cs" />
-    <Compile Include="../../Scripts/UI/ItemTooltipText.cs" />
-    <Compile Include="../../Scripts/UI/HotbarSwap.cs" />
-    <Compile Include="../../Scripts/UI/SpellbookPaging.cs" />
-    <Compile Include="../../Scripts/UI/ChatCommandParser.cs" />
-    <Compile Include="../../Scripts/UI/UnityRect.cs" />
-    <Compile Include="../../Scripts/UI/DefaultWindowLayout.cs" />
-    <Compile Include="../../Scripts/UI/CharacterEquipmentLayout.cs" />
+    <Compile Include="../../Scripts/**/*.cs" />
   </ItemGroup>
 </Project>
