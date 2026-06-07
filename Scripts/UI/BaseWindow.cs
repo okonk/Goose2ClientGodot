@@ -61,6 +61,13 @@ public partial class BaseWindow : Control
         // Close button
         if (_closeButton != null)
             _closeButton.Pressed += OnClosePressed;
+
+        // Keep the title bar (and its CloseButton) the topmost sibling so its drag region
+        // and close button always receive clicks, even when a full-rect Content child
+        // (e.g. CharacterWindow's SlotGrid) would otherwise occlude them. Sibling pick
+        // order follows tree order; last child = drawn on top = picked first.
+        if (_titleBar != null)
+            MoveChild(_titleBar, GetChildCount() - 1);
     }
 
     private void OnTitleBarGuiInput(InputEvent @event)
