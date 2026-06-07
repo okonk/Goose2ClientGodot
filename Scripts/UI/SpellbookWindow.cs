@@ -42,6 +42,8 @@ public partial class SpellbookWindow : BaseWindow, IWindow
         for (int p = 0; p < PageCount; p++)
         {
             var grid = new GridContainer { Columns = 5 };
+            grid.AddThemeConstantOverride("h_separation", 1);
+            grid.AddThemeConstantOverride("v_separation", 1);
             grid.Name = $"Page{p}";
             pagesContainer.AddChild(grid);
 

@@ -357,6 +357,29 @@ Each step is independently testable; the order front-loads the foundations the r
    at runtime with zero errors** (headless smoke test). **Not yet done in this environment:** live
    in-game E2E (interactive drag/drop, vendor/bank/combine flows, chat round-trip, screenshots) —
    blocked by no display/Xvfb, no `run` skill, and no test credentials; see Step 7 deferred.
+
+   **UI Window Overhaul — Part 1 + Part 2 (2026-06-07).** ✅ **Landed.** The windows were
+   re-skinned and re-laid-out to match the Unity prefabs pixel-for-pixel. *Part 1 (merged):*
+   imported the Unity window sprite art + LiberationSans font, a shared `GameTheme.tres`
+   (white text, button/panel skins), a tested `UnityRect` Unity→Godot RectTransform converter,
+   `DefaultWindowLayout`, refactored `BaseWindow` to host a sprite background + transparent drag
+   region, 32px slots, and window-visibility persistence (Step 8 **D1** ✅). *Part 2 (this branch,
+   `feat/ui-windows-part2`):* each window's root sized to its PNG with the PNG as background and
+   every widget repositioned from the cited prefab coordinates via `UnityRect`:
+   **CharacterWindow** fully rebuilt (character.png 400×222, anatomical 14-slot equipment doll
+   positioned by the new tested `CharacterEquipmentLayout` using Unity's serialized `slots[]`
+   order, two-column labeled stats/resists); **VitalsWindow** skinned (vitals-outline.png) + a
+   portrait node skeleton (`Portrait`→`Mask`→Body/Eyes/Hair/Chest/Helmet + circle frame) for the
+   Step 8 **A1** renderer to fill; **Inventory** (5×6), **Spellbook** (24px slots, sprite page
+   buttons), **Hotbar** (9-slice `hotbar.png` + sprite up/down + xp-bar), **Vendor/Bank/CombineBag**
+   (CombineBag corrected to 2 columns), **Chat** (chat.png, size-12 log), **Party** (per-member
+   party-frame + HP/MP bar sprites), **Buffs** (20px overlay row), **Options** (StyleBox panel),
+   **Info/Quest** (`NinePatchRect` with verified `spriteBorder` patch margins), **Debug** (themed
+   corner overlay). All 24 UI scenes load headless; build clean; 156 unit tests pass.
+   **Still deferred (owned by Step 8):** the **Task 10 live visual pixel-tuning pass + screenshots**
+   (needs a desktop display + the live server + credentials — the same environment gap as Step 7/8
+   E1, not runnable headless here); plus the Step 8 items below — **A1** portrait *rendering* into
+   the new Vitals node tree, **A2** targeting, **B** world overlays, etc.
 8. **Polish** — character paper-doll portrait (`VitalsCharacterDisplay`), on-screen spell
    **targeting** (`SpellTargetManager`), sprite-accurate character clicks + map-item hover tooltip,
    world-space **overlays** (chat bubble, battle text, emote, spell animation), 2D lighting,
@@ -440,10 +463,12 @@ All Step-7 deferrals are scoped as explicit tasks in
 
 - **`SpellTargetManager` is a stub.** Targeted spell casting + on-screen targeting is Step 8;
   `SpellbookWindow.UseSpell` wires the call but it no-ops (`// TODO(step8)`). → **task A2**.
-- **`VitalsCharacterDisplay` is a stub.** Resolves the local player but renders nothing, and is
-  **not yet instantiated in any scene**. The Unity original is a static layered portrait (body/
-  hair/eyes/chest/helmet), not an animation — needs `Character` to expose appearance data first.
-  → **task A1** (incl. the Character-appearance-accessor prerequisite).
+- **`VitalsCharacterDisplay` is a stub.** Resolves the local player but renders nothing. The
+  layered-portrait **node tree now exists** in `VitalsWindow.tscn` (`Portrait`→`Mask`→Body/Eyes/
+  Hair/Chest/Helmet TextureRects + circle frame, script attached) as of the UI overhaul Part 2 —
+  A1 just needs to *render* appearance data into those (empty) layer textures. The Unity original
+  is a static layered portrait (body/hair/eyes/chest/helmet), not an animation — needs `Character`
+  to expose appearance data first. → **task A1** (incl. the Character-appearance-accessor prerequisite).
 - **Sprite-accurate character clicks + map-item hover tooltip.** `MapManager._UnhandledInput`
   resolves clicks by tile (clicking a character's foot tile targets them via server coords), but
   pixel-accurate body hit-testing and the on-hover map-item tooltip are deferred to Step 8

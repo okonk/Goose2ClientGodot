@@ -1,55 +1,50 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene load_steps=8 format=3]
 
 [ext_resource type="Script" path="res://Scripts/UI/HotbarWindow.cs" id="1_hw"]
+[ext_resource type="Theme" path="res://Assets/UI/GameTheme.tres" id="theme"]
+[ext_resource type="Texture2D" path="res://Assets/UI/hotbar.png" id="bg_tex"]
+[ext_resource type="Texture2D" path="res://Assets/UI/hotbar-up.png" id="up_icon"]
+[ext_resource type="Texture2D" path="res://Assets/UI/hotbar-down.png" id="down_icon"]
+[ext_resource type="Texture2D" path="res://Assets/UI/xp-bar-outline.png" id="xp_under"]
+[ext_resource type="Texture2D" path="res://Assets/UI/xp-bar.png" id="xp_prog"]
 
 [node name="HotbarWindow" type="Control"]
 script = ExtResource("1_hw")
+theme = ExtResource("theme")
 layout_mode = 3
-offset_left = 100.0
-offset_top = 100.0
-offset_right = 540.0
-offset_bottom = 190.0
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 333.0
+offset_bottom = 36.0
 WindowName = "Hotbar"
 
-[node name="Background" type="Panel" parent="."]
+[node name="Background" type="NinePatchRect" parent="."]
 layout_mode = 2
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
+texture = ExtResource("bg_tex")
+mouse_filter = 2
+patch_margin_left = 3
+patch_margin_top = 3
+patch_margin_right = 3
+patch_margin_bottom = 3
 
-[node name="TitleBar" type="Panel" parent="."]
-layout_mode = 2
-anchors_preset = 10
-anchor_right = 1.0
-offset_bottom = 24.0
-mouse_filter = 0
-
-[node name="TitleLabel" type="Label" parent="TitleBar"]
+[node name="TitleBar" type="Control" parent="."]
 layout_mode = 2
 anchors_preset = 10
 anchor_right = 0.0
-offset_left = 4.0
-offset_top = 2.0
-offset_bottom = 22.0
-mouse_filter = 1
-text = "Hotbar"
-
-[node name="CloseButton" type="Button" parent="TitleBar"]
-layout_mode = 2
-anchors_preset = 6
-anchor_bottom = 1.0
-offset_left = -18.0
-offset_top = 2.0
-offset_right = -2.0
-offset_bottom = 22.0
-text = "X"
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 333.0
+offset_bottom = 0.0
+mouse_filter = 0
 
 [node name="Content" type="Control" parent="."]
 layout_mode = 2
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_top = 24.0
 mouse_filter = 1
 
 [node name="Pages" type="Control" parent="Content"]
@@ -61,46 +56,52 @@ mouse_filter = 1
 
 [node name="BackButton" type="Button" parent="Content"]
 layout_mode = 2
-anchors_preset = 7
-anchor_bottom = 1.0
-offset_left = 4.0
-offset_top = -24.0
-offset_right = 44.0
-offset_bottom = -4.0
-text = "<"
+anchors_preset = 0
+offset_left = 316.0
+offset_top = 2.0
+offset_right = 332.0
+offset_bottom = 18.0
+flat = true
+icon = ExtResource("up_icon")
+expand_icon = true
 
 [node name="NextButton" type="Button" parent="Content"]
 layout_mode = 2
-anchors_preset = 3
-anchor_right = 1.0
-anchor_bottom = 1.0
-offset_left = -44.0
-offset_top = -24.0
-offset_right = -4.0
-offset_bottom = -4.0
-text = ">"
+anchors_preset = 0
+offset_left = 316.0
+offset_top = 18.0
+offset_right = 332.0
+offset_bottom = 34.0
+flat = true
+icon = ExtResource("down_icon")
+expand_icon = true
 
 [node name="XpBar" type="TextureProgressBar" parent="Content"]
 layout_mode = 2
-anchors_preset = 6
-anchor_bottom = 1.0
-offset_left = 50.0
-offset_top = -16.0
-offset_right = -50.0
-offset_bottom = -4.0
+anchors_preset = 0
+offset_left = 0.0
+offset_top = -17.0
+offset_right = 333.0
+offset_bottom = 0.0
 mouse_filter = 0
 max_value = 1.0
 value = 0.0
+fill_mode = 0
+texture_under = ExtResource("xp_under")
+texture_progress = ExtResource("xp_prog")
+nine_patch_stretch = true
+stretch_margin_left = 3
+stretch_margin_top = 3
+stretch_margin_right = 3
+stretch_margin_bottom = 3
 
 [node name="XpText" type="Label" parent="Content"]
 layout_mode = 2
-anchors_preset = 8
-anchor_left = 0.5
-anchor_right = 0.5
-anchor_bottom = 1.0
-offset_left = -25.0
-offset_top = -16.0
-offset_right = 25.0
-offset_bottom = -4.0
+anchors_preset = 0
+offset_left = 141.0
+offset_top = -17.0
+offset_right = 191.0
+offset_bottom = 0.0
 mouse_filter = 1
 horizontal_alignment = 1
+vertical_alignment = 1

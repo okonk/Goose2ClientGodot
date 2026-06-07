@@ -1,25 +1,29 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene load_steps=3 format=3]
 
 [ext_resource type="Script" path="res://Scripts/UI/DebugWindow.cs" id="1_debug"]
+[ext_resource type="Theme" path="res://Assets/UI/GameTheme.tres" id="theme"]
 
 [node name="DebugWindow" type="Control"]
 script = ExtResource("1_debug")
+theme = ExtResource("theme")
 layout_mode = 0
 offset_left = 0.0
 offset_top = 0.0
-offset_right = 120.0
+offset_right = 160.0
 offset_bottom = 40.0
 
 [node name="FpsText" type="Label" parent="."]
 layout_mode = 0
 offset_left = 2.0
 offset_top = 2.0
-offset_right = 118.0
+offset_right = 158.0
 offset_bottom = 20.0
+theme_override_font_sizes/font_size = 12
 
 [node name="VersionText" type="Label" parent="."]
 layout_mode = 0
 offset_left = 2.0
 offset_top = 22.0
-offset_right = 118.0
+offset_right = 158.0
 offset_bottom = 38.0
+theme_override_font_sizes/font_size = 12

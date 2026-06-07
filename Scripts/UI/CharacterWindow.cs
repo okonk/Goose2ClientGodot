@@ -63,14 +63,15 @@ public partial class CharacterWindow : BaseWindow, IWindow
         _airResistText = GetNode<Label>("Content/AirResistText");
         _spiritResistText = GetNode<Label>("Content/SpiritResistText");
 
-        // Create 14 equipped slots
+        // Create 14 equipped slots — anatomical layout via CharacterEquipmentLayout
         _slots = new ItemSlot[EquippedSlotCount];
-        var grid = GetNode<GridContainer>("Content/SlotGrid");
+        var slotGrid = GetNode<Control>("Content/SlotGrid");
 
         for (int i = 0; i < EquippedSlotCount; i++)
         {
             var slot = SlotScene.Instantiate<ItemSlot>();
-            grid.AddChild(slot);
+            slotGrid.AddChild(slot);
+            slot.Position = CharacterEquipmentLayout.SlotOffset(i);
             slot.SlotNumber = i + FirstSlotNumber;
             slot.Window = this;
             slot.OnDoubleClick = UseItem;

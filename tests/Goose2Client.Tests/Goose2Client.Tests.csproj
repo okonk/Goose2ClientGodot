@@ -38,5 +38,6 @@
     <Compile Include="../../Scripts/UI/ChatCommandParser.cs" />
     <Compile Include="../../Scripts/UI/UnityRect.cs" />
     <Compile Include="../../Scripts/UI/DefaultWindowLayout.cs" />
+    <Compile Include="../../Scripts/UI/CharacterEquipmentLayout.cs" />
   </ItemGroup>
 </Project>
