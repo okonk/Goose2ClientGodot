@@ -15,9 +15,6 @@ run/main_scene="res://Scenes/Login.tscn"
 config/features=PackedStringArray("4.6", "C#", "Forward Plus")
 config/icon="res://icon.svg"
 
-[gui]
-theme/custom="res://Assets/UI/GameTheme.tres"
-
 [autoload]
 
 GameManager="*res://Scripts/GameManager.cs"
@@ -25,6 +22,10 @@ GameManager="*res://Scripts/GameManager.cs"
 [dotnet]
 
 project/assembly_name="Goose2ClientGodot"
+
+[gui]
+
+theme/custom="res://Assets/UI/GameTheme.tres"
 
 [input]
 
@@ -333,4 +334,5 @@ TrackedDeviceOrientation={
 }
 
 [rendering]
+
 textures/canvas_textures/default_texture_filter=0
