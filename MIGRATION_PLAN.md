@@ -436,6 +436,25 @@ Each step is independently testable; the order front-loads the foundations the r
    pass** Step 7 couldn't run headless. Every Step-6/7 deferral below is scoped as an explicit task
    in **`docs/plans/2026-06-06-step8-polish-overlays.md`** so nothing falls through the cracks.
 
+   **Step 8 — Part 1 + Part 2 code merged to `master` (2026-06-07).** ✅ **Code landed** (pending
+   live E1). *Part 1* (`feat/step8-part1`, merged): idle PING/PONG keepalive, weapon-speed attack
+   gating, occupancy-blocked prediction, graceful-close Disconnected event, `Character` appearance/
+   `Height`/`CharacterType`/`Cast()` accessors + `CharacterUpdated`, `Overlays.OverlayLifetime`
+   (tested) + `WorldOverlay` base, paper-doll portrait (**A1**), on-screen spell targeting (**A2**).
+   *Part 2* (`feat/step8-part2`, merged via plan `docs/plans/2026-06-07-step8-part2-overlays-and-polish.md`):
+   floating **battle text (B1)**, **chat bubble (B2)**, **emote (B3)**, **spell cast/impact +
+   remote caster pose (B4)** — all `WorldOverlay`-based with self-freeing lifetimes and pure,
+   unit-tested layout logic; **body-accurate character clicks + ground-item hover tooltip (A3)**;
+   spell-cooldown bar art (**C2**); per-window **visibility restore on load (D1)**; **D4** (Hair/16
+   source-data gap) and **D5** (staff/2h/bow attack clips) data-verified. **C1** (2D lighting)
+   intentionally skipped (no server light packet); **C3** (dyed-gear color space) deferred to E1.
+   Build clean (0 errors); **206 unit tests pass**; full headless smoke zero-error. **NOT yet done:**
+   **Task 10 / E1** — the live interactive validation pass + screenshots against
+   `scyther.local:2006` (needs a desktop display + real credentials); all eye-verified pixel offsets
+   (overlay positions, dyed-gear color space, ambient) and slot-count vs-live confirmation remain
+   owned by that live run. Step 8 is therefore **code-complete and merged, but not declared fully
+   “Landed” until E1 passes.**
+
 ## Open questions / risks to resolve before Phase 2
 
 - **Animation redesign (§5)** — approach **de-risked** by the `~/code/3dMMO-Server/client`
