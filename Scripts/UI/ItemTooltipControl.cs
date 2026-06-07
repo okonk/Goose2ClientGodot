@@ -59,6 +59,13 @@ namespace Goose2Client.UI
                 return;
             }
 
+            // Size to content so the full-rect Background panel covers icon + text.
+            // Header block runs to y≈46 (Flags label bottom); StatsVBox starts at y=48
+            // and its combined minimum size reflects only the visible stat lines.
+            float statsHeight = _statsVBox.GetCombinedMinimumSize().Y;
+            float height = Mathf.Max(46f, 48f + statsHeight) + 4f;
+            Size = new Vector2(264f, height);
+
             PositionTooltip();
         }
 

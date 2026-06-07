@@ -1,10 +1,17 @@
-[gd_scene load_steps=6 format=3]
+[gd_scene load_steps=7 format=3]
 
 [ext_resource type="Script" path="res://Scripts/UI/TooltipManager.cs" id="1_manager"]
 [ext_resource type="Script" path="res://Scripts/UI/ItemTooltipControl.cs" id="2_item"]
 [ext_resource type="Script" path="res://Scripts/UI/SpellTooltipControl.cs" id="3_spell"]
 [ext_resource type="Script" path="res://Scripts/UI/TextTooltipControl.cs" id="4_text"]
 [ext_resource type="Script" path="res://Scripts/UI/MapItemTooltipControl.cs" id="5_mapitem"]
+
+[sub_resource type="StyleBoxFlat" id="sb_tooltip_bg"]
+bg_color = Color(0, 0, 0, 0.9)
+corner_radius_top_left = 3
+corner_radius_top_right = 3
+corner_radius_bottom_right = 3
+corner_radius_bottom_left = 3
 
 [node name="TooltipManager" type="Control"]
 script = ExtResource("1_manager")
@@ -19,6 +26,14 @@ script = ExtResource("2_item")
 layout_mode = 0
 mouse_filter = 2
 visible = false
+
+[node name="Background" type="Panel" parent="ItemTooltip"]
+layout_mode = 0
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+theme_override_styles/panel = SubResource("sb_tooltip_bg")
 
 [node name="Icon" type="TextureRect" parent="ItemTooltip"]
 layout_mode = 0
@@ -63,6 +78,13 @@ layout_mode = 0
 mouse_filter = 2
 visible = false
 
+[node name="Background" type="Panel" parent="SpellTooltip"]
+layout_mode = 0
+offset_right = 200.0
+offset_bottom = 24.0
+mouse_filter = 2
+theme_override_styles/panel = SubResource("sb_tooltip_bg")
+
 [node name="Label" type="Label" parent="SpellTooltip"]
 layout_mode = 0
 offset_left = 0.0
@@ -76,6 +98,13 @@ layout_mode = 0
 mouse_filter = 2
 visible = false
 
+[node name="Background" type="Panel" parent="TextTooltip"]
+layout_mode = 0
+offset_right = 200.0
+offset_bottom = 24.0
+mouse_filter = 2
+theme_override_styles/panel = SubResource("sb_tooltip_bg")
+
 [node name="Label" type="Label" parent="TextTooltip"]
 layout_mode = 0
 offset_left = 0.0
@@ -88,6 +117,13 @@ script = ExtResource("5_mapitem")
 layout_mode = 0
 mouse_filter = 2
 visible = false
+
+[node name="Background" type="Panel" parent="MapItemTooltip"]
+layout_mode = 0
+offset_right = 200.0
+offset_bottom = 40.0
+mouse_filter = 2
+theme_override_styles/panel = SubResource("sb_tooltip_bg")
 
 [node name="Name" type="Label" parent="MapItemTooltip"]
 layout_mode = 0
