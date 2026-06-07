@@ -95,9 +95,15 @@ public partial class MapManager : Node2D
         pm.Remove<WeaponSpeedPacket>(OnWeaponSpeed);
     }
 
-    /// <summary>Bounds + blocked check (Unity IsValidMove, map-only part; occupancy is Step 6).</summary>
+    /// <summary>Bounds + blocked + occupancy check (Unity IsValidMove).</summary>
     public bool IsValidMove(int x, int y)
-        => _map != null && x >= 0 && y >= 0 && x < _map.Width && y < _map.Height && !_map[x, y].IsBlocked;
+    {
+        if (_map == null || x < 0 || y < 0 || x >= _map.Width || y >= _map.Height) return false;
+        if (_map[x, y].IsBlocked) return false;
+        foreach (var c in _characters.Values)
+            if (c.X == x && c.Y == y) return false;
+        return true;
+    }
 
     private void OnMakeCharacter(object packetObj)
     {
