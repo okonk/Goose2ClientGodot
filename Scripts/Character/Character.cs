@@ -461,6 +461,14 @@ void fragment() {
             _chatBubble.Position = new Vector2(0, -(Height + (_chatBubble.BackgroundHeight - 0.4355469f * 32f) / 2f));
         }
 
+        /// <summary>Show a spell impact animation at this character's origin. Spells stack (no replacement).</summary>
+        public void ShowSpell(int animationId)
+        {
+            var s = new Overlays.SpellAnimation { Name = "Spell", ZIndex = 20 };
+            AddChild(s);
+            if (!s.Setup(animationId)) s.QueueFree();   // discard orphan on missing asset
+        }
+
         /// <summary>Show an emote animation above this character. Replaces any existing emote.</summary>
         public void ShowEmote(int animationId)
         {

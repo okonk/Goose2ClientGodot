@@ -71,6 +71,9 @@ public partial class MapManager : Node2D
         pm.Listen<BattleTextPacket>(OnBattleText);
         pm.Listen<ChatPacket>(OnChatBubble);
         pm.Listen<EmotePacket>(OnEmote);
+        pm.Listen<SpellCharacterPacket>(OnSpellCharacter);
+        pm.Listen<SpellTilePacket>(OnSpellTile);
+        pm.Listen<CastPacket>(OnCast);
         _listenersRegistered = true;
 
         GameManager.Instance.CurrentMapManager = this;
@@ -101,6 +104,9 @@ public partial class MapManager : Node2D
         pm.Remove<BattleTextPacket>(OnBattleText);
         pm.Remove<ChatPacket>(OnChatBubble);
         pm.Remove<EmotePacket>(OnEmote);
+        pm.Remove<SpellCharacterPacket>(OnSpellCharacter);
+        pm.Remove<SpellTilePacket>(OnSpellTile);
+        pm.Remove<CastPacket>(OnCast);
     }
 
     /// <summary>Bounds + blocked + occupancy check (Unity IsValidMove).</summary>
@@ -251,6 +257,27 @@ public partial class MapManager : Node2D
     {
         var p = (EmotePacket)packetObj;
         GetCharacter(p.LoginId)?.ShowEmote(p.AnimationId);
+    }
+
+    private void OnSpellCharacter(object packetObj)
+    {
+        var p = (SpellCharacterPacket)packetObj;
+        GetCharacter(p.LoginId)?.ShowSpell(p.AnimationId);
+    }
+
+    private void OnSpellTile(object packetObj)
+    {
+        var p = (SpellTilePacket)packetObj;
+        var s = new Goose2Client.Overlays.SpellAnimation { Name = $"SpellTile({p.AnimationId})", ZIndex = 20 };
+        _objects.AddChild(s);
+        if (!s.Setup(p.AnimationId)) { s.QueueFree(); return; }
+        s.Position = MapCoords.TileBottomCenter(p.TileX, p.TileY);
+    }
+
+    private void OnCast(object packetObj)
+    {
+        var p = (CastPacket)packetObj;
+        GetCharacter(p.LoginId)?.Cast();
     }
 
     private void OnTileUpdate(object packetObj)

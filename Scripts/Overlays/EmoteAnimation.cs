@@ -16,7 +16,9 @@ namespace Goose2Client.Overlays
             {
                 TextureFilter = CanvasItem.TextureFilterEnum.Nearest,
             };
-            _sprite.SpriteFrames = GD.Load<SpriteFrames>(path);
+            var frames = GD.Load<SpriteFrames>(path);
+            if (frames == null) return false;
+            _sprite.SpriteFrames = frames;
             AddChild(_sprite);
 
             var clip = animationId.ToString();
