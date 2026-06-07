@@ -70,6 +70,7 @@ public partial class MapManager : Node2D
         pm.Listen<WeaponSpeedPacket>(OnWeaponSpeed);
         pm.Listen<BattleTextPacket>(OnBattleText);
         pm.Listen<ChatPacket>(OnChatBubble);
+        pm.Listen<EmotePacket>(OnEmote);
         _listenersRegistered = true;
 
         GameManager.Instance.CurrentMapManager = this;
@@ -99,6 +100,7 @@ public partial class MapManager : Node2D
         pm.Remove<WeaponSpeedPacket>(OnWeaponSpeed);
         pm.Remove<BattleTextPacket>(OnBattleText);
         pm.Remove<ChatPacket>(OnChatBubble);
+        pm.Remove<EmotePacket>(OnEmote);
     }
 
     /// <summary>Bounds + blocked + occupancy check (Unity IsValidMove).</summary>
@@ -243,6 +245,12 @@ public partial class MapManager : Node2D
     {
         var p = (ChatPacket)packetObj;
         GetCharacter(p.LoginId)?.ShowChatBubble(p.Message);
+    }
+
+    private void OnEmote(object packetObj)
+    {
+        var p = (EmotePacket)packetObj;
+        GetCharacter(p.LoginId)?.ShowEmote(p.AnimationId);
     }
 
     private void OnTileUpdate(object packetObj)

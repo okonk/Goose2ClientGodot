@@ -31,6 +31,7 @@ namespace Goose2Client.Character
         private ColorRect _hpBar;
         private Goose2Client.Overlays.BattleText _battleText;
         private Overlays.ChatBubble _chatBubble;
+        private Overlays.EmoteAnimation _emote;
 
         private void EnsureBars()
         {
@@ -458,6 +459,31 @@ void fragment() {
             // Godot pixels: Height is already in px, 0.4355469 * 32 = 13.9375px
             // Godot Y is down, so negate for "above":
             _chatBubble.Position = new Vector2(0, -(Height + (_chatBubble.BackgroundHeight - 0.4355469f * 32f) / 2f));
+        }
+
+        /// <summary>Show an emote animation above this character. Replaces any existing emote.</summary>
+        public void ShowEmote(int animationId)
+        {
+            if (GodotObject.IsInstanceValid(_emote))
+                _emote.QueueFree();
+
+            var e = new Overlays.EmoteAnimation
+            {
+                Name = "Emote",
+                ZIndex = 20,
+            };
+            AddChild(e);
+
+            if (!e.Setup(animationId))
+            {
+                e.QueueFree();
+                _emote = null;
+                return;
+            }
+
+            // Position above the body — faithful pixel port of Unity (0.5, Height/32 - 0.75).
+            e.Position = new Vector2(0.5f * 32f, -(Height - 0.75f * 32f));
+            _emote = e;
         }
     }
 }
