@@ -104,13 +104,13 @@ text = "Experience"
 [node name="ExperienceText" type="Label" parent="Content"]
 layout_mode = 2
 anchors_preset = 0
-offset_left = 304.0
+offset_left = 264.0
 offset_top = 74.0
-offset_right = 360.0
+offset_right = 399.0
 offset_bottom = 85.0
 mouse_filter = 1
 text = "0"
-horizontal_alignment = 2
+horizontal_alignment = 0
 
 [node name="ExperienceSoldLabel" type="Label" parent="Content"]
 layout_mode = 2
@@ -125,13 +125,13 @@ text = "Exp Sold"
 [node name="ExperienceSoldText" type="Label" parent="Content"]
 layout_mode = 2
 anchors_preset = 0
-offset_left = 304.0
+offset_left = 264.0
 offset_top = 85.0
 offset_right = 399.0
 offset_bottom = 96.0
 mouse_filter = 1
 text = "0"
-horizontal_alignment = 2
+horizontal_alignment = 0
 
 [node name="StrengthLabel" type="Label" parent="Content"]
 layout_mode = 2
