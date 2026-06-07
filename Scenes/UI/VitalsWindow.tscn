@@ -50,9 +50,9 @@ max_value = 1.0
 
 [node name="HpText" type="Label" parent="."]
 layout_mode = 0
-offset_left = 49.0
+offset_left = 74.0
 offset_top = 10.0
-offset_right = 182.0
+offset_right = 207.0
 offset_bottom = 27.0
 mouse_filter = 2
 horizontal_alignment = 0
@@ -60,9 +60,9 @@ vertical_alignment = 1
 
 [node name="MpText" type="Label" parent="."]
 layout_mode = 0
-offset_left = 49.0
+offset_left = 74.0
 offset_top = 28.0
-offset_right = 157.0
+offset_right = 182.0
 offset_bottom = 45.0
 mouse_filter = 2
 horizontal_alignment = 0
