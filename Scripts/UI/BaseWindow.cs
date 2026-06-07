@@ -29,6 +29,14 @@ public partial class BaseWindow : Control
         Content = GetNodeOrNull<Control>("Content");
         Background = GetNodeOrNull<TextureRect>("Background");
 
+        // The full-rect Content (MouseFilter=Pass) is drawn on top of the TitleBar and
+        // swallows its clicks — Pass forwards unhandled events to the PARENT, never to the
+        // TitleBar sibling — which kills title-bar dragging. Make Content transparent to the
+        // mouse so the TitleBar receives drag clicks. Interactive descendants (slots, buttons,
+        // bars) keep their own MouseFilter and are unaffected (mouse_filter does not cascade).
+        if (Content != null)
+            Content.MouseFilter = MouseFilterEnum.Ignore;
+
         // Restore persisted position (or first-run default)
         if (WindowName != null)
         {
