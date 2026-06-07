@@ -480,18 +480,27 @@ Surfaced during the Step 6 characters port; none block Step 6 itself:
 - **Occupancy check in `IsValidMove`.** Local-player prediction only blocks on map-blocked tiles;
   it does not reject tiles occupied by another character yet. Add a `_characters` occupancy test
   when the collision/combat layer needs it. → **Step 8 task D3**.
-- **Missing converter assets (e.g. `Hair/16`).** The live server sends graphic ids the converter
-  didn't emit (`Assets/Sprites/Hair/16/animations.tres` is absent; ids 1–15, 17–28 exist). The
-  slot is skipped gracefully (renders bald). Regenerate assets / fix converter coverage.
-  → **Step 8 task D4** (may belong to the asset pipeline, not the UI branch).
+- **Missing converter assets (e.g. `Hair/16`).** ✅ **Resolved as source-data / out of scope (Step 8
+  D4).** Confirmed: `Assets/Sprites/Hair/` holds ids 1–15 and 17–28 — id 16 is genuinely absent. The
+  converter emits exactly the ids present in `compiled.enc`, so a missing id is a **source-data hole,
+  not a converter bug**. The client degrades gracefully: `Character.ApplySlot` checks
+  `ResourceLoader.Exists` and calls `RemoveSlot` on a missing `.tres`, so the affected slot simply
+  renders nothing (bald) with no error. No code change. Backlog: re-run the converter if the source
+  `Hair/16` asset is ever obtained. → **Step 8 task D4** (asset pipeline, not the UI branch).
 - **MP bar.** ✅ **Resolved (Step 7).** `VitalsWindow` renders both HP and MP bars from
   `StatusInfoPacket`. (`Character.SetVitals` also now stores `HPPercent`/`MPPercent` for the party UI.)
 - **Dyed-gear color space (C3).** **Conditional, deferred to live E1 (Task 10).** The `_Tint` shader
   mixes in Godot's sample space; only revisit the `source_color` hint / sRGB-vs-linear mix if E1
   shows dyed gear looks off vs Unity. No code change now (may be a no-op).
-- **Staff / 2h / bow attack clips (BodyState 5/6/7).** Implemented from the `BodyState`→weapon-type
-  mapping, but only 1hand (state 4) was live-verified — confirm the others when such a character
-  is available. → **Step 8 task D5/E1** (`docs/plans/2026-06-06-step8-polish-overlays.md`).
+- **Staff / 2h / bow attack clips (BodyState 5/6/7).** ✅ **Data-verified (Step 8 D5).** The runtime
+  `AnimationNames.AttackVariant` map (4=1hand, 5=staff, 6=2hand, 7=bow) matches the converter's
+  `AnimationNaming` clip names. Asset inspection confirmed the converter emitted complete 4-direction
+  clip sets: weapon (`Hands/`) graphics carry `attack-1hand` (148 files), `attack-staff` (44),
+  `attack-2hand` (30), `attack-bow` (1, `Hands/168`), and `Bodies/` carry matching attack poses
+  (1hand 6, staff/2hand/bow 4 each) — each representative file (e.g. `Hands/180` staff, `Hands/210`
+  2hand, `Hands/168` bow) has up/down/left/right. Missing cases fall back gracefully via the
+  candidate chain (`attack-<variant>` → `attack-1hand` → `attack` → `attack-no-equip` → `idle`).
+  Final in-motion confirmation is part of live E1 (Task 10). → **Step 8 task D5/E1**.
 - **Step-8 overlays.** Chat bubble, battle text, spell/emote overlays (out of Step 6 scope).
   → **Step 8 tasks B1–B4**.
 
