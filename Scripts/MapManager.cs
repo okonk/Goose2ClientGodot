@@ -215,11 +215,16 @@ public partial class MapManager : Node2D
         if (@event is not InputEventMouseButton mb || !mb.Pressed) return;
         if (mb.ButtonIndex != MouseButton.Left && mb.ButtonIndex != MouseButton.Right) return;
 
-        var (tx, ty) = MapCoords.WorldToTile(GetGlobalMousePosition());
-
-        // Clicking a character lands on its tile, so the server resolves it by coords (same as a map-tile click).
-        // TODO(step8): sprite-accurate character body hit-testing + map-item hover tooltip
-        // (deferred: MapItem doesn't carry ItemStats and the Control-parent tooltip lifetime doesn't fit world Sprite2Ds).
+        var mouseWorld = GetGlobalMousePosition();
+        Character.Character hit = null;
+        foreach (var child in _characterRoot.GetChildren())
+        {
+            if (child is not Character.Character c || !GodotObject.IsInstanceValid(c)) continue;
+            if (c.ContainsPoint(mouseWorld)) hit = c;   // later children draw on top → last match is topmost
+        }
+        int tx, ty;
+        if (hit != null) { tx = hit.X; ty = hit.Y; }
+        else { (tx, ty) = MapCoords.WorldToTile(mouseWorld); }
         if (mb.ButtonIndex == MouseButton.Left)
             GameManager.Instance.NetworkClient.LeftClick(tx, ty);
         else
@@ -316,6 +321,7 @@ public partial class MapManager : Node2D
         _objects.AddChild(item);
         item.Setup(tex, p.TileX, p.TileY,
             new Color(p.GraphicR / 255f, p.GraphicG / 255f, p.GraphicB / 255f, p.GraphicA / 255f));
+        item.Item = ItemStats.FromPacket(p);
         _mapObjects[ItemKey(p.TileX, p.TileY)] = item;
     }
 

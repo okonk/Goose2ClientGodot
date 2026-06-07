@@ -9,7 +9,7 @@ namespace Goose2Client.UI
         private Label _bindLabel;
 
         public ItemStats Item { get; private set; }
-        private Control _parent;
+        private Node2D _owner;
 
         public override void _Ready()
         {
@@ -17,10 +17,10 @@ namespace Goose2Client.UI
             _bindLabel = GetNode<Label>("Bind");
         }
 
-        public void SetItem(ItemStats stats, Control parent)
+        public void SetItem(ItemStats stats, Node2D owner)
         {
             Item = stats;
-            _parent = parent;
+            _owner = owner;
 
             _nameLabel.Text = $"{stats.Title} {stats.Name} {stats.Surname}".Trim();
             if (stats.StackSize > 1)
@@ -31,7 +31,7 @@ namespace Goose2Client.UI
 
         public override void _Process(double delta)
         {
-            if (_parent == null || !_parent.IsVisibleInTree())
+            if (_owner == null || !Godot.GodotObject.IsInstanceValid(_owner) || !_owner.Visible)
             {
                 Visible = false;
                 return;

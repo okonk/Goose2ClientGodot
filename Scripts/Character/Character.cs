@@ -240,6 +240,19 @@ void fragment() {
                 ? _heights.GetHeight($"Body-{b.GraphicId}-{ResolveClip(b, "idle", BodyState) ?? "idle-down"}")
                 : 0;
 
+        /// <summary>Hit-test: does a world-space point lie inside the Body slot's sprite rect?
+        /// Body sprites are Centered, so the rect is center ± size/2.</summary>
+        public bool ContainsPoint(Vector2 worldPoint)
+        {
+            if (!_slots.TryGetValue(CharacterSlot.Body, out var b) || b.Sprite.SpriteFrames == null) return false;
+            var tex = b.Sprite.SpriteFrames.GetFrameTexture(b.Sprite.Animation, b.Sprite.Frame);
+            if (tex == null) return false;
+            var size = tex.GetSize();
+            var center = GlobalPosition + b.Sprite.Offset;   // Centered sprite: Offset is the sprite center relative to origin
+            var rect = new Rect2(center - size / 2f, size);
+            return rect.HasPoint(worldPoint);
+        }
+
         /// <summary>Play the caster's spell-cast pose. Locked like an attack so walk/idle don't clobber it.</summary>
         public void Cast()
         {

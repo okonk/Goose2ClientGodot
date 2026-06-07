@@ -46,9 +46,9 @@ namespace Goose2Client.UI
 
         public void HideSpellTooltip() => _spellTooltip.Visible = false;
 
-        public void ShowMapItemTooltip(ItemStats stats, Control parent)
+        public void ShowMapItemTooltip(ItemStats stats, Node2D owner)
         {
-            _mapItemTooltip.SetItem(stats, parent);
+            _mapItemTooltip.SetItem(stats, owner);
             _mapItemTooltip.Visible = true;
         }
 
