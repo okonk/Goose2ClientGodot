@@ -17,6 +17,7 @@ offset_bottom = 33.0
 
 [node name="Content" type="Control" parent="."]
 layout_mode = 0
+visible = false
 offset_left = 0.0
 offset_top = 0.0
 offset_right = 87.0

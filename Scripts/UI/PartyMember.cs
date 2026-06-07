@@ -19,6 +19,7 @@ public partial class PartyMember : Control
         _hpBar = GetNode<TextureProgressBar>("Content/HpBar");
         _mpBar = GetNode<TextureProgressBar>("Content/MpBar");
         _content = GetNode<Control>("Content");
+        _content.Visible = false;
     }
 
     public void OnGroupUpdate(GroupUpdatePacket packet)
