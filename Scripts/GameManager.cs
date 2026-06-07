@@ -65,6 +65,7 @@ namespace Goose2Client
 
             // Listen for class table updates for the lifetime of the app.
             PacketManager.Listen<ClassUpdatePacket>(OnClassUpdate);
+            PacketManager.Listen<PingPacket>(OnPing);
 
             Sprites = new SpriteCache();
             SpellTargetManager = new SpellTargetManager();
@@ -128,6 +129,8 @@ namespace Goose2Client
             CharacterSettings = new CharacterSettings(characterName);
         }
 
+        private void OnPing(object packetObj) => NetworkClient.Pong();
+
         private void OnClassUpdate(object packetObj)
         {
             var packet = (ClassUpdatePacket)packetObj;
@@ -173,6 +176,7 @@ namespace Goose2Client
         public override void _ExitTree()
         {
             PacketManager.Remove<ClassUpdatePacket>(OnClassUpdate);
+            PacketManager.Remove<PingPacket>(OnPing);
             NetworkClient?.Disconnect();
         }
     }
