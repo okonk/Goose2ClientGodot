@@ -33,6 +33,8 @@ public partial class MapManager : Node2D
     /// <summary>The local player's character node (if alive).</summary>
     public Character.Character LocalPlayer => GetCharacter(_myLoginId);
 
+    public System.Collections.Generic.IEnumerable<Character.Character> Characters => _characters.Values;
+
     public override void _Ready()
     {
         _map = GameManager.Instance.CurrentMap;
@@ -117,6 +119,7 @@ public partial class MapManager : Node2D
         _characters[p.LoginId] = c;
 
         if (p.LoginId == _myLoginId) AttachLocalPlayer(c);
+        if (c == _localPlayer) GameManager.Instance.OnCharacterUpdated(c);
     }
 
     private void OnSetYourCharacter(object packetObj)
@@ -124,6 +127,7 @@ public partial class MapManager : Node2D
         var p = (SetYourCharacterPacket)packetObj;
         _myLoginId = p.LoginId;
         if (_characters.TryGetValue(p.LoginId, out var c)) AttachLocalPlayer(c);
+        if (c == _localPlayer) GameManager.Instance.OnCharacterUpdated(c);
     }
 
     private void OnMoveCharacter(object packetObj)
@@ -141,7 +145,11 @@ public partial class MapManager : Node2D
     private void OnUpdateCharacter(object packetObj)
     {
         var p = (UpdateCharacterPacket)packetObj;
-        if (_characters.TryGetValue(p.LoginId, out var c)) c.SetAppearance(p);
+        if (_characters.TryGetValue(p.LoginId, out var c))
+        {
+            c.SetAppearance(p);
+            if (c == _localPlayer) GameManager.Instance.OnCharacterUpdated(c);
+        }
     }
 
     private void OnEraseCharacter(object packetObj)

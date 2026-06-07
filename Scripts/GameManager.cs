@@ -47,6 +47,9 @@ namespace Goose2Client
         /// <summary>The persistent HUD root, instantiated once under UiLayer.</summary>
         public GameHud Hud { get; private set; }
 
+        public event System.Action<Character.Character> CharacterUpdated;
+        public void OnCharacterUpdated(Character.Character c) => CharacterUpdated?.Invoke(c);
+
         public override void _EnterTree()
         {
             instance = this;

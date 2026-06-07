@@ -16,6 +16,7 @@ namespace Goose2Client.Character
         public bool IsLocalPlayer { get; set; }
         public float HPPercent { get; private set; } = 1f;
         public float MPPercent { get; private set; } = 1f;
+        public CharacterType CharacterType { get; private set; }
         // Server body state: 3 = unarmed (no-equip), 4=1hand, 5=staff, 6=2hand, 7=bow. Drives whether
         // slots play their -equip vs -no-equip idle/walk and which attack-<type> clip they swing.
         public int BodyState { get; private set; } = 3;
@@ -24,6 +25,7 @@ namespace Goose2Client.Character
         private sealed class Slot { public AnimatedSprite2D Sprite; public int GraphicId; }
         private readonly Dictionary<CharacterSlot, Slot> _slots = new();
         private static AnimationHeights _heights;
+        private AppearanceData _appearance;
 
         private Label _nameLabel;
         private ColorRect _hpBar;
@@ -98,6 +100,8 @@ namespace Goose2Client.Character
             MoveSpeed = p.MoveSpeed <= 0 ? 250 : p.MoveSpeed;
             X = p.MapX; Y = p.MapY; Facing = p.Facing;
 
+            CharacterType = p.CharacterType;
+
             ApplyAppearance(p.BodyId, p.BodyR, p.BodyG, p.BodyB, p.BodyA,
                             p.HairId, p.HairR, p.HairG, p.HairB, p.HairA,
                             p.FaceId, p.DisplayedEquipment);
@@ -155,6 +159,10 @@ namespace Goose2Client.Character
             ApplySlot(CharacterSlot.Shield, shieldId, es);
             ApplySlot(CharacterSlot.Weapon, weaponId, ew);
             ApplySlot(CharacterSlot.Mount, mountId, em);
+
+            _appearance = new AppearanceData(bodyId, RgbaColor(bodyR, bodyG, bodyB, bodyA),
+                hairId, RgbaColor(hairR, hairG, hairB, hairA), faceId,
+                chestId, ec, helmId, eh);
         }
 
         // The slot tint shader reads the alpha as a BLEND FACTOR (lerp texture->tint), NOT opacity
@@ -220,6 +228,21 @@ void fragment() {
         private void RemoveSlot(CharacterSlot slot)
         {
             if (_slots.Remove(slot, out var s)) s.Sprite.QueueFree();
+        }
+
+        public AppearanceData GetAppearance() => _appearance;
+
+        public int Height =>
+            _slots.TryGetValue(CharacterSlot.Body, out var b)
+                ? _heights.GetHeight($"Body-{b.GraphicId}-{ResolveClip(b, "idle", BodyState) ?? "idle-down"}")
+                : 0;
+
+        /// <summary>Play the caster's spell-cast pose. Locked like an attack so walk/idle don't clobber it.</summary>
+        public void Cast()
+        {
+            _attackLocked = true;
+            _attackTimer = AttackDuration();
+            PlayCurrent();
         }
 
         /// <summary>Order the slot sprites back-to-front by SortOrder(slot, Facing) via child order
