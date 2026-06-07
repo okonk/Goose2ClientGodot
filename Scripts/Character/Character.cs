@@ -30,6 +30,7 @@ namespace Goose2Client.Character
         private Label _nameLabel;
         private ColorRect _hpBar;
         private Goose2Client.Overlays.BattleText _battleText;
+        private Overlays.ChatBubble _chatBubble;
 
         private void EnsureBars()
         {
@@ -435,6 +436,28 @@ void fragment() {
             };
             if (_battleText.GetParent() != this) AddChild(_battleText);
             _battleText.AddText(type, text, Height);
+        }
+
+        /// <summary>Show a speech chat bubble above this character's head. Replaces any existing bubble.</summary>
+        public void ShowChatBubble(string message)
+        {
+            // Destroy previous bubble if still alive (one bubble per character)
+            if (GodotObject.IsInstanceValid(_chatBubble))
+                _chatBubble.QueueFree();
+
+            _chatBubble = new Overlays.ChatBubble
+            {
+                Name = "ChatBubble",
+                ZIndex = 20,
+            };
+            AddChild(_chatBubble);
+            _chatBubble.SetText(message);
+
+            // Position above head — faithful pixel port of Unity formula.
+            // Unity: localPosition = (0, character.Height/32 + (bubbleHeight - 0.4355469f)/2f)
+            // Godot pixels: Height is already in px, 0.4355469 * 32 = 13.9375px
+            // Godot Y is down, so negate for "above":
+            _chatBubble.Position = new Vector2(0, -(Height + (_chatBubble.BackgroundHeight - 0.4355469f * 32f) / 2f));
         }
     }
 }
