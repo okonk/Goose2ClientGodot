@@ -20,7 +20,8 @@ pixels** — drop the `/32` and offset relative to `Character.Height` (px). Over
 in BOTH the `_Ready` listen block and `_ExitTree` remove block of `MapManager.cs` (`_listenersRegistered`
 already guards, `:65`/`:77`).
 
-**Tech Stack:** Godot 4.6 / C# (.NET 10), xUnit (explicit `<Compile Include>`).
+**Tech Stack:** Godot 4.6 / C# (.NET 10), xUnit (`Scripts/**/*.cs` glob — **no per-file
+`<Compile Include>`**; an explicit duplicate triggers build error NETSDK1022).
 
 **Repo / branch:** off `master` after Part 1 merges → `feat/step8-part2`.
 
@@ -39,9 +40,12 @@ Godot port (`Scripts/`):
 - `UI/MapItemTooltipControl.cs` — `SetItem(ItemStats, Control parent)`, `_Process` auto-hides on
   `!_parent.IsVisibleInTree()`, `PositionTooltip()` follows mouse. Never invoked yet.
 - `UI/TooltipManager.cs` — `ShowMapItemTooltip/HideMapItemTooltip/HideMapItemTooltipIfMatching` (wired).
-- `CharacterSettings.cs:29-32` `WindowSettings { Vector2 Position; }` (no `Visible`); `:152`
-  `GetWindowSettings`; `:160` `SetWindowSetting(name, Vector2?)`; `JsonOptions` `:36`.
-- `UI/BaseWindow.cs:33-38` restore position; `:86` `Toggle()`; `:88` `OnClosePressed`→`Hide()`.
+- `CharacterSettings.cs:29-33` `WindowSettings { Vector2 Position; bool Visible; }` (**`Visible` already
+  added** by the UI overhaul); `:153` `GetWindowSettings`; `:172` `SetWindowSetting(name, Vector2?)`
+  **plus a `:180` `SetWindowSetting(name, Vector2?, bool visible)` overload that persists visibility**;
+  `JsonOptions` `:37`. (D1's data model + save are already done — see Task 7.)
+- `UI/BaseWindow.cs:46-50` restore position (**Position only — NOT Visible**); `:105` `Toggle()`; `:112`
+  `OnClosePressed`→`Hide()` (both already call `SetWindowSetting(..., visible)`).
 - `Character/Character.cs:175-205` slots built (`AnimatedSprite2D` per `CharacterSlot`); `:209-218` tint
   shader; **Part 1 added** `GetAppearance()`, `Height`, `CharacterType`, `Cast()`, `AddBattleText`.
 - Overlay packets present & field-matched: `BattleTextPacket` (`LoginId`,`BattleTextType`,`Text`,`Name`),
@@ -66,7 +70,8 @@ Unity reference overlay constants (verified):
 
 ## Task 0: Branch setup
 `git checkout master && git pull` (ensure Part 1 merged) `&& git checkout -b feat/step8-part2`.
-Confirm build + tests green before starting.
+Confirm build + tests green before starting (the one known `MapFileTests.Map1_ParsesHeaderAndGrid`
+failure is pre-existing/environmental — see Part 1 Task 0; not a regression).
 
 ---
 
@@ -88,9 +93,9 @@ x ∈ {12,-4,4}) and the color/text-override map (`BattleTextLine.cs:11-48`). Te
 **Listener:** `MapManager` `Listen<BattleTextPacket>(OnBattleText)` (+ remove) →
 `GetCharacter(p.LoginId)?.AddBattleText(p.BattleTextType, p.Text)`.
 
-**Steps:** failing layout tests → run FAIL → implement layout + add to csproj → run PASS → build the
-two Godot nodes + listener → build 0 errors, smoke zero-error → commit
-`feat(overlays): floating battle text (B1)`.
+**Steps:** failing layout tests → run FAIL → implement layout (auto-included via the `Scripts/**` glob —
+no csproj edit) → run PASS → build the two Godot nodes + listener → build 0 errors, smoke zero-error →
+commit `feat(overlays): floating battle text (B1)`.
 
 ---
 
@@ -108,8 +113,9 @@ constant as px, verify by eye); **one** bubble per character (destroy existing f
 character. **Note:** `ChatWindow` already listens to `ChatPacket` for the text log — a second listener
 is fine (PacketManager is multi-subscriber); confirm both coexist.
 
-**Steps:** failing layout/lifetime tests → FAIL → implement + csproj → PASS → Godot node + listener →
-build/smoke green → commit `feat(overlays): speech chat bubble above speaker (B2)`.
+**Steps:** failing layout/lifetime tests → FAIL → implement (auto-included via the glob; no csproj edit)
+→ PASS → Godot node + listener → build/smoke green → commit
+`feat(overlays): speech chat bubble above speaker (B2)`.
 
 ---
 
@@ -188,9 +194,11 @@ item shows its name/bind tooltip.
 
 ## Task 6: C — Visual polish (bars art, color space, lighting)
 
-- **C2 — `TextureProgressBar` art.** HP/MP/XP/cooldown bars drive `Value` but render nothing without a
-  `texture_progress`. Author/assign simple bar textures in `VitalsWindow`, `HotbarWindow` (XP), spell
-  cooldown. Verify each scene loads headless.
+- **C2 — `TextureProgressBar` art (mostly already done).** The UI hotfixes after Part 4 already assigned
+  working `texture_progress` art (+ `step=0`) to **HP/MP** (`VitalsWindow.tscn`, `PartyMember.tscn`) and
+  **XP** (`HotbarWindow.tscn`). The plan's old premise ("bars render nothing without a `texture_progress`")
+  is now **false for those**. **Remaining: the spell-cooldown bar only** — author/assign its texture and
+  verify its scene loads headless. (Re-confirm HP/MP/XP visually in Task 10 E1; no code change expected.)
 - **C3 — dyed-gear color space (conditional).** Only if E1 shows dyed gear looks off vs Unity: revisit
   the `_Tint` shader `source_color` hint / sRGB-vs-linear mix space (`Character.cs:212-217`). May be a no-op.
 - **C1 — 2D lighting (conditional/optional).** Review confirmed **no server light packet** — Unity uses
@@ -201,21 +209,32 @@ item shows its name/bind tooltip.
 
 ---
 
-## Task 7: D1 — Window visibility persistence
+## Task 7: D1 — Window visibility persistence (data model + save ALREADY done — only restore + test left)
 
-Persist open/closed per window (positions already persist). Additive (Unity also saved Position only).
+Persist open/closed per window (positions already persist). **The UI overhaul already landed most of
+this:** `WindowSettings.Visible` exists (`CharacterSettings.cs:32`), there's a
+`SetWindowSetting(name, Vector2?, bool visible)` overload (`:180`), and `BaseWindow.Toggle()` (`:109`) /
+`OnClosePressed()` (`:116`) already persist visibility. **Two things remain:** the round-trip **test**,
+and **restoring** `Visible` on load (`_Ready` currently restores `Position` only).
 
-**Files:** `Scripts/CharacterSettings.cs` (+ `tests/.../CharacterSettingsJsonTests.cs` — already in test
-csproj), `Scripts/UI/BaseWindow.cs`.
+**Files:** `tests/.../CharacterSettingsJsonTests.cs` (auto-globbed; today it round-trips `Position` but
+**not** `Visible`), `Scripts/UI/BaseWindow.cs`. (`CharacterSettings.cs` needs **no** change — field +
+overload already exist.)
 
 **Step 1 — failing test:** round-trip a `WindowSettings` with `Visible=false` through `Serialize`/
 `FromJson`; assert it survives.
-**Step 2 — run FAIL. Step 3 — implement:** add `public bool Visible = true;` to `WindowSettings`
-(`:29-32`); extend `SetWindowSetting` with an optional `bool? visible = null` to persist it.
-**Step 4 — run PASS. Step 5 — wire BaseWindow:** restore `Visible = ws.Visible` in `_Ready` (`:33-38`);
-persist via `SetWindowSetting(WindowName, visible: Visible)` in `Toggle()`/`OnClosePressed()`/show.
+**Step 2 — run.** May already PASS (since `Visible` is a serialized field) — if so, keep the test as a
+regression guard and skip to Step 5.
+**Step 3 — (already implemented; no code change):** `public bool Visible;` on `WindowSettings` (`:32`) +
+the `SetWindowSetting(name, Vector2?, bool)` overload (`:180`).
+**Step 4 — run PASS. Step 5 — wire BaseWindow restore (the real remaining gap):** in `_Ready` (`:46-50`,
+where it currently sets `Position` only) also apply `Visible = ws.Visible`. Saving is already wired in
+`Toggle()`/`OnClosePressed()` — verify it also covers the "show" path.
 **Step 6 — build + test green; HUD smoke zero-error. Step 7 — commit**
-`feat(ui): persist per-window visibility across relog (D1)`.
+`feat(ui): restore persisted per-window visibility on load (D1 finish)`.
+
+> **Also correct `MIGRATION_PLAN.md`:** its Step-7 deferred section claims D1 is "✅ Resolved … restored
+> in `_Ready`", but restore was never wired — that claim only becomes true after Step 5 above.
 
 ---
 

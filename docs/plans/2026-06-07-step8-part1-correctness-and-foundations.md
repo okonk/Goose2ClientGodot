@@ -13,13 +13,14 @@ interactive systems (paper-doll portrait, spell targeting). Part 1 leaves the en
 is pure visual-overlay + polish work.
 
 **Architecture:** Same conventions as Steps 6/7. Each visual element = a `.tscn` + `partial class`
-under `Scripts/`. Pure logic (timing, layout, cycling) goes in **Godot-free** classes added to the
-test csproj and unit-tested; Godot-typed files are validated by the headless smoke test + the Part 2
-live E2E. Packet listeners register in `_Ready` (named methods, `_listenersRegistered` guard) and
+under `Scripts/`. Pure logic (timing, layout, cycling) goes in **Godot-free** classes (kept Godot-free
+so they're unit-testable) and is unit-tested; the test csproj auto-includes them via its
+`Scripts/**/*.cs` glob (see below). Godot-typed files are validated by the headless smoke test + the
+Part 2 live E2E. Packet listeners register in `_Ready` (named methods, `_listenersRegistered` guard) and
 remove in `_ExitTree`.
 
-**Tech Stack:** Godot 4.6 / C# (.NET 10), xUnit (`tests/Goose2Client.Tests`, explicit
-`<Compile Include>`), raw-socket text protocol.
+**Tech Stack:** Godot 4.6 / C# (.NET 10), xUnit (`tests/Goose2Client.Tests`, `Scripts/**/*.cs` glob —
+**no per-file `<Compile Include>`**), raw-socket text protocol.
 
 **Repo / branch:** `/home/hayden/code/Goose2ClientGodot`, currently `master` (clean). Part 1 runs on
 `feat/step8-part1` (Task 0). Merge before starting Part 2.
@@ -69,9 +70,15 @@ Godot port (`Scripts/`):
 - `NetworkClient.cs:11-13` events (`ConnectionError`,`Connected`,`SocketError` — **no** `Disconnected`);
   `:101-102` `received==0` silent break; `:145` `Pong()`; `:165` `Attack()`; `:215` `CastSpell(slot,targetId)`.
 - `SpellTargetManager.cs` — stub (`IsTargeting`, `Cast(SpellInfo)` no-op).
-- `UI/VitalsCharacterDisplay.cs` — stub (resolves `LocalPlayer`, renders nothing; not in any scene).
-- `UI/SpellbookWindow.cs:97-113` `UseSpell` → `SpellTargetManager?.Cast(info)` at `:111`.
-- `CharacterSettings.cs:176` `GetOption<T>`; `Constants.cs:114` `SpellTargetType {None=0,NPC=1,NPCPlayer=2,
+- `UI/VitalsCharacterDisplay.cs` — stub (resolves `LocalPlayer`, renders nothing). **Now attached** to
+  `Scenes/UI/VitalsWindow.tscn` (the `Portrait` node, script `id=2_char`) with layer children under
+  `Portrait/Mask/`: `Body`,`Eyes`,`Hair`,`Chest`,`Helmet` (TextureRects, `expand_mode=1`), plus
+  `Portrait/CircleFrame` — added by UI overhaul Part 2. **Task 8 adapts to these, does NOT create them**
+  (note `Eyes` not `Face`, `Helmet` not `Helm`, all under `Mask/`).
+- `UI/SpellbookWindow.cs:108` `UseSpell` (drifted from `:97`) → `SpellTargetManager?.Cast(info)` in the
+  non-`None`-target branch (Task 9 leaves `UseSpell` unchanged, so the drift is cosmetic).
+- `CharacterSettings.cs:189` `GetOption<T>` (drifted from `:176` after the D1 visibility fields landed);
+  `Constants.cs:114` `SpellTargetType {None=0,NPC=1,NPCPlayer=2,
   Player=3}`; `:122` `CharacterType {Player=1,Monster=2,Vendor=10,Banker=11,Quest=12}`; `:133`
   `Options.TargetFiltering`.
 - `Character/AnimationNames.cs:21-28` `AttackVariant`: 4=1hand,5=staff,6=2hand,7=bow,_=no-equip;
@@ -79,7 +86,12 @@ Godot port (`Scripts/`):
 - Packets present & field-matched: `PingPacket` (prefix `PING`, no fields), `WeaponSpeedPacket`
   (prefix `WPS`, `int Speed`), plus the Part-2 overlay packets.
 - `project.godot` InputMap: `TargetDown`,`TargetUp`,`ConfirmTarget`,`TargetHome`,`CancelTarget` exist.
-- Test csproj uses explicit `<Compile Include>` (add each new pure file + its test file).
+- Test csproj globs `<Compile Include="../../Scripts/**/*.cs" />` (switched from explicit includes in UI
+  overhaul Part 4). **Do NOT add per-file `<Compile Include>` lines** — new `Scripts/` files are
+  auto-included, and an explicit duplicate triggers build error **NETSDK1022**. Test files in `tests/`
+  are auto-globbed by the SDK too. (The whole Scripts tree — incl. Godot-typed classes — now compiles
+  into the test assembly via the `GodotSharp` PackageReference, so the "Godot-free" rule is about
+  *testability*, not the csproj.)
 
 Unity reference (`/home/hayden/code/Goose2Client/Assets/Scripts/`, READ-ONLY):
 - `MapManager.cs:112` Ping→Pong; `:183-195` `IsValidMove` incl. occupancy `Any(c=>c.X==x&&c.Y==y)` `:191`;
@@ -103,7 +115,12 @@ Unity reference (`/home/hayden/code/Goose2Client/Assets/Scripts/`, READ-ONLY):
 dotnet build Goose2ClientGodot.csproj
 dotnet test tests/Goose2Client.Tests/Goose2Client.Tests.csproj
 ```
-Expected: 0 build errors; all existing tests pass. Commit nothing yet.
+Expected: 0 build errors; **159/160 tests pass**. The one known failure,
+`MapFileTests.Map1_ParsesHeaderAndGrid`, is **pre-existing and environmental** — it hardcodes a path
+from another sandbox (`MapFileTests.cs:7` → `/home/agent/workspace/...`) and reads `Map1.bytes`, which
+isn't in this checkout (only `Map100+` exist). It is unrelated to Step 8 — do **not** treat it as a
+regression. (Optional: derive `MapsDir` from the repo root and/or guard on the asset to get a fully
+green baseline.) Commit nothing yet.
 
 ---
 
@@ -194,8 +211,8 @@ namespace Goose2Client.Character
     }
 }
 ```
-**Step 4 — add to test csproj:** `<Compile Include="../../Scripts/Character/AttackGate.cs" />`
-**Step 5 — run, expect PASS.**
+**Step 4 — (no csproj edit needed):** the test csproj globs `Scripts/**/*.cs`, so `AttackGate.cs` is
+auto-included. **Step 5 — run, expect PASS.**
 **Step 6 — wire MapManager** (property + listener in `_Ready`/`_ExitTree`):
 ```csharp
 public int WeaponSpeed { get; private set; }
@@ -219,7 +236,7 @@ if (Input.IsActionJustPressed("Attack"))
 **Step 8 — build + test green. Step 9 — commit.**
 ```bash
 git add Scripts/Character/AttackGate.cs tests/Goose2Client.Tests/AttackGateTests.cs \
-        tests/Goose2Client.Tests/Goose2Client.Tests.csproj Scripts/MapManager.cs Scripts/Character/Character.cs
+        Scripts/MapManager.cs Scripts/Character/Character.cs
 git commit -m "fix(combat): gate local attacks on server WeaponSpeed (WPS) instead of clip length"
 ```
 
@@ -400,7 +417,7 @@ namespace Goose2Client.Overlays
     }
 }
 ```
-**Step 4 — add to test csproj** (`Scripts/Overlays/OverlayLifetime.cs`). **Step 5 — run, expect PASS.**
+**Step 4 — (no csproj edit; auto-included via the glob). Step 5 — run, expect PASS.**
 **Step 6 — Godot base** `Scripts/Overlays/WorldOverlay.cs`:
 ```csharp
 using Godot;
@@ -425,7 +442,7 @@ namespace Goose2Client.Overlays
 **Step 7 — build + test green. Step 8 — commit.**
 ```bash
 git add Scripts/Overlays/OverlayLifetime.cs Scripts/Overlays/WorldOverlay.cs \
-        tests/Goose2Client.Tests/OverlayLifetimeTests.cs tests/Goose2Client.Tests/Goose2Client.Tests.csproj
+        tests/Goose2Client.Tests/OverlayLifetimeTests.cs
 git commit -m "feat(overlays): add OverlayLifetime (tested) + WorldOverlay base node"
 ```
 
@@ -462,11 +479,18 @@ git commit -am "feat(character): AddBattleText hook + container scaffold (B1 vis
 Static 5-layer portrait of the local player; refresh on `CharacterUpdated`. Uses the per-graphic
 `SpriteFrames` (idle-down frame 0) as a static texture — **no** `AnimationManager.GetFrame` port needed.
 
-**Decision (verified):** Unity places this on the **Vitals window** (`VitalsCanvas.prefab`), not
-Character. Place it in `Scenes/UI/VitalsWindow.tscn`. (Override only if a desktop check disagrees.)
+**Decision (verified — now confirmed by the actual scene):** Unity places this on the **Vitals window**
+(`VitalsCanvas.prefab`), and **UI overhaul Part 2 already built the node tree** in
+`Scenes/UI/VitalsWindow.tscn`. **Adapt to it; do NOT recreate it:** the `Portrait` node (a `Control`)
+**already has `VitalsCharacterDisplay.cs` attached**, with layer children under `Portrait/Mask/`:
+`Body`, `Eyes`, `Hair`, `Chest`, `Helmet` (TextureRects, fixed 53×53, `expand_mode=1`), plus a
+`Portrait/CircleFrame` overlay. **Node names differ from the original draft** — it's `Eyes` (not `Face`),
+`Helmet` (not `Helm`), and every layer is under `Mask/`. The script extends `Control` and is attached to
+`Portrait`, so its `GetNode` paths are relative to `Portrait` (e.g. `"Mask/Body"`, `"Mask/Helmet"`), and
+the layers are `TextureRect`s — set `.Texture`.
 
-**Files:** Modify `Scripts/UI/VitalsCharacterDisplay.cs`, `Scenes/UI/VitalsWindow.tscn`,
-`Scripts/UI/VitalsWindow.cs`.
+**Files:** Modify `Scripts/UI/VitalsCharacterDisplay.cs` only (the scene tree + `VitalsWindow.cs` wiring
+already exist — verify/adjust, don't rebuild).
 
 **Step 1 — implement the control:**
 ```csharp
@@ -488,12 +512,13 @@ public void Refresh()
     if (_localPlayer == null) { HideAll(); return; }
     var a = _localPlayer.GetAppearance();
 
-    SetLayer("Body", "Body", a.BodyId, a.BodyColor, a.IsMonster ? 0 : -20);
-    if (a.IsMonster) { ClearLayer("Hair"); ClearLayer("Eyes"); ClearLayer("Chest"); ClearLayer("Helm"); return; }
-    SetLayer("Hair", "Hair", a.HairId, a.HairColor, -20);
-    SetLayer("Eyes", "Eyes", a.FaceId, new Color(0,0,0,0), -20);
-    SetLayer("Chest", "Chest", a.ChestId, a.ChestColor, -20);
-    SetLayer("Helm", "Helm", a.HelmId, a.HelmColor, -20);
+    // 1st arg = scene node path (relative to Portrait, under Mask/); 2nd arg = Assets/Sprites folder.
+    SetLayer("Mask/Body", "Body", a.BodyId, a.BodyColor, a.IsMonster ? 0 : -20);
+    if (a.IsMonster) { ClearLayer("Mask/Hair"); ClearLayer("Mask/Eyes"); ClearLayer("Mask/Chest"); ClearLayer("Mask/Helmet"); return; }
+    SetLayer("Mask/Hair", "Hair", a.HairId, a.HairColor, -20);
+    SetLayer("Mask/Eyes", "Eyes", a.FaceId, new Color(0,0,0,0), -20);
+    SetLayer("Mask/Chest", "Chest", a.ChestId, a.ChestColor, -20);
+    SetLayer("Mask/Helmet", "Helm", a.HelmId, a.HelmColor, -20);   // node "Helmet", asset folder "Helm"
 }
 ```
 **Step 2 — layer helper** (idle-down frame 0 as static texture, ×1.25, tint shader reused from
@@ -521,9 +546,14 @@ private void SetLayer(string node, string folder, int graphicId, Color tint, int
 > exposed; else add `Scripts/UI/TintShader.cs` (`static Shader` + `Apply(CanvasItem,Color)`) and
 > refactor both — small optional DRY pass.
 
-**Step 3 — scene.** Add a `VitalsCharacterDisplay` node (script attached) with 5 child `TextureRect`s
-named exactly `Body`,`Hair`,`Eyes`,`Chest`,`Helm` (child order = back-to-front), `texture_filter =
-Nearest`, into `Scenes/UI/VitalsWindow.tscn` Content. Wire `VitalsWindow.cs` to call `Refresh()` on show.
+**Step 3 — scene (already built; verify/adjust only, do NOT recreate).** The
+`Portrait`→`Mask`→`Body/Eyes/Hair/Chest/Helmet` (+`CircleFrame`) tree already exists in
+`Scenes/UI/VitalsWindow.tscn` with the script attached (UI overhaul Part 2). Verify: child order under
+`Mask` is back-to-front (`Body → Eyes → Hair → Chest → Helmet` — matches the scene); set
+`texture_filter = Nearest` on the layers if not already; confirm `VitalsWindow.cs` calls
+`Portrait.Refresh()` on show (wire it if missing). **Caveat:** the layers are fixed 53×53 with
+`expand_mode=1`, so the `×1.25` resize in Step 2's helper may fight the scene layout — if so, drop the
+explicit `Size`/`Position` set and let the scene anchors place them (decide live).
 **Step 4 — headless scene-load check** (existing smoke harness): no parse/script errors.
 **Step 5 — build (0 errors); full-HUD smoke still zero-error. Step 6 — commit.**
 ```bash
@@ -608,7 +638,7 @@ namespace Goose2Client
     }
 }
 ```
-**Step 4 — add to test csproj. Step 5 — run, expect PASS.**
+**Step 4 — (no csproj edit; auto-included via the glob). Step 5 — run, expect PASS.**
 **Step 6 — reticle scene** `Scenes/UI/SpellTarget.tscn` (Node2D + reticle Sprite); `SpellTarget.cs`
 thin. `ResizeTarget` math from Unity (`heightScaled=max(1,Height/32)`, `width=max(1,h*0.75)`,
 `yOffset=(h-1)*0.5`) → convert to pixels using `Character.Height`.
@@ -621,8 +651,7 @@ input on `IsTargeting` (Godot has no Unity-style input-map switch).
 **Step 8 — build + test green; SpellTarget.tscn loads headless; HUD smoke zero-error. Step 9 — commit.**
 ```bash
 git add Scripts/TargetCycler.cs tests/Goose2Client.Tests/TargetCyclerTests.cs \
-        tests/Goose2Client.Tests/Goose2Client.Tests.csproj Scripts/SpellTargetManager.cs \
-        Scripts/SpellTarget.cs Scenes/UI/SpellTarget.tscn
+        Scripts/SpellTargetManager.cs Scripts/SpellTarget.cs Scenes/UI/SpellTarget.tscn
 git commit -m "feat(spells): on-screen spell targeting — TargetCycler (tested) + reticle + confirm/cancel (A2)"
 ```
 **Acceptance:** targeted cast enters targeting; cycle/home/confirm/cancel work; filtering respects the
@@ -639,5 +668,5 @@ Then start Part 2 (`docs/plans/2026-06-07-step8-part2-overlays-and-polish.md`).
 - **Task 5:** confirm `MakeCharacterPacket.CharacterType` field name; confirm whether a `cast-<dir>`
   clip family exists (drives whether `Cast()` swings a real cast clip or reuses attack).
 - **Task 7:** decide stub-node vs defer for `AddBattleText` based on PR boundary (prefer no-op stub).
-- **Task 8:** confirm Vitals-vs-Character window placement on the actual prefab if a desktop is
-  available; default to Vitals (verified from `VitalsCanvas.prefab`).
+- **Task 8:** ✅ resolved — Vitals placement is confirmed by the live `VitalsWindow.tscn` (the
+  `Portrait` node tree already exists; adapt to its node names, see Task 8).
