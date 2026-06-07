@@ -17,7 +17,8 @@ public partial class MapLayer : Node2D
         _map = map;
         _layer = layer;
         _cache = cache;
-        ZIndex = layer * 10;     // 0,10,20,30,40 — room for items at z=35
+        ZIndex = layer * 10;     // 0,10,20,30,40. Matches Unity sorting layers: dropped items sit at
+                                 // z=14 and characters at z=15 (both below Objects 1 @20); roofs @40.
         QueueRedraw();
     }
 

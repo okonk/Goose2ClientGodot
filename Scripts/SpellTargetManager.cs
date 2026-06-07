@@ -23,23 +23,28 @@ public partial class SpellTargetManager : Node
         ExitTargeting();
     }
     
-    public override void _UnhandledInput(InputEvent @event)
+    // Handle targeting input in _Input (the earliest stage) rather than _UnhandledInput, so it
+    // runs BEFORE Godot's GUI focus navigation. Otherwise, when a spell is cast from a focused
+    // hotkey button / spell slot, the built-in ui_left/ui_right/ui_up/ui_down navigation eats the
+    // arrow keys before targeting ever sees them (only Enter happened to fall through).
+    public override void _Input(InputEvent @event)
     {
         if (!IsTargeting) return;
-        
-        if (@event is InputEventAction action)
-        {
-            if (action.Action == "TargetDown" && action.Pressed)
-                CycleTarget(searchDown: true);
-            else if (action.Action == "TargetUp" && action.Pressed)
-                CycleTarget(searchDown: false);
-            else if (action.Action == "ConfirmTarget" && action.Pressed)
-                ConfirmTarget();
-            else if (action.Action == "CancelTarget" && action.Pressed)
-                CancelTarget();
-            else if (action.Action == "TargetHome" && action.Pressed)
-                GoHome();
-        }
+
+        // Physical key/mouse input arrives as InputEventKey, not InputEventAction — so we must
+        // match against the configured actions on the raw event. While targeting, movement keys
+        // (WASD) cycle the target alongside the arrow-key TargetUp/TargetDown bindings: up/left
+        // step backward through targets, down/right step forward (Unity's "Targeting" map).
+        if (@event.IsActionPressed("TargetUp") || @event.IsActionPressed("MoveUp") || @event.IsActionPressed("MoveLeft"))
+            CycleTarget(searchDown: false);
+        else if (@event.IsActionPressed("TargetDown") || @event.IsActionPressed("MoveDown") || @event.IsActionPressed("MoveRight"))
+            CycleTarget(searchDown: true);
+        else if (@event.IsActionPressed("ConfirmTarget")) ConfirmTarget();
+        else if (@event.IsActionPressed("CancelTarget")) CancelTarget();
+        else if (@event.IsActionPressed("TargetHome")) GoHome();
+        else return;
+
+        GetViewport().SetInputAsHandled();
     }
     
     /// <summary>Begin targeting for the given spell.</summary>
@@ -47,7 +52,10 @@ public partial class SpellTargetManager : Node
     {
         _pendingSpell = info;
         IsTargeting = true;
-        
+
+        // Drop focus from whatever button/slot launched the cast so it can't grab navigation keys.
+        GetViewport().GuiReleaseFocus();
+
         var mm = GameManager.Instance.CurrentMapManager;
         if (mm == null) { ExitTargeting(); return; }
         
@@ -99,12 +107,18 @@ public partial class SpellTargetManager : Node
         if (_target == null) return;
         
         if (_reticle == null || !GodotObject.IsInstanceValid(_reticle))
-        {
             _reticle = GD.Load<PackedScene>("res://Scenes/UI/SpellTarget.tscn").Instantiate<SpellTarget>();
-            AddChild(_reticle);
+
+        // Parent the reticle to the target character so it follows them and renders in the world
+        // canvas — mirrors Unity SpellTargetManager.SetTarget. ResizeTarget then sets a LOCAL
+        // position relative to the character. (Previously parented to this autoload-side manager,
+        // so ResizeTarget's local Position teleported it to the map origin and it never showed.)
+        if (_reticle.GetParent() != _target)
+        {
+            _reticle.GetParent()?.RemoveChild(_reticle);
+            _target.AddChild(_reticle);
         }
-        
-        _reticle.GlobalPosition = _target.Position;
+
         _reticle.ResizeTarget(_target.Height);
     }
     

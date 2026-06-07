@@ -11,9 +11,9 @@ script = ExtResource("1_mm")
 [node name="Layers" type="Node2D" parent="."]
 
 [node name="Objects" type="Node2D" parent="."]
-z_index = 35
+z_index = 14
 y_sort_enabled = true
 
 [node name="Characters" type="Node2D" parent="."]
-z_index = 35
+z_index = 15
 y_sort_enabled = true

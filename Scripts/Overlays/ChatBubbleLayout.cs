@@ -9,6 +9,9 @@ namespace Goose2Client.Overlays
         public static readonly Vector2 Padding = new Vector2(7f, 5f);
         public const double LifetimeSeconds = 3.0;
 
+        /// <summary>Extra pixels to lift the bubble above its computed head position.</summary>
+        public const float VerticalGap = 10f;
+
         /// <summary>Clamp text width to MaxWidth.</summary>
         public static float ClampWidth(float textWidth) => Mathf.Min(textWidth, MaxWidth);
 

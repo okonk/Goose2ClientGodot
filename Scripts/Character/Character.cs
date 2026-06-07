@@ -29,6 +29,11 @@ namespace Goose2Client.Character
 
         private Label _nameLabel;
         private ColorRect _hpBar;
+        private ColorRect _mpBar;
+
+        // MP bar fill color, matching the Unity CharacterHealthBars prefab (RGB 32,60,128).
+        private static readonly Color MpColor = new(0.1254902f, 0.23529412f, 0.5019608f);
+        private const float BarWidth = 32f;
         private Goose2Client.Overlays.BattleText _battleText;
         private Overlays.ChatBubble _chatBubble;
         private Overlays.EmoteAnimation _emote;
@@ -36,24 +41,36 @@ namespace Goose2Client.Character
         private void EnsureBars()
         {
             if (_hpBar != null) return;
+            // HP bar: 3px tall, centered 32px-wide bar, just below the name label.
             _hpBar = new ColorRect
             {
-                Position = new Vector2(-16, -56),   // centered 32px-wide bar, just below the name label
-                Size = new Vector2(32, 3),
+                Position = new Vector2(-16, -56),
+                Size = new Vector2(BarWidth, 3),
                 Color = Colors.Green,
                 ZIndex = 20,
             };
             AddChild(_hpBar);
+            // MP bar: 2px tall, stacked directly under the HP bar (Unity stacks MP below HP).
+            _mpBar = new ColorRect
+            {
+                Position = new Vector2(-16, -53),
+                Size = new Vector2(BarWidth, 2),
+                Color = MpColor,
+                ZIndex = 20,
+            };
+            AddChild(_mpBar);
         }
 
-        /// <summary>Update the HP bar (and accept MP for future use). hpPercent/mpPercent are 0..1.</summary>
+        /// <summary>Update the HP and MP bars. hpPercent/mpPercent are 0..1. Bars resize left-aligned
+        /// (shrink from the right), matching the Unity CharacterHealthBar.</summary>
         public void SetVitals(float hpPercent, float mpPercent)
         {
             HPPercent = hpPercent;
             MPPercent = mpPercent;
             EnsureBars();
-            _hpBar.Size = new Vector2(32 * Mathf.Clamp(hpPercent, 0f, 1f), 3);
+            _hpBar.Size = new Vector2(BarWidth * Mathf.Clamp(hpPercent, 0f, 1f), 3);
             _hpBar.Color = hpPercent > 0.66f ? Colors.Green : hpPercent > 0.33f ? Colors.Orange : Colors.Red;
+            _mpBar.Size = new Vector2(BarWidth * Mathf.Clamp(mpPercent, 0f, 1f), 2);
         }
 
         private void EnsureNameLabel()
@@ -353,10 +370,12 @@ void fragment() {
         private void ProcessLocalInput(double delta)
         {
             if (!IsLocalPlayer) return;
+            if (GameManager.Instance.IsTargeting) return;   // spell targeting consumes movement/attack input
             if (GetViewport().GuiGetFocusOwner() is LineEdit) return;   // ignore movement/attack while typing in chat
             _moveCooldown -= delta;
 
-            if (Input.IsActionJustPressed("Attack"))
+            // Held button keeps swinging; AttackGate throttles repeats to the weapon-speed interval.
+            if (Input.IsActionPressed("Attack"))
             {
                 int ws = GameManager.Instance.CurrentMapManager?.WeaponSpeed ?? 0;
                 if (_attackGate.TryAttack(Time.GetTicksMsec() / 1000.0, ws))
@@ -470,8 +489,10 @@ void fragment() {
             // Position above head — faithful pixel port of Unity formula.
             // Unity: localPosition = (0, character.Height/32 + (bubbleHeight - 0.4355469f)/2f)
             // Godot pixels: Height is already in px, 0.4355469 * 32 = 13.9375px
-            // Godot Y is down, so negate for "above":
-            _chatBubble.Position = new Vector2(0, -(Height + (_chatBubble.BackgroundHeight - 0.4355469f * 32f) / 2f));
+            // Godot Y is down, so negate for "above". The Unity formula was anchored at its tile-center
+            // character origin; this port's Character node origin is the feet (tile bottom edge), so lift
+            // by half a tile to match — same feet->center correction ShowEmote/ShowSpell apply.
+            _chatBubble.Position = new Vector2(0, -(Height + (_chatBubble.BackgroundHeight - 0.4355469f * 32f) / 2f) - Goose2Client.Map.MapCoords.TileSize / 2f - Overlays.ChatBubbleLayout.VerticalGap);
         }
 
         /// <summary>Show a spell impact animation at this character's origin. Spells stack (no replacement).</summary>
@@ -479,7 +500,10 @@ void fragment() {
         {
             var s = new Overlays.SpellAnimation { Name = "Spell", ZIndex = 20 };
             AddChild(s);
-            if (!s.Setup(animationId)) s.QueueFree();   // discard orphan on missing asset
+            if (!s.Setup(animationId)) { s.QueueFree(); return; }   // discard orphan on missing asset
+            // Node origin is the feet (tile bottom edge); lift to the tile-cell center so the
+            // effect is centered on the character's tile.
+            s.Position = new Vector2(0, -Goose2Client.Map.MapCoords.TileSize / 2f);
         }
 
         /// <summary>Show an emote animation above this character. Replaces any existing emote.</summary>
@@ -502,8 +526,11 @@ void fragment() {
                 return;
             }
 
-            // Position above the body — faithful pixel port of Unity (0.5, Height/32 - 0.75).
-            e.Position = new Vector2(0.5f * 32f, -(Height - 0.75f * 32f));
+            // Position above the body. Unity's (0.5, Height/32 - 0.75) offset was anchored at its
+            // tile-center character origin, but this port's Character node origin is the feet (tile
+            // bottom edge), so lift by half a tile to reach the tile cell — the same feet->center
+            // correction ShowSpell already applies. Without it the emote lands a half-tile too low.
+            e.Position = new Vector2(0.5f * 32f, -(Height - 0.75f * 32f) - Goose2Client.Map.MapCoords.TileSize / 2f);
             _emote = e;
         }
     }

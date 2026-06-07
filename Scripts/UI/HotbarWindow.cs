@@ -330,6 +330,8 @@ public partial class HotbarWindow : BaseWindow, IWindow
 
         // Guard against typing in input fields
         if (GetViewport().GuiGetFocusOwner() is LineEdit) return;
+        // Spell targeting captures input — don't fire hotkeys while choosing a target.
+        if (GameManager.Instance.IsTargeting) return;
 
         for (int i = 0; i < SlotsPerPage; i++)
         {

@@ -84,6 +84,9 @@ public partial class GameHud : Control
 
     public override void _UnhandledInput(InputEvent @event)
     {
+        // Spell targeting captures all keyboard input (Unity disables the Player input map).
+        if (GameManager.Instance.IsTargeting)
+            return;
         // Don't toggle windows or refocus while typing in chat.
         if (GetViewport().GuiGetFocusOwner() is LineEdit)
             return;
@@ -98,6 +101,8 @@ public partial class GameHud : Control
             Hotbar.CyclePage();
         else if (@event.IsActionPressed("ToggleMount"))
             Hotbar.ToggleMount();
+        else if (@event.IsActionPressed("PickUp"))
+            GameManager.Instance.NetworkClient.Pickup();
         else if (@event.IsActionPressed("StartChat"))
             Chat.FocusChat("");
         else if (@event.IsActionPressed("SlashCommand"))

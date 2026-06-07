@@ -24,6 +24,9 @@ namespace Goose2Client.Overlays
             _label.AddThemeConstantOverride("outline_size", 4);
             _label.AddThemeColorOverride("font_outline_color", new Color(0, 0, 0, 0.9f));
             _label.AddThemeColorOverride("font_color", color);
+            // Anchor the 100px-wide label by its CENTER on the node origin (= character center),
+            // so HorizontalAlignment.Center actually centers the text on the character.
+            _label.Position = new Vector2(-_label.Size.X / 2f, 0);
             AddChild(_label);
 
             // 1.0s lifetime, rising at 32 px/s (1 world-unit/s = 32 px/s)

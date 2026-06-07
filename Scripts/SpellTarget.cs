@@ -2,52 +2,42 @@ using Godot;
 
 namespace Goose2Client;
 
-/// <summary>Spell targeting reticle — positioned at the target character's feet.</summary>
+/// <summary>Spell targeting reticle — a white rectangle outline framing the target character.
+/// Mirrors the Unity client's white-tinted, 9-sliced "spelltarget" sprite (sort order 1000):
+/// the border stays a constant pixel width while the frame scales to the character.</summary>
 public partial class SpellTarget : Node2D
 {
-    private Sprite2D _reticle;
-    
+    private const float BorderWidth = 2f;
+    private Vector2 _size = new(Map.MapCoords.TileSize, Map.MapCoords.TileSize);
+
     public override void _Ready()
     {
-        _reticle = new Sprite2D
-        {
-            TextureFilter = CanvasItem.TextureFilterEnum.Nearest,
-            ZIndex = 30,
-            Name = "ReticleSprite",
-            // Simple diamond-shaped reticle (no external texture needed)
-            Texture = CreateReticleTexture(),
-        };
-        AddChild(_reticle);
+        // High ZIndex so the frame draws above the character body (Unity sortingOrder 1000).
+        ZIndex = 1000;
+        QueueRedraw();
     }
 
-    /// <summary>Create a minimal diamond reticle texture (no external asset needed).</summary>
-    private static ImageTexture CreateReticleTexture()
-    {
-        var img = Image.Create(16, 16, false, Image.Format.Rgba8);
-        img.Fill(new Color(0, 0, 0, 0));
-        // Draw a diamond outline
-        var c = new Color(1f, 1f, 0.4f, 1f);
-        int[] dx = { 0, 1, 2, 3, 4, 5, 6, 7 };
-        int[] dy = { 7, 6, 5, 4, 3, 2, 1, 0 };
-        for (int i = 0; i < dx.Length; i++)
-        {
-            int x = dx[i], y = dy[i];
-            img.SetPixel(7 - x, y, c); img.SetPixel(7 + x, y, c);
-            img.SetPixel(7 - x, 15 - y, c); img.SetPixel(7 + x, 15 - y, c);
-        }
-        return ImageTexture.CreateFromImage(img);
-    }
-    
-    /// <summary>Size the reticle to match the target character's dimensions.</summary>
+    /// <summary>Size the frame to match the target character's dimensions (Unity ResizeTarget).</summary>
     public void ResizeTarget(int characterHeight)
     {
         if (characterHeight <= 0) characterHeight = 64;
-        int h = characterHeight / 32; // scale factor
-        if (h < 1) h = 1;
-        int w = (int)System.Math.Max(1, h * 0.75f);
-        _reticle.Scale = new Vector2(w, h);
-        // Position offset so reticle sits under character feet
-        int yOffset = (h - 1) * 16; // half the scaled height offset
-        Position = new Vector2(0, -yOffset);
+        float ts = Map.MapCoords.TileSize;
+        float h = Mathf.Max(1f, characterHeight / 32f);   // tile units — float, like Unity
+        float w = Mathf.Max(1f, h * 0.75f);
+        _size = new Vector2(w * ts, h * ts);
+        // Center the frame on the character body. Unity places it at (h-1)*0.5 tiles above the
+        // character root, but that root is the TILE CENTER; this port's character origin is the
+        // TILE BOTTOM (feet), 0.5 tile lower — so we add that half-tile back: -h*0.5 tiles up.
+        // (Equivalently -Height/2 px: the frame spans feet→head, matching the body sprite.)
+        Position = new Vector2(0, -h * 0.5f * ts);
+        QueueRedraw();
+    }
+
+    public override void _Draw()
+    {
+        // White rectangle outline centered on this node's origin. Constant border width (the node
+        // itself is never scaled — the size is baked into the rect), matching Unity's 9-slice.
+        var rect = new Rect2(-_size / 2f, _size);
+        DrawRect(rect, Colors.White, filled: false, width: BorderWidth);
     }
 }

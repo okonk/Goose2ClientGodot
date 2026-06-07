@@ -77,16 +77,25 @@ mouse_filter = 1
 layout_mode = 2
 anchors_preset = 0
 offset_left = 6.0
-offset_top = 118.0
-offset_right = 66.0
-offset_bottom = 136.0
-text = "<"
+offset_top = 114.0
+offset_right = 80.0
+offset_bottom = 138.0
+text = "Back"
+
+[node name="CloseButton" type="Button" parent="Content"]
+layout_mode = 2
+anchors_preset = 0
+offset_left = 89.0
+offset_top = 114.0
+offset_right = 163.0
+offset_bottom = 138.0
+text = "Close"
 
 [node name="NextButton" type="Button" parent="Content"]
 layout_mode = 2
 anchors_preset = 0
-offset_left = 72.0
-offset_top = 118.0
-offset_right = 132.0
-offset_bottom = 136.0
-text = ">"
+offset_left = 172.0
+offset_top = 114.0
+offset_right = 246.0
+offset_bottom = 138.0
+text = "Next"

@@ -34,23 +34,10 @@ namespace Goose2Client.Overlays
 
             Lifetime = new OverlayLifetime(lengthSeconds);
 
-            // Compute effect height = max frame texture height, fallback 64.
-            int height = 0;
-            for (int i = 0; i < n; i++)
-            {
-                var tex = sprite.SpriteFrames.GetFrameTexture(clip, i);
-                if (tex != null)
-                {
-                    int h = (int)tex.GetSize().Y;
-                    if (h > height) height = h;
-                }
-            }
-            if (height == 0) height = 64;
-
-            // Apply the spell vertical offset to the INNER sprite (so the node's own Position
-            // stays the pure anchor the caller sets).
-            // Unity yOffset is +Y-up; negate for Godot +Y-down. Vertical placement eye-verified in live E2E (Task 10).
-            sprite.Position = new Vector2(0, -SpellLayout.VerticalOffsetPixels(height));
+            // AnimatedSprite2D is Centered, so the texture is already centered on this node's
+            // origin. The caller anchors the node on the target's center (tile cell / character),
+            // so no extra vertical offset is needed. (Unity's -h/2 offset existed only to center
+            // its BOTTOM-pivot sprite; re-applying it here double-shifted the effect downward.)
 
             return true;
         }

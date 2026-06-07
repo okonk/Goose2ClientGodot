@@ -11,7 +11,8 @@ public partial class MapManager : Node2D
 {
     private MapFile _map;
     private SpriteCache _cache;
-    private readonly MapLayer[] _layers = new MapLayer[5];
+    private readonly MapLayer[] _layers = new MapLayer[5];   // immediate-draw bands; [2] is null (see _objectLayer)
+    private ObjectLayer _objectLayer;   // layer 2 ("Objects 1") as per-object Y-sortable sprites
     private Node2D _objects;     // dropped-item container
     private Camera2D _camera;
     private readonly System.Collections.Generic.Dictionary<int, MapItem> _mapObjects = new();
@@ -48,11 +49,21 @@ public partial class MapManager : Node2D
         var layersRoot = GetNode<Node2D>("Layers");
         for (int i = 0; i < 5; i++)
         {
+            if (i == 2) continue;   // layer 2 is the Y-sorted ObjectLayer (built below), not a flat band
             var layer = new MapLayer { Name = $"Layer{i}" };
             layersRoot.AddChild(layer);
             layer.Setup(_map, i, _cache);
             _layers[i] = layer;
         }
+
+        // Layer 2 ("Objects 1": trees, walls) shares the characters' z_index (15) and Y-sorts with them,
+        // so the player passes in front of an object's base and behind its top. It must be a direct
+        // Y-sort child of this (Y-sort) node to merge into the same sort as the Characters node; placing
+        // it just before Characters makes a character win the tie when it shares an object's base tile.
+        _objectLayer = new ObjectLayer { Name = "Objects1", ZIndex = 15, YSortEnabled = true };
+        AddChild(_objectLayer);
+        MoveChild(_objectLayer, _characterRoot.GetIndex());
+        _objectLayer.Setup(_map, 2, _cache);
 
         var pm = GameManager.Instance.PacketManager;
         pm.Listen<TileUpdatePacket>(OnTileUpdate);
@@ -212,6 +223,7 @@ public partial class MapManager : Node2D
 
     public override void _UnhandledInput(InputEvent @event)
     {
+        if (GameManager.Instance.IsTargeting) return;   // spell targeting suppresses world clicks
         if (@event is not InputEventMouseButton mb || !mb.Pressed) return;
         if (mb.ButtonIndex != MouseButton.Left && mb.ButtonIndex != MouseButton.Right) return;
 
@@ -276,7 +288,7 @@ public partial class MapManager : Node2D
         var s = new Goose2Client.Overlays.SpellAnimation { Name = $"SpellTile({p.AnimationId})", ZIndex = 20 };
         _objects.AddChild(s);
         if (!s.Setup(p.AnimationId)) { s.QueueFree(); return; }
-        s.Position = MapCoords.TileBottomCenter(p.TileX, p.TileY);
+        s.Position = MapCoords.TileCenter(p.TileX, p.TileY);   // centered on the tile cell
     }
 
     private void OnCast(object packetObj)
@@ -302,7 +314,8 @@ public partial class MapManager : Node2D
 
             l.Graphic = sheet == 0 ? 0 : graphic;                      // sheet 0 ⇒ empty cell
             l.Sheet   = sheet;
-            _layers[layer].QueueRedraw();                              // repaint that layer
+            if (layer == 2) _objectLayer.RefreshCell(p.X, p.Y);        // Y-sorted layer: rebuild the cell
+            else _layers[layer].QueueRedraw();                         // flat band: repaint the layer
         }
     }
 

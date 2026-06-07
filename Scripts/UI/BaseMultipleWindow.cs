@@ -14,9 +14,17 @@ public abstract partial class BaseMultipleWindow : BaseWindow, IWindow
 {
     public const int LineCount = 20;
 
+    // The server pre-wraps each line for the original window width at this font size (matches the
+    // Unity client's LiberationSans @ 10). Code-created labels otherwise fall back to Godot's
+    // built-in 16px default — the theme's default_font_size isn't applied to runtime children —
+    // which overflows the fixed-width window. Keep this in sync with the line wrapping the server assumes.
+    private const int LineFontSize = 10;
+    private const int ButtonFontSize = 12;
+
     private Label[] _lines;
     private Button _backButton;
     private Button _nextButton;
+    private Button _closeButton;
 
     public Action<BaseMultipleWindow> OnCloseWindow { get; set; }
 
@@ -31,18 +39,25 @@ public abstract partial class BaseMultipleWindow : BaseWindow, IWindow
         // Server-spawned — hidden until a MakeWindow/EndWindow pair arrives.
         Visible = false;
 
-        // Resolve paging buttons
+        // Resolve paging/close buttons (Back/Close/Next along the bottom, like the Unity client)
         _backButton = GetNode<Button>("Content/BackButton");
         _nextButton = GetNode<Button>("Content/NextButton");
+        _closeButton = GetNode<Button>("Content/CloseButton");
         _backButton.Pressed += BackClicked;
         _nextButton.Pressed += NextClicked;
+        _closeButton.Pressed += CloseWindow;
+        foreach (var b in new[] { _backButton, _nextButton, _closeButton })
+            b.AddThemeFontSizeOverride("font_size", ButtonFontSize);
 
-        // Create line labels at runtime
+        // Create line labels at runtime. Pack them tight (separation 0) and pin the font size so
+        // the server's pre-wrapped lines fit the window exactly as they do in the Unity client.
         _lines = new Label[LineCount];
         var linesContainer = GetNode<VBoxContainer>("Content/Lines");
+        linesContainer.AddThemeConstantOverride("separation", 0);
         for (int i = 0; i < LineCount; i++)
         {
             var label = new Label { Text = " " };
+            label.AddThemeFontSizeOverride("font_size", LineFontSize);
             linesContainer.AddChild(label);
             _lines[i] = label;
         }
@@ -55,9 +70,10 @@ public abstract partial class BaseMultipleWindow : BaseWindow, IWindow
         Title = packet.Title;
         WindowId = packet.WindowId;
 
-        // Buttons is bool[5]; Back=3 → index 2, Next=4 → index 3
+        // Buttons is bool[5] indexed by (enum value - 1): Close=2→1, Back=3→2, Next=4→3
         if (packet.Buttons != null && packet.Buttons.Length >= 4)
         {
+            _closeButton.Visible = packet.Buttons[(int)WindowButtons.Close - 1];
             _backButton.Visible = packet.Buttons[(int)WindowButtons.Back - 1];
             _nextButton.Visible = packet.Buttons[(int)WindowButtons.Next - 1];
         }

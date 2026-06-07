@@ -77,37 +77,43 @@ namespace Goose2Client.Overlays
                 textSize = _label.GetMinimumSize();
             }
 
-            // If text exceeds max width, wrap it
+            // If the single line exceeds the max width, turn on word wrap and re-measure as a
+            // multi-line block so the background sizes to the wrapped text. GetStringSize only
+            // ever reports one line; GetMultilineStringSize accounts for the wrapped rows, giving
+            // both the longest line's width and the full stacked height.
             float clampedWidth = ChatBubbleLayout.ClampWidth(textSize.X);
-            if (clampedWidth < textSize.X)
+            if (clampedWidth < textSize.X && defaultFont != null)
             {
                 _label.AutowrapMode = TextServer.AutowrapMode.Word;
-                _label.CustomMinimumSize = new Vector2(clampedWidth, 0);
-                _label.Size = new Vector2(clampedWidth, 1);
-
-                // Re-measure after wrapping
-                if (defaultFont != null)
-                {
-                    textSize = defaultFont.GetStringSize(
-                        message,
-                        HorizontalAlignment.Left,
-                        (int)clampedWidth,
-                        fontSize
-                    );
-                }
-                else
-                {
-                    textSize = _label.GetMinimumSize();
-                }
+                textSize = defaultFont.GetMultilineStringSize(
+                    message,
+                    HorizontalAlignment.Center,
+                    clampedWidth,
+                    fontSize
+                );
+                // Round up so the longest line can't land a hair over the wrap width (which would
+                // make the label re-wrap one extra word that the measurement didn't account for).
+                textSize = new Vector2(Mathf.Ceil(textSize.X), Mathf.Ceil(textSize.Y));
             }
 
             // Compute background size with padding
             var bgSize = ChatBubbleLayout.BackgroundSize(textSize);
             BackgroundHeight = bgSize.Y;
 
-            // Set background and label sizes
             _background.Size = bgSize;
-            _label.Size = bgSize;
+
+            // Center the panel horizontally on the character. A Panel's origin is its
+            // top-left corner, so shift it left by half its width — otherwise the bubble
+            // hangs off to the right of the character's center.
+            _background.Position = new Vector2(-bgSize.X / 2f, 0);
+
+            // Size the label to the measured text block, inset by the padding. Pin the wrap width
+            // with CustomMinimumSize: a Label that isn't inside a Container won't actually reflow
+            // its autowrap from Size alone. Using the measured longest-line width reproduces the
+            // exact line breaks from GetMultilineStringSize above.
+            _label.CustomMinimumSize = new Vector2(textSize.X, 0);
+            _label.Position = ChatBubbleLayout.Padding / 2f;
+            _label.Size = textSize;
         }
     }
 }

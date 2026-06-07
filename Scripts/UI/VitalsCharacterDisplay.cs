@@ -25,12 +25,14 @@ public partial class VitalsCharacterDisplay : Control
         if (localPlayer == null) { HideAll(); return; }
         var a = localPlayer.GetAppearance();
 
-        SetLayer("Mask/Body", "Body", a.BodyId, a.BodyColor);
+        // Monster bodies (Unity: id >= 100) are shown centered; humanoids drop so the head/upper
+        // body fills the circle.
+        SetLayer("Mask/Body", "Bodies", a.BodyId, a.BodyColor, a.IsMonster ? 0f : HeadDropPixels);
         if (a.IsMonster) { ClearLayer("Mask/Hair"); ClearLayer("Mask/Eyes"); ClearLayer("Mask/Chest"); ClearLayer("Mask/Helmet"); return; }
         SetLayer("Mask/Hair", "Hair", a.HairId, a.HairColor);
         SetLayer("Mask/Eyes", "Eyes", a.FaceId, new Color(0,0,0,0));
         SetLayer("Mask/Chest", "Chest", a.ChestId, a.ChestColor);
-        SetLayer("Mask/Helmet", "Helm", a.HelmId, a.HelmColor);
+        SetLayer("Mask/Helmet", "Helms", a.HelmId, a.HelmColor);
     }
 
     private void HideAll()
@@ -42,7 +44,12 @@ public partial class VitalsCharacterDisplay : Control
         ClearLayer("Mask/Helmet");
     }
 
-    private void SetLayer(string nodePath, string folder, int graphicId, Color tint)
+    // Unity VitalsCharacterDisplay: sizeDelta = frame * 1.25, localPosition.y = -20 (humanoids).
+    private const float PortraitZoom = 1.25f;
+    private const float PortraitSize = 53f;       // Mask is 53x53 (matches VitalsWindow.tscn).
+    private const float HeadDropPixels = 20f;     // push the figure down so the head frames in the circle.
+
+    private void SetLayer(string nodePath, string folder, int graphicId, Color tint, float dropPixels = HeadDropPixels)
     {
         var rect = GetNode<TextureRect>(nodePath);
         if (graphicId <= 0) { ClearLayer(nodePath); return; }
@@ -56,6 +63,17 @@ public partial class VitalsCharacterDisplay : Control
         rect.Texture = tex;
         rect.Visible = true;
         rect.TextureFilter = CanvasItem.TextureFilterEnum.Nearest;
+
+        // Draw at native size * zoom (preserve aspect — never stretch to the square), centered
+        // horizontally on the circle and dropped so the head/upper body fills it. The Mask node's
+        // clip_children crops the overflow to the circle, mirroring Unity's UI Mask. Layers are
+        // center-registered (like the in-world character), so a common center keeps them aligned.
+        var size = tex.GetSize() * PortraitZoom;
+        rect.Size = size;
+        rect.Position = new Vector2(
+            PortraitSize / 2f - size.X / 2f,
+            PortraitSize / 2f + dropPixels - size.Y / 2f);
+
         ApplyTint(rect, tint);
     }
 
