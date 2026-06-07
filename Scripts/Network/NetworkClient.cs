@@ -11,6 +11,7 @@ namespace Goose2Client.Network
         public event Action<Exception>? ConnectionError;
         public event Action? Connected;
         public event Action<Exception>? SocketError;
+        public event Action? Disconnected;
 
         public bool IsConnected => socket != null && socket.Connected;
         public bool Pause { get; set; } = false;
@@ -99,7 +100,12 @@ namespace Goose2Client.Network
                 while (running)
                 {
                     int received = socket!.Receive(buffer);   // blocking; no Select(...,500) poll
-                    if (received == 0) break;                 // remote closed the connection
+                    if (received == 0)
+                    {
+                        if (running)
+                            Callable.From(() => Disconnected?.Invoke()).CallDeferred();
+                        break;
+                    }
 
                     packetBuffer += Encoding.ASCII.GetString(buffer, 0, received);
                     if (packetBuffer.Length == 0) continue;
