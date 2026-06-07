@@ -21,6 +21,9 @@ public partial class MapManager : Node2D
     private Character.Character _localPlayer;
     private bool _listenersRegistered;
 
+    /// <summary>Weapon speed in ms received from the server via WPS (0 = not yet set).</summary>
+    public int WeaponSpeed { get; private set; }
+
     /// <summary>The login ID of the local player.</summary>
     public int MyLoginId => _myLoginId;
 
@@ -62,6 +65,7 @@ public partial class MapManager : Node2D
         pm.Listen<EraseCharacterPacket>(OnEraseCharacter);
         pm.Listen<AttackPacket>(OnAttack);
         pm.Listen<VitalsPercentagePacket>(OnVitals);
+        pm.Listen<WeaponSpeedPacket>(OnWeaponSpeed);
         _listenersRegistered = true;
 
         GameManager.Instance.CurrentMapManager = this;
@@ -88,6 +92,7 @@ public partial class MapManager : Node2D
         pm.Remove<EraseCharacterPacket>(OnEraseCharacter);
         pm.Remove<AttackPacket>(OnAttack);
         pm.Remove<VitalsPercentagePacket>(OnVitals);
+        pm.Remove<WeaponSpeedPacket>(OnWeaponSpeed);
     }
 
     /// <summary>Bounds + blocked check (Unity IsValidMove, map-only part; occupancy is Step 6).</summary>
@@ -207,6 +212,8 @@ public partial class MapManager : Node2D
         if (x < 0 || y < 0 || x >= _map.Width || y >= _map.Height) return;
         _layers[4].Visible = !_map[x, y].IsRoof;
     }
+
+    private void OnWeaponSpeed(object packetObj) => WeaponSpeed = ((WeaponSpeedPacket)packetObj).Speed;
 
     private void OnTileUpdate(object packetObj)
     {

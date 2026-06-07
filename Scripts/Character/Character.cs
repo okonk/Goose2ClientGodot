@@ -247,6 +247,7 @@ void fragment() {
         private bool _attackLocked;
         private double _attackTimer;
         protected bool AttackLocked => _attackLocked;   // replaces the Task 6 stub
+        private readonly AttackGate _attackGate = new();
 
         public void TriggerAttack()
         {
@@ -316,7 +317,15 @@ void fragment() {
             if (GetViewport().GuiGetFocusOwner() is LineEdit) return;   // ignore movement/attack while typing in chat
             _moveCooldown -= delta;
 
-            if (Input.IsActionJustPressed("Attack")) { TriggerAttack(); GameManager.Instance.NetworkClient.Attack(); }
+            if (Input.IsActionJustPressed("Attack"))
+            {
+                int ws = GameManager.Instance.CurrentMapManager?.WeaponSpeed ?? 0;
+                if (_attackGate.TryAttack(Time.GetTicksMsec() / 1000.0, ws))
+                {
+                    TriggerAttack();
+                    GameManager.Instance.NetworkClient.Attack();
+                }
+            }
 
             if (_moving || _moveCooldown > 0) return;
 
