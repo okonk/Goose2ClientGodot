@@ -60,12 +60,12 @@ namespace Goose2Client.UI
             }
 
             // Size to content (both axes) so the full-rect Background panel hugs the text.
-            // Text columns start at x=40 (right of the 32px icon); add 4px right padding.
+            // Text columns start at x=40 (right of the 32px icon); add 9px right padding.
             // Width = widest of the name/type/flags lines and the stat rows.
             float textWidth = Mathf.Max(
                 Mathf.Max(_nameLabel.GetCombinedMinimumSize().X, _typeLabel.GetCombinedMinimumSize().X),
                 Mathf.Max(_flagsLabel.GetCombinedMinimumSize().X, _statsVBox.GetCombinedMinimumSize().X));
-            float width = Mathf.Max(60f, 40f + textWidth + 4f);
+            float width = Mathf.Max(60f, 40f + textWidth + 9f);
 
             // Header block runs to y≈46 (Flags label bottom); StatsVBox starts at y=48
             // and its combined minimum size reflects only the visible stat lines.
