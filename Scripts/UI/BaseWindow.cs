@@ -47,6 +47,7 @@ public partial class BaseWindow : Control
         {
             var ws = GameManager.Instance.CharacterSettings.GetWindowSettings(WindowName);
             Position = ws != null ? ws.Position : DefaultWindowLayout.For(WindowName);
+            if (ws != null) Visible = ws.Visible;
         }
 
         // Title-bar drag

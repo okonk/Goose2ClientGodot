@@ -58,5 +58,29 @@ namespace Goose2Client.Tests
             Assert.Equal(18, back.GetOption<int>("fontSize", 0));
             Assert.Equal("TestPlayer", back.GetOption<string>("nickname", null));
         }
+
+        [Fact]
+        public void RoundTrip_PreservesWindowVisibility()
+        {
+            // Arrange — two windows with different Visible values
+            var cs = new CharacterSettings
+            {
+                WindowSettings = new Dictionary<string, WindowSettings>
+                {
+                    { "Spellbook", new WindowSettings { Position = new Vector2(100, 200), Visible = true } },
+                    { "Bank",      new WindowSettings { Position = new Vector2(300, 400), Visible = false } },
+                },
+            };
+
+            // Act
+            var json = JsonSerializer.Serialize(cs, CharacterSettings.JsonOptions);
+            var back = JsonSerializer.Deserialize<CharacterSettings>(json, CharacterSettings.JsonOptions);
+
+            // Assert — Visible survives round-trip for both entries
+            Assert.True(back.WindowSettings.ContainsKey("Spellbook"));
+            Assert.True(back.WindowSettings["Spellbook"].Visible);
+            Assert.True(back.WindowSettings.ContainsKey("Bank"));
+            Assert.False(back.WindowSettings["Bank"].Visible);
+        }
     }
 }

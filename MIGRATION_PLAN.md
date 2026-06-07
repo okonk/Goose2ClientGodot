@@ -530,7 +530,7 @@ All Step-7 deferrals are scoped as explicit tasks in
   against the live server's actual ranges during the manual E2E and adjust the consts if needed.
 - **Window default positions/visibility.** Positions persist via `CharacterSettings.WindowSettings`;
   per-window saved *visibility* now persists too (`WindowSettings.Visible`, saved on toggle/close,
-  restored in `_Ready`). → **task D1 ✅ Resolved (UI windows overhaul Part 1).** The Step 8 D1 item
+  restored in `_Ready` as of Step 8 (D1 finish)). → **task D1 ✅ Resolved (UI windows overhaul Part 1).** The Step 8 D1 item
   is satisfied here.
 - **TextureProgressBar visuals (C2).** ✅ **Resolved (Step 8).** HP/MP bars (`VitalsWindow.tscn`) and
   XP bar (`HotbarWindow.tscn`) already had `texture_progress` art. Cooldown-bar radial overlay now
