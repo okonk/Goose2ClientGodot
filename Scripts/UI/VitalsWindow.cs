@@ -30,12 +30,18 @@ namespace Goose2Client.UI
             _hpBar.MaxValue = 1;
             _mpBar.MaxValue = 1;
 
-            // Connect hover handlers for tooltips
+            // Connect hover handlers for tooltips. The value labels overlap the bars, so wire
+            // both the bar AND its label (mouse_filter=Pass) — otherwise hovering the number
+            // (which covers most of the bar) wouldn't surface the tooltip.
             _hpBar.MouseEntered += () => TooltipManager.Instance.ShowTextTooltip(_hpTooltip, _hpBar);
             _hpBar.MouseExited += () => TooltipManager.Instance.HideTextTooltip();
+            _hpText.MouseEntered += () => TooltipManager.Instance.ShowTextTooltip(_hpTooltip, _hpText);
+            _hpText.MouseExited += () => TooltipManager.Instance.HideTextTooltip();
 
             _mpBar.MouseEntered += () => TooltipManager.Instance.ShowTextTooltip(_mpTooltip, _mpBar);
             _mpBar.MouseExited += () => TooltipManager.Instance.HideTextTooltip();
+            _mpText.MouseEntered += () => TooltipManager.Instance.ShowTextTooltip(_mpTooltip, _mpText);
+            _mpText.MouseExited += () => TooltipManager.Instance.HideTextTooltip();
 
             _levelText.MouseEntered += () => TooltipManager.Instance.ShowTextTooltip(_levelTooltip, _levelText);
             _levelText.MouseExited += () => TooltipManager.Instance.HideTextTooltip();
