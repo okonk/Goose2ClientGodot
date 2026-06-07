@@ -4,6 +4,7 @@
 
 [node name="HotbarSlot" type="Panel"]
 script = ExtResource("1_hotbar")
+custom_minimum_size = Vector2(32, 32)
 layout_mode = 0
 mouse_filter = 0
 offset_left = 0.0

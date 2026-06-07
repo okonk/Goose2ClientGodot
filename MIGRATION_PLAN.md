@@ -380,6 +380,30 @@ Each step is independently testable; the order front-loads the foundations the r
    (needs a desktop display + the live server + credentials — the same environment gap as Step 7/8
    E1, not runnable headless here); plus the Step 8 items below — **A1** portrait *rendering* into
    the new Vitals node tree, **A2** targeting, **B** world overlays, etc.
+
+   **UI Window Overhaul — Part 3: interaction fixes (2026-06-07).** ✅ **Landed** (branch
+   `fix/ui-window-interaction`). Fixed the six interaction regressions found after Part 1/Part 2:
+   (1) **window dragging restored** — `BaseWindow._Ready` now sets the full-rect `Content`
+   (`MouseFilter=Pass`) to `Ignore` so it stops occluding the `TitleBar` and swallowing its drag
+   clicks (one fix covers all nine `BaseWindow` subclasses); (2) **inventory icons no longer stack
+   in slot 1** + (3) **item/spell tooltips** + (4) **spellbook cast** + (5) **hotbar slots visible**
+   — all four collapse to one root cause: the `ItemSlot`/`SpellSlot`/`HotbarSlot` scenes had no
+   `custom_minimum_size`, so inside a `GridContainer` every slot sized to `(0,0)`; added
+   `custom_minimum_size` (32/24/32) so slots lay out, gaining real hover/click rects (covers
+   Inventory/Vendor/Bank/CombineBag/Spellbook/Hotbar; CharacterWindow's plain-`Control` equipment
+   doll is unchanged since its slots were already 32×32); (6) **toolbar** rebuilt from a top-left
+   text strip into four 32px icon `Button`s anchored bottom-right (8px margin), importing the
+   missing `combinebagbutton.png` asset (skipped by Part 1's import loop) and preserving the
+   `OptionsButton` node name + `ItemType` exports so `GameHud` wiring keeps working. Also **docked
+   the (still non-draggable) Hotbar bottom-center** via scene anchors plus a new
+   `BaseWindow.UseFixedDockLayout` opt-out (so `_Ready` doesn't clobber the anchors with a saved
+   `Position`). Build clean; 156 unit tests still pass; all scenes load headless.
+   **Known limitations (intentional, not bugs):** the Hotbar stays non-draggable by design (no
+   title-bar room on the 36px art — it docks instead); `ChatWindow` drag is out of scope (it's a
+   plain `Control`, not a `BaseWindow`, and was not reported). **Deferred:** the live in-game
+   visual acceptance checklist (drag/tooltips/cast/hotbar/toolbar against `scyther.local:2006`)
+   needs a desktop display + the live server + credentials — the same environment gap as the
+   Part 1/2 Task 10 pass — so it is owned by the user's live run, not landed headless here.
 8. **Polish** — character paper-doll portrait (`VitalsCharacterDisplay`), on-screen spell
    **targeting** (`SpellTargetManager`), sprite-accurate character clicks + map-item hover tooltip,
    world-space **overlays** (chat bubble, battle text, emote, spell animation), 2D lighting,

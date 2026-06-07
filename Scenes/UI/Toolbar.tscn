@@ -1,30 +1,57 @@
-[gd_scene load_steps=4 format=3]
+[gd_scene load_steps=7 format=3]
 
 [ext_resource type="Script" path="res://Scripts/UI/DestroyButton.cs" id="1_db"]
 [ext_resource type="Script" path="res://Scripts/UI/ToolbarItem.cs" id="2_ti"]
+[ext_resource type="Texture2D" path="res://Assets/UI/destroy.png" id="3_destroy"]
+[ext_resource type="Texture2D" path="res://Assets/UI/combinebagbutton.png" id="4_combine"]
+[ext_resource type="Texture2D" path="res://Assets/UI/optionsbutton.png" id="5_options"]
+[ext_resource type="Texture2D" path="res://Assets/UI/exitbutton.png" id="6_exit"]
 
 [node name="Toolbar" type="HBoxContainer"]
 layout_mode = 3
-offset_left = 0.0
-offset_top = 0.0
-offset_right = 300.0
-offset_bottom = 32.0
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -142.0
+offset_top = -40.0
+offset_right = -8.0
+offset_bottom = -8.0
+grow_horizontal = 0
+grow_vertical = 0
+theme_override_constants/separation = 2
 
 [node name="DestroyButton" type="Button" parent="."]
+custom_minimum_size = Vector2(32, 32)
+layout_mode = 2
 script = ExtResource("1_db")
-text = "Destroy"
+flat = true
+icon = ExtResource("3_destroy")
+expand_icon = true
 
 [node name="CombineBagButton" type="Button" parent="."]
+custom_minimum_size = Vector2(32, 32)
+layout_mode = 2
 script = ExtResource("2_ti")
-text = "Combine Bag"
+flat = true
+icon = ExtResource("4_combine")
+expand_icon = true
 ItemType = 1
 
 [node name="OptionsButton" type="Button" parent="."]
+custom_minimum_size = Vector2(32, 32)
+layout_mode = 2
 script = ExtResource("2_ti")
-text = "Options"
+flat = true
+icon = ExtResource("5_options")
+expand_icon = true
 ItemType = 2
 
 [node name="ExitButton" type="Button" parent="."]
+custom_minimum_size = Vector2(32, 32)
+layout_mode = 2
 script = ExtResource("2_ti")
-text = "Exit"
+flat = true
+icon = ExtResource("6_exit")
+expand_icon = true
 ItemType = 3
