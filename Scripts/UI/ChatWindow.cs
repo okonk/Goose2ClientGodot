@@ -148,7 +148,7 @@ public partial class ChatWindow : Control
         ClearAndUnfocus();
     }
 
-    private void ClearAndUnfocus()
+    public void ClearAndUnfocus()
     {
         _input.Text = "";
         _input.ReleaseFocus();

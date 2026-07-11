@@ -109,6 +109,10 @@ namespace Goose2Client
         /// </summary>
         public async void ChangeMap(string mapFile, string mapName)
         {
+            // Unity parity: clear and unfocus chat input on every map change
+            if (Hud != null && GodotObject.IsInstanceValid(Hud))
+                Hud.Chat?.ClearAndUnfocus();
+
             SetPaused(true);   // buffer gameplay packets during the transition (drained on unpause)
             try
             {
