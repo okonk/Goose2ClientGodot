@@ -67,13 +67,13 @@ public partial class ChatWindow : Control
         _commandHandlers["/quit"] = OnQuitCommand;
 
         // Chat type colors
-        _chatColors[ChatType.Chat] = Colors.White;
-        _chatColors[ChatType.Guild] = Colors.Yellow;
-        _chatColors[ChatType.Group] = Colors.Yellow;
-        _chatColors[ChatType.Melee] = Colors.Red;
-        _chatColors[ChatType.Spells] = Colors.Blue;
-        _chatColors[ChatType.Tell] = Colors.Yellow;
-        _chatColors[ChatType.Server] = Colors.Green;
+        _chatColors[ChatType.Chat] = GameColors.White;
+        _chatColors[ChatType.Guild] = GameColors.Yellow;
+        _chatColors[ChatType.Group] = GameColors.Yellow;
+        _chatColors[ChatType.Melee] = GameColors.Red;
+        _chatColors[ChatType.Spells] = GameColors.Blue;
+        _chatColors[ChatType.Tell] = GameColors.Yellow;
+        _chatColors[ChatType.Server] = GameColors.Green;
     }
 
     public override void _ExitTree()
@@ -113,7 +113,7 @@ public partial class ChatWindow : Control
     public void AddChatLine(string message, ChatType chatType)
     {
         message = message.Replace("[", "[lb]").Replace('`', '\u2665');
-        var color = _chatColors.TryGetValue(chatType, out var c) ? c : Colors.White;
+        var color = _chatColors.TryGetValue(chatType, out var c) ? c : GameColors.White;
         _chatLog.AppendText($"[color=#{color.ToHtml(false)}]{message}[/color]\n");
     }
 
