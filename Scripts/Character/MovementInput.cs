@@ -7,6 +7,16 @@ namespace Goose2Client.Character
     /// Updates <paramref name="wasMovingVertical"/> to reflect the returned axis.</summary>
     public static class MovementInput
     {
+        /// <summary>Commit the axis selected by <see cref="Resolve"/> only when its move succeeds.
+        /// Returns whether the caller should perform/send the move.</summary>
+        public static bool TryCommitMoveAxis(bool isValidMove, bool nextWasMovingVertical,
+                                             ref bool wasMovingVertical)
+        {
+            if (!isValidMove) return false;
+            wasMovingVertical = nextWasMovingVertical;
+            return true;
+        }
+
         public static Direction? Resolve(bool up, bool down, bool left, bool right, ref bool wasMovingVertical)
         {
             bool hasVertical = up || down;

@@ -432,8 +432,8 @@ namespace Goose2Client.Character
 
             // Resolve currently held movement actions through MovementInput.
             // Use a local copy so diagonal direction stays stable while waiting for the hold
-            // delay and while moving; the alternation state is committed only when a new
-            // movement attempt is actually initiated.
+            // delay, while moving, and across blocked attempts; commit the alternation state
+            // only when movement succeeds.
             bool nextWasMovingVertical = _wasMovingVertical;
             Direction? dir = MovementInput.Resolve(
                 Input.IsActionPressed("MoveUp"),
@@ -464,15 +464,12 @@ namespace Goose2Client.Character
             _movePressedTime += delta;
             if (_movePressedTime < MoveStartDelay) return;
 
-            // Commit the alternation state now that the hold delay has elapsed.
-            // This ensures diagonal direction alternates once per movement attempt,
-            // not every frame while keys are held.
-            _wasMovingVertical = nextWasMovingVertical;
-
             var (dx, dy) = Delta(dir.Value);
             int nx = X + dx, ny = Y + dy;
             var map = GetParent()?.GetParent() as Goose2Client.MapManager;   // Characters -> Map(MapManager)
-            if (map != null && map.IsValidMove(nx, ny))
+            bool isValidMove = map != null && map.IsValidMove(nx, ny);
+            if (MovementInput.TryCommitMoveAxis(isValidMove, nextWasMovingVertical,
+                                                ref _wasMovingVertical))
             {
                 MoveTo(nx, ny);
                 GameManager.Instance.NetworkClient.Move(dir.Value);
@@ -520,6 +517,10 @@ namespace Goose2Client.Character
                 s.Sprite.Offset = new Vector2(0, CharacterAnchor.OffsetY(h));
                 s.Sprite.Play(clip);
             }
+
+            // Height resolves from the current body motion clip, so state changes (walk/idle,
+            // cast/attack, mounted) must move the name and vitals with the new sprite height.
+            RepositionOverlays();
         }
 
         /// <summary>First candidate clip (per BodyState/equip/weapon-type) that this slot's
