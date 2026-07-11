@@ -43,6 +43,9 @@ namespace Goose2Client.Character
                 "attack" => equipped
                     ? new List<string> { $"attack-{AttackVariant(bodyState)}", "attack-1hand", "attack", "attack-no-equip", "idle-equip", "idle" }
                     : new List<string> { "attack-no-equip", "attack", "idle-no-equip", "idle" },
+                "cast" => equipped
+                    ? new List<string> { "cast", "idle-equip", "idle" }
+                    : new List<string> { "cast", "idle-no-equip", "idle" },
                 "mounted-idle" => new List<string> { "mounted-idle", "idle-equip", "idle" },
                 "mounted-walk" => new List<string> { "mounted-walk", "walk-equip", "walk" },
                 _ => new List<string> { motion },

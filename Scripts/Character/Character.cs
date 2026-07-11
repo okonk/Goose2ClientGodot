@@ -273,9 +273,7 @@ void fragment() {
         /// <summary>Play the caster's spell-cast pose. Locked like an attack so walk/idle don't clobber it.</summary>
         public void Cast()
         {
-            _attackLocked = true;
-            _attackTimer = AttackDuration();
-            PlayCurrent();
+            BeginLock("cast");
         }
 
         /// <summary>Order the slot sprites back-to-front by SortOrder(slot, Facing) via child order
@@ -300,23 +298,28 @@ void fragment() {
         private Vector2 _targetPosition;
         private bool _moving;
         protected bool IsMoving => _moving;   // replaces the Task 6 stub
-        private bool _attackLocked;
+        private string _lockedMotion;
         private double _attackTimer;
-        protected bool AttackLocked => _attackLocked;   // replaces the Task 6 stub
+        protected bool AttackLocked => _lockedMotion != null;   // true iff a motion is locked
         private readonly AttackGate _attackGate = new();
 
         public void TriggerAttack()
         {
-            _attackLocked = true;
-            _attackTimer = AttackDuration();
-            PlayCurrent();   // CharacterMotion.State returns "attack" while locked -> all slots swing
+            BeginLock("attack");
         }
 
-        private double AttackDuration()
+        private void BeginLock(string motion)
         {
-            // Time the lock to the Body's actual attack clip (weapon-type aware); fallback 0.5s.
+            _lockedMotion = motion;
+            _attackTimer = LockDuration(motion);
+            PlayCurrent();
+        }
+
+        private double LockDuration(string motion)
+        {
+            // Time the lock to the Body's actual clip for the requested motion; fallback 0.5s.
             if (_slots.TryGetValue(CharacterSlot.Body, out var body) &&
-                ResolveClip(body, "attack", BodyState) is { } clip &&
+                ResolveClip(body, motion, BodyState) is { } clip &&
                 body.Sprite.SpriteFrames is { } frames)
             {
                 int n = frames.GetFrameCount(clip);
@@ -421,11 +424,11 @@ void fragment() {
 
         protected void TickAttackLock(double delta)
         {
-            if (!_attackLocked) return;
+            if (_lockedMotion == null) return;
             _attackTimer -= delta;
             if (_attackTimer <= 0)
             {
-                _attackLocked = false;
+                _lockedMotion = null;
                 PlayCurrent();   // resume walk/idle/mounted-*
             }
         }
@@ -437,7 +440,7 @@ void fragment() {
             foreach (var (slot, s) in _slots)
             {
                 bool slotMounted = IsMounted && slot != CharacterSlot.Mount;
-                string motion = CharacterMotion.State(IsMoving, AttackLocked, slotMounted);
+                string motion = CharacterMotion.State(IsMoving, _lockedMotion, slotMounted);
                 // The mount itself always animates as an unmounted walking body (Unity forces state 3).
                 int state = slot == CharacterSlot.Mount ? 3 : BodyState;
                 if (ResolveClip(s, motion, state) is not { } clip) continue;
