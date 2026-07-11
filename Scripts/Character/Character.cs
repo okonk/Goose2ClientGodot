@@ -251,7 +251,7 @@ namespace Goose2Client.Character
             if (tint.A > 0f)
             {
                 if (s.Sprite.Material is not ShaderMaterial mat)
-                    s.Sprite.Material = mat = new ShaderMaterial { Shader = TintShader };
+                    s.Sprite.Material = mat = new ShaderMaterial { Shader = TintMaterial.Shader };
                 mat.SetShaderParameter("tint", tint);
             }
             else
@@ -259,19 +259,6 @@ namespace Goose2Client.Character
                 s.Sprite.Material = null;
             }
         }
-
-        // Faithful port of Unity Custom/CharacterAnimation: tint.a lerps the texture rgb toward the
-        // tint rgb; final opacity is always the texture's own alpha, so a tint never fades the sprite.
-        private static Shader _tintShader;
-        private static Shader TintShader => _tintShader ??= new Shader
-        {
-            Code = @"shader_type canvas_item;
-uniform vec4 tint : source_color = vec4(0.0);
-void fragment() {
-    vec4 tex = texture(TEXTURE, UV);
-    COLOR = vec4(mix(tex.rgb, tint.rgb, tint.a), tex.a) * COLOR;
-}"
-        };
 
         private void RemoveSlot(CharacterSlot slot)
         {

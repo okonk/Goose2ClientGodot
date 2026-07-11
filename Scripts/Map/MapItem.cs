@@ -2,8 +2,8 @@ using Godot;
 
 namespace Goose2Client.Map;
 
-/// <summary>A dropped item on the ground. Sprite anchored bottom-center; tint via Modulate
-/// (replaces Unity's material _Tint). Carries ItemStats for hover tooltip.</summary>
+/// <summary>A dropped item on the ground. Sprite anchored bottom-center; tint via shared
+/// TintMaterial lerp shader (port of Unity material _Tint). Carries ItemStats for hover tooltip.</summary>
 public partial class MapItem : Sprite2D
 {
     /// <summary>Item data for the hover tooltip (set by MapManager after Setup).</summary>
@@ -16,7 +16,7 @@ public partial class MapItem : Sprite2D
         var size = tex.GetSize();
         var anchor = MapCoords.TileBottomCenter(tileX, tileY);
         Position = new Vector2(anchor.X - size.X / 2f, anchor.Y - size.Y);
-        if (tint.A > 0) Modulate = tint;     // RGBA all-0 sentinel ⇒ no tint (MapObjectPacket '*' case)
+        if (tint.A > 0) Material = TintMaterial.Make(tint);   // Unity lerp-tint shader, NOT Modulate
 
         // Area2D for hover tooltip — covers the sprite rect.
         // Sprite is Centered=false with top-left at (0,0), so the rect is (0,0)..size.
