@@ -367,15 +367,16 @@ void fragment() {
             TickAttackLock(delta);   // defined in Task 8
         }
 
-        private const double MoveRepeatDelay = 0.12;   // Unity used ~0.1s debounce
-        private double _moveCooldown;
+        private const double MoveStartDelay = 0.1;   // Unity hold threshold: short release → turn in place
+        private double _movePressedTime;
+        private bool _wasMovingVertical;
+        private Direction? _heldDir;
 
         private void ProcessLocalInput(double delta)
         {
             if (!IsLocalPlayer) return;
             if (GameManager.Instance.IsTargeting) return;   // spell targeting consumes movement/attack input
             if (GetViewport().GuiGetFocusOwner() is LineEdit) return;   // ignore movement/attack while typing in chat
-            _moveCooldown -= delta;
 
             // Unity suppresses attacks entirely while mounted; gate input before AttackGate.
             if (!IsMounted && Input.IsActionPressed("Attack"))
@@ -388,14 +389,35 @@ void fragment() {
                 }
             }
 
-            if (_moving || _moveCooldown > 0) return;
+            // Resolve currently held movement actions through MovementInput
+            Direction? dir = MovementInput.Resolve(
+                Input.IsActionPressed("MoveUp"),
+                Input.IsActionPressed("MoveDown"),
+                Input.IsActionPressed("MoveLeft"),
+                Input.IsActionPressed("MoveRight"),
+                ref _wasMovingVertical);
 
-            Direction? dir = null;
-            if (Input.IsActionPressed("MoveUp")) dir = Direction.Up;
-            else if (Input.IsActionPressed("MoveDown")) dir = Direction.Down;
-            else if (Input.IsActionPressed("MoveLeft")) dir = Direction.Left;
-            else if (Input.IsActionPressed("MoveRight")) dir = Direction.Right;
-            if (dir == null) return;
+            // No direction — tap-to-turn: if we were holding a key but released within delay, turn in place
+            if (dir == null)
+            {
+                if (_heldDir.HasValue && _movePressedTime < MoveStartDelay)
+                {
+                    SetFacing(_heldDir.Value);
+                    GameManager.Instance.NetworkClient.Face(_heldDir.Value);
+                }
+                _heldDir = null;
+                _movePressedTime = 0;
+                return;
+            }
+
+            _heldDir = dir;
+
+            // Already moving — preserve accumulated duration for seamless chained movement
+            if (_moving) return;
+
+            // Accumulate delta only while standing
+            _movePressedTime += delta;
+            if (_movePressedTime < MoveStartDelay) return;
 
             var (dx, dy) = Delta(dir.Value);
             int nx = X + dx, ny = Y + dy;
@@ -410,7 +432,6 @@ void fragment() {
                 SetFacing(dir.Value);
                 GameManager.Instance.NetworkClient.Face(dir.Value);
             }
-            _moveCooldown = MoveRepeatDelay;
         }
 
         private static (int dx, int dy) Delta(Direction d) => d switch
