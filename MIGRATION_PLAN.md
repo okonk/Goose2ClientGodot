@@ -477,6 +477,32 @@ Each step is independently testable; the order front-loads the foundations the r
 - **Title/Surname full names** — `NameFormatting.FullName` trims null/empty title + surname; overhead label and Character window both display the full name
 - **Health bar auto-hide + Unity colors** — `HealthBarAutoHide` hides bars 2 s after full HP/MP, re-shows on any vitals change; bar colors use `GameColors.HpGreen/Orange/Red`
 
+## 2026-07-11 Unity-parity bugfix pass — Part 3 (series complete)
+
+> Plan: `docs/plans/2026-07-11-unity-parity-part3-ui-and-world-polish.md`
+
+- **Game palette chat colors** — `ChatWindow` uses `GameColors` palette for speaker-name coloring (Unity `Colors` parity)
+- **Visible Level in vitals HUD** — `VitalsWindow` LevelText moved above the Portrait circle in scene tree so it draws unoccluded (was hidden behind the portrait)
+- **Immediate/no-drop hotbar + Shift+digit emotes + Ctrl+R** — `HotbarWindow._Process` uses `IsActionJustPressed(action, exactMatch: true)` so Shift+digit is reserved for the emote layer and never consumed as a hotkey; `Ctrl+R` triggers map refresh
+- **Monster equipment strip on morph** — morphing into a monster body clears hair and equipment slots (Unity `Character` parity)
+- **Remembered spell target** — `SpellTargetManager` retains last confirmed target across repeated casts (Unity `SpellTargetManager` parity)
+- **Absolute spell z below Objects2** — spell effect overlays use `ZIndex = 20, ZAsRelative = false` (absolute) so Objects2 layer (z 30) draws above them
+- **Dropped-item Unity lerp tint** — `MapItem` tint uses the Unity `_Tint` lerp shader (alpha as blend factor) instead of `Modulate`
+- **Dynamic body-height labels/bars** — name labels and HP/MP bars use current-state `Height` for Y-offset; emote animations use bottom pivot; chat bubbles center on the character (all via direct `RepositionOverlays()` calls in `EnsureBars`, `EnsureNameLabel`, and both `SetAppearance` overloads)
+- **Unknown SetYourCharacter guard** — `SetYourCharacterPacket` handler guards unknown LoginId in the character dictionary, returning early to prevent a null update
+- **Negative WorldToTile floor** — `MapCoords.WorldToTile` uses `Mathf.FloorToInt` so negative world coordinates map to negative tile indices (e.g. −0.5 px → tile −1) instead of the old truncation-to-zero behavior
+
+**E1 manual validation checklist (append):**
+
+- chat colors match Unity palette; Level number visible in vitals HUD
+- hotbar responsiveness (instant first press, taps never eaten); Shift+digit emotes; Ctrl+R refresh
+- morphing into a monster body strips hair/equipment
+- repeat-casting keeps previous target
+- tile-spell layering under Objects 2; dyed dropped-item tint looks like Unity
+- emote/bubble heights on tall/mounted bodies; name/bars above tall monsters
+
+> **Scene check skipped:** Godot execution can hang in this environment; live visual validation deferred to desktop run.
+
 ## Open questions / risks to resolve before Phase 2
 
 - **Animation redesign (§5)** — approach **de-risked** by the `~/code/3dMMO-Server/client`
