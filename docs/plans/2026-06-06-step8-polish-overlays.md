@@ -139,7 +139,11 @@ headless environment could not.
   capture screenshots. Confirm the Step 7 "reasonable default" slot counts (inventory 30,
   equipped 14, spellbook 8×30, hotbar 3×10, vendor 40, bank 30, combine 10, party 8, buffs 20)
   against the live server and adjust consts if needed. Verify B1–B4 overlays in-world and D5
-  attack clips.
+  attack clips. **Part 1 bugfix additions (2026-07-11):**
+  - Warp between maps via a door/teleport tile, including a back-to-back warp
+  - Chat clears and unfocuses on death/warp
+  - First "previous target" press reaches the bottom-most candidate
+  - Attack cadence before the first WPS packet ≈ 1/s; mounted attack suppressed
 
 ---
 

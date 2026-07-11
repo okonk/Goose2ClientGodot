@@ -455,6 +455,18 @@ Each step is independently testable; the order front-loads the foundations the r
    owned by that live run. Step 8 is therefore **code-complete and merged, but not declared fully
    “Landed” until E1 passes.**
 
+## 2026-07-11 Unity-parity bugfix pass — Part 1
+
+> Plan: `docs/plans/2026-07-11-unity-parity-part1-critical-and-networking.md`
+
+- **GameColors shared palette** — ported Unity `Colors.cs` + health-bar colors into `GameColors` (not `Colors` to avoid Godot collision)
+- **Pause-aware packet drain** — `PausablePacketQueue.Drain` stops mid-batch when a handler re-pauses (back-to-back map changes)
+- **Persistent in-game `SendCurrentMapPacket` listener** — moved from login-scene-only to `GameManager` so warps/doors/death-recalls work in-world
+- **Chat clear/unfocus on map changes** — `ChatWindow.ClearAndUnfocus()` called at top of `ChangeMap` (Unity `LoadingMapScene` parity)
+- **Backward target-cycle fix** — `TargetCycler.Next` with `idx == -1` now returns last candidate, not n−2
+- **1.0 s pre-WPS attack default** — `AttackGate.DefaultWindowSeconds` raised from 0.5 s to 1.0 s (Unity `MapManager` default)
+- **Mounted attack suppression** — `Character` attack input gated on `!IsMounted` (Unity `PlayerController` parity)
+
 ## Open questions / risks to resolve before Phase 2
 
 - **Animation redesign (§5)** — approach **de-risked** by the `~/code/3dMMO-Server/client`
