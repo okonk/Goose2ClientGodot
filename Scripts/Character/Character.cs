@@ -40,6 +40,7 @@ namespace Goose2Client.Character
         private Goose2Client.Overlays.BattleText _battleText;
         private Overlays.ChatBubble _chatBubble;
         private Overlays.EmoteAnimation _emote;
+        private readonly HealthBarAutoHide _healthBarAutoHide = new();
 
         private void EnsureBars()
         {
@@ -49,7 +50,7 @@ namespace Goose2Client.Character
             {
                 Position = new Vector2(-16, -56),
                 Size = new Vector2(BarWidth, 3),
-                Color = Colors.Green,
+                Color = GameColors.HpGreen,
                 ZIndex = 20,
             };
             AddChild(_hpBar);
@@ -72,8 +73,20 @@ namespace Goose2Client.Character
             MPPercent = mpPercent;
             EnsureBars();
             _hpBar.Size = new Vector2(BarWidth * Mathf.Clamp(hpPercent, 0f, 1f), 3);
-            _hpBar.Color = hpPercent > 0.66f ? Colors.Green : hpPercent > 0.33f ? Colors.Orange : Colors.Red;
+            _hpBar.Color = hpPercent > 0.66f ? GameColors.HpGreen : hpPercent > 0.33f ? GameColors.HpOrange : GameColors.HpRed;
             _mpBar.Size = new Vector2(BarWidth * Mathf.Clamp(mpPercent, 0f, 1f), 2);
+
+            _healthBarAutoHide.OnVitalsChanged(hpPercent, mpPercent, Time.GetTicksMsec() / 1000.0);
+            ApplyBarVisibility();
+        }
+
+        private void ApplyBarVisibility()
+        {
+            double now = Time.GetTicksMsec() / 1000.0;
+            _healthBarAutoHide.Tick(now);
+            bool visible = _healthBarAutoHide.Visible;
+            if (_hpBar != null) _hpBar.Visible = visible;
+            if (_mpBar != null) _mpBar.Visible = visible;
         }
 
         private void EnsureNameLabel()
@@ -379,6 +392,7 @@ void fragment() {
                 }
             }
             TickAttackLock(delta);   // defined in Task 8
+            ApplyBarVisibility();
         }
 
         private const double MoveStartDelay = 0.1;   // Unity hold threshold: short release → turn in place
