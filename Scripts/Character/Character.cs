@@ -417,13 +417,17 @@ void fragment() {
                 }
             }
 
-            // Resolve currently held movement actions through MovementInput
+            // Resolve currently held movement actions through MovementInput.
+            // Use a local copy so diagonal direction stays stable while waiting for the hold
+            // delay and while moving; the alternation state is committed only when a new
+            // movement attempt is actually initiated.
+            bool nextWasMovingVertical = _wasMovingVertical;
             Direction? dir = MovementInput.Resolve(
                 Input.IsActionPressed("MoveUp"),
                 Input.IsActionPressed("MoveDown"),
                 Input.IsActionPressed("MoveLeft"),
                 Input.IsActionPressed("MoveRight"),
-                ref _wasMovingVertical);
+                ref nextWasMovingVertical);
 
             // No direction — tap-to-turn: if we were holding a key but released within delay, turn in place
             if (dir == null)
@@ -446,6 +450,11 @@ void fragment() {
             // Accumulate delta only while standing
             _movePressedTime += delta;
             if (_movePressedTime < MoveStartDelay) return;
+
+            // Commit the alternation state now that the hold delay has elapsed.
+            // This ensures diagonal direction alternates once per movement attempt,
+            // not every frame while keys are held.
+            _wasMovingVertical = nextWasMovingVertical;
 
             var (dx, dy) = Delta(dir.Value);
             int nx = X + dx, ny = Y + dy;
