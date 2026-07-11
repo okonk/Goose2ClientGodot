@@ -332,8 +332,16 @@ void fragment() {
         /// <summary>Server (or local prediction) says this character stepped to (x,y).</summary>
         public void MoveTo(int x, int y)
         {
-            if (x != X) Facing = x > X ? Direction.Right : Direction.Left;
-            else if (y != Y) Facing = y > Y ? Direction.Down : Direction.Up;
+            // Snap to previous target if a chained packet arrives mid-move
+            if (_moving) Position = _targetPosition;
+
+            // Facing priority: Down > Right > Up > Left; zero delta preserves facing
+            int dx = x - X, dy = y - Y;
+            if (dy > 0) Facing = Direction.Down;
+            else if (dx > 0) Facing = Direction.Right;
+            else if (dy < 0) Facing = Direction.Up;
+            else if (dx < 0) Facing = Direction.Left;
+
             X = x; Y = y;
             _targetPosition = Goose2Client.Map.MapCoords.TileBottomCenter(x, y);
             _moving = true;
@@ -348,6 +356,7 @@ void fragment() {
             Position = Goose2Client.Map.MapCoords.TileBottomCenter(x, y);
             _targetPosition = Position;
             _moving = false;
+            PlayState();   // walk -> idle, matching Unity SetMoving(false)
         }
 
         public override void _Process(double delta)
