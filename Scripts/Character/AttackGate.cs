@@ -4,7 +4,7 @@ namespace Goose2Client.Character
     /// (Unity PlayerController gated on MapManager.WeaponSpeed). Pure/testable.</summary>
     public sealed class AttackGate
     {
-        public const double DefaultWindowSeconds = 0.5;   // matches Character.AttackDuration fallback
+        public const double DefaultWindowSeconds = 1.0;   // Unity MapManager default WeaponSpeed; applies until first WPS
         private double _lastAttack = double.NegativeInfinity;
 
         /// <param name="weaponSpeedMs">Server WPS value (ms between attacks); ≤0 ⇒ default.</param>

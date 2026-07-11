@@ -26,4 +26,12 @@ public class AttackGateTests
         Assert.True(g.TryAttack(0.0, 0));
         Assert.False(g.TryAttack(0.1, 0));
     }
+
+    [Fact] public void TryAttack_NoWeaponSpeedYet_UsesUnityOneSecondDefault()
+    {
+        var g = new AttackGate();
+        Assert.True(g.TryAttack(10.0, 0));   // first attack always allowed
+        Assert.False(g.TryAttack(10.7, 0));  // 0.7s < 1.0s default → blocked
+        Assert.True(g.TryAttack(11.0, 0));   // 1.0s == 1.0s default → allowed
+    }
 }
