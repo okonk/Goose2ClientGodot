@@ -149,8 +149,10 @@ public partial class MapManager : Node2D
     {
         var p = (SetYourCharacterPacket)packetObj;
         _myLoginId = p.LoginId;
-        if (_characters.TryGetValue(p.LoginId, out var c)) AttachLocalPlayer(c);
-        if (c == _localPlayer) GameManager.Instance.OnCharacterUpdated(c);
+        if (!_characters.TryGetValue(p.LoginId, out var c))
+            return; // Unity returns unknown / MKC attaches later
+        AttachLocalPlayer(c);
+        GameManager.Instance.OnCharacterUpdated(c);
     }
 
     private void OnMoveCharacter(object packetObj)

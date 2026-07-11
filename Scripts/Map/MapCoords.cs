@@ -18,7 +18,8 @@ public static class MapCoords
     public static Vector2 TileBottomCenter(int x, int y)
         => new(x * TileSize + TileSize / 2f, (y + 1) * TileSize);
 
-    /// <summary>World pixel → tile coords (floor).</summary>
+    /// <summary>World pixel → tile coords. Uses floor division so negative world
+    /// coordinates map to negative tile indices (e.g. -0.5 px → tile -1).</summary>
     public static (int x, int y) WorldToTile(Vector2 world)
-        => ((int)(world.X / TileSize), (int)(world.Y / TileSize));
+        => (Mathf.FloorToInt(world.X / TileSize), Mathf.FloorToInt(world.Y / TileSize));
 }
