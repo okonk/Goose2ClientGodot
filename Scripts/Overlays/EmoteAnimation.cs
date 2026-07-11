@@ -25,6 +25,15 @@ namespace Goose2Client.Overlays
             _sprite.Animation = clip;
             _sprite.Play(clip);
 
+            // Plan: bottom-pivot — offset the sprite so its bottom edge sits at the node origin,
+            // matching Unity's emote anchor point above the character.
+            var firstFrame = _sprite.SpriteFrames.GetFrameTexture(clip, 0);
+            if (firstFrame != null)
+            {
+                int height = (int)firstFrame.GetSize().Y;
+                _sprite.Offset = new Vector2(0, -height / 2f);
+            }
+
             // Compute clip length (do NOT mutate the shared cached resource).
             double speed = _sprite.SpriteFrames.GetAnimationSpeed(clip);
             int n = _sprite.SpriteFrames.GetFrameCount(clip);

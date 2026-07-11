@@ -113,5 +113,35 @@ public partial class GameHud : Control
             Chat.FocusChat("/tell ");
         else if (@event.IsActionPressed("ReplyCommand"))
             Chat.FocusChat(Chat.ReplyToName == null ? "/tell " : $"/tell {Chat.ReplyToName} ");
+        else if (@event.IsActionPressed("EmoteHeart"))
+            SendEmote(1080, 8);
+        else if (@event.IsActionPressed("EmoteQuestion"))
+            SendEmote(1081, 8);
+        else if (@event.IsActionPressed("EmoteDots"))
+            SendEmote(1083, 8);
+        else if (@event.IsActionPressed("EmotePoop"))
+            SendEmote(1084, 9);
+        else if (@event.IsActionPressed("EmoteSurprised"))
+            SendEmote(1085, 9);
+        else if (@event.IsActionPressed("EmoteSleep"))
+            SendEmote(1086, 9);
+        else if (@event.IsActionPressed("EmoteAnnoyed"))
+            SendEmote(1087, 9);
+        else if (@event.IsActionPressed("EmoteSweat"))
+            SendEmote(1088, 10);
+        else if (@event.IsActionPressed("EmoteMusic"))
+            SendEmote(1089, 10);
+        else if (@event.IsActionPressed("EmoteWink"))
+            SendEmote(1091, 10);
+        else if (@event.IsActionPressed("EmoteTrash"))
+            SendEmote(1082, 8);
+        else if (@event.IsActionPressed("EmoteDollar"))
+            SendEmote(1090, 10);
+        else if (@event.IsActionPressed("RefreshPosition"))
+            GameManager.Instance.NetworkClient.Command("/refresh");
     }
+
+    // Animation/graphic id pairs from Unity PlayerController.cs:32-43.
+    private static void SendEmote(int animationId, int graphicFile)
+        => GameManager.Instance.NetworkClient.Emote(animationId, graphicFile);
 }

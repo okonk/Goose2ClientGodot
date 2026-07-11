@@ -28,4 +28,12 @@ public class MapCoordsTests
     {
         Assert.Equal((3, 5), MapCoords.WorldToTile(new Vector2(3 * 32 + 5, 5 * 32 + 5)));
     }
+
+    [Fact]
+    public void WorldToTile_NegativeCoords_FloorsToNegativeTile()
+    {
+        var (x, y) = MapCoords.WorldToTile(new Godot.Vector2(-0.5f, -0.5f));
+        Assert.Equal(-1, x);
+        Assert.Equal(-1, y);
+    }
 }

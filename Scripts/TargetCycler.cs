@@ -48,8 +48,14 @@ namespace Goose2Client
                 }
             }
             
-            // Move to next (or previous) with wrap
-            if (searchDown)
+            // Move to next (or previous) with wrap.
+            // When current is not in the filtered list (idx == -1), forward goes to first,
+            // backward goes to last — avoiding the off-by-one where (-1-1+n)%n picks n-2.
+            if (idx == -1)
+            {
+                idx = searchDown ? 0 : filtered.Count - 1;
+            }
+            else if (searchDown)
             {
                 idx = (idx + 1) % filtered.Count;
             }

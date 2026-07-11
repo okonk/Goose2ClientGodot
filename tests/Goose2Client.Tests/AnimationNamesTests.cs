@@ -54,4 +54,20 @@ public class AnimationNamesTests
         Assert.Equal("attack-1hand-down", atk[0]);
         Assert.Contains("idle-equip-down", atk);   // graceful fallback for slots lacking an attack clip
     }
+
+    [Fact]
+    public void Candidates_cast_equipped_falls_back_to_idle_equip()
+    {
+        // Equipped (bodyState 4) + down => cast-down, idle-equip-down, idle-down
+        var cast = AnimationNames.Candidates("cast", 4, Direction.Down);
+        Assert.Equal(new[] { "cast-down", "idle-equip-down", "idle-down" }, cast);
+    }
+
+    [Fact]
+    public void Candidates_cast_unarmed_falls_back_to_idle_no_equip()
+    {
+        // Unarmed (bodyState 3) + left => cast-left, idle-no-equip-left, idle-left
+        var cast = AnimationNames.Candidates("cast", 3, Direction.Left);
+        Assert.Equal(new[] { "cast-left", "idle-no-equip-left", "idle-left" }, cast);
+    }
 }

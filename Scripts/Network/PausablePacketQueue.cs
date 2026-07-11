@@ -36,11 +36,23 @@ namespace Goose2Client.Network
         }
 
         /// <summary>
-        /// Drain all queued packets in FIFO order. Safe to call on an empty queue (no-op).
+        /// Drains queued packets in FIFO order until the queue is empty or re-paused.
+        /// <para>
+        /// If a dispatched packet synchronously re-pauses the queue (e.g. a map change
+        /// that triggers a context reload), Drain stops immediately. Remaining packets
+        /// stay buffered for the next call when the queue is unpaused again.
+        /// </para>
+        /// <para>
+        /// This matches Unity client behavior where mid-batch re-pauses prevent
+        /// stale packets from processing in the wrong map context.
+        /// </para>
+        /// <para>
+        /// Calling Drain on an empty queue is a no-op.
+        /// </para>
         /// </summary>
         public void Drain()
         {
-            while (_queued.Count > 0)
+            while (_queued.Count > 0 && !_isPaused())
                 _dispatch(_queued.Dequeue());
         }
     }

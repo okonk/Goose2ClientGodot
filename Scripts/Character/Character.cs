@@ -8,6 +8,9 @@ namespace Goose2Client.Character
     {
         public int LoginId { get; private set; }
         public string CharacterName { get; private set; }
+        public string Title { get; private set; } = "";
+        public string Surname { get; private set; } = "";
+        public string FullName => NameFormatting.FullName(Title, CharacterName, Surname);
         public int X { get; private set; }
         public int Y { get; private set; }
         public Direction Facing { get; private set; } = Direction.Down;
@@ -37,6 +40,7 @@ namespace Goose2Client.Character
         private Goose2Client.Overlays.BattleText _battleText;
         private Overlays.ChatBubble _chatBubble;
         private Overlays.EmoteAnimation _emote;
+        private readonly HealthBarAutoHide _healthBarAutoHide = new();
 
         private void EnsureBars()
         {
@@ -46,7 +50,7 @@ namespace Goose2Client.Character
             {
                 Position = new Vector2(-16, -56),
                 Size = new Vector2(BarWidth, 3),
-                Color = Colors.Green,
+                Color = GameColors.HpGreen,
                 ZIndex = 20,
             };
             AddChild(_hpBar);
@@ -59,6 +63,7 @@ namespace Goose2Client.Character
                 ZIndex = 20,
             };
             AddChild(_mpBar);
+            RepositionOverlays();
         }
 
         /// <summary>Update the HP and MP bars. hpPercent/mpPercent are 0..1. Bars resize left-aligned
@@ -69,8 +74,20 @@ namespace Goose2Client.Character
             MPPercent = mpPercent;
             EnsureBars();
             _hpBar.Size = new Vector2(BarWidth * Mathf.Clamp(hpPercent, 0f, 1f), 3);
-            _hpBar.Color = hpPercent > 0.66f ? Colors.Green : hpPercent > 0.33f ? Colors.Orange : Colors.Red;
+            _hpBar.Color = hpPercent > 0.66f ? GameColors.HpGreen : hpPercent > 0.33f ? GameColors.HpOrange : GameColors.HpRed;
             _mpBar.Size = new Vector2(BarWidth * Mathf.Clamp(mpPercent, 0f, 1f), 2);
+
+            _healthBarAutoHide.OnVitalsChanged(hpPercent, mpPercent, Time.GetTicksMsec() / 1000.0);
+            ApplyBarVisibility();
+        }
+
+        private void ApplyBarVisibility()
+        {
+            double now = Time.GetTicksMsec() / 1000.0;
+            _healthBarAutoHide.Tick(now);
+            bool visible = _healthBarAutoHide.Visible;
+            if (_hpBar != null) _hpBar.Visible = visible;
+            if (_mpBar != null) _mpBar.Visible = visible;
         }
 
         private void EnsureNameLabel()
@@ -78,7 +95,7 @@ namespace Goose2Client.Character
             if (_nameLabel != null) return;
             _nameLabel = new Label
             {
-                Text = CharacterName,
+                Text = FullName,
                 HorizontalAlignment = HorizontalAlignment.Center,
                 ZIndex = 20,
                 Position = new Vector2(-50, -74),   // name sits on top; HP bar (-56) below it, no overlap
@@ -88,6 +105,19 @@ namespace Goose2Client.Character
             _nameLabel.AddThemeConstantOverride("outline_size", 4);
             _nameLabel.AddThemeColorOverride("font_outline_color", new Color(0, 0, 0, 0.9f));
             AddChild(_nameLabel);
+            RepositionOverlays();
+        }
+
+        /// <summary>Plan: position name label and HP/MP bars relative to the character's current Height.
+        /// Uses the resolved Height (or 48px fallback) to compute Y offsets so overlays track the
+        /// sprite's top edge across body types and states. Initializer defaults remain as-is for
+        /// the first render before Height is known.</summary>
+        private void RepositionOverlays()
+        {
+            int h = Height <= 0 ? 48 : Height;
+            if (_hpBar != null) _hpBar.Position = new Vector2(-16, -(h + 8));
+            if (_mpBar != null) _mpBar.Position = new Vector2(-16, -(h + 5));
+            if (_nameLabel != null) _nameLabel.Position = new Vector2(-50, -(h + 26));
         }
 
         // The converter's height-prefix uses its AnimationType name, which differs from the
@@ -116,6 +146,8 @@ namespace Goose2Client.Character
         {
             LoginId = p.LoginId;
             CharacterName = p.Name;
+            Title = p.Title ?? "";
+            Surname = p.Surname ?? "";
             BodyState = p.BodyState;
             MoveSpeed = p.MoveSpeed <= 0 ? 250 : p.MoveSpeed;
             X = p.MapX; Y = p.MapY; Facing = p.Facing;
@@ -129,9 +161,10 @@ namespace Goose2Client.Character
             TeleportTo(p.MapX, p.MapY);   // no walk anim
             ApplyDrawOrder();
             PlayState();
+            RepositionOverlays();
 
             EnsureNameLabel();
-            _nameLabel.Text = CharacterName;
+            _nameLabel.Text = FullName;
             SetVitals(p.HPPercent, 1f);
         }
 
@@ -148,6 +181,7 @@ namespace Goose2Client.Character
 
             ApplyDrawOrder();
             PlayState();
+            RepositionOverlays();
         }
 
         private void ApplyAppearance(int bodyId, int bodyR, int bodyG, int bodyB, int bodyA,
@@ -162,6 +196,16 @@ namespace Goose2Client.Character
             int weaponId = Equip(eq, 5, out var ew);
             int mountId  = Equip(eq, 6, out var em);
             IsMounted = mountId != 0;
+
+            // Unity renders only the Body slot for monster/morph bodies (>= 100): create-path
+            // Character.cs:70-84 skips the rest, update-path :147-158 destroys them. Zeroed ids
+            // flow into ApplySlot below, which RemoveSlot()s each — covering the CHP update case.
+            if (bodyId >= 100)
+            {
+                hairId = 0; faceId = 0; chestId = 0; helmId = 0; legsId = 0;
+                feetId = 0; shieldId = 0; weaponId = 0; mountId = 0;
+                IsMounted = false;
+            }
 
             // Underwear defaults when slots are empty (Unity SetUnderwear).
             int uwLegs = CharacterLayout.UnderwearLegs(bodyId, legsId);
@@ -223,7 +267,7 @@ namespace Goose2Client.Character
             if (tint.A > 0f)
             {
                 if (s.Sprite.Material is not ShaderMaterial mat)
-                    s.Sprite.Material = mat = new ShaderMaterial { Shader = TintShader };
+                    s.Sprite.Material = mat = new ShaderMaterial { Shader = TintMaterial.Shader };
                 mat.SetShaderParameter("tint", tint);
             }
             else
@@ -231,19 +275,6 @@ namespace Goose2Client.Character
                 s.Sprite.Material = null;
             }
         }
-
-        // Faithful port of Unity Custom/CharacterAnimation: tint.a lerps the texture rgb toward the
-        // tint rgb; final opacity is always the texture's own alpha, so a tint never fades the sprite.
-        private static Shader _tintShader;
-        private static Shader TintShader => _tintShader ??= new Shader
-        {
-            Code = @"shader_type canvas_item;
-uniform vec4 tint : source_color = vec4(0.0);
-void fragment() {
-    vec4 tex = texture(TEXTURE, UV);
-    COLOR = vec4(mix(tex.rgb, tint.rgb, tint.a), tex.a) * COLOR;
-}"
-        };
 
         private void RemoveSlot(CharacterSlot slot)
         {
@@ -254,7 +285,7 @@ void fragment() {
 
         public int Height =>
             _slots.TryGetValue(CharacterSlot.Body, out var b)
-                ? _heights.GetHeight($"Body-{b.GraphicId}-{ResolveClip(b, "idle", BodyState) ?? "idle-down"}")
+                ? _heights.GetHeight($"Body-{b.GraphicId}-{ResolveClip(b, CharacterMotion.State(IsMoving, _lockedMotion, IsMounted), BodyState) ?? "idle-down"}")
                 : 0;
 
         /// <summary>Hit-test: does a world-space point lie inside the Body slot's sprite rect?
@@ -273,9 +304,7 @@ void fragment() {
         /// <summary>Play the caster's spell-cast pose. Locked like an attack so walk/idle don't clobber it.</summary>
         public void Cast()
         {
-            _attackLocked = true;
-            _attackTimer = AttackDuration();
-            PlayCurrent();
+            BeginLock("cast");
         }
 
         /// <summary>Order the slot sprites back-to-front by SortOrder(slot, Facing) via child order
@@ -300,23 +329,28 @@ void fragment() {
         private Vector2 _targetPosition;
         private bool _moving;
         protected bool IsMoving => _moving;   // replaces the Task 6 stub
-        private bool _attackLocked;
+        private string _lockedMotion;
         private double _attackTimer;
-        protected bool AttackLocked => _attackLocked;   // replaces the Task 6 stub
+        protected bool AttackLocked => _lockedMotion != null;   // true iff a motion is locked
         private readonly AttackGate _attackGate = new();
 
         public void TriggerAttack()
         {
-            _attackLocked = true;
-            _attackTimer = AttackDuration();
-            PlayCurrent();   // CharacterMotion.State returns "attack" while locked -> all slots swing
+            BeginLock("attack");
         }
 
-        private double AttackDuration()
+        private void BeginLock(string motion)
         {
-            // Time the lock to the Body's actual attack clip (weapon-type aware); fallback 0.5s.
+            _lockedMotion = motion;
+            _attackTimer = LockDuration(motion);
+            PlayCurrent();
+        }
+
+        private double LockDuration(string motion)
+        {
+            // Time the lock to the Body's actual clip for the requested motion; fallback 0.5s.
             if (_slots.TryGetValue(CharacterSlot.Body, out var body) &&
-                ResolveClip(body, "attack", BodyState) is { } clip &&
+                ResolveClip(body, motion, BodyState) is { } clip &&
                 body.Sprite.SpriteFrames is { } frames)
             {
                 int n = frames.GetFrameCount(clip);
@@ -329,8 +363,16 @@ void fragment() {
         /// <summary>Server (or local prediction) says this character stepped to (x,y).</summary>
         public void MoveTo(int x, int y)
         {
-            if (x != X) Facing = x > X ? Direction.Right : Direction.Left;
-            else if (y != Y) Facing = y > Y ? Direction.Down : Direction.Up;
+            // Snap to previous target if a chained packet arrives mid-move
+            if (_moving) Position = _targetPosition;
+
+            // Facing priority: Down > Right > Up > Left; zero delta preserves facing
+            int dx = x - X, dy = y - Y;
+            if (dy > 0) Facing = Direction.Down;
+            else if (dx > 0) Facing = Direction.Right;
+            else if (dy < 0) Facing = Direction.Up;
+            else if (dx < 0) Facing = Direction.Left;
+
             X = x; Y = y;
             _targetPosition = Goose2Client.Map.MapCoords.TileBottomCenter(x, y);
             _moving = true;
@@ -345,6 +387,7 @@ void fragment() {
             Position = Goose2Client.Map.MapCoords.TileBottomCenter(x, y);
             _targetPosition = Position;
             _moving = false;
+            PlayState();   // walk -> idle, matching Unity SetMoving(false)
         }
 
         public override void _Process(double delta)
@@ -362,20 +405,22 @@ void fragment() {
                 }
             }
             TickAttackLock(delta);   // defined in Task 8
+            ApplyBarVisibility();
         }
 
-        private const double MoveRepeatDelay = 0.12;   // Unity used ~0.1s debounce
-        private double _moveCooldown;
+        private const double MoveStartDelay = 0.1;   // Unity hold threshold: short release → turn in place
+        private double _movePressedTime;
+        private bool _wasMovingVertical;
+        private Direction? _heldDir;
 
         private void ProcessLocalInput(double delta)
         {
             if (!IsLocalPlayer) return;
             if (GameManager.Instance.IsTargeting) return;   // spell targeting consumes movement/attack input
             if (GetViewport().GuiGetFocusOwner() is LineEdit) return;   // ignore movement/attack while typing in chat
-            _moveCooldown -= delta;
 
-            // Held button keeps swinging; AttackGate throttles repeats to the weapon-speed interval.
-            if (Input.IsActionPressed("Attack"))
+            // Unity suppresses attacks entirely while mounted; gate input before AttackGate.
+            if (!IsMounted && Input.IsActionPressed("Attack"))
             {
                 int ws = GameManager.Instance.CurrentMapManager?.WeaponSpeed ?? 0;
                 if (_attackGate.TryAttack(Time.GetTicksMsec() / 1000.0, ws))
@@ -385,19 +430,46 @@ void fragment() {
                 }
             }
 
-            if (_moving || _moveCooldown > 0) return;
+            // Resolve currently held movement actions through MovementInput.
+            // Use a local copy so diagonal direction stays stable while waiting for the hold
+            // delay, while moving, and across blocked attempts; commit the alternation state
+            // only when movement succeeds.
+            bool nextWasMovingVertical = _wasMovingVertical;
+            Direction? dir = MovementInput.Resolve(
+                Input.IsActionPressed("MoveUp"),
+                Input.IsActionPressed("MoveDown"),
+                Input.IsActionPressed("MoveLeft"),
+                Input.IsActionPressed("MoveRight"),
+                ref nextWasMovingVertical);
 
-            Direction? dir = null;
-            if (Input.IsActionPressed("MoveUp")) dir = Direction.Up;
-            else if (Input.IsActionPressed("MoveDown")) dir = Direction.Down;
-            else if (Input.IsActionPressed("MoveLeft")) dir = Direction.Left;
-            else if (Input.IsActionPressed("MoveRight")) dir = Direction.Right;
-            if (dir == null) return;
+            // No direction — tap-to-turn: if we were holding a key but released within delay, turn in place
+            if (dir == null)
+            {
+                if (_heldDir.HasValue && _movePressedTime < MoveStartDelay)
+                {
+                    SetFacing(_heldDir.Value);
+                    GameManager.Instance.NetworkClient.Face(_heldDir.Value);
+                }
+                _heldDir = null;
+                _movePressedTime = 0;
+                return;
+            }
+
+            _heldDir = dir;
+
+            // Already moving — preserve accumulated duration for seamless chained movement
+            if (_moving) return;
+
+            // Accumulate delta only while standing
+            _movePressedTime += delta;
+            if (_movePressedTime < MoveStartDelay) return;
 
             var (dx, dy) = Delta(dir.Value);
             int nx = X + dx, ny = Y + dy;
             var map = GetParent()?.GetParent() as Goose2Client.MapManager;   // Characters -> Map(MapManager)
-            if (map != null && map.IsValidMove(nx, ny))
+            bool isValidMove = map != null && map.IsValidMove(nx, ny);
+            if (MovementInput.TryCommitMoveAxis(isValidMove, nextWasMovingVertical,
+                                                ref _wasMovingVertical))
             {
                 MoveTo(nx, ny);
                 GameManager.Instance.NetworkClient.Move(dir.Value);
@@ -407,7 +479,6 @@ void fragment() {
                 SetFacing(dir.Value);
                 GameManager.Instance.NetworkClient.Face(dir.Value);
             }
-            _moveCooldown = MoveRepeatDelay;
         }
 
         private static (int dx, int dy) Delta(Direction d) => d switch
@@ -421,11 +492,11 @@ void fragment() {
 
         protected void TickAttackLock(double delta)
         {
-            if (!_attackLocked) return;
+            if (_lockedMotion == null) return;
             _attackTimer -= delta;
             if (_attackTimer <= 0)
             {
-                _attackLocked = false;
+                _lockedMotion = null;
                 PlayCurrent();   // resume walk/idle/mounted-*
             }
         }
@@ -437,7 +508,7 @@ void fragment() {
             foreach (var (slot, s) in _slots)
             {
                 bool slotMounted = IsMounted && slot != CharacterSlot.Mount;
-                string motion = CharacterMotion.State(IsMoving, AttackLocked, slotMounted);
+                string motion = CharacterMotion.State(IsMoving, _lockedMotion, slotMounted);
                 // The mount itself always animates as an unmounted walking body (Unity forces state 3).
                 int state = slot == CharacterSlot.Mount ? 3 : BodyState;
                 if (ResolveClip(s, motion, state) is not { } clip) continue;
@@ -446,6 +517,10 @@ void fragment() {
                 s.Sprite.Offset = new Vector2(0, CharacterAnchor.OffsetY(h));
                 s.Sprite.Play(clip);
             }
+
+            // Height resolves from the current body motion clip, so state changes (walk/idle,
+            // cast/attack, mounted) must move the name and vitals with the new sprite height.
+            RepositionOverlays();
         }
 
         /// <summary>First candidate clip (per BodyState/equip/weapon-type) that this slot's
@@ -498,7 +573,7 @@ void fragment() {
         /// <summary>Show a spell impact animation at this character's origin. Spells stack (no replacement).</summary>
         public void ShowSpell(int animationId)
         {
-            var s = new Overlays.SpellAnimation { Name = "Spell", ZIndex = 20 };
+            var s = new Overlays.SpellAnimation { Name = "Spell", ZIndex = 20, ZAsRelative = false };
             AddChild(s);
             if (!s.Setup(animationId)) { s.QueueFree(); return; }   // discard orphan on missing asset
             // Node origin is the feet (tile bottom edge); lift to the tile-cell center so the

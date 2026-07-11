@@ -69,6 +69,10 @@ namespace Goose2Client
             // Listen for class table updates for the lifetime of the app.
             PacketManager.Listen<ClassUpdatePacket>(OnClassUpdate);
             PacketManager.Listen<PingPacket>(OnPing);
+            // GameManager persists across scene swaps and owns ChangeMap.
+            // SendCurrentMapPacket drives warp / door / death-recall map transitions
+            // that arrive after login — login scene is freed and would drop them.
+            PacketManager.Listen<SendCurrentMapPacket>(OnSendCurrentMap);
 
             Sprites = new SpriteCache();
             SpellTargetManager = new SpellTargetManager();
@@ -105,6 +109,10 @@ namespace Goose2Client
         /// </summary>
         public async void ChangeMap(string mapFile, string mapName)
         {
+            // Unity parity: clear and unfocus chat input on every map change
+            if (Hud != null && GodotObject.IsInstanceValid(Hud))
+                Hud.Chat?.ClearAndUnfocus();
+
             SetPaused(true);   // buffer gameplay packets during the transition (drained on unpause)
             try
             {
@@ -134,6 +142,12 @@ namespace Goose2Client
         }
 
         private void OnPing(object packetObj) => NetworkClient.Pong();
+
+        private void OnSendCurrentMap(object packetObj)
+        {
+            var p = (SendCurrentMapPacket)packetObj;
+            ChangeMap(p.MapFileName, p.MapName);
+        }
 
         private void OnClassUpdate(object packetObj)
         {
@@ -181,6 +195,7 @@ namespace Goose2Client
         {
             PacketManager.Remove<ClassUpdatePacket>(OnClassUpdate);
             PacketManager.Remove<PingPacket>(OnPing);
+            PacketManager.Remove<SendCurrentMapPacket>(OnSendCurrentMap);
             NetworkClient?.Disconnect();
         }
     }

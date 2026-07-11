@@ -48,20 +48,41 @@ public partial class SpellTargetManager : Node
     }
     
     /// <summary>Begin targeting for the given spell.</summary>
+    /// <remarks>
+    /// Cast — Unity parity: remember last confirmed target across casts.
+    /// Unity's SpellTargetManager keeps its internal target between casts and only resets
+    /// to the local player when the remembered target is no longer valid or is rejected by
+    /// the spell's target-type filter. This avoids the jarring "always start on self" behavior.
+    /// </remarks>
     public void Cast(SpellInfo info)
     {
         _pendingSpell = info;
         IsTargeting = true;
-
-        // Drop focus from whatever button/slot launched the cast so it can't grab navigation keys.
         GetViewport().GuiReleaseFocus();
-
         var mm = GameManager.Instance.CurrentMapManager;
         if (mm == null) { ExitTargeting(); return; }
-        
-        // Start with the local player as initial target
-        _target = mm.LocalPlayer;
+        if (_target == null
+            || !GodotObject.IsInstanceValid(_target)
+            || mm.GetCharacter(_target.LoginId) != _target
+            || FilterRejects(_target))
+        {
+            _target = mm.LocalPlayer;
+        }
         PositionReticle();
+    }
+    
+    /// <summary>
+    /// FilterRejects — mirrors Unity SetTarget filter mismatch check.
+    /// Returns true when the target's character type does not match the spell's required
+    /// target type (e.g. a player-target spell pointed at an NPC), causing the remembered
+    /// target to be discarded and replaced with the local player.
+    /// </summary>
+    private bool FilterRejects(Character.Character target)
+    {
+        var filteringEnabled = GameManager.Instance.CharacterSettings.GetOption<bool>(Options.TargetFiltering, true);
+        if (!filteringEnabled) return false;
+        return (_pendingSpell.TargetType != SpellTargetType.Player && target.CharacterType == CharacterType.Player)
+            || (_pendingSpell.TargetType == SpellTargetType.Player && target.CharacterType != CharacterType.Player);
     }
     
     private void CycleTarget(bool searchDown)
@@ -140,7 +161,6 @@ public partial class SpellTargetManager : Node
     private void ExitTargeting()
     {
         IsTargeting = false;
-        _target = null;
         _pendingSpell = null;
         if (_reticle != null && GodotObject.IsInstanceValid(_reticle))
         {
