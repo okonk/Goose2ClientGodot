@@ -467,6 +467,16 @@ Each step is independently testable; the order front-loads the foundations the r
 - **1.0 s pre-WPS attack default** — `AttackGate.DefaultWindowSeconds` raised from 0.5 s to 1.0 s (Unity `MapManager` default)
 - **Mounted attack suppression** — `Character` attack input gated on `!IsMounted` (Unity `PlayerController` parity)
 
+## 2026-07-11 Unity-parity bugfix pass — Part 2
+
+> Plan: `docs/plans/2026-07-11-unity-parity-part2-character-movement-animation.md`
+
+- **Cast animation** — `CharacterMotion.State` / `AnimationNames` extended with "cast" motion; `Cast()` plays `cast-<dir>` clips on body/hair/chest/eyes/legs while weapons idle (Unity `DoCast` trigger parity)
+- **Tap-to-turn + held-diagonal alternation** — `MovementInput.Resolve` with 0.1 s hold threshold; tap turns in place and sends `Face`; held diagonal alternates axes for staircase walking
+- **Chained-move snap / teleport anim reset / facing priority** — `MoveTo` snaps `_moving` characters to `_targetPosition` before each step; `TeleportTo` calls `PlayState()` to drop walk→idle; facing uses Down→Right→Up→Left priority
+- **Title/Surname full names** — `NameFormatting.FullName` trims null/empty title + surname; overhead label and Character window both display the full name
+- **Health bar auto-hide + Unity colors** — `HealthBarAutoHide` hides bars 2 s after full HP/MP, re-shows on any vitals change; bar colors use `GameColors.HpGreen/Orange/Red`
+
 ## Open questions / risks to resolve before Phase 2
 
 - **Animation redesign (§5)** — approach **de-risked** by the `~/code/3dMMO-Server/client`

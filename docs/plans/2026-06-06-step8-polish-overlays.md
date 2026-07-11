@@ -144,6 +144,12 @@ headless environment could not.
   - Chat clears and unfocuses on death/warp
   - First "previous target" press reaches the bottom-most candidate
   - Attack cadence before the first WPS packet ≈ 1/s; mounted attack suppressed
+  **Part 2 bugfix additions (2026-07-11):**
+  - Cast pose shows the cast clip (self-cast and remote caster); attack still swings the weapon clip
+  - Tap-turn in place toward an open tile; held-diagonal staircase walk
+  - `/refresh`-style position snap drops the walk animation; fast remote movers stay on-grid
+  - Titled character shows "Title Name Surname" overhead + in Character window
+  - Overhead bars hide 2 s after full HP/MP, reappear on damage
 
 ---
 
