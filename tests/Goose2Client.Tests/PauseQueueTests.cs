@@ -102,6 +102,42 @@ namespace Goose2Client.Network.Tests
         }
 
         [Fact]
+        public void Drain_StopsWhenDispatchedPacketRepauses()
+        {
+            // Arrange: queue starts paused; dispatch repauses on MAP_CHANGE
+            bool paused = true;
+            var recorded = new List<string>();
+            var queue = new PausablePacketQueue(
+                () => paused,
+                s =>
+                {
+                    recorded.Add(s);
+                    if (s == "MAP_CHANGE")
+                        paused = true; // re-pause mid-drain
+                });
+
+            queue.Handle("A");
+            queue.Handle("MAP_CHANGE");
+            queue.Handle("B");
+
+            // Act: first drain — should stop after MAP_CHANGE re-pauses
+            paused = false;
+            queue.Drain();
+
+            // Assert: A and MAP_CHANGE dispatched, B still buffered
+            Assert.Equal(new[] { "A", "MAP_CHANGE" }, recorded);
+            Assert.Equal(1, queue.Count);
+
+            // Act: second drain — B should now dispatch
+            paused = false;
+            queue.Drain();
+
+            // Assert: all three dispatched in FIFO order
+            Assert.Equal(new[] { "A", "MAP_CHANGE", "B" }, recorded);
+            Assert.Equal(0, queue.Count);
+        }
+
+        [Fact]
         public void FullCycle_PauseQueueUnpauseDrainThenInline()
         {
             // Arrange: adversarial regression test — the exact scenario that caused desyncs
