@@ -37,7 +37,6 @@ public partial class LoginScene : Control
         var gm = GameManager.Instance;
         gm.PacketManager.Listen<LoginSuccessPacket>(OnLoginSuccess);
         gm.PacketManager.Listen<LoginFailPacket>(OnLoginFail);
-        gm.PacketManager.Listen<SendCurrentMapPacket>(OnSendCurrentMap);
 
         // 4. Subscribe to NetworkClient events
         gm.NetworkClient.Connected += OnConnected;
@@ -62,7 +61,6 @@ public partial class LoginScene : Control
         gm.NetworkClient.SocketError -= OnError;
         gm.PacketManager.Remove<LoginSuccessPacket>(OnLoginSuccess);
         gm.PacketManager.Remove<LoginFailPacket>(OnLoginFail);
-        gm.PacketManager.Remove<SendCurrentMapPacket>(OnSendCurrentMap);
     }
 
     // --- UI handlers ---
@@ -113,9 +111,4 @@ public partial class LoginScene : Control
         _loginButton.Disabled = false;
     }
 
-    private void OnSendCurrentMap(object packet)
-    {
-        var p = (SendCurrentMapPacket)packet;
-        GameManager.Instance.ChangeMap(p.MapFileName, p.MapName);
-    }
 }
