@@ -374,8 +374,8 @@ void fragment() {
             if (GetViewport().GuiGetFocusOwner() is LineEdit) return;   // ignore movement/attack while typing in chat
             _moveCooldown -= delta;
 
-            // Held button keeps swinging; AttackGate throttles repeats to the weapon-speed interval.
-            if (Input.IsActionPressed("Attack"))
+            // Unity suppresses attacks entirely while mounted; gate input before AttackGate.
+            if (!IsMounted && Input.IsActionPressed("Attack"))
             {
                 int ws = GameManager.Instance.CurrentMapManager?.WeaponSpeed ?? 0;
                 if (_attackGate.TryAttack(Time.GetTicksMsec() / 1000.0, ws))
