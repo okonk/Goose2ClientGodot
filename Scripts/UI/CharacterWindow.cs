@@ -131,7 +131,7 @@ public partial class CharacterWindow : BaseWindow, IWindow
 
         var lp = GameManager.Instance.CurrentMapManager?.LocalPlayer;
         if (lp != null)
-            _nameText.Text = lp.CharacterName;
+            _nameText.Text = lp.FullName;
 
         _levelClassText.Text = $"Level {p.Level} {p.ClassName}";
         _guildText.Text = string.IsNullOrWhiteSpace(p.GuildName) ? "No Guild" : p.GuildName;

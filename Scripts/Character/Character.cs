@@ -8,6 +8,9 @@ namespace Goose2Client.Character
     {
         public int LoginId { get; private set; }
         public string CharacterName { get; private set; }
+        public string Title { get; private set; } = "";
+        public string Surname { get; private set; } = "";
+        public string FullName => NameFormatting.FullName(Title, CharacterName, Surname);
         public int X { get; private set; }
         public int Y { get; private set; }
         public Direction Facing { get; private set; } = Direction.Down;
@@ -78,7 +81,7 @@ namespace Goose2Client.Character
             if (_nameLabel != null) return;
             _nameLabel = new Label
             {
-                Text = CharacterName,
+                Text = FullName,
                 HorizontalAlignment = HorizontalAlignment.Center,
                 ZIndex = 20,
                 Position = new Vector2(-50, -74),   // name sits on top; HP bar (-56) below it, no overlap
@@ -116,6 +119,8 @@ namespace Goose2Client.Character
         {
             LoginId = p.LoginId;
             CharacterName = p.Name;
+            Title = p.Title ?? "";
+            Surname = p.Surname ?? "";
             BodyState = p.BodyState;
             MoveSpeed = p.MoveSpeed <= 0 ? 250 : p.MoveSpeed;
             X = p.MapX; Y = p.MapY; Facing = p.Facing;
@@ -131,7 +136,7 @@ namespace Goose2Client.Character
             PlayState();
 
             EnsureNameLabel();
-            _nameLabel.Text = CharacterName;
+            _nameLabel.Text = FullName;
             SetVitals(p.HPPercent, 1f);
         }
 
