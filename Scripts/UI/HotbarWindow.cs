@@ -325,8 +325,8 @@ public partial class HotbarWindow : BaseWindow, IWindow
     public override void _Process(double delta)
     {
         _repeatTimer += (float)delta;
-        if (_repeatTimer < 0.1f) return;
-        _repeatTimer = 0;
+        bool repeatTick = _repeatTimer >= 0.1f;
+        if (repeatTick) _repeatTimer = 0;
 
         // Guard against typing in input fields
         if (GetViewport().GuiGetFocusOwner() is LineEdit) return;
@@ -336,8 +336,16 @@ public partial class HotbarWindow : BaseWindow, IWindow
         for (int i = 0; i < SlotsPerPage; i++)
         {
             string action = i == 9 ? "Hotkey0" : $"Hotkey{i + 1}";
-            if (Input.IsActionPressed(action))
+            // exactMatch: Shift+1 must NOT count as Hotkey1 — Shift+digit is the emote layer (Task 4).
+            if (Input.IsActionJustPressed(action, exactMatch: true))
+            {
                 UseSlot(i);
+                _repeatTimer = 0;
+            }
+            else if (repeatTick && Input.IsActionPressed(action, exactMatch: true))
+            {
+                UseSlot(i);
+            }
         }
     }
 }
