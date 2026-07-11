@@ -70,16 +70,6 @@ mouse_filter = 1
 horizontal_alignment = 0
 vertical_alignment = 1
 
-[node name="LevelText" type="Label" parent="."]
-layout_mode = 0
-offset_left = 37.0
-offset_top = 36.0
-offset_right = 56.0
-offset_bottom = 56.0
-mouse_filter = 0
-horizontal_alignment = 1
-vertical_alignment = 1
-
 [node name="Portrait" type="Control" parent="."]
 script = ExtResource("2_char")
 layout_mode = 0
@@ -143,3 +133,13 @@ offset_right = 53.0
 offset_bottom = 53.0
 mouse_filter = 2
 expand_mode = 1
+
+[node name="LevelText" type="Label" parent="."]
+layout_mode = 0
+offset_left = 37.0
+offset_top = 36.0
+offset_right = 56.0
+offset_bottom = 56.0
+mouse_filter = 0
+horizontal_alignment = 1
+vertical_alignment = 1
