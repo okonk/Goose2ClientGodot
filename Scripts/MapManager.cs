@@ -285,7 +285,9 @@ public partial class MapManager : Node2D
     private void OnSpellTile(object packetObj)
     {
         var p = (SpellTilePacket)packetObj;
-        var s = new Goose2Client.Overlays.SpellAnimation { Name = $"SpellTile({p.AnimationId})", ZIndex = 20 };
+        // Absolute z 20: above characters/Objects1 (15), below Objects2 (30) — Unity puts spell
+        // effects on sorting layer "Objects 1" order 100. Relative z would land at 14+20=34.
+        var s = new Goose2Client.Overlays.SpellAnimation { Name = $"SpellTile({p.AnimationId})", ZIndex = 20, ZAsRelative = false };
         _objects.AddChild(s);
         if (!s.Setup(p.AnimationId)) { s.QueueFree(); return; }
         s.Position = MapCoords.TileCenter(p.TileX, p.TileY);   // centered on the tile cell

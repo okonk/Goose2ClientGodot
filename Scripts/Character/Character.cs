@@ -569,7 +569,7 @@ void fragment() {
         /// <summary>Show a spell impact animation at this character's origin. Spells stack (no replacement).</summary>
         public void ShowSpell(int animationId)
         {
-            var s = new Overlays.SpellAnimation { Name = "Spell", ZIndex = 20 };
+            var s = new Overlays.SpellAnimation { Name = "Spell", ZIndex = 20, ZAsRelative = false };
             AddChild(s);
             if (!s.Setup(animationId)) { s.QueueFree(); return; }   // discard orphan on missing asset
             // Node origin is the feet (tile bottom edge); lift to the tile-cell center so the
