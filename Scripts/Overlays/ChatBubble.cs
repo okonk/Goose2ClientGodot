@@ -102,10 +102,9 @@ namespace Goose2Client.Overlays
 
             _background.Size = bgSize;
 
-            // Center the panel horizontally on the character. A Panel's origin is its
-            // top-left corner, so shift it left by half its width — otherwise the bubble
-            // hangs off to the right of the character's center.
-            _background.Position = new Vector2(-bgSize.X / 2f, 0);
+            // Plan: centered-pivot — shift the Panel so its center (not top-left corner) sits at
+            // the node origin, matching Unity's chat bubble anchor point above the character.
+            _background.Position = new Vector2(-bgSize.X / 2f, -bgSize.Y / 2f);
 
             // Size the label to the measured text block, inset by the padding. Pin the wrap width
             // with CustomMinimumSize: a Label that isn't inside a Container won't actually reflow

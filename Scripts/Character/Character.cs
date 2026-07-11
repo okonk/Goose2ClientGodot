@@ -63,6 +63,7 @@ namespace Goose2Client.Character
                 ZIndex = 20,
             };
             AddChild(_mpBar);
+            RepositionOverlays();
         }
 
         /// <summary>Update the HP and MP bars. hpPercent/mpPercent are 0..1. Bars resize left-aligned
@@ -104,6 +105,19 @@ namespace Goose2Client.Character
             _nameLabel.AddThemeConstantOverride("outline_size", 4);
             _nameLabel.AddThemeColorOverride("font_outline_color", new Color(0, 0, 0, 0.9f));
             AddChild(_nameLabel);
+            RepositionOverlays();
+        }
+
+        /// <summary>Plan: position name label and HP/MP bars relative to the character's current Height.
+        /// Uses the resolved Height (or 48px fallback) to compute Y offsets so overlays track the
+        /// sprite's top edge across body types and states. Initializer defaults remain as-is for
+        /// the first render before Height is known.</summary>
+        private void RepositionOverlays()
+        {
+            int h = Height <= 0 ? 48 : Height;
+            if (_hpBar != null) _hpBar.Position = new Vector2(-16, -(h + 8));
+            if (_mpBar != null) _mpBar.Position = new Vector2(-16, -(h + 5));
+            if (_nameLabel != null) _nameLabel.Position = new Vector2(-50, -(h + 26));
         }
 
         // The converter's height-prefix uses its AnimationType name, which differs from the
@@ -147,6 +161,7 @@ namespace Goose2Client.Character
             TeleportTo(p.MapX, p.MapY);   // no walk anim
             ApplyDrawOrder();
             PlayState();
+            RepositionOverlays();
 
             EnsureNameLabel();
             _nameLabel.Text = FullName;
@@ -166,6 +181,7 @@ namespace Goose2Client.Character
 
             ApplyDrawOrder();
             PlayState();
+            RepositionOverlays();
         }
 
         private void ApplyAppearance(int bodyId, int bodyR, int bodyG, int bodyB, int bodyA,
@@ -269,7 +285,7 @@ namespace Goose2Client.Character
 
         public int Height =>
             _slots.TryGetValue(CharacterSlot.Body, out var b)
-                ? _heights.GetHeight($"Body-{b.GraphicId}-{ResolveClip(b, "idle", BodyState) ?? "idle-down"}")
+                ? _heights.GetHeight($"Body-{b.GraphicId}-{ResolveClip(b, CharacterMotion.State(IsMoving, _lockedMotion, IsMounted), BodyState) ?? "idle-down"}")
                 : 0;
 
         /// <summary>Hit-test: does a world-space point lie inside the Body slot's sprite rect?
