@@ -1,0 +1,7 @@
+asp_type	asp_id	decision	ill_type	ill_id	source	dye
+Body	1	match	Body	1	shape	
+Body	100	inject				
+Chest	27	match	Helm	60	manual	
+Hair	70	match	Eyes	1	color	
+Hair	6	match-unreviewed	Eyes	16	shape	
+Feet	1	match	Feet	2	shape	#b5835a
