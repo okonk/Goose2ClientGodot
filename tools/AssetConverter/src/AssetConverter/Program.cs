@@ -1,7 +1,24 @@
 using Goose2.AssetConverter;
+using Goose2.AssetConverter.Aspereta;
 using Goose2.AssetConverter.Manifest;
 using Goose2.AssetConverter.Maps;
 using Goose2.AssetConverter.SpriteFrames;
+
+if (args.Length >= 1 && args[0] == "aspereta-mapping")
+{
+    string outPath = args.Length >= 2
+        ? args[1]
+        : Path.GetFullPath(Path.Combine("data", "aspereta-mapping.tsv"));
+
+    var rows = AsperetaMapping.Build(Paths.IllutiaData, Paths.AsperetaData);
+    Directory.CreateDirectory(Path.GetDirectoryName(outPath)!);
+    File.WriteAllText(outPath, AsperetaMapping.ToTsv(rows));
+
+    int matched = rows.Count(r => r.Status == MappingStatus.Matched);
+    int inject = rows.Count(r => r.Status == MappingStatus.Inject);
+    Console.WriteLine($"Wrote {rows.Count} rows ({matched} matched, {inject} inject) -> {outPath}");
+    return;
+}
 
 if (args.Length >= 1 && args[0] == "animations")
 {
@@ -91,4 +108,4 @@ if (args.Length >= 1 && args[0] == "all")
     return;
 }
 
-Console.WriteLine("Usage: AssetConverter batch [outDir] | frames <id> | animations [repoRoot] | maps [outDir] | manifest [outPath] | all [repoRoot]");
+Console.WriteLine("Usage: AssetConverter batch [outDir] | frames <id> | animations [repoRoot] | maps [outDir] | manifest [outPath] | aspereta-mapping [outPath] | all [repoRoot]");
