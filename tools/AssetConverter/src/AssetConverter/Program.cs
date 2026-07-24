@@ -176,6 +176,10 @@ if (args.Length >= 1 && args[0] == "all")
     var mappingRows = AsperetaMapping.FromTsv(mappingPath);
     var aspMaps = AsperetaMapConverter.Convert(Paths.AsperetaMaps, mapsDir, mappingRows);
 
+    // Aspereta effects (after Illutia animation metadata so heights merge preserves it)
+    var fx = AsperetaEffectsConverter.Convert(
+        Paths.AsperetaData, Paths.AsperetaCompiledEnc, repoRoot);
+
     // Combined frame manifest
     string manifestPath = Path.Combine(repoRoot, "Assets", "Sprites", "manifest.json");
     Directory.CreateDirectory(Path.GetDirectoryName(manifestPath)!);
@@ -189,8 +193,10 @@ if (args.Length >= 1 && args[0] == "all")
     Console.WriteLine($"Maps: {maps.Copied} copied, {maps.Failures.Count} failed");
     Console.WriteLine($"Aspereta sheets: {aspBatch.Succeeded} ok, {aspBatch.Failed} failed");
     Console.WriteLine($"Aspereta maps: {aspMaps.Converted} converted, {aspMaps.Failures.Count} failed, {aspMaps.Warnings.Count} warnings");
+    Console.WriteLine($"Aspereta effects: {fx.EffectsWritten} written, {fx.Failed} failed");
     foreach (var w in aspMaps.Warnings) Console.WriteLine($"  WARN {w}");
-    foreach (var f in aspBatch.Failures.Concat(aspMaps.Failures)) Console.WriteLine($"  FAIL {f}");
+    foreach (var f in aspBatch.Failures.Concat(aspMaps.Failures).Concat(fx.Failures))
+        Console.WriteLine($"  FAIL {f}");
     Console.WriteLine($"Manifest: {manifestPath}");
     return;
 }

@@ -83,15 +83,23 @@ public static class AsperetaEffectsConverter
 
         if (effectHeights.Count > 0)
         {
-            var resourcesDir = Path.Combine(outRoot, "Assets", "Resources");
-            // SAFE merge: preserve any existing metadata already under outRoot.
-            // AnimationMetadataWriter.Write overwrites both files, so re-load first.
-            var existingHeights = LoadHeights(Path.Combine(resourcesDir, "AnimationHeights.txt"));
-            var existingFirst = LoadFirstFrames(
-                Path.Combine(resourcesDir, "AnimationToFirstFrame.txt"));
-            var mergedHeights = AnimationMetadataWriter.MergeHeights(
-                new[] { existingHeights, effectHeights });
-            AnimationMetadataWriter.Write(resourcesDir, existingFirst, mergedHeights);
+            try
+            {
+                var resourcesDir = Path.Combine(outRoot, "Assets", "Resources");
+                // SAFE merge: preserve any existing metadata already under outRoot.
+                // AnimationMetadataWriter.Write overwrites both files, so re-load first.
+                var existingHeights = LoadHeights(Path.Combine(resourcesDir, "AnimationHeights.txt"));
+                var existingFirst = LoadFirstFrames(
+                    Path.Combine(resourcesDir, "AnimationToFirstFrame.txt"));
+                var mergedHeights = AnimationMetadataWriter.MergeHeights(
+                    new[] { existingHeights, effectHeights });
+                AnimationMetadataWriter.Write(resourcesDir, existingFirst, mergedHeights);
+            }
+            catch (Exception ex)
+            {
+                failed++;
+                failures.Add($"Metadata merge/write failed: {ex.GetType().Name} {ex.Message}");
+            }
         }
 
         return new AsperetaEffectsResult(written, failed, failures);
