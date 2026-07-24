@@ -1,0 +1,244 @@
+asp_type	asp_id	decision	ill_type	ill_id	source	dye
+Body	1	match	Body	1	shape	
+Body	2	match	Body	1	manual	
+Body	3	match	Body	129	color	
+Body	11	match	Body	11	manual	
+Body	12	match	Body	11	manual	
+Body	100	inject	Body	126	manual	
+Body	101	inject	Body	107	shape	
+Body	102	inject	Body	107	shape	
+Body	103	inject	Body	107	shape	
+Body	104	inject				
+Body	105	match	Body	128	color	
+Body	106	inject	Body	129	manual	
+Body	107	inject	Body	111	shape	
+Body	108	inject	Body	111	shape	
+Body	109	inject	Body	111	shape	
+Body	110	inject	Body	111	shape	
+Body	111	inject	Body	113	manual	
+Body	112	match	Body	169	manual	
+Body	113	inject	Body	122	shape	
+Body	114	inject	Body	104	manual	
+Body	115	match	Body	125	shape	
+Body	116	inject				
+Body	117	match	Body	116	shape	
+Body	118	inject	Body	116	shape	
+Body	119	match	Body	128	shape	#44ff0d
+Body	120	inject	Body	111	shape	
+Body	121	match	Body	128	shape	#ff89be
+Body	122	inject	Body	123	shape	
+Body	123	match	Body	123	shape	
+Body	124	match	Body	117	shape	
+Body	125	inject				
+Body	126	inject				
+Body	127	inject				
+Body	128	inject				
+Body	129	inject	Body	122	shape	
+Body	130	inject	Body	122	shape	
+Body	131	inject	Body	122	shape	
+Body	132	match	Body	108	shape	
+Body	133	inject				
+Body	134	match	Body	114	shape	
+Body	135	match	Body	126	manual	
+Body	136	match	Body	121	color	
+Body	137	inject	Body	121	shape	
+Body	138	inject	Body	121	shape	
+Body	139	inject	Body	121	shape	
+Body	140	inject	Body	121	shape	
+Body	141	inject	Body	121	shape	
+Body	142	inject	Body	21	shape	
+Body	143	inject	Body	21	shape	
+Body	144	match	Body	153	color	
+Body	145	match	Body	127	color	
+Body	146	inject	Body	127	shape	
+Body	147	inject	Body	127	shape	
+Body	148	match	Body	156	shape	
+Body	149	inject	Body	156	shape	
+Body	150	inject				
+Body	151	inject				
+Body	152	inject				
+Body	153	inject				
+Body	154	inject				
+Body	155	inject				
+Body	156	inject				
+Body	157	inject				
+Body	158	match	Body	233	color	
+Body	159	match	Body	105	color	
+Body	160	match	Body	106	manual	
+Body	161	match	Body	109	color	
+Body	162	match	Body	134	manual	
+Body	163	match	Body	115	color	
+Body	164	match	Body	160	manual	
+Body	165	match	Body	120	color	
+Body	166	match	Body	110	color	
+Hair	1	inject				
+Hair	2	inject				
+Hair	3	inject				
+Hair	4	inject				
+Hair	5	inject				
+Hair	6	match-unreviewed	Eyes	16	shape	
+Hair	7	match-unreviewed	Eyes	16	shape	
+Hair	8	match-unreviewed	Eyes	16	shape	
+Hair	9	match-unreviewed	Eyes	16	shape	
+Hair	10	match-unreviewed	Eyes	16	shape	
+Hair	11	match-unreviewed	Eyes	16	shape	
+Hair	12	match-unreviewed	Eyes	16	shape	
+Hair	13	match-unreviewed	Eyes	16	shape	
+Hair	14	match-unreviewed	Eyes	16	shape	
+Hair	15	match-unreviewed	Eyes	16	shape	
+Hair	16	match	Hair	14	manual	
+Hair	20	match	Hair	31	manual	
+Hair	21	match	Hair	32	manual	
+Hair	22	match	Hair	33	manual	
+Hair	23	match	Hair	34	manual	
+Hair	24	match	Hair	35	manual	
+Hair	25	match	Hair	36	manual	
+Hair	51	match-unreviewed	Eyes	16	shape	
+Hair	52	match-unreviewed	Eyes	16	shape	
+Hair	53	match-unreviewed	Eyes	16	shape	
+Hair	54	match-unreviewed	Eyes	16	shape	
+Hair	55	match-unreviewed	Eyes	16	shape	
+Hair	56	inject				
+Hair	57	inject				
+Hair	58	inject				
+Hair	59	inject				
+Hair	60	inject				
+Hair	61	inject				
+Hair	62	inject				
+Hair	63	inject				
+Hair	64	inject				
+Hair	65	inject				
+Hair	70	match	Eyes	1	color	
+Hair	71	match	Eyes	1	manual	
+Hair	72	match	Eyes	3	color	
+Hair	73	match	Eyes	2	color	
+Hand	1	match	Hand	11	manual	
+Hand	2	match	Hand	39	manual	
+Hand	3	match	Hand	171	manual	
+Hand	4	match	Hand	10	manual	
+Hand	5	match	Hand	13	manual	
+Hand	6	match	Hand	1	manual	
+Hand	7	match	Hand	60	manual	
+Hand	8	match	Hand	5	manual	
+Hand	9	match	Hand	44	manual	
+Hand	10	match	Hand	62	manual	
+Hand	11	match	Hand	177	manual	
+Hand	12	match	Hand	109	manual	
+Hand	13	match	Hand	72	manual	
+Hand	14	match	Hand	85	manual	
+Hand	15	match	Hand	90	manual	
+Hand	16	match	Hand	38	manual	
+Hand	17	match	Hand	246	manual	
+Hand	18	match	Hand	104	manual	
+Hand	19	match	Hand	104	manual	
+Hand	20	match	Hand	104	manual	
+Hand	21	match	Hand	79	color	
+Hand	22	match	Hand	107	manual	
+Hand	23	match	Hand	304	manual	
+Hand	24	match	Hand	118	manual	
+Hand	25	match	Hand	117	manual	
+Hand	26	match	Hand	104	manual	
+Hand	27	match	Hand	73	manual	
+Hand	28	match	Hand	41	color	
+Hand	29	match	Hand	61	color	
+Hand	30	match	Hand	75	manual	
+Hand	31	match	Hand	37	manual	
+Hand	32	match	Hand	33	manual	
+Hand	33	match	Hand	34	manual	
+Hand	34	match	Hand	295	manual	
+Hand	35	match	Hand	30	manual	
+Hand	36	match	Hand	47	manual	
+Hand	37	match	Hand	19	manual	
+Hand	38	match	Hand	29	manual	
+Hand	39	match	Hand	69	manual	
+Hand	40	match	Hand	22	manual	
+Hand	41	match	Hand	21	manual	
+Hand	42	match	Hand	263	manual	
+Hand	43	match	Hand	68	manual	
+Hand	44	match	Hand	17	shape	
+Hand	45	match	Hand	20	manual	
+Hand	46	match	Hand	98	manual	
+Hand	47	match	Hand	31	color	
+Hand	48	match	Hand	18	color	
+Hand	49	match	Hand	27	color	
+Hand	50	match	Hand	72	manual	
+Hand	51	match	Hand	64	manual	
+Hand	52	match	Hand	28	manual	
+Hand	53	match	Hand	9	manual	
+Hand	54	match	Hand	355	manual	
+Hand	55	match	Hand	316	manual	
+Hand	56	match	Hand	2	manual	
+Hand	57	match	Hand	70	manual	
+Hand	58	match	Hand	42	color	
+Hand	59	match	Hand	50	color	
+Hand	60	match	Hand	40	color	
+Chest	1	match	Chest	21	manual	
+Chest	2	match	Chest	118	manual	
+Chest	3	match	Chest	13	color	
+Chest	4	match	Chest	2	manual	
+Chest	5	match	Chest	80	manual	
+Chest	6	match	Chest	3	manual	#fbaaff
+Chest	7	match	Chest	15	shape	
+Chest	8	match	Chest	3	manual	
+Chest	9	match	Chest	33	manual	
+Chest	10	match	Chest	11	manual	
+Chest	11	match	Chest	15	shape	#c01c28
+Chest	12	match	Chest	4	manual	
+Chest	13	match	Chest	20	manual	
+Chest	14	match	Chest	20	manual	
+Chest	15	match	Chest	34	shape	
+Chest	16	match	Chest	34	shape	
+Chest	17	match	Chest	58	manual	
+Chest	18	match	Chest	58	manual	
+Chest	19	match	Helm	11	color	
+Chest	20	match	Chest	9	manual	
+Chest	21	match	Chest	36	manual	
+Chest	22	match	Chest	14	color	
+Chest	23	match	Chest	12	manual	
+Chest	24	match	Chest	12	manual	
+Chest	25	match	Chest	16	manual	#e01b24
+Chest	26	match	Chest	23	manual	
+Chest	27	match	Helm	60	manual	
+Chest	28	match	Chest	10	color	
+Helm	1	match	Helm	52	shape	
+Helm	2	match	Helm	20	color	
+Helm	3	match	Helm	46	color	
+Helm	4	match	Helm	12	color	
+Helm	5	match	Helm	22	manual	#e01b24
+Helm	6	match	Helm	22	manual	
+Helm	7	match	Helm	52	shape	#33d17a
+Helm	8	match	Helm	22	manual	#1c71d8
+Helm	9	match	Helm	20	shape	#f57902
+Helm	10	match	Helm	20	shape	#3a3838
+Helm	11	match	Helm	4	manual	
+Helm	12	match	Helm	122	manual	#ff7800
+Helm	13	match	Helm	3	color	
+Helm	14	match	Helm	28	color	
+Helm	15	match	Helm	11	color	
+Helm	16	match	Helm	10	color	
+Helm	17	match	Helm	143	manual	
+Helm	18	match	Helm	65	manual	
+Helm	19	match	Helm	19	shape	
+Helm	20	match	Helm	17	manual	
+Helm	21	match	Helm	68	manual	
+Helm	22	match	Helm	26	color	
+Helm	23	match	Helm	9	color	
+Helm	24	match	Helm	32	manual	
+Helm	25	match	Helm	61	manual	
+Helm	26	match	Helm	62	manual	
+Helm	27	match	Helm	36	color	
+Helm	28	match	Helm	54	manual	
+Helm	29	match	Helm	53	manual	
+Legs	1	match	Legs	1	manual	#1c71d8
+Legs	2	match	Legs	6	manual	
+Legs	3	match	Legs	1	manual	
+Legs	4	match	Legs	13	manual	
+Legs	5	match	Legs	14	manual	
+Legs	6	match	Legs	1	manual	#e01b24
+Feet	1	match	Feet	2	shape	#b5835a
+Feet	2	match	Feet	4	manual	
+Feet	3	match	Feet	11	color	
+Feet	4	match	Feet	9	manual	
+Feet	5	match	Feet	2	shape	#ed333b
+Feet	6	match	Feet	7	manual	
+Feet	7	match	Feet	13	manual	
