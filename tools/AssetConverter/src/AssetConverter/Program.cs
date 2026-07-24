@@ -60,11 +60,15 @@ if (args.Length >= 1 && args[0] == "aspereta")
         Paths.AsperetaData, Path.Combine(repoRoot, "Assets", "Sprites", "sheets"));
     var maps = AsperetaMapConverter.Convert(
         Paths.AsperetaMaps, Path.Combine(repoRoot, "Assets", "Maps"), mapping);
+    var fx = AsperetaEffectsConverter.Convert(
+        Paths.AsperetaData, Paths.AsperetaCompiledEnc, repoRoot);
 
     Console.WriteLine($"Aspereta sheets: {sheets.Succeeded} ok, {sheets.Failed} failed");
     Console.WriteLine($"Aspereta maps: {maps.Converted} converted, {maps.Failures.Count} failed, {maps.Warnings.Count} warnings");
+    Console.WriteLine($"Aspereta effects: {fx.EffectsWritten} written, {fx.Failed} failed");
     foreach (var w in maps.Warnings) Console.WriteLine($"  WARN {w}");
-    foreach (var f in sheets.Failures.Concat(maps.Failures)) Console.WriteLine($"  FAIL {f}");
+    foreach (var f in sheets.Failures.Concat(maps.Failures).Concat(fx.Failures))
+        Console.WriteLine($"  FAIL {f}");
     return;
 }
 
