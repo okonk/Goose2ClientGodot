@@ -14,11 +14,12 @@ public static class AsperetaMapping
     public static List<MappingRow> Build(string illutiaDataDir, string asperetaDataDir)
     {
         var illutiaIndex = new Dictionary<string, (int Graphic, int Sheet)>();
-        foreach (var file in Directory.EnumerateFiles(illutiaDataDir, "*.adf").OrderBy(f => f))
+        foreach (var file in Directory.EnumerateFiles(illutiaDataDir, "*.adf")
+            .OrderBy(f => int.TryParse(Path.GetFileNameWithoutExtension(f), out int n) ? n : int.MaxValue))
         {
             AdfFile adf;
             try { adf = new AdfFile(file); }
-            catch { continue; }
+            catch { continue; } // silent: skip unreadable/non-ADF files (decode skip counts deferred)
             if (adf.Type != AdfType.Graphic || adf.Frames.Count == 0) continue;
 
             foreach (var (frame, hash) in FrameHashes(adf))
@@ -70,12 +71,43 @@ public static class AsperetaMapping
         return sb.ToString();
     }
 
-    public static List<MappingRow> FromTsv(string path) =>
-        File.ReadLines(path).Skip(1).Where(l => l.Length > 0).Select(l =>
+    public static List<MappingRow> FromTsv(string path)
+    {
+        var rows = new List<MappingRow>();
+        int lineNumber = 0;
+        foreach (var line in File.ReadLines(path))
         {
-            var f = l.Split('\t');
-            return new MappingRow(int.Parse(f[0]), int.Parse(f[1]),
-                f[2] == "matched" ? MappingStatus.Matched : MappingStatus.Inject,
-                int.Parse(f[3]), int.Parse(f[4]));
-        }).ToList();
+            lineNumber++;
+            if (lineNumber == 1) continue; // header
+            if (line.Length == 0) continue;
+
+            var f = line.Split('\t');
+            if (f.Length != 5)
+                throw new FormatException(
+                    $"Line {lineNumber}: expected 5 tab-separated columns, got {f.Length}");
+
+            MappingStatus status = f[2] switch
+            {
+                "matched" => MappingStatus.Matched,
+                "inject" => MappingStatus.Inject,
+                _ => throw new FormatException(
+                    $"Line {lineNumber}: status must be \"matched\" or \"inject\", got \"{f[2]}\""),
+            };
+
+            try
+            {
+                rows.Add(new MappingRow(
+                    int.Parse(f[0]), int.Parse(f[1]), status, int.Parse(f[3]), int.Parse(f[4])));
+            }
+            catch (FormatException ex)
+            {
+                throw new FormatException($"Line {lineNumber}: invalid integer field", ex);
+            }
+            catch (OverflowException ex)
+            {
+                throw new FormatException($"Line {lineNumber}: integer out of range", ex);
+            }
+        }
+        return rows;
+    }
 }
