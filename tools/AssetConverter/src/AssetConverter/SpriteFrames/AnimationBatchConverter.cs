@@ -38,7 +38,8 @@ public static class AnimationBatchConverter
         string outRoot,
         Func<CompiledAnimation, bool>? only = null,
         bool includeEffects = false,
-        int[]? onlyEffectsFromSheets = null)
+        int[]? onlyEffectsFromSheets = null,
+        IReadOnlyList<CompiledSpriteFramesResource>? extraResources = null)
     {
         var warnings = new List<string>();
         var failures = new List<string>();
@@ -176,20 +177,16 @@ public static class AnimationBatchConverter
             }
         }
 
+        // 5b. Append any extra resources (e.g. Aspereta monsters) before metadata write
+        if (extraResources is not null)
+            allResources.AddRange(extraResources);
+
         // 6. Merge and write metadata (only after all resources are built)
         if (allResources.Any(r => r.Animations.Count > 0) || effectHeights.Count > 0)
         {
             try
             {
-                var mergedFirstFrames = AnimationMetadataWriter.MergeFirstFrames(
-                    allResources.Select(r => r.AnimationToFirstFrame));
-                var characterHeights = AnimationMetadataWriter.MergeHeights(
-                    allResources.Select(r => r.AnimationHeights));
-                var mergedHeights = AnimationMetadataWriter.MergeHeights(
-                    new[] { characterHeights, effectHeights });
-
-                string resourcesDir = Path.Combine(outRoot, "Assets", "Resources");
-                AnimationMetadataWriter.Write(resourcesDir, mergedFirstFrames, mergedHeights);
+                WriteMergedMetadata(outRoot, allResources, effectHeights);
             }
             catch (Exception ex)
             {
@@ -199,5 +196,25 @@ public static class AnimationBatchConverter
         }
 
         return new AnimationBatchResult(resourcesWritten, effectsWritten, failed, warnings, failures);
+    }
+
+    /// <summary>
+    /// Merges first-frame and height metadata from character resources and effect heights,
+    /// then writes <c>AnimationToFirstFrame.txt</c> and <c>AnimationHeights.txt</c>.
+    /// </summary>
+    public static void WriteMergedMetadata(
+        string outRoot,
+        IEnumerable<CompiledSpriteFramesResource> resources,
+        IReadOnlyDictionary<string, int> effectHeights)
+    {
+        var mergedFirstFrames = AnimationMetadataWriter.MergeFirstFrames(
+            resources.Select(r => r.AnimationToFirstFrame));
+        var characterHeights = AnimationMetadataWriter.MergeHeights(
+            resources.Select(r => r.AnimationHeights));
+        var mergedHeights = AnimationMetadataWriter.MergeHeights(
+            new[] { characterHeights, effectHeights });
+
+        string resourcesDir = Path.Combine(outRoot, "Assets", "Resources");
+        AnimationMetadataWriter.Write(resourcesDir, mergedFirstFrames, mergedHeights);
     }
 }

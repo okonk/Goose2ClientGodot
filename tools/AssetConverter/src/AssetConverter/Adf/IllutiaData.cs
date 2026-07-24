@@ -119,6 +119,12 @@ public class Animation
     public int Id { get; set; }
     public List<Frame> Frames { get; set; }
 
+    /// <summary>
+    /// Raw frame index references as stored in the ADF (Aspereta animations often
+    /// point at frames living on other sheets). Null for Illutia-loaded animations.
+    /// </summary>
+    public List<int>? SourceFrameIds { get; set; }
+
     public Animation(int id)
     {
         this.Id = id;
@@ -160,6 +166,14 @@ public class AdfFile
     public Dictionary<int, Animation>? Animations { get; set; }
     public byte[] FileData { get; set; }
     public byte[] ExtraBytes { get; set; }
+
+    /// <summary>Creates an empty AdfFile for programmatic population (Aspereta import).</summary>
+    public AdfFile()
+    {
+        this.Frames = new List<Frame>();
+        this.FileData = Array.Empty<byte>();
+        this.ExtraBytes = Array.Empty<byte>();
+    }
 
     public AdfFile(string file)
     {
