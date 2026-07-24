@@ -32,3 +32,6 @@ Thumbs.db
 *.swp
 *~
 *.uid
+
+# Git worktrees (isolated feature workspaces)
+.worktrees/
