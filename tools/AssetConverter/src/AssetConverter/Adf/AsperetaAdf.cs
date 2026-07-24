@@ -49,12 +49,15 @@ public static class AsperetaAdf
                 var frameIds = new int[n];
                 for (int f = 0; f < n; f++) frameIds[f] = reader.ReadInt32() - offset;
                 DecodeByte(reader.ReadByte(), offset); // interval — unused, must still consume
+                animation.SourceFrameIds = frameIds.ToList();
                 pendingAnimations.Add((animation, frameIds));
                 result.Animations[id] = animation;
             }
         }
 
-        // Resolve animation frame ids -> Frame objects now the table is complete.
+        // Resolve animation frame ids -> Frame objects when they live on this sheet.
+        // Aspereta often stores all animation defs in 0.adf with frame ids on other sheets;
+        // those stay empty here and are resolved cross-sheet by consumers (e.g. monster converter).
         foreach (var (animation, frameIds) in pendingAnimations)
         {
             foreach (int fid in frameIds)

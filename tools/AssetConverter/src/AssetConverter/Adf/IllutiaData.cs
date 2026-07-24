@@ -119,6 +119,12 @@ public class Animation
     public int Id { get; set; }
     public List<Frame> Frames { get; set; }
 
+    /// <summary>
+    /// Raw frame index references as stored in the ADF (Aspereta animations often
+    /// point at frames living on other sheets). Null for Illutia-loaded animations.
+    /// </summary>
+    public List<int>? SourceFrameIds { get; set; }
+
     public Animation(int id)
     {
         this.Id = id;
