@@ -28,4 +28,18 @@ public class FrameManifestBuilderTests
 
         Assert.Equal(8, sheet1000.EnumerateObject().Count());
     }
+
+    [Fact]
+    public void CombinedManifest_ContainsIllutiaAndRenumberedAsperetaSheets()
+    {
+        string json = FrameManifestBuilder.BuildCombined(Paths.IllutiaData, Paths.AsperetaData);
+        using var doc = System.Text.Json.JsonDocument.Parse(json);
+        var sheets = doc.RootElement.GetProperty("sheets");
+
+        Assert.True(sheets.TryGetProperty("1000", out _));      // illutia sheet still present
+        Assert.True(sheets.TryGetProperty("20000", out var asp)); // renumbered aspereta sheet
+        // every graphic key in an aspereta sheet is in the 700000+ range
+        foreach (var g in asp.EnumerateObject())
+            Assert.True(int.Parse(g.Name) >= 700000);
+    }
 }
