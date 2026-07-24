@@ -161,6 +161,14 @@ public class AdfFile
     public byte[] FileData { get; set; }
     public byte[] ExtraBytes { get; set; }
 
+    /// <summary>Creates an empty AdfFile for programmatic population (Aspereta import).</summary>
+    public AdfFile()
+    {
+        this.Frames = new List<Frame>();
+        this.FileData = Array.Empty<byte>();
+        this.ExtraBytes = Array.Empty<byte>();
+    }
+
     public AdfFile(string file)
     {
         using (var reader = new BinaryReader(File.Open(file, FileMode.Open)))
