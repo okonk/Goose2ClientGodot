@@ -108,10 +108,8 @@ namespace Goose2Client.Character
             RepositionOverlays();
         }
 
-        /// <summary>Plan: position name label and HP/MP bars relative to the character's current Height.
-        /// Uses the resolved Height (or 48px fallback) to compute Y offsets so overlays track the
-        /// sprite's top edge across body types and states. Initializer defaults remain as-is for
-        /// the first render before Height is known.</summary>
+        /// <summary>Position name label and HP/MP bars from the resting-pose <see cref="Height"/>
+        /// (idle / mounted-idle), so attack/cast/walk frame heights never bob the overlays.</summary>
         private void RepositionOverlays()
         {
             int h = Height <= 0 ? 48 : Height;
@@ -289,10 +287,24 @@ namespace Goose2Client.Character
 
         public AppearanceData GetAppearance() => _appearance;
 
-        public int Height =>
-            _slots.TryGetValue(CharacterSlot.Body, out var b)
-                ? _heights.GetHeight($"Body-{b.GraphicId}-{ResolveClip(b, CharacterMotion.State(IsMoving, _lockedMotion, IsMounted), BodyState) ?? "idle-down"}")
-                : 0;
+        /// <summary>
+        /// Body height used for name, HP/MP bars, chat bubbles, and emotes.
+        /// Always taken from the resting pose (idle, or mounted-idle when mounted) so taller
+        /// attack/cast/walk frames do not push overlays up. Per-slot sprite anchors still use
+        /// the active clip height in <see cref="PlayCurrent"/>.
+        /// </summary>
+        public int Height
+        {
+            get
+            {
+                if (!_slots.TryGetValue(CharacterSlot.Body, out var b)) return 0;
+                EnsureHeights();
+                // Resting pose only — ignore IsMoving / attack-lock so overlays stay fixed.
+                string motion = CharacterMotion.State(isMoving: false, lockedMotion: null, isMounted: IsMounted);
+                string clip = ResolveClip(b, motion, BodyState) ?? "idle-down";
+                return _heights.GetHeight($"Body-{b.GraphicId}-{clip}");
+            }
+        }
 
         /// <summary>Hit-test: does a world-space point lie inside the Body slot's sprite rect?
         /// Body sprites are Centered, so the rect is center ± size/2.</summary>
@@ -524,8 +536,7 @@ namespace Goose2Client.Character
                 s.Sprite.Play(clip);
             }
 
-            // Height resolves from the current body motion clip, so state changes (walk/idle,
-            // cast/attack, mounted) must move the name and vitals with the new sprite height.
+            // Overlays use resting-pose Height; still refresh after mount/appearance-driven PlayCurrent.
             RepositionOverlays();
         }
 

@@ -60,33 +60,33 @@ layout_mode = 2
 anchors_preset = 0
 offset_left = 204.0
 offset_top = 29.0
-offset_right = 305.0
+offset_right = 399.0
 offset_bottom = 40.0
 mouse_filter = 1
 text = "—"
-horizontal_alignment = 1
+horizontal_alignment = 0
 
 [node name="LevelClassText" type="Label" parent="Content"]
 layout_mode = 2
 anchors_preset = 0
 offset_left = 204.0
 offset_top = 40.0
-offset_right = 306.0
+offset_right = 399.0
 offset_bottom = 51.0
 mouse_filter = 1
 text = "Level 1"
-horizontal_alignment = 1
+horizontal_alignment = 0
 
 [node name="GuildText" type="Label" parent="Content"]
 layout_mode = 2
 anchors_preset = 0
 offset_left = 204.0
 offset_top = 51.0
-offset_right = 288.0
+offset_right = 399.0
 offset_bottom = 63.0
 mouse_filter = 1
 text = "No Guild"
-horizontal_alignment = 1
+horizontal_alignment = 0
 
 [node name="ExperienceLabel" type="Label" parent="Content"]
 layout_mode = 2
