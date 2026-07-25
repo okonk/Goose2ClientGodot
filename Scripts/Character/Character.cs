@@ -135,11 +135,11 @@ namespace Goose2Client.Character
             _ => "Body",
         };
 
-        public override void _Ready()
-        {
+        public override void _Ready() => EnsureHeights();
+
+        private static void EnsureHeights() =>
             _heights ??= AnimationHeights.Load(
                 ProjectSettings.GlobalizePath("res://Assets/Resources/AnimationHeights.txt"));
-        }
 
         /// <summary>(Re)build every slot from an MKC spawn packet (position + appearance).</summary>
         public void SetAppearance(MakeCharacterPacket p)
@@ -262,6 +262,12 @@ namespace Goose2Client.Character
             }
             s.GraphicId = graphicId;
             s.Sprite.SpriteFrames = GD.Load<SpriteFrames>(path);
+            // Anchor immediately from the idle-equip height (or the 64px Unity default) so a slot
+            // that fails clip resolve later is not left at Offset (0,0) — that puts tall weapon
+            // frames' centers on the feet and the art floats mid-body / into the ground.
+            EnsureHeights();
+            int h = _heights.GetHeight($"{HeightPrefix(slot)}-{graphicId}-idle-equip-down");
+            s.Sprite.Offset = new Vector2(0, CharacterAnchor.OffsetY(h));
             // Only dyed slots get the tint shader; untinted slots use the default canvas path so they
             // render byte-identically to pre-shader behaviour (no global color-management shift).
             if (tint.A > 0f)
@@ -524,14 +530,16 @@ namespace Goose2Client.Character
         }
 
         /// <summary>First candidate clip (per BodyState/equip/weapon-type) that this slot's
-        /// SpriteFrames actually contains, or null if none match.</summary>
+        /// SpriteFrames actually contains. Falls back to the first animation on the sheet so
+        /// equip-only Hands graphics still draw and receive a height-based Offset.</summary>
         private string ResolveClip(Slot s, string motion, int state)
         {
             var frames = s.Sprite.SpriteFrames;
             if (frames == null) return null;
             foreach (var cand in AnimationNames.Candidates(motion, state, Facing))
                 if (frames.HasAnimation(cand)) return cand;
-            return null;
+            var names = frames.GetAnimationNames();
+            return names.Length > 0 ? names[0] : null;
         }
 
         public void AddBattleText(BattleTextType type, string text)

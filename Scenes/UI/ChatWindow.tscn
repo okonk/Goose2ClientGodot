@@ -7,11 +7,17 @@
 [node name="ChatWindow" type="Control"]
 script = ExtResource("1_chat")
 theme = ExtResource("theme")
-layout_mode = 0
+layout_mode = 3
+anchor_left = 0.0
+anchor_top = 1.0
+anchor_right = 0.0
+anchor_bottom = 1.0
 offset_left = 8.0
-offset_top = 432.0
+offset_top = -208.0
 offset_right = 508.0
-offset_bottom = 640.0
+offset_bottom = 0.0
+grow_horizontal = 0
+grow_vertical = 0
 
 [node name="Panel" type="Panel" parent="."]
 layout_mode = 0

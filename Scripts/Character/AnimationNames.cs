@@ -34,18 +34,22 @@ namespace Goose2Client.Character
         public static IReadOnlyList<string> Candidates(string motion, int bodyState, Direction d)
         {
             bool equipped = bodyState != 3;
+            // Always end unarmed lists with -equip fallbacks: Hands weapon/shield sheets only
+            // ship idle-equip / walk-equip / attack-<type>. If BodyState is still 3 (or a
+            // preferred clip is missing) those slots must still resolve a clip — otherwise
+            // PlayCurrent skips them, Offset stays 0, and the graphic floats at the feet.
             List<string> bases = motion switch
             {
                 "idle" => equipped ? new List<string> { "idle-equip", "idle", "idle-no-equip" }
-                                   : new List<string> { "idle-no-equip", "idle" },
+                                   : new List<string> { "idle-no-equip", "idle", "idle-equip" },
                 "walk" => equipped ? new List<string> { "walk-equip", "walk", "walk-no-equip" }
-                                   : new List<string> { "walk-no-equip", "walk" },
+                                   : new List<string> { "walk-no-equip", "walk", "walk-equip" },
                 "attack" => equipped
                     ? new List<string> { $"attack-{AttackVariant(bodyState)}", "attack-1hand", "attack", "attack-no-equip", "idle-equip", "idle" }
-                    : new List<string> { "attack-no-equip", "attack", "idle-no-equip", "idle" },
+                    : new List<string> { "attack-no-equip", "attack", "idle-no-equip", "idle", "idle-equip" },
                 "cast" => equipped
                     ? new List<string> { "cast", "idle-equip", "idle" }
-                    : new List<string> { "cast", "idle-no-equip", "idle" },
+                    : new List<string> { "cast", "idle-no-equip", "idle", "idle-equip" },
                 "mounted-idle" => new List<string> { "mounted-idle", "idle-equip", "idle" },
                 "mounted-walk" => new List<string> { "mounted-walk", "walk-equip", "walk" },
                 _ => new List<string> { motion },

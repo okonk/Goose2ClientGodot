@@ -66,8 +66,20 @@ public class AnimationNamesTests
     [Fact]
     public void Candidates_cast_unarmed_falls_back_to_idle_no_equip()
     {
-        // Unarmed (bodyState 3) + left => cast-left, idle-no-equip-left, idle-left
+        // Unarmed (bodyState 3) + left => cast-left, idle-no-equip-left, idle-left, idle-equip-left
+        // (idle-equip last so Hands weapon sheets still resolve when BodyState is unarmed)
         var cast = AnimationNames.Candidates("cast", 3, Direction.Left);
-        Assert.Equal(new[] { "cast-left", "idle-no-equip-left", "idle-left" }, cast);
+        Assert.Equal(new[] { "cast-left", "idle-no-equip-left", "idle-left", "idle-equip-left" }, cast);
+    }
+
+    [Fact]
+    public void Candidates_unarmed_idle_still_offers_equip_fallback_for_weapon_sheets()
+    {
+        // Hands weapon graphics only have idle-equip-*; without this trailing candidate,
+        // ResolveClip returns null, Offset stays 0, and the weapon floats at the feet.
+        var idle = AnimationNames.Candidates("idle", 3, Direction.Down);
+        Assert.Equal("idle-no-equip-down", idle[0]);
+        Assert.Contains("idle-equip-down", idle);
+        Assert.Equal("idle-equip-down", idle[^1]);
     }
 }

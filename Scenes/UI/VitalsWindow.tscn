@@ -1,4 +1,4 @@
-[gd_scene load_steps=8 format=3]
+[gd_scene load_steps=9 format=3]
 
 [ext_resource type="Script" path="res://Scripts/UI/VitalsWindow.cs" id="1_vitals"]
 [ext_resource type="Script" path="res://Scripts/UI/VitalsCharacterDisplay.cs" id="2_char"]
@@ -7,6 +7,7 @@
 [ext_resource type="Texture2D" path="res://Assets/UI/vitals-hp-bar.png" id="hp_tex"]
 [ext_resource type="Texture2D" path="res://Assets/UI/vitals-mp-bar.png" id="mp_tex"]
 [ext_resource type="Texture2D" path="res://Assets/UI/vitals-character-circle.png" id="circle_tex"]
+[ext_resource type="Texture2D" path="res://Assets/UI/vitals-level-circle.png" id="level_circle_tex"]
 
 [node name="VitalsWindow" type="Control"]
 script = ExtResource("1_vitals")
@@ -133,6 +134,15 @@ offset_right = 53.0
 offset_bottom = 53.0
 mouse_filter = 2
 expand_mode = 1
+
+[node name="LevelCircle" type="TextureRect" parent="."]
+layout_mode = 0
+offset_left = 37.0
+offset_top = 36.0
+offset_right = 56.0
+offset_bottom = 55.0
+texture = ExtResource("level_circle_tex")
+mouse_filter = 2
 
 [node name="LevelText" type="Label" parent="."]
 layout_mode = 0
