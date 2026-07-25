@@ -1,10 +1,9 @@
-[gd_scene load_steps=8 format=3]
+[gd_scene load_steps=7 format=3]
 
 [ext_resource type="Script" path="res://Scripts/UI/SpellbookWindow.cs" id="1_sb"]
 [ext_resource type="Script" path="res://Scripts/UI/SpellbookButton.cs" id="2_sbb"]
 [ext_resource type="Theme" path="res://Assets/UI/GameTheme.tres" id="theme"]
 [ext_resource type="Texture2D" path="res://Assets/UI/spellbook-background.png" id="bg_tex"]
-[ext_resource type="Texture2D" path="res://Assets/UI/exitbutton.png" id="close_icon"]
 [ext_resource type="Texture2D" path="res://Assets/UI/spellbook-back.png" id="back_icon"]
 [ext_resource type="Texture2D" path="res://Assets/UI/spellbook-next.png" id="next_icon"]
 
@@ -44,8 +43,6 @@ offset_top = 2.0
 offset_right = 127.0
 offset_bottom = 18.0
 flat = true
-icon = ExtResource("close_icon")
-expand_icon = true
 
 [node name="Content" type="Control" parent="."]
 layout_mode = 2

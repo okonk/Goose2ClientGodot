@@ -1,9 +1,8 @@
-[gd_scene load_steps=5 format=3]
+[gd_scene load_steps=4 format=3]
 
 [ext_resource type="Script" path="res://Scripts/UI/InfoWindow.cs" id="1_iw"]
 [ext_resource type="Theme" path="res://Assets/UI/GameTheme.tres" id="theme"]
 [ext_resource type="Texture2D" path="res://Assets/UI/info.png" id="bg_tex"]
-[ext_resource type="Texture2D" path="res://Assets/UI/exitbutton.png" id="close_icon"]
 
 [node name="InfoWindow" type="Control"]
 script = ExtResource("1_iw")
@@ -54,8 +53,6 @@ offset_top = 2.0
 offset_right = 251.0
 offset_bottom = 18.0
 flat = true
-icon = ExtResource("close_icon")
-expand_icon = true
 
 [node name="Content" type="Control" parent="."]
 layout_mode = 2
