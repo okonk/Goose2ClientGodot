@@ -36,3 +36,36 @@ def test_spell_effect_zero_animation_untouched():
     r = Remapper({}, {})
     transform_spell_effects(sheet, r)
     assert sheet.rows[0][2] is None
+
+
+def test_haste_buff_graphic_fixup_then_tile_remap():
+    hdr = ["effect id", "name", "animation (0)", "animation file (0)",
+           "body id", "hair id", "face id", "buff graphic", "buff graphic file"]
+    # 115021 is the Aspereta typo (anim id); fixup → 110027 then graphics table.
+    sheet = Sheet("Spell Effects", hdr,
+                  [[253, "Haste", 115013.0, None, None, None, None, 115021.0, None]])
+    r = Remapper({110027: (20107, 810027)}, {})
+    transform_spell_effects(sheet, r)
+    assert sheet.get(sheet.rows[0], "buff graphic") == 810027
+    assert sheet.get(sheet.rows[0], "buff graphic file") == 20107
+    assert sheet.get(sheet.rows[0], "animation") == EFFECT_BASE + 115013
+
+
+def test_spell_effect_face_morph_remaps_aspereta_faces():
+    hdr = ["effect id", "name", "animation (0)", "animation file (0)",
+           "body id", "hair id", "face id", "buff graphic", "buff graphic file"]
+    sheet = Sheet("Spell Effects", hdr, [
+        [95, "Face: 1", None, None, None, None, 70.0, None, None],
+        [96, "Face: 2", None, None, None, None, 71.0, None, None],
+        [97, "Face: 3", None, None, None, None, 72.0, None, None],
+        [98, "Face: 4", None, None, None, None, 73.0, None, None],
+    ])
+    items = {
+        ("Hair", 70): ItemMapEntry(ill=("Eyes", 1), dye=None),
+        ("Hair", 71): ItemMapEntry(ill=("Eyes", 1), dye=None),
+        ("Hair", 72): ItemMapEntry(ill=("Eyes", 3), dye=None),
+        ("Hair", 73): ItemMapEntry(ill=("Eyes", 2), dye=None),
+    }
+    r = Remapper({}, items)
+    transform_spell_effects(sheet, r)
+    assert [sheet.get(row, "face id") for row in sheet.rows] == [1, 1, 3, 2]

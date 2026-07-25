@@ -1,5 +1,5 @@
-from remap.sheets import intval
-from remap.mappings import SLOT_TO_TYPE, TYPE_TO_SLOT, DYE_ALPHA
+from remap.sheets import intval, is_blank, cell_int
+from remap.mappings import SLOT_TO_TYPE, TYPE_TO_SLOT, DYE_ALPHA, illutia_body_state
 
 
 def transform_items(sheet, remapper, ill_index):
@@ -7,8 +7,9 @@ def transform_items(sheet, remapper, ill_index):
         item_id = intval(sheet.get(row, "id"))
         where = f"Items id={item_id}"
         slot = str(sheet.get(row, "slot") or "")
+        item_type = str(sheet.get(row, "type") or "")
         typ = SLOT_TO_TYPE.get(slot)
-        display = intval(sheet.get(row, "equip display"))
+        display = cell_int(sheet.get(row, "equip display"))
 
         tile_written = False
         if typ is not None and display:
@@ -40,10 +41,18 @@ def transform_items(sheet, remapper, ill_index):
                     remapper.warn(f"{where}: display {typ}:{display} has no Illutia art "
                                   f"(inject) — item will render unequipped look")
 
-        if not tile_written:
-            tile = intval(sheet.get(row, "graphic tile"))
+        if not tile_written and not is_blank(sheet.get(row, "graphic tile")):
+            tile = cell_int(sheet.get(row, "graphic tile"))
             if tile:
                 out = remapper.tile(tile, where)
                 if out is not None:
                     sheet.set(row, "graphic tile", out[1])
                     sheet.set(row, "graphic file", out[0])
+
+        # Body state: only rewrite when the source cell was non-blank.
+        # Blank weapons keep blank (importer/header default applies).
+        if not is_blank(sheet.get(row, "body state")):
+            slot = str(sheet.get(row, "slot") or "")
+            pose = illutia_body_state(slot, item_type)
+            if pose is not None:
+                sheet.set(row, "body state", pose)

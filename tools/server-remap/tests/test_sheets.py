@@ -18,9 +18,15 @@ def test_sheet_column_lookup_and_cell_access():
     assert rows[1][1] == "Coins"
 
 def test_intval_normalizes_floats_and_blanks():
-    from remap.sheets import intval
+    from remap.sheets import intval, cell_int, is_blank
     assert intval(6.0) == 6
     assert intval("6") == 6
     assert intval(None) == 0
     assert intval("") == 0
     assert intval("*") is None   # non-numeric -> None (caller decides)
+    assert is_blank(None) and is_blank("")
+    assert not is_blank(0) and not is_blank(1)
+    assert cell_int(None) is None
+    assert cell_int("") is None
+    assert cell_int(6.0) == 6
+    assert cell_int(0) == 0

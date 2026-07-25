@@ -24,7 +24,10 @@ def test_full_run_invariants(tmp_path):
             assert str(r[fn_col]).startswith("Map1"), r[fn_col]   # Map10001.map etc.
 
     npcs = list(wb["NPCs"].iter_rows(values_only=True))
-    assert len(npcs) - 1 >= 317          # 182 base + 135 merged
+    # 182 Aspereta + 8 quest givers (311–318 renumbered to 183–190)
+    assert len(npcs) - 1 == 190
+    npc_ids = sorted(int(float(r[0])) for r in npcs[1:] if r and r[0] is not None)
+    assert npc_ids[-8:] == list(range(183, 191))
 
     quests = list(wb["Quests"].iter_rows(values_only=True))
     assert len(quests) - 1 > 0           # xendria quests copied

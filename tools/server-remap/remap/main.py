@@ -15,7 +15,8 @@ from remap.illutia_index import build_display_tile_index
 from remap.items import transform_items
 from remap.npcs import transform_npcs
 from remap.spells import transform_spells, transform_spell_effects
-from remap.merge import rename_map_files, merge_xendria_npcs, XENDRIA_COPY_SHEETS
+from remap.merge import (rename_map_files, merge_xendria_npcs,
+                         merge_xendria_quest_items, XENDRIA_COPY_SHEETS)
 
 REPO = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 DEFAULTS = {
@@ -64,11 +65,16 @@ def run():
                         load_item_mapping(cfg("ITEM_MAP")))
     ill_index = build_display_tile_index(ill["Items"])
 
-    # 1. Xendria merge (before transforms so merged NPCs get remapped too)
-    merge_xendria_npcs(asp["NPCs"], xen["NPCs"], asp["NPC Spawns"], xen["NPC Spawns"],
-                       asp["Maps"], xen["Maps"], remapper.warnings)
+    # 1. Xendria merge (before transforms so merged rows get remapped too)
     for name in XENDRIA_COPY_SHEETS:
         asp[name] = xen[name]
+    # Quest sheets first so TalkToNPC refs can be rewritten when renumbering givers.
+    merge_xendria_npcs(asp["NPCs"], xen["NPCs"], asp["NPC Spawns"], xen["NPC Spawns"],
+                       asp["Maps"], xen["Maps"], remapper.warnings,
+                       quest_reqs=asp["Quest Reqs"])
+    merge_xendria_quest_items(asp["Items"], xen["Items"],
+                              asp["Quest Rewards"], asp["Quest Reqs"],
+                              remapper.warnings)
 
     # 2. Transforms
     transform_items(asp["Items"], remapper, ill_index)
@@ -86,6 +92,11 @@ def run():
         if str(asp["Quest Rewards"].get(r, "reward type")).lower().startswith("item") \
                 and v and int(float(v)) not in item_ids:
             remapper.warn(f"Quest Rewards quest={r[1]}: item {v} not in Items")
+    for r in asp["Quest Reqs"].rows:
+        v = asp["Quest Reqs"].get(r, "value")
+        if "item" in str(asp["Quest Reqs"].get(r, "requirement type") or "").lower() \
+                and v and int(float(v)) not in item_ids:
+            remapper.warn(f"Quest Reqs quest={r[1]}: item {v} not in Items")
     for r in asp["Class Levelup Spells"].rows:
         v = asp["Class Levelup Spells"].get(r, "spell id")
         if v and int(float(v)) not in spell_ids:

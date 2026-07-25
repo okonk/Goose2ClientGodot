@@ -24,6 +24,40 @@ TYPE_TO_SLOT = {"Chest": "Chest", "Helm": "Helmet", "Legs": "Pants", "Feet": "Sh
 # equipped-items wire positions -> animation type
 EQUIP_WIRE_TYPES = ["Chest", "Helm", "Legs", "Feet", "Hand", "Hand"]
 
+# Illutia client BodyState (AnimationNames.cs / Character.cs): pose for equip+attack clips.
+# Aspereta NPC/item body_state used a different enum (and compiled.enc column indexes):
+#   ASP 1 = normal/unarmed, ASP 3 = staff, ASP 4 = sword — NOT the Illutia numbers.
+# Weapons: rewrite from slot/type via illutia_body_state(). NPCs: remap_npc_body_state().
+ILLUTIA_BODY_UNARMED = 3
+ILLUTIA_BODY_1HAND = 4
+ILLUTIA_BODY_STAFF = 5
+ILLUTIA_BODY_2HAND = 6
+ILLUTIA_BODY_BOW = 7
+
+
+def illutia_body_state(slot, item_type):
+    """Map item slot/type → Illutia BodyState, or None if the field should be left alone.
+
+    Aspereta weapons often stamped body_state=3 (staff pose) or 4 (sword pose). On Illutia
+    those numbers mean unarmed / 1hand, so staffs would look unarmed. Derive pose from
+    slot/type instead of trusting the ASP integer.
+    """
+    slot = str(slot or "").strip()
+    typ = str(item_type or "").strip()
+    if slot == "OneHanded":
+        return ILLUTIA_BODY_1HAND
+    if slot == "TwoHanded":
+        # Aspereta staves are TwoHandedBlunt; swords/spears use 2hand swing.
+        if "Blunt" in typ:
+            return ILLUTIA_BODY_STAFF
+        if "Bow" in typ:
+            return ILLUTIA_BODY_BOW
+        return ILLUTIA_BODY_2HAND
+    if slot == "Shield":
+        # Pose comes from the weapon slot; keep 1hand so a shield-only stamp is harmless.
+        return ILLUTIA_BODY_1HAND
+    return None
+
 
 def parse_dye(s):
     if not s:

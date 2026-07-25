@@ -14,10 +14,29 @@ def canon(header):
     return _ANNOT.sub("", str(header)).strip()
 
 
+def is_blank(v):
+    """True for empty spreadsheet cells (None or ""). Explicit 0 is not blank."""
+    return v is None or v == ""
+
+
 def intval(v):
     """Cell -> int. Empty/None -> 0. Non-numeric text -> None."""
-    if v is None or v == "":
+    if is_blank(v):
         return 0
+    try:
+        return int(float(v))
+    except (TypeError, ValueError):
+        return None
+
+
+def cell_int(v):
+    """Cell -> int if present, else None when blank. Non-numeric -> None.
+
+    Use this for optional fields so transforms can leave blank cells blank
+    instead of writing 0.
+    """
+    if is_blank(v):
+        return None
     try:
         return int(float(v))
     except (TypeError, ValueError):
