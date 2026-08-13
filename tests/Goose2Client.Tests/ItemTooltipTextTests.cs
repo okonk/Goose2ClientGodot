@@ -37,6 +37,7 @@ public class ItemTooltipTextTests
         Assert.Equal("Value: 1,500 gold", line.Text);
     }
 
+    /// <summary>Fallback for a server too old to name the currency.</summary>
     [Fact]
     public void Build_Donation_item_value_credits()
     {
@@ -45,6 +46,27 @@ public class ItemTooltipTextTests
 
         var line = lines.FirstOrDefault(l => l.Color == ItemTooltipColor.Value);
         Assert.Equal("Value: 200 credits", line.Text);
+    }
+
+    [Fact]
+    public void Build_Script_currency_named_by_the_server()
+    {
+        var s = new ItemStats { Value = 4500, CurrencyName = "spirit" };
+        var lines = ItemTooltipText.Build(s, ClassName);
+
+        var line = lines.FirstOrDefault(l => l.Color == ItemTooltipColor.Value);
+        Assert.Equal("Value: 4,500 spirit", line.Text);
+    }
+
+    /// <summary>The server's name wins over the flag guess.</summary>
+    [Fact]
+    public void Build_Server_currency_beats_the_donation_flag()
+    {
+        var s = new ItemStats { Value = 200, Flags = ItemFlags.Donation, CurrencyName = "gold" };
+        var lines = ItemTooltipText.Build(s, ClassName);
+
+        var line = lines.FirstOrDefault(l => l.Color == ItemTooltipColor.Value);
+        Assert.Equal("Value: 200 gold", line.Text);
     }
 
     [Fact]

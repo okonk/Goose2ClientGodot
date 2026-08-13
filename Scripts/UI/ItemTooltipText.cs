@@ -158,7 +158,11 @@ namespace Goose2Client.UI
                 lines.Add(("No Value", ItemTooltipColor.Value));
             else
             {
-                var currency = s.Flags.HasFlag(ItemFlags.Donation) ? "credits" : "gold";
+                // The server names the currency (gold, credits, or a script one like spirit).
+                // Older servers do not send it, so the Donation flag stays as the fallback.
+                var currency = !string.IsNullOrEmpty(s.CurrencyName)
+                    ? s.CurrencyName
+                    : s.Flags.HasFlag(ItemFlags.Donation) ? "credits" : "gold";
                 lines.Add((
                     $"Value: {s.Value.ToString("N0", Inv)} {currency}",
                     ItemTooltipColor.Value));

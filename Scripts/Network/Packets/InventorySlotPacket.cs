@@ -49,6 +49,10 @@ namespace Goose2Client.Network.Packets
         public int GraphicB { get; set; }
         public int GraphicA { get; set; }
 
+        /// <summary>Name of the currency Value is denominated in ("gold", "spirit", …).
+        /// Appended after GraphicA, so an older server that does not send it leaves this null.</summary>
+        public string CurrencyName { get; set; }
+
         public override string Prefix { get; } = "SIS";
 
         public override object Parse(PacketParser p)
@@ -100,6 +104,7 @@ namespace Goose2Client.Network.Packets
                 GraphicG = p.GetInt32(),
                 GraphicB = p.GetInt32(),
                 GraphicA = p.GetInt32(),
+                CurrencyName = p.LengthRemaining() > 0 ? p.GetString() : null,
             };
         }
     }

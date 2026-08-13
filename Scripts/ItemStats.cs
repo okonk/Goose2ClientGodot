@@ -48,6 +48,10 @@ namespace Goose2Client
         public int GraphicB { get; set; }
         public int GraphicA { get; set; }
 
+        /// <summary>Currency Value is denominated in. Null on a map object, which carries no
+        /// value, and on anything an older server sent.</summary>
+        public string CurrencyName { get; set; }
+
         public static ItemStats FromPacket(InventorySlotPacket packet)
         {
             return new ItemStats
@@ -95,6 +99,7 @@ namespace Goose2Client
                 GraphicG = packet.GraphicG,
                 GraphicB = packet.GraphicB,
                 GraphicA = packet.GraphicA,
+                CurrencyName = packet.CurrencyName,
             };
         }
 
