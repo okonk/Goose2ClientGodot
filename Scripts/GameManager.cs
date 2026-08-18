@@ -77,6 +77,10 @@ namespace Goose2Client
             Sprites = new SpriteCache();
             SpellTargetManager = new SpellTargetManager();
             AddChild(SpellTargetManager);
+
+            // Always-on-top build stamp. Its own CanvasLayer at 128 so HUD windows
+            // on UiLayer can never draw over it.
+            AddChild(new UI.BuildStampOverlay());
         }
 
         /// <summary>
