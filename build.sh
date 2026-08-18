@@ -13,6 +13,7 @@ cd "$(dirname "${BASH_SOURCE[0]}")"
 
 GODOT="${GODOT:-/usr/bin/godot-mono}"
 BUILD_DIR="build"
+STAGING_DIR="build/.staging"
 PRESETS_FILE="export_presets.cfg"
 
 die() { echo "build.sh: $*" >&2; exit 1; }
@@ -91,7 +92,7 @@ BUILD_ID="$(date -u +%Y%m%dT%H%M%SZ)-$(git rev-parse --short HEAD)"
 [ "$DIRTY" -eq 1 ] && BUILD_ID="$BUILD_ID-dirty"
 # Trap so a crashed or failed run never leaves a stale id behind — the editor would
 # then display a bogus build stamp instead of "dev".
-trap 'rm -f build_id.txt' EXIT
+trap 'rm -f build_id.txt; rm -rf "${STAGING_DIR:?}"' EXIT
 printf '%s\n' "$BUILD_ID" > build_id.txt
 echo "==> Build id $BUILD_ID"
 
@@ -100,14 +101,23 @@ echo "==> Build id $BUILD_ID"
 rm -rf "$BUILD_DIR"
 mkdir -p "$BUILD_DIR"
 
+# Everything is built and archived under staging, then published into $BUILD_DIR only
+# once every requested platform has succeeded. A half-finished run must not leave a
+# partial release set behind — one platform's archive alone is worse than nothing.
+mkdir -p "$STAGING_DIR"
+
 export_platform() {
   local plat="$1" preset="$2" binary="$3"
   echo "==> Exporting $plat"
-  mkdir -p "$BUILD_DIR/$plat"
-  "$GODOT" --headless --path . --export-release "$preset" "$BUILD_DIR/$plat/$binary" \
+  mkdir -p "$STAGING_DIR/$plat"
+  "$GODOT" --headless --path . --export-release "$preset" "$STAGING_DIR/$plat/$binary" \
     || die "$plat export failed"
 }
 
+# Sets ARTIFACT_NAME rather than echoing it: bash does not propagate errexit out of a
+# command substitution, so `X=$(archive_platform ...)` would swallow a failed tar/zip/mv
+# and report a build that never produced an archive as a success.
+ARTIFACT_NAME=""
 archive_platform() {
   local plat="$1"
   local out
@@ -115,20 +125,21 @@ archive_platform() {
     linux)
       out="Goose2Client-$BUILD_ID-linux.tar.gz"
       # tar, not zip: preserves the executable bit on the binary.
-      tar -czf "$BUILD_DIR/$out" -C "$BUILD_DIR/$plat" .
+      tar -czf "$STAGING_DIR/$out" -C "$STAGING_DIR/$plat" . || die "linux archive failed"
       ;;
     windows)
       out="Goose2Client-$BUILD_ID-windows.zip"
-      (cd "$BUILD_DIR/$plat" && zip -qr "../$out" .)
+      (cd "$STAGING_DIR/$plat" && zip -qr "../$out" .) || die "windows archive failed"
       ;;
     macos)
       # Godot already emits a self-contained, ad-hoc-signed .zip of the .app.
       out="Goose2Client-$BUILD_ID-macos.zip"
-      mv "$BUILD_DIR/$plat/Goose2Client.zip" "$BUILD_DIR/$out"
+      mv "$STAGING_DIR/$plat/Goose2Client.zip" "$STAGING_DIR/$out" || die "macos archive failed"
       ;;
   esac
-  rm -rf "${BUILD_DIR:?}/$plat"
-  echo "$out"
+  [ -s "$STAGING_DIR/$out" ] || die "$plat archive '$out' is missing or empty"
+  rm -rf "${STAGING_DIR:?}/$plat"
+  ARTIFACT_NAME="$out"
 }
 
 ARTIFACTS=()
@@ -138,7 +149,14 @@ for plat in "${PLATFORMS[@]}"; do
     windows) export_platform windows "Windows" "Goose2Client.exe" ;;
     macos)   export_platform macos   "macOS"   "Goose2Client.zip" ;;
   esac
-  ARTIFACTS+=("$(archive_platform "$plat")")
+  archive_platform "$plat"
+  ARTIFACTS+=("$ARTIFACT_NAME")
+done
+
+# --- Publish -----------------------------------------------------------------
+
+for a in "${ARTIFACTS[@]}"; do
+  mv "$STAGING_DIR/$a" "$BUILD_DIR/$a" || die "could not publish '$a'"
 done
 
 # --- Report ------------------------------------------------------------------
