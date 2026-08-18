@@ -1,30 +1,40 @@
+using System;
 using System.IO;
+using System.Linq;
 using Goose2Client;
 using Xunit;
 
 public class MapFileTests
 {
-    private const string MapsDir = "/home/agent/workspace/Goose2ClientGodot/Assets/Maps";
+    private static string FixturePath =>
+        Path.Combine(AppContext.BaseDirectory, "Fixtures", "Map10x10.bytes");
 
     [Fact]
-    public void Map1_ParsesHeaderAndGrid()
+    public void Fixture_ParsesHeaderAndGrid()
     {
-        var bytes = File.ReadAllBytes(Path.Combine(MapsDir, "Map1.bytes"));
+        var bytes = File.ReadAllBytes(FixturePath);
         var map = new MapFile(bytes);
 
+        // Real values carved from Map1.bytes — see tools/gen-map-fixture.py.
         Assert.Equal(146, map.Version);
         Assert.Equal(10, map.EditorVersion);
-        Assert.Equal(286, map.Width);
-        Assert.Equal(194, map.Height);
-        Assert.Equal(286 * 194, map.Tiles.Length);
+        Assert.Equal(10, map.Width);
+        Assert.Equal(10, map.Height);
+        Assert.Equal(100, map.Tiles.Length);
 
-        // File is at least header(12) + 34 bytes/tile (may have a trailer).
-        Assert.True(bytes.Length >= 12 + 34 * map.Width * map.Height);
+        // header(12) + 34 bytes/tile, exactly — the carved fixture has no trailer.
+        Assert.Equal(12 + 34 * map.Width * map.Height, bytes.Length);
 
         // Indexer is (x, y) -> Tiles[y*Width + x]; first tile is reachable and well-formed.
         var t = map[0, 0];
         Assert.Equal(5, t.Layers.Length);
         Assert.All(t.Layers, l => Assert.NotNull(l));
+        Assert.Equal(421500, t.Layers[0].Graphic);
+        Assert.Equal(2286, t.Layers[0].Sheet);
+        Assert.False(t.IsBlocked);
+
+        // The region was picked for variety: some tiles carry the blocked bit.
+        Assert.Equal(6, map.Tiles.Count(x => x.IsBlocked));
     }
 
     [Fact]
