@@ -115,9 +115,9 @@ Three archives in `build/`, approximate sizes:
 
 | Artifact | Size |
 | --- | --- |
-| `Goose2Client-<id>-linux.tar.gz` | ~77M |
-| `Goose2Client-<id>-windows.zip` | ~87M |
-| `Goose2Client-<id>-macos.zip` | ~138M |
+| `Goose2Client-<id>-linux.tar.gz` | ~78M |
+| `Goose2Client-<id>-windows.zip` | ~88M |
+| `Goose2Client-<id>-macos.zip` | ~140M |
 
 Linux uses tar rather than zip to preserve the executable bit on the binary.
 
