@@ -42,3 +42,6 @@ Thumbs.db
 
 # Git worktrees (isolated feature workspaces)
 .worktrees/
+
+
+run.sh
