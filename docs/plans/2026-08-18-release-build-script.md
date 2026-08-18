@@ -74,13 +74,7 @@ Add `using System;` to the top of the file if not already present.
 
 **Step 3: Skip the test when assets are absent**
 
-Change the `[Fact]` attribute on `Map1_ParsesHeaderAndGrid` to:
-
-```csharp
-    [SkippableFact]
-```
-
-xUnit 2.9 has no built-in `SkippableFact`. Rather than add the `Xunit.SkippableFact` package, keep `[Fact]` and guard at the top of the method body instead:
+xUnit 2.9 has no built-in skip-at-runtime attribute, and adding the `Xunit.SkippableFact` package is not worth it for one test. Keep `[Fact]` and guard at the top of the method body instead:
 
 ```csharp
     [Fact]
