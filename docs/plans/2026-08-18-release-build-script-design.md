@@ -56,9 +56,11 @@ trimmed contents, or `"dev"` when the file is absent (i.e. running from the edit
 `MouseFilter = Ignore`. Deliberately separate from `GameManager.UiLayer` so HUD windows
 can never draw over it. Nothing currently occupies that corner.
 
-**`build_id.txt`** — gitignored, format `YYYYMMDD-HHMM`. Timestamp-only: self-contained,
-monotonic, and needs no state file, which matters because `build/` is wiped each run and
-so cannot carry a per-day counter.
+**`build_id.txt`** — gitignored, format `<UTC>-<short-sha>[-dirty]`, e.g.
+`20260818T091305Z-40f2dbe-dirty`. Revised after review: a bare `YYYYMMDD-HHMM` can
+collide, is not monotonic across clock changes, and cannot identify the commit a bug
+report came from. Still needs no manual bookkeeping and no state file, which matters
+because `build/` is wiped each run.
 
 ## Script flow
 
@@ -67,7 +69,9 @@ so cannot carry a per-day counter.
 1. **Resolve Godot** — `${GODOT:-/usr/bin/godot-mono}`; abort if not executable.
 2. **Preflight** — export templates for the running engine version exist (the most
    likely failure after an engine upgrade); `Assets/` exists and is non-empty; client
-   tests pass unless `--fast`; a dirty tree warns but does not block.
+   tests pass unless `--fast`; a dirty tree aborts unless `--allow-dirty` is passed
+   (revised after review — a warning alone undermines reproducibility), in which case
+   the build id is marked `-dirty`.
 3. **Stamp** — compute the build id, write `build_id.txt`, register an `EXIT` trap to
    remove it. Without the trap a crashed run leaves a stale id behind and the editor
    then shows a fake build stamp instead of `dev`.
@@ -79,9 +83,10 @@ so cannot carry a per-day counter.
    `build/Goose2Client-<build-id>-<platform>.<ext>`. Staging directories are removed.
 7. **Report** — each artifact path with its human-readable size.
 
-Verification of `Assets/` is existence-and-non-empty only; the script does not regenerate
-them. `Assets/` is gitignored derived output, so a release built against a stale or
-missing `Assets/` would silently ship broken.
+`Assets/` verification checks one sentinel per generated subtree — `Assets/Maps/Map1.bytes`,
+`Assets/Sprites/manifest.json`, `Assets/Resources/AnimationHeights.txt`. Revised after
+review: a mere non-empty check passes on the tracked `Assets/UI` alone while the client is
+still unshippable. The script does not regenerate assets; it names the command that does.
 
 No arguments builds all three platforms; naming platforms builds only those.
 
