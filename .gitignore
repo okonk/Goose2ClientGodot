@@ -6,6 +6,9 @@
 /export/
 *.translation
 
+# Build stamp written by build.sh, removed on exit
+/build_id.txt
+
 # ---- .NET / C# (Godot C# game project + tools/AssetConverter) ----
 bin/
 obj/
