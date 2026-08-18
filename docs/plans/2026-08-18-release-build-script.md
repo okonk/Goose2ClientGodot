@@ -2,13 +2,15 @@
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
-**Goal:** A local `build.sh` that builds and packages the Godot client for Windows, Linux, and macOS in one invocation, stamping each build with a timestamp id shown in-game.
+**Goal:** A local `build.sh` that builds and packages the Godot client for Windows, Linux, and macOS in one invocation, stamping each build with a commit-traceable id shown in-game.
 
 **Architecture:** Three committed Godot export presets are the source of truth for export config. `build.sh` orchestrates preflight checks, writes a gitignored `build_id.txt`, runs three headless exports, and archives each platform's output. At runtime a `CanvasLayer` overlay created by the `GameManager` autoload reads that file and renders the id top-right, falling back to `dev` in the editor.
 
-**Tech Stack:** Godot 4.7.1 mono, .NET 10, xUnit, bash.
+**Tech Stack:** Godot 4.7.1 mono; the game targets `net8.0` (`Goose2ClientGodot.csproj:3`) while the test project targets `net10.0` and pins `GodotSharp` 4.6.2 against a 4.7 engine (`tests/Goose2Client.Tests/Goose2Client.Tests.csproj:3,8`) — a pre-existing mismatch this plan does not address. xUnit 2.9, bash.
 
 Design doc: `docs/plans/2026-08-18-release-build-script-design.md`
+
+This plan incorporates review feedback dated 2026-08-18; see "Review decisions" below.
 
 ---
 
@@ -16,46 +18,105 @@ Design doc: `docs/plans/2026-08-18-release-build-script-design.md`
 
 - `GameManager._Ready()` — `Scripts/GameManager.cs:62`. Creates `UiLayer` at `:65-67`, ends by `AddChild(SpellTargetManager)` at `:79`.
 - `GameManager.UiLayer` — `Scripts/GameManager.cs:21`, `public CanvasLayer UiLayer { get; private set; }`.
-- Godot file IO pattern in this codebase — `Scripts/GameManager.cs:174`, `using var f = Godot.FileAccess.Open(path, Godot.FileAccess.ModeFlags.Read);` with error check via `Godot.FileAccess.GetOpenError()` at `:177`.
-- Test project compiles the game sources directly — `tests/Goose2Client.Tests/Goose2Client.Tests.csproj`, `<Compile Include="../../Scripts/**/*.cs" />`. It references the `GodotSharp` NuGet package only; **there is no Godot engine at test time**, so any code a test touches must not call into the engine. Established pattern: pure static function tested directly, Godot IO left to the caller — see `CharacterSettings.FromJson` tested in `tests/Goose2Client.Tests/CharacterSettingsLoadTests.cs:11`.
-- Verified working presets already exist at `/home/hayden/code/Goose2ClientGodot/export_presets.cfg` (91 lines, main checkout). All three exports were run successfully from that file on 2026-08-18. **Copy it; do not rewrite it from memory.**
+- Godot file IO pattern in this codebase — `Scripts/GameManager.cs:174`, `using var f = Godot.FileAccess.Open(path, Godot.FileAccess.ModeFlags.Read);`, error checked via `Godot.FileAccess.GetOpenError()` at `:177`.
+- Test project compiles the game sources directly — `tests/Goose2Client.Tests/Goose2Client.Tests.csproj`, `<Compile Include="../../Scripts/**/*.cs" />`. It references the `GodotSharp` NuGet package only; **there is no Godot engine at test time**, so anything a test touches must not call into the engine. Established pattern: pure static function tested directly, Godot IO left to the caller — see `CharacterSettings.FromJson` tested at `tests/Goose2Client.Tests/CharacterSettingsLoadTests.cs:11`.
+- Asset generation entry point — `tools/AssetConverter/src/AssetConverter/Program.cs:138`, `if (args.Length >= 1 && args[0] == "all")`, taking an optional repo-root argument at `:140-141`. The `batch` subcommand only produces sprite sheets; `all` is the full pipeline (sheets, Aspereta monsters, maps).
+- Asset source paths come from environment variables with sandbox defaults that do not exist on this machine — `tools/AssetConverter/src/AssetConverter/Paths.cs:10-17`: `ILLUTIA_DATA`, `ILLUTIA_MAPS`, `ASPERETA_DATA`, `ASPERETA_MAPS`. They must be set to run the converter here.
 
-## Environment note
+## Repository facts this plan depends on
 
-This worktree has no generated `Assets/` (616K of tracked leftovers vs 248M in the main checkout). Tasks 5 and 6 need real assets. Symlink them once, before Task 5:
+Verified 2026-08-18:
 
-```bash
-cd /home/hayden/code/Goose2ClientGodot/.worktrees/release-build
-rm -rf Assets && ln -s ../../Assets Assets
-```
+- **Only `Assets/UI` is tracked** (66 files: PNGs, `.import` sidecars, `Assets/UI/Fonts/LiberationSans.ttf`). `Assets/Maps`, `Assets/Resources`, and `Assets/Sprites` are generated and gitignored. Never `rm -rf Assets` — it would stage 66 tracked deletions.
+- **`Assets/Maps/Map1.bytes` is 1.8 MB** across 160 map files. Too large to commit as a test fixture, hence the skip mechanism in Task 0.
+- **The main checkout is on `master`** and cannot be used to verify changes made on this branch.
+- **`export_presets.cfg` and `run.sh` are untracked** in the main checkout, so neither exists in this worktree.
+- **Test totals differ by checkout and this is expected:** 259 in the main checkout, 246 here. The 13-test gap is uncommitted test work on `master` (`WindowButtonFlagsTests.cs` is untracked, several test files modified), not asset-dependent tests. Treat the exact totals as informational; what matters is **0 failed**.
 
-`Assets/` is gitignored, so the symlink will not be committed.
+## Review decisions
+
+Settled with the user after review, overriding earlier choices in the design doc:
+
+- **Build id is `<UTC>-<short-sha>[-dirty]`** (e.g. `20260818T091305Z-40f2dbe-dirty`), not bare `YYYYMMDD-HHMM`. Collision-free, monotonic, and traceable to a commit.
+- **A dirty tree aborts the build** unless `--allow-dirty` is passed. Reverses the design doc's warn-and-proceed.
+- **No SHA-256 checksums.** Local-only tool with no distribution channel yet; revisit when there is a download page.
 
 ---
 
-### Task 0: Fix the pre-existing MapFileTests path
+### Task 0: Install generated assets in this worktree
 
-`tests/Goose2Client.Tests/MapFileTests.cs:6` hardcodes `/home/agent/workspace/Goose2ClientGodot/Assets/Maps`, a path from an earlier agent sandbox. It fails on this machine today (258 passed, 1 failed). Tests gate the build, so `build.sh` would abort every run until this is fixed.
+Prerequisite for Tasks 1, 5, and 6. Symlink the three **generated** subdirectories individually, leaving tracked `Assets/UI` untouched.
+
+**Step 1: Link the generated subdirectories**
+
+```bash
+cd /home/hayden/code/Goose2ClientGodot/.worktrees/release-build
+for d in Maps Resources Sprites; do
+  rm -rf "Assets/$d"
+  ln -s "../../../Assets/$d" "Assets/$d"
+done
+```
+
+The link target is relative to `Assets/`, hence three levels up: `Assets/` → worktree root → `.worktrees/` → repo root.
+
+**Step 2: Verify no tracked file was disturbed**
+
+```bash
+git status --porcelain -- Assets
+```
+Expected: **empty output.** If anything appears, a tracked file under `Assets/UI` was clobbered — restore with `git checkout -- Assets` and investigate before continuing.
+
+**Step 3: Verify the sentinels resolve**
+
+```bash
+for f in Assets/Maps/Map1.bytes Assets/Sprites/manifest.json Assets/Resources/AnimationHeights.txt; do
+  [ -e "$f" ] && echo "ok $f" || echo "MISSING $f"
+done
+```
+Expected: three `ok` lines.
+
+Nothing to commit — `Assets/Maps`, `Assets/Resources`, and `Assets/Sprites` are gitignored.
+
+---
+
+### Task 1: Fix the pre-existing MapFileTests path
+
+`tests/Goose2Client.Tests/MapFileTests.cs:7` hardcodes `/home/agent/workspace/Goose2ClientGodot/Assets/Maps`, a path from an earlier agent sandbox. It fails on this machine today. Tests gate the build, so `build.sh` would abort on every run until this is fixed.
+
+A missing-assets run must report **skipped, not passed**. An early `return` from a `[Fact]` reports success, which would hide a genuinely broken fixture. xUnit 2.9 has no runtime skip, so add the standard `Xunit.SkippableFact` package.
 
 **Files:**
-- Modify: `tests/Goose2Client.Tests/MapFileTests.cs:6`
+- Modify: `tests/Goose2Client.Tests/Goose2Client.Tests.csproj`
+- Modify: `tests/Goose2Client.Tests/MapFileTests.cs`
 
-**Step 1: Confirm the failure**
+**Step 1: Confirm the current failure**
 
 Run: `dotnet test tests/Goose2Client.Tests --filter MapFileTests`
-Expected: FAIL with `DirectoryNotFoundException : '/home/agent/workspace/Goose2ClientGodot/Assets/Maps/Map1.bytes'`
+Expected: FAIL — `DirectoryNotFoundException : '/home/agent/workspace/Goose2ClientGodot/Assets/Maps/Map1.bytes'`. Note this fails even now that assets are linked, because the path is absolute and wrong.
 
-**Step 2: Replace the constant with root-relative resolution**
+**Step 2: Add the skip package**
 
-Replace line 6 (`private const string MapsDir = "...";`) with:
+In `tests/Goose2Client.Tests/Goose2Client.Tests.csproj`, add to the existing `PackageReference` `ItemGroup`:
+
+```xml
+    <PackageReference Include="Xunit.SkippableFact" Version="1.4.13" />
+```
+
+Run `dotnet restore tests/Goose2Client.Tests` and confirm it succeeds. If 1.4.13 is unavailable, run `dotnet package search Xunit.SkippableFact` and use the latest stable — do not silently fall back to an early `return`.
+
+**Step 3: Replace the hardcoded constant**
+
+Find every usage first: `grep -n MapsDir tests/Goose2Client.Tests/MapFileTests.cs`.
+
+Replace line 7 with:
 
 ```csharp
     private static readonly string? MapsDir = FindMapsDir();
 
     /// <summary>
-    /// Walks up from the test assembly location to the repo root (identified by the .sln)
-    /// and returns Assets/Maps, or null when the generated assets are absent — Assets/ is
-    /// gitignored build output and does not exist in a fresh clone.
+    /// Walks up from the test assembly to the repo root (identified by the .sln) and returns
+    /// Assets/Maps, or null when the generated maps are absent — Assets/Maps is gitignored
+    /// build output and does not exist in a fresh clone.
     /// </summary>
     private static string? FindMapsDir()
     {
@@ -70,66 +131,151 @@ Replace line 6 (`private const string MapsDir = "...";`) with:
     }
 ```
 
-Add `using System;` to the top of the file if not already present.
+Add `using System;` and `using System.IO;` to the top of the file if not already present.
 
-**Step 3: Skip the test when assets are absent**
+**Step 4: Convert each asset-reading test to a genuine skip**
 
-xUnit 2.9 has no built-in skip-at-runtime attribute, and adding the `Xunit.SkippableFact` package is not worth it for one test. Keep `[Fact]` and guard at the top of the method body instead:
+For every test that touches `MapsDir`, change `[Fact]` to `[SkippableFact]` and open the body with:
 
 ```csharp
-    [Fact]
-    public void Map1_ParsesHeaderAndGrid()
-    {
-        if (MapsDir == null) return;   // generated assets absent — nothing to verify
-
-        var bytes = File.ReadAllBytes(Path.Combine(MapsDir, "Map1.bytes"));
-        // ...rest unchanged
+        Skip.If(MapsDir == null, "Assets/Maps not generated — run the AssetConverter 'all' command");
 ```
 
-Apply the same guard to every other test in the file that reads from `MapsDir`. Check first: `grep -n MapsDir tests/Goose2Client.Tests/MapFileTests.cs`.
+**Step 5: Verify it passes with assets present**
 
-**Step 4: Verify it passes with assets present**
+Run: `dotnet test tests/Goose2Client.Tests --filter MapFileTests`
+Expected: PASS, **0 skipped**. Assets are linked from Task 0, so a skip here means `FindMapsDir` is broken — the test would be silently doing nothing.
 
-Run from the **main checkout**, which has real assets:
-`dotnet test tests/Goose2Client.Tests --filter MapFileTests`
-Expected: PASS — this proves the guard did not simply mask the test into a no-op.
-
-**Step 5: Verify it passes with assets absent**
-
-Run from the worktree, **before** creating the symlink:
-`dotnet test tests/Goose2Client.Tests`
-Expected: PASS, 246 total, 0 failed.
-
-**Step 6: Commit**
+**Step 6: Verify it genuinely skips with assets absent**
 
 ```bash
-git add tests/Goose2Client.Tests/MapFileTests.cs
+mv Assets/Maps /tmp/maps-link-parked
+dotnet test tests/Goose2Client.Tests --filter MapFileTests
+mv /tmp/maps-link-parked Assets/Maps
+```
+Expected: **0 failed, N skipped** — skipped, not passed. Restore the link before continuing and re-run `git status --porcelain -- Assets` to confirm it is empty.
+
+**Step 7: Verify the whole suite**
+
+Run: `dotnet test tests/Goose2Client.Tests`
+Expected: 0 failed.
+
+**Step 8: Commit**
+
+```bash
+git add tests/Goose2Client.Tests/MapFileTests.cs tests/Goose2Client.Tests/Goose2Client.Tests.csproj
 git commit -m "fix(tests): resolve map fixture path from repo root, skip when assets absent"
 ```
 
 ---
 
-### Task 1: Commit the export presets and the ETC2 project setting
+### Task 2: Commit the export presets and the ETC2 project setting
+
+The presets below are the reviewed source of truth, reproduced in full so this plan does not depend on an untracked file in a dirty checkout. They are the exact contents that exported all three platforms successfully on 2026-08-18.
 
 **Files:**
-- Create: `export_presets.cfg` (copy from main checkout)
-- Modify: `project.godot` — add one line to the `[rendering]` section
+- Create: `export_presets.cfg`
+- Modify: `project.godot` — one line in `[rendering]`
 
-**Step 1: Copy the verified presets**
+**Step 1: Write the presets**
 
-```bash
-cp /home/hayden/code/Goose2ClientGodot/export_presets.cfg .
+Create `export_presets.cfg` with exactly:
+
+```ini
+[preset.0]
+
+name="Linux"
+platform="Linux"
+runnable=true
+advanced_options=false
+dedicated_server=false
+custom_features=""
+export_filter="all_resources"
+include_filter=""
+exclude_filter=""
+export_path="build/linux/Goose2Client.x86_64"
+patches=PackedStringArray()
+encryption_include_filters=""
+encryption_exclude_filters=""
+seed=0
+encrypt_pck=false
+encrypt_directory=false
+script_export_mode=2
+
+[preset.0.options]
+
+binary_format/embed_pck=false
+binary_format/architecture="x86_64"
+dotnet/include_scripts_content=false
+dotnet/include_debug_symbols=false
+dotnet/embed_build_outputs=false
+
+[preset.1]
+
+name="Windows"
+platform="Windows Desktop"
+runnable=true
+advanced_options=false
+dedicated_server=false
+custom_features=""
+export_filter="all_resources"
+include_filter=""
+exclude_filter=""
+export_path="build/windows/Goose2Client.exe"
+patches=PackedStringArray()
+encryption_include_filters=""
+encryption_exclude_filters=""
+seed=0
+encrypt_pck=false
+encrypt_directory=false
+script_export_mode=2
+
+[preset.1.options]
+
+binary_format/embed_pck=false
+binary_format/architecture="x86_64"
+codesign/enable=false
+application/console_wrapper_icon=""
+dotnet/include_scripts_content=false
+dotnet/include_debug_symbols=false
+dotnet/embed_build_outputs=false
+
+[preset.2]
+
+name="macOS"
+platform="macOS"
+runnable=true
+advanced_options=false
+dedicated_server=false
+custom_features=""
+export_filter="all_resources"
+include_filter=""
+exclude_filter=""
+export_path="build/macos/Goose2Client.zip"
+patches=PackedStringArray()
+encryption_include_filters=""
+encryption_exclude_filters=""
+seed=0
+encrypt_pck=false
+encrypt_directory=false
+script_export_mode=2
+
+[preset.2.options]
+
+export/distribution_type=0
+application/bundle_identifier="net.illutia.goose2client"
+application/short_version="1.0.0"
+application/version="1.0.0"
+binary_format/architecture="universal"
+codesign/codesign=1
+codesign/enable=false
+notarization/notarization=0
+dotnet/include_scripts_content=false
+dotnet/include_debug_symbols=false
+dotnet/embed_build_outputs=false
 ```
 
-Sanity-check the copy contains three presets and the macOS settings that were empirically required:
-
-```bash
-grep -n 'name=\|architecture\|bundle_identifier\|codesign/codesign' export_presets.cfg
-```
-
-Expected: `name="Linux"`, `name="Windows"`, `name="macOS"`; macOS `binary_format/architecture="universal"`; `application/bundle_identifier="net.illutia.goose2client"`; `codesign/codesign=1`.
-
-Why these matter (from the design's measured findings): the 4.7.1 macOS template ships universal binaries only, so an x86_64 preset fails with *"Requested template binary godot_macos_release.x86_64 not found"*; a missing bundle identifier fails the export outright; and without ad-hoc signing the `.app` will not launch on Apple Silicon.
+Why the macOS settings are what they are, from the design's measured findings: the 4.7.1 macOS template ships **universal binaries only**, so an x86_64 preset fails with *"Requested template binary godot_macos_release.x86_64 not found"*; a missing `bundle_identifier` fails the export outright; and without ad-hoc signing (`codesign/codesign=1`) the `.app` will not launch on Apple Silicon at all.
 
 **Step 2: Add the ETC2 ASTC setting**
 
@@ -141,8 +287,12 @@ textures/vram_compression/import_etc2_astc=true
 
 **Step 3: Verify it costs nothing**
 
-Run: `/usr/bin/godot-mono --headless --path . --import`
-Expected: completes in a few seconds. Then `du -sh .godot/imported` — should stay around 66M. The sprites use lossless 2D import, so no ASTC data is generated.
+```bash
+du -sh .godot/imported 2>/dev/null || echo "no import cache yet"
+/usr/bin/godot-mono --headless --path . --import
+du -sh .godot/imported
+```
+Expected: the import completes in seconds and the cache does not grow meaningfully between the two measurements. The sprites use lossless 2D import, so no ASTC data is generated. (The design doc's "around 66M" figure was measured in the main checkout; this worktree builds its own cache from scratch on first import, so compare before-and-after here rather than against that number.)
 
 **Step 4: Commit**
 
@@ -153,9 +303,9 @@ git commit -m "build: add Linux/Windows/macOS export presets"
 
 ---
 
-### Task 2: BuildInfo
+### Task 3: BuildInfo
 
-Reads the build id written by `build.sh`. The engine-free test constraint (see APIs verified) drives the split: a pure `Normalize` function holds all the logic and gets tested; `Load()` is a thin Godot IO wrapper that is not unit-tested.
+Reads the build id written by `build.sh`. The engine-free test constraint drives the split: a pure `Normalize` holds the logic and is tested; `Load` is a thin Godot IO wrapper that is not unit-tested.
 
 **Files:**
 - Create: `Scripts/BuildInfo.cs`
@@ -186,7 +336,7 @@ namespace Goose2Client.Tests
         [Fact]
         public void Normalize_TrimsSurroundingWhitespace()
         {
-            Assert.Equal("20260818-2113", BuildInfo.Normalize("20260818-2113\n"));
+            Assert.Equal("20260818T091305Z-40f2dbe", BuildInfo.Normalize("20260818T091305Z-40f2dbe\n"));
         }
     }
 }
@@ -257,7 +407,7 @@ git commit -m "feat(build): add BuildInfo build id reader with dev fallback"
 
 ---
 
-### Task 3: Build stamp overlay
+### Task 4: Build stamp overlay
 
 **Files:**
 - Create: `Scripts/UI/BuildStampOverlay.cs`
@@ -295,10 +445,11 @@ namespace Goose2Client.UI
                 HorizontalAlignment = HorizontalAlignment.Right,
             };
 
-            // Anchor to the top-right, inset by Margin.
+            // Anchor to the top-right, inset by Margin. Wide enough for the longest id
+            // form: <UTC>-<short-sha>-dirty.
             label.SetAnchorsPreset(Control.LayoutPreset.TopRight);
             label.GrowHorizontal = Control.GrowDirection.Begin;
-            label.OffsetLeft = -240;
+            label.OffsetLeft = -320;
             label.OffsetRight = -Margin;
             label.OffsetTop = Margin;
             label.OffsetBottom = Margin + 20;
@@ -313,7 +464,7 @@ namespace Goose2Client.UI
 
 **Step 2: Wire it into GameManager**
 
-In `Scripts/GameManager.cs`, at the end of `_Ready()` (after `AddChild(SpellTargetManager);`, line 79), add:
+At the end of `_Ready()` in `Scripts/GameManager.cs` (after `AddChild(SpellTargetManager);`, line 79):
 
 ```csharp
             // Always-on-top build stamp. Its own CanvasLayer at 128 so HUD windows
@@ -321,20 +472,26 @@ In `Scripts/GameManager.cs`, at the end of `_Ready()` (after `AddChild(SpellTarg
             AddChild(new UI.BuildStampOverlay());
 ```
 
-**Step 3: Verify the project still builds**
+**Step 3: Verify the project builds**
 
 Run: `dotnet build`
 Expected: Build succeeded, 0 errors.
 
-**Step 4: Verify the full suite still passes**
+**Step 4: Verify the suite still passes**
 
 Run: `dotnet test tests/Goose2Client.Tests`
 Expected: 0 failed.
 
-**Step 5: Smoke-test in the editor**
+**Step 5: Defer the visual check**
 
-Run: `GOOSE_HOST=127.0.0.1 /usr/bin/godot-mono --path . --quit-after 200`
-Expected: no errors on stdout. Running from the editor there is no `build_id.txt`, so the overlay shows `dev`. If you have a display available, run `./run.sh` instead and confirm the faint `dev` text in the top-right of the login screen.
+There is no `run.sh` in this worktree (untracked in the main checkout), and a headless run cannot show the overlay. The real visual confirmation is Task 6 Step 5, which launches the exported Linux client and reads the stamp off the screen. Do not fabricate a smoke test here.
+
+If you want an early look and have a display, run the editor directly — expect a connection failure to the default server, which is unrelated to the overlay:
+
+```bash
+GOOSE_HOST=127.0.0.1 GOOSE_PORT=2006 /usr/bin/godot-mono --path . --display-driver wayland
+```
+Expected: faint `dev` text in the top-right of the login screen.
 
 **Step 6: Commit**
 
@@ -345,7 +502,7 @@ git commit -m "feat(ui): show build id in top-right corner on every screen"
 
 ---
 
-### Task 4: build.sh
+### Task 5: build.sh
 
 **Files:**
 - Create: `build.sh` (repo root, mode 755)
@@ -359,6 +516,7 @@ git commit -m "feat(ui): show build id in top-right corner on every screen"
 #   ./build.sh                    # all three platforms
 #   ./build.sh linux windows      # only those
 #   ./build.sh --fast             # skip the test suite
+#   ./build.sh --allow-dirty      # permit uncommitted changes (marks the build id -dirty)
 #
 # Override the engine with GODOT=/path/to/godot.
 set -euo pipefail
@@ -367,38 +525,71 @@ cd "$(dirname "${BASH_SOURCE[0]}")"
 
 GODOT="${GODOT:-/usr/bin/godot-mono}"
 BUILD_DIR="build"
+PRESETS_FILE="export_presets.cfg"
 
 die() { echo "build.sh: $*" >&2; exit 1; }
 
 FAST=0
-PLATFORMS=()
+ALLOW_DIRTY=0
+REQUESTED=()
 for arg in "$@"; do
   case "$arg" in
-    --fast) FAST=1 ;;
-    linux|windows|macos) PLATFORMS+=("$arg") ;;
-    *) die "unknown argument '$arg' (expected --fast, linux, windows, or macos)" ;;
+    --fast)        FAST=1 ;;
+    --allow-dirty) ALLOW_DIRTY=1 ;;
+    linux|windows|macos) REQUESTED+=("$arg") ;;
+    *) die "unknown argument '$arg' (expected --fast, --allow-dirty, linux, windows, or macos)" ;;
   esac
 done
-[ ${#PLATFORMS[@]} -eq 0 ] && PLATFORMS=(linux windows macos)
+[ ${#REQUESTED[@]} -eq 0 ] && REQUESTED=(linux windows macos)
+
+# Deduplicate while preserving order, so `./build.sh linux linux` exports once.
+PLATFORMS=()
+for p in "${REQUESTED[@]}"; do
+  case " ${PLATFORMS[*]-} " in *" $p "*) continue ;; esac
+  PLATFORMS+=("$p")
+done
 
 # --- Preflight ---------------------------------------------------------------
 
+for cmd in dotnet git tar zip du; do
+  command -v "$cmd" >/dev/null || die "required command '$cmd' not found on PATH"
+done
+
 [ -x "$GODOT" ] || die "godot not found at '$GODOT' — set GODOT=/path/to/godot"
 
-# Export templates must match the engine version. This is the failure you hit
-# after every engine upgrade, so name it explicitly rather than letting Godot
-# fail deep inside the export with a confusing message.
-ENGINE_VERSION="$("$GODOT" --version | head -1)"          # e.g. 4.7.1.stable.mono.arch_linux.a13da4feb
-TEMPLATE_VERSION="$(echo "$ENGINE_VERSION" | grep -oE '^[0-9]+\.[0-9]+(\.[0-9]+)?\.[a-z]+\.mono')"
-TEMPLATE_DIR="$HOME/.local/share/godot/export_templates/$TEMPLATE_VERSION"
+# Export templates must match the engine version. This is the failure you hit after
+# every engine upgrade, so name it explicitly rather than letting Godot fail deep
+# inside the export with a confusing message.
+ENGINE_VERSION="$("$GODOT" --version | head -1)"   # e.g. 4.7.1.stable.mono.arch_linux.a13da4feb
+TEMPLATE_VERSION="$(echo "$ENGINE_VERSION" | grep -oE '^[0-9]+\.[0-9]+(\.[0-9]+)?\.[a-z]+\.mono')" \
+  || die "could not parse a template version out of engine version '$ENGINE_VERSION'"
+[ -n "$TEMPLATE_VERSION" ] || die "could not parse a template version out of engine version '$ENGINE_VERSION'"
+
+# Linux/XDG layout. Godot uses ~/.local/share unless XDG_DATA_HOME is set; macOS and
+# Windows hosts use different locations and are not supported by this script.
+TEMPLATE_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/godot/export_templates/$TEMPLATE_VERSION"
 [ -d "$TEMPLATE_DIR" ] || die "no export templates at '$TEMPLATE_DIR' for engine $ENGINE_VERSION — install them via Editor > Manage Export Templates"
 
-# Assets/ is gitignored generated output. Building against a missing or stale
-# Assets/ silently ships a broken client, so refuse to proceed without it.
-[ -d Assets ] && [ -n "$(ls -A Assets 2>/dev/null)" ] || die "Assets/ is missing or empty — regenerate with: dotnet run --project tools/AssetConverter/src/AssetConverter -- batch"
+[ -f "$PRESETS_FILE" ] || die "$PRESETS_FILE not found"
+for preset in Linux Windows macOS; do
+  grep -q "^name=\"$preset\"\$" "$PRESETS_FILE" || die "preset '$preset' missing from $PRESETS_FILE"
+done
 
+# Assets/ is generated, gitignored output. A non-empty Assets/ is not enough — the
+# tracked Assets/UI alone would satisfy that while the client is still unshippable.
+# Check one sentinel per generated subtree instead.
+for sentinel in Assets/Maps/Map1.bytes Assets/Sprites/manifest.json Assets/Resources/AnimationHeights.txt; do
+  [ -e "$sentinel" ] || die "missing generated asset '$sentinel' — regenerate with:
+    ILLUTIA_DATA=... ILLUTIA_MAPS=... ASPERETA_DATA=... ASPERETA_MAPS=... \\
+      dotnet run --project tools/AssetConverter/src/AssetConverter -- all \"\$PWD\"
+  (see tools/AssetConverter/src/AssetConverter/Paths.cs for the source paths)"
+done
+
+DIRTY=0
 if [ -n "$(git status --porcelain)" ]; then
-  echo "build.sh: warning — working tree is dirty; this build is not reproducible from a commit" >&2
+  DIRTY=1
+  [ "$ALLOW_DIRTY" -eq 1 ] || die "working tree is dirty — commit, or rerun with --allow-dirty"
+  echo "build.sh: warning — building from a dirty tree; the build id will be marked -dirty" >&2
 fi
 
 if [ "$FAST" -eq 0 ]; then
@@ -408,9 +599,10 @@ fi
 
 # --- Stamp -------------------------------------------------------------------
 
-BUILD_ID="$(date +%Y%m%d-%H%M)"
-# Trap so a crashed run never leaves a stale id behind — the editor would then
-# display a bogus build stamp instead of "dev".
+BUILD_ID="$(date -u +%Y%m%dT%H%M%SZ)-$(git rev-parse --short HEAD)"
+[ "$DIRTY" -eq 1 ] && BUILD_ID="$BUILD_ID-dirty"
+# Trap so a crashed or failed run never leaves a stale id behind — the editor would
+# then display a bogus build stamp instead of "dev".
 trap 'rm -f build_id.txt' EXIT
 printf '%s\n' "$BUILD_ID" > build_id.txt
 echo "==> Build id $BUILD_ID"
@@ -466,37 +658,79 @@ done
 echo
 echo "==> Build $BUILD_ID complete"
 for a in "${ARTIFACTS[@]}"; do
-  printf '    %-44s %s\n' "$BUILD_DIR/$a" "$(du -h "$BUILD_DIR/$a" | cut -f1)"
+  printf '    %-56s %s\n' "$BUILD_DIR/$a" "$(du -h "$BUILD_DIR/$a" | cut -f1)"
 done
 ```
 
-**Step 2: Make it executable**
+**Step 2: Make it executable and syntax-check it**
 
 ```bash
 chmod +x build.sh
+bash -n build.sh
 ```
+Expected: no output from `bash -n`.
 
 **Step 3: Verify the preflight failure paths**
 
-These are the branches most likely to be wrong, and each is cheap to provoke:
+These branches are the most likely to be wrong and each is cheap to provoke. Every one must exit non-zero with the named message.
 
 ```bash
-GODOT=/nonexistent ./build.sh
+GODOT=/nonexistent ./build.sh; echo "exit=$?"
 ```
-Expected: `build.sh: godot not found at '/nonexistent' — set GODOT=/path/to/godot`, exit 1.
+Expected: `godot not found at '/nonexistent' ...`, exit 1.
 
 ```bash
-./build.sh --bogus
+./build.sh --bogus; echo "exit=$?"
 ```
-Expected: `build.sh: unknown argument '--bogus' ...`, exit 1.
+Expected: `unknown argument '--bogus' ...`, exit 1.
 
-Confirm the template-version parse produces a real directory:
+```bash
+mv export_presets.cfg /tmp/presets-parked && ./build.sh; echo "exit=$?"
+mv /tmp/presets-parked export_presets.cfg
+```
+Expected: `export_presets.cfg not found`, exit 1.
+
+```bash
+sed -i 's/^name="macOS"$/name="macOSX"/' export_presets.cfg && ./build.sh; echo "exit=$?"
+git checkout -- export_presets.cfg
+```
+Expected: `preset 'macOS' missing from export_presets.cfg`, exit 1.
+
+```bash
+mv Assets/Maps /tmp/maps-parked && ./build.sh; echo "exit=$?"
+mv /tmp/maps-parked Assets/Maps
+```
+Expected: `missing generated asset 'Assets/Maps/Map1.bytes'` plus the regeneration command, exit 1.
+
+```bash
+./build.sh --fast   # with the tree dirty from in-progress work
+```
+Expected: `working tree is dirty — commit, or rerun with --allow-dirty`, exit 1. Then confirm `./build.sh --fast --allow-dirty` gets past the check and prints a build id ending in `-dirty`.
+
+Confirm the template-version parse resolves to a real directory — a broken regex turns into a spurious "no export templates" abort on every run:
 ```bash
 /usr/bin/godot-mono --version | head -1 | grep -oE '^[0-9]+\.[0-9]+(\.[0-9]+)?\.[a-z]+\.mono'
+ls -d "${XDG_DATA_HOME:-$HOME/.local/share}/godot/export_templates/4.7.1.stable.mono"
 ```
-Expected: `4.7.1.stable.mono`, and `ls ~/.local/share/godot/export_templates/4.7.1.stable.mono` must exist. If the parse comes out empty or wrong, fix the regex before moving on — a broken parse turns into a spurious "no export templates" abort on every run.
+Expected: `4.7.1.stable.mono`, and the directory exists.
 
-**Step 4: Commit**
+Verify duplicate arguments export once:
+```bash
+bash -x ./build.sh linux linux --fast 2>&1 | grep -c "==> Exporting linux"
+```
+Expected: `1`.
+
+**Step 4: Verify the trap fires on a failed export**
+
+```bash
+mv "${XDG_DATA_HOME:-$HOME/.local/share}/godot/export_templates/4.7.1.stable.mono/linux_release.x86_64" /tmp/
+./build.sh linux --fast --allow-dirty; echo "exit=$?"
+ls build_id.txt
+mv /tmp/linux_release.x86_64 "${XDG_DATA_HOME:-$HOME/.local/share}/godot/export_templates/4.7.1.stable.mono/"
+```
+Expected: the export fails, exit non-zero, and `ls build_id.txt` reports **No such file or directory** — the EXIT trap cleaned up despite the failure.
+
+**Step 5: Commit**
 
 ```bash
 git add build.sh
@@ -505,9 +739,9 @@ git commit -m "build: add release build/packaging script"
 
 ---
 
-### Task 5: Full verification run
+### Task 6: Full verification run
 
-The only real evidence the script works end to end. Requires the `Assets` symlink from the Environment note above.
+The only real evidence the script works end to end. Requires Task 0's asset links.
 
 **Step 1: Run it**
 
@@ -515,43 +749,83 @@ The only real evidence the script works end to end. Requires the `Assets` symlin
 ./build.sh
 ```
 
-Expected: tests pass, then three exports, then a report listing three artifacts. Takes several minutes — the first export also performs the C# build.
+Expected: tests pass, three exports, then a report listing three artifacts. Several minutes — the first export also performs the C# build. If the tree is dirty from in-progress work, use `--allow-dirty` and expect a `-dirty` build id.
 
 **Step 2: Verify the artifacts**
 
 ```bash
 ls -la build/
 ```
-Expected: exactly three files named `Goose2Client-<YYYYMMDD-HHMM>-{linux.tar.gz,windows.zip,macos.zip}`, no leftover `build/linux`, `build/windows`, or `build/macos` directories. Rough sizes from the design's measured run: linux ~90M, windows ~100M, macos ~138M.
+Expected: exactly three files, `Goose2Client-<id>-{linux.tar.gz,windows.zip,macos.zip}`, with no leftover `build/linux`, `build/windows`, or `build/macos` directories. Rough sizes measured on 2026-08-18: linux ~90M, windows ~100M, macos ~138M.
 
 **Step 3: Verify the stamp file was cleaned up**
 
 ```bash
 ls build_id.txt
 ```
-Expected: `No such file or directory` — the EXIT trap removed it.
+Expected: `No such file or directory`.
 
-**Step 4: Verify each archive's contents**
+**Step 4: Verify archive integrity and contents**
 
 ```bash
+tar -tzf build/Goose2Client-*-linux.tar.gz >/dev/null && echo "linux archive ok"
+unzip -t build/Goose2Client-*-windows.zip >/dev/null && echo "windows archive ok"
+unzip -t build/Goose2Client-*-macos.zip >/dev/null && echo "macos archive ok"
+
 tar -tzf build/Goose2Client-*-linux.tar.gz | head
 unzip -l build/Goose2Client-*-windows.zip | head
 unzip -l build/Goose2Client-*-macos.zip | head
 ```
-Expected: linux has `Goose2Client.x86_64`, `Goose2Client.pck`, and `data_Goose2ClientGodot_linuxbsd_x86_64/`; windows the `.exe` equivalent; macos a `Goose2ClientGodot.app/` bundle.
+Expected: three `ok` lines; linux contains `Goose2Client.x86_64`, `Goose2Client.pck`, and `data_Goose2ClientGodot_linuxbsd_x86_64/`; windows the `.exe` equivalent; macos a `Goose2ClientGodot.app/` bundle.
 
-**Step 5: Verify the build stamp actually shows the id**
+**Step 5: Verify the executable bit survived the tar**
 
 ```bash
-mkdir -p /tmp/goose-verify && tar -xzf build/Goose2Client-*-linux.tar.gz -C /tmp/goose-verify
-/tmp/goose-verify/Goose2Client.x86_64
+tar -tvzf build/Goose2Client-*-linux.tar.gz | grep 'Goose2Client\.x86_64$'
 ```
-Expected: the client launches and the top-right corner shows the build id (e.g. `20260818-2113`), **not** `dev`. This is the one check that proves the stamp survived export into the pck.
+Expected: permissions beginning `-rwx`. This is the whole reason Linux uses tar rather than zip; if it shows `-rw-`, the archive is broken for users.
 
-**Step 6: Note what stays unverified**
+**Step 6: Verify the build stamp reaches the running client**
 
-The macOS artifact cannot be smoke-tested from Linux. It is ad-hoc signed and unnotarized, so the first launch on a Mac needs right-click → Open. Record this in the commit message.
+```bash
+VERIFY_DIR="$(mktemp -d)"
+tar -xzf build/Goose2Client-*-linux.tar.gz -C "$VERIFY_DIR"
+"$VERIFY_DIR/Goose2Client.x86_64"
+```
+Expected: the client launches and the top-right corner shows the build id (e.g. `20260818T091305Z-40f2dbe`), **not** `dev`. This is the one check proving the stamp survived export into the pck. Clean up with `rm -rf "$VERIFY_DIR"` afterwards.
 
-**Step 7: Commit**
+**Step 7: Note what stays unverified**
+
+The macOS artifact cannot be smoke-tested from Linux. It is ad-hoc signed and unnotarized, so its first launch on a Mac needs right-click → Open. This belongs in the release doc (Task 7), not only in a commit message.
+
+**Step 8: Commit**
 
 Nothing to commit unless a fix was needed. If the run exposed bugs, fix and commit them here, then rerun from Step 1.
+
+---
+
+### Task 7: Release documentation
+
+`build.sh --help` output and commit messages are not durable documentation for a process someone runs a few times a year.
+
+**Files:**
+- Create: `docs/releasing.md`
+
+**Step 1: Write the document**
+
+Cover, briefly and concretely:
+
+- **Host requirements** — Linux only; the template lookup assumes the XDG layout. `dotnet`, `git`, `tar`, `zip`, `du` on PATH, plus a Godot mono build.
+- **Godot and export templates** — the engine version and its matching mono templates must agree; install via Editor → Manage Export Templates. Name the current pair (4.7.1).
+- **Asset generation** — `Assets/Maps`, `Assets/Resources`, and `Assets/Sprites` are generated and gitignored; only `Assets/UI` is tracked. Give the full command with the `ILLUTIA_*`/`ASPERETA_*` environment variables, citing `tools/AssetConverter/src/AssetConverter/Paths.cs:10-17`.
+- **Running a build** — the four invocation forms, what `--fast` and `--allow-dirty` skip, and what the build id means (including `-dirty`).
+- **Outputs** — the three artifact names and their approximate sizes.
+- **macOS limitations** — universal, ad-hoc signed, unnotarized; first launch needs right-click → Open; proper signing and notarization would need an Apple Developer account and are not implemented.
+- **Validating artifacts** — the integrity, exec-bit, and build-stamp checks from Task 6.
+
+**Step 2: Commit**
+
+```bash
+git add docs/releasing.md
+git commit -m "docs: how to build and package a release"
+```
