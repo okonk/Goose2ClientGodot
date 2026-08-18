@@ -70,10 +70,41 @@ appended when built from a dirty tree via `--allow-dirty`. It is collision-free,
 monotonic, and traceable to a commit.
 
 The script writes it to a gitignored `build_id.txt`, which is exported into the `.pck`
-(`include_filter` in each preset — it is a plain file, not an imported resource, so
-`all_resources` would otherwise leave it out). The running client displays it in the
+via `include_filter` (see below). The running client displays it in the
 top-right corner of every screen. An EXIT trap removes the file even on failure, so the
 editor shows `dev` rather than a stale id.
+
+### Non-resource files must be named in `include_filter`
+
+Each preset uses `export_filter="all_resources"`, which exports only files Godot treats as
+**imported resources**. Anything else is silently dropped from the `.pck` — no warning,
+and the export still reports success.
+
+That bites three generated file types, so every preset carries:
+
+```ini
+include_filter="build_id.txt,Assets/Maps/*.bytes,Assets/Resources/*.txt"
+```
+
+- `build_id.txt` — a plain file; without this the client displays `dev`.
+- `Assets/Maps/*.bytes` — 160 map files with no importer and no `.import` sidecar.
+  Without this the client logs in fine and then fails with
+  `LoadMap: cannot open res://Assets/Maps/MapN.bytes (err FileNotFound)` followed by
+  `MapManager: CurrentMap is null`, and the screen simply stays empty.
+- `Assets/Resources/*.txt` — `AnimationHeights.txt` / `AnimationToFirstFrame.txt`, read
+  on every character spawn.
+
+Sprites need no entry: their PNGs carry `.import` sidecars and `.tres`/`.json` are native
+resources, so `all_resources` already covers them. **If you add a new generated asset type
+that Godot does not import, add it here or it will be missing from every release.**
+
+### Reading res:// at runtime
+
+Inside an export `res://` lives in the `.pck`, so `ProjectSettings.GlobalizePath` returns a
+path beside the executable that does not exist on disk and `System.IO` throws. Read
+`res://` text through `ResourceText.ReadAll` (which uses `Godot.FileAccess`) and binary
+through `Godot.FileAccess` directly. Code that uses `System.IO` on a globalized `res://`
+path works in the editor and fails in every export.
 
 Builds are staged under `build/.staging` and published into `build/` only after **every**
 requested platform succeeds — a partial release set is worse than none.
@@ -122,6 +153,12 @@ V="$(mktemp -d)"
 tar -xzf build/Goose2Client-*-linux.tar.gz -C "$V"
 (cd "$V" && ./Goose2Client.x86_64)
 ```
+
+**Log in and confirm the map renders.** The login screen loading proves very little: it
+uses sprite assets, which `all_resources` covers. Maps, and everything else Godot does not
+import, only get exercised after login — a whole asset subtree can be missing from the
+`.pck` while the client looks perfectly healthy at the login prompt. Point the client at a
+local server with `GOOSE_HOST` / `GOOSE_PORT` and walk around.
 
 The top-right corner must show the build id, **not** `dev`. `dev` means `build_id.txt`
 never made it into the `.pck`; a missing stamp entirely means startup threw before the
