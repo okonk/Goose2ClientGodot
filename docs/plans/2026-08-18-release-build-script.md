@@ -28,7 +28,7 @@ This plan incorporates review feedback dated 2026-08-18; see "Review decisions" 
 Verified 2026-08-18:
 
 - **Only `Assets/UI` is tracked** (66 files: PNGs, `.import` sidecars, `Assets/UI/Fonts/LiberationSans.ttf`). `Assets/Maps`, `Assets/Resources`, and `Assets/Sprites` are generated and gitignored. Never `rm -rf Assets` — it would stage 66 tracked deletions.
-- **`Assets/Maps/Map1.bytes` is 1.8 MB** across 160 map files. Too large to commit as a test fixture, hence the skip mechanism in Task 0.
+- **`Assets/Maps/Map1.bytes` is 1.8 MB** across 160 map files — too large to commit. Task 1 instead uses a 3412-byte fixture carved from it, committed at `tests/Goose2Client.Tests/Fixtures/Map10x10.bytes`.
 - **The main checkout is on `master`** and cannot be used to verify changes made on this branch.
 - **`export_presets.cfg` and `run.sh` are untracked** in the main checkout, so neither exists in this worktree.
 - **Test totals differ by checkout and this is expected:** 259 in the main checkout, 246 here. The 13-test gap is uncommitted test work on `master` (`WindowButtonFlagsTests.cs` is untracked, several test files modified), not asset-dependent tests. Treat the exact totals as informational; what matters is **0 failed**.
@@ -79,92 +79,100 @@ Nothing to commit — `Assets/Maps`, `Assets/Resources`, and `Assets/Sprites` ar
 
 ---
 
-### Task 1: Fix the pre-existing MapFileTests path
+### Task 1: Point MapFileTests at a committed fixture
 
-`tests/Goose2Client.Tests/MapFileTests.cs:7` hardcodes `/home/agent/workspace/Goose2ClientGodot/Assets/Maps`, a path from an earlier agent sandbox. It fails on this machine today. Tests gate the build, so `build.sh` would abort on every run until this is fixed.
+`tests/Goose2Client.Tests/MapFileTests.cs:7` hardcodes `/home/agent/workspace/Goose2ClientGodot/Assets/Maps`, a path from an earlier agent sandbox, and reads the 1.8 MB `Map1.bytes` out of gitignored generated output. It fails on this machine today. Tests gate the build, so `build.sh` would abort on every run until this is fixed.
 
-A missing-assets run must report **skipped, not passed**. An early `return` from a `[Fact]` reports success, which would hide a genuinely broken fixture. xUnit 2.9 has no runtime skip, so add the standard `Xunit.SkippableFact` package.
+The fixture and its generator are **already committed on this branch** (see below), so the test becomes independent of generated assets — no skip mechanism, no new package, and it runs in a fresh clone.
 
 **Files:**
-- Modify: `tests/Goose2Client.Tests/Goose2Client.Tests.csproj`
+- Already present: `tests/Goose2Client.Tests/Fixtures/Map10x10.bytes` (3412 bytes), `tools/gen-map-fixture.py`
 - Modify: `tests/Goose2Client.Tests/MapFileTests.cs`
+- Modify: `tests/Goose2Client.Tests/Goose2Client.Tests.csproj` (copy the fixture to the output directory)
+
+**About the fixture.** It is the real 10x10 tile region at (row 100, col 100) of `Assets/Maps/Map1.bytes` with the header dimensions rewritten — genuine game data, not bytes synthesized from a reading of the format, so a parser change is still checked against a real file. That region was chosen for variety: 45 open tiles, 6 blocked, 49 carrying flag 16. Regenerate with `python3 tools/gen-map-fixture.py` from the repo root with assets present; output is deterministic.
+
+Verified fixture values: version 146, editor version 10, 10x10, tile[0,0] flags 0 with layer 0 = graphic 421500 / sheet 2286, and 6 tiles with the blocked bit set.
 
 **Step 1: Confirm the current failure**
 
 Run: `dotnet test tests/Goose2Client.Tests --filter MapFileTests`
-Expected: FAIL — `DirectoryNotFoundException : '/home/agent/workspace/Goose2ClientGodot/Assets/Maps/Map1.bytes'`. Note this fails even now that assets are linked, because the path is absolute and wrong.
+Expected: FAIL — `DirectoryNotFoundException : '/home/agent/workspace/Goose2ClientGodot/Assets/Maps/Map1.bytes'`. It fails even with assets linked, because the path is absolute and wrong.
 
-**Step 2: Add the skip package**
+**Step 2: Copy the fixture to the test output directory**
 
-In `tests/Goose2Client.Tests/Goose2Client.Tests.csproj`, add to the existing `PackageReference` `ItemGroup`:
+In `tests/Goose2Client.Tests/Goose2Client.Tests.csproj`, add a new `ItemGroup`:
 
 ```xml
-    <PackageReference Include="Xunit.SkippableFact" Version="1.4.13" />
+  <ItemGroup>
+    <None Include="Fixtures/**" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 ```
 
-Run `dotnet restore tests/Goose2Client.Tests` and confirm it succeeds. If 1.4.13 is unavailable, run `dotnet package search Xunit.SkippableFact` and use the latest stable — do not silently fall back to an early `return`.
+**Step 3: Rewrite the test against the fixture**
 
-**Step 3: Replace the hardcoded constant**
-
-Find every usage first: `grep -n MapsDir tests/Goose2Client.Tests/MapFileTests.cs`.
-
-Replace line 7 with:
+Replace the `MapsDir` constant (line 7) and the body of `Map1_ParsesHeaderAndGrid` with:
 
 ```csharp
-    private static readonly string? MapsDir = FindMapsDir();
+    private static string FixturePath =>
+        Path.Combine(AppContext.BaseDirectory, "Fixtures", "Map10x10.bytes");
 
-    /// <summary>
-    /// Walks up from the test assembly to the repo root (identified by the .sln) and returns
-    /// Assets/Maps, or null when the generated maps are absent — Assets/Maps is gitignored
-    /// build output and does not exist in a fresh clone.
-    /// </summary>
-    private static string? FindMapsDir()
+    [Fact]
+    public void Fixture_ParsesHeaderAndGrid()
     {
-        var dir = new DirectoryInfo(AppContext.BaseDirectory);
-        while (dir != null && !File.Exists(Path.Combine(dir.FullName, "Goose2ClientGodot.sln")))
-            dir = dir.Parent;
+        var bytes = File.ReadAllBytes(FixturePath);
+        var map = new MapFile(bytes);
 
-        if (dir == null) return null;
+        // Real values carved from Map1.bytes — see tools/gen-map-fixture.py.
+        Assert.Equal(146, map.Version);
+        Assert.Equal(10, map.EditorVersion);
+        Assert.Equal(10, map.Width);
+        Assert.Equal(10, map.Height);
+        Assert.Equal(100, map.Tiles.Length);
 
-        var maps = Path.Combine(dir.FullName, "Assets", "Maps");
-        return Directory.Exists(maps) ? maps : null;
+        // header(12) + 34 bytes/tile, exactly — the carved fixture has no trailer.
+        Assert.Equal(12 + 34 * map.Width * map.Height, bytes.Length);
+
+        // Indexer is (x, y) -> Tiles[y*Width + x]; first tile is reachable and well-formed.
+        var t = map[0, 0];
+        Assert.Equal(5, t.Layers.Length);
+        Assert.All(t.Layers, l => Assert.NotNull(l));
+        Assert.Equal(421500, t.Layers[0].Graphic);
+        Assert.Equal(2286, t.Layers[0].Sheet);
+        Assert.False(t.IsBlocked);
+
+        // The region was picked for variety: some tiles carry the blocked bit.
+        Assert.Equal(6, map.Tiles.Count(x => x.IsBlocked));
     }
 ```
 
-Add `using System;` and `using System.IO;` to the top of the file if not already present.
+Add `using System;` and `using System.Linq;` to the top of the file. `MapTile_FlagsAndRoofDerive` is unchanged — it already covers `IsRoof`, which no tile in this region exercises.
 
-**Step 4: Convert each asset-reading test to a genuine skip**
-
-For every test that touches `MapsDir`, change `[Fact]` to `[SkippableFact]` and open the body with:
-
-```csharp
-        Skip.If(MapsDir == null, "Assets/Maps not generated — run the AssetConverter 'all' command");
-```
-
-**Step 5: Verify it passes with assets present**
+**Step 4: Run the test**
 
 Run: `dotnet test tests/Goose2Client.Tests --filter MapFileTests`
-Expected: PASS, **0 skipped**. Assets are linked from Task 0, so a skip here means `FindMapsDir` is broken — the test would be silently doing nothing.
+Expected: PASS, 2 tests, 0 skipped.
 
-**Step 6: Verify it genuinely skips with assets absent**
+**Step 5: Prove it no longer depends on generated assets**
 
 ```bash
-mv Assets/Maps /tmp/maps-link-parked
+mv Assets/Maps /tmp/maps-parked
 dotnet test tests/Goose2Client.Tests --filter MapFileTests
-mv /tmp/maps-link-parked Assets/Maps
+mv /tmp/maps-parked Assets/Maps
+git status --porcelain -- Assets   # must be empty
 ```
-Expected: **0 failed, N skipped** — skipped, not passed. Restore the link before continuing and re-run `git status --porcelain -- Assets` to confirm it is empty.
+Expected: PASS with the maps absent. This is the point of the change — the suite runs in a fresh clone.
 
-**Step 7: Verify the whole suite**
+**Step 6: Verify the whole suite**
 
 Run: `dotnet test tests/Goose2Client.Tests`
 Expected: 0 failed.
 
-**Step 8: Commit**
+**Step 7: Commit**
 
 ```bash
 git add tests/Goose2Client.Tests/MapFileTests.cs tests/Goose2Client.Tests/Goose2Client.Tests.csproj
-git commit -m "fix(tests): resolve map fixture path from repo root, skip when assets absent"
+git commit -m "test(map): parse a committed 10x10 fixture instead of generated assets"
 ```
 
 ---
