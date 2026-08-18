@@ -3,21 +3,42 @@ using Goose2.AssetConverter.SpriteFrames;
 
 namespace Goose2.AssetConverter.Aspereta;
 
-public record AsperetaEffectsResult(int EffectsWritten, int Failed, List<string> Failures);
+public record AsperetaEffectsResult(
+    int EffectsWritten, int Failed, List<string> Failures, int SkippedOutOfRange = 0);
 
 /// <summary>
-/// Emits effect SpriteFrames for every Aspereta ADF animation that is not referenced
-/// by Aspereta <c>compiled.enc</c>, at offset id <c>GraphicBase + animId</c>
-/// (the server remap rewrites spell <c>animation</c> cells to the same offset).
-/// Mirrors the Illutia effect loop in <see cref="AnimationBatchConverter"/>.
+/// Emits effect SpriteFrames for the Aspereta ADF animations that are emotes or spell
+/// effects, at offset id <c>GraphicBase + animId</c> (the server remap rewrites spell
+/// <c>animation</c> cells to the same offset).
 /// </summary>
 /// <remarks>
-/// Aspereta stores most animation defs on <c>0.adf</c> with frame indexes that live
-/// on other graphic sheets; this converter resolves those cross-sheet references
-/// (same approach as <see cref="AsperetaMonsterConverter"/>).
+/// <para>
+/// Selection is by id range (see <see cref="EmoteIdMax"/> and <see cref="SpellIdMin"/>).
+/// "Every animation not referenced by <c>compiled.enc</c>" over-selects: it also picks up
+/// ~41 stray defs in the 55xxx/95xxx/96xxx/97xxx character buckets that no spell or emote
+/// ever plays. The sheet-level rule <see cref="AnimationBatchConverter"/> uses does not work
+/// here, because Aspereta parks nearly every animation def on <c>0.adf</c>.
+/// </para>
+/// <para>
+/// Aspereta stores those defs with frame indexes that live on other graphic sheets;
+/// this converter resolves the cross-sheet references (same approach as
+/// <see cref="AsperetaMonsterConverter"/>).
+/// </para>
 /// </remarks>
 public static class AsperetaEffectsConverter
 {
+    /// <summary>Emote animation ids: <c>0..999</c>, emitted as <c>700000..700999</c>.</summary>
+    public const int EmoteIdMax = 999;
+
+    /// <summary>Spell effect animation ids: <c>115000..115999</c>, emitted as <c>815xxx</c>.</summary>
+    public const int SpellIdMin = 115000;
+
+    /// <inheritdoc cref="SpellIdMin"/>
+    public const int SpellIdMax = 115999;
+
+    public static bool IsEffectId(int animId) =>
+        animId <= EmoteIdMax || (animId >= SpellIdMin && animId <= SpellIdMax);
+
     public static AsperetaEffectsResult Convert(
         string asperetaDataDir, string compiledEncPath, string outRoot)
     {
@@ -46,10 +67,24 @@ public static class AsperetaEffectsConverter
                 animDefs[animId] = anim;
         }
 
+        int skippedOutOfRange = 0;
         foreach (var (animId, animation) in animDefs)
         {
-            if (compiledIds.Contains(animId))
+            if (!IsEffectId(animId))
+            {
+                if (!compiledIds.Contains(animId))
+                    skippedOutOfRange++;
                 continue;
+            }
+
+            // Holds across the current data; surfaced rather than silently dropped so a
+            // broken range assumption cannot cost us a spell animation unnoticed.
+            if (compiledIds.Contains(animId))
+            {
+                failures.Add($"Effect {AsperetaSheets.GraphicBase + animId}: animation {animId} is " +
+                    "in the emote/spell id range but compiled.enc claims it; skipped");
+                continue;
+            }
 
             string effectId = (AsperetaSheets.GraphicBase + animId).ToString();
             string relativePath = $"Assets/Sprites/Effects/{effectId}/animations.tres";
@@ -102,7 +137,7 @@ public static class AsperetaEffectsConverter
             }
         }
 
-        return new AsperetaEffectsResult(written, failed, failures);
+        return new AsperetaEffectsResult(written, failed, failures, skippedOutOfRange);
     }
 
     /// <summary>

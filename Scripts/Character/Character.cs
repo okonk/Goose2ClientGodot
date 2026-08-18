@@ -97,7 +97,11 @@ namespace Goose2Client.Character
             {
                 Text = FullName,
                 HorizontalAlignment = HorizontalAlignment.Center,
-                ZIndex = 20,
+                // Absolute z so Y-sorted map objects / taller TileMap layers cannot cover the name.
+                ZIndex = Constants.NamesZIndex,
+                ZAsRelative = false,
+                ClipText = false,
+                MouseFilter = Control.MouseFilterEnum.Ignore,
                 Position = new Vector2(-50, -74),   // name sits on top; HP bar (-56) below it, no overlap
                 Size = new Vector2(100, 16),
             };
@@ -115,7 +119,19 @@ namespace Goose2Client.Character
             int h = Height <= 0 ? 48 : Height;
             if (_hpBar != null) _hpBar.Position = new Vector2(-16, -(h + 8));
             if (_mpBar != null) _mpBar.Position = new Vector2(-16, -(h + 5));
-            if (_nameLabel != null) _nameLabel.Position = new Vector2(-50, -(h + 26));
+            LayoutNameLabel(h);
+        }
+
+        /// <summary>Size the name to its text and center it horizontally so long names
+        /// (e.g. "Smithing Supplies") are not clipped by a fixed 100px box.</summary>
+        private void LayoutNameLabel(int bodyHeight)
+        {
+            if (_nameLabel == null) return;
+            var min = _nameLabel.GetMinimumSize();
+            float w = Mathf.Max(min.X, 8f);
+            float h = Mathf.Max(min.Y, 16f);
+            _nameLabel.Size = new Vector2(w, h);
+            _nameLabel.Position = new Vector2(-w / 2f, -(bodyHeight + 26));
         }
 
         // The converter's height-prefix uses its AnimationType name, which differs from the
@@ -163,6 +179,7 @@ namespace Goose2Client.Character
 
             EnsureNameLabel();
             _nameLabel.Text = FullName;
+            LayoutNameLabel(Height <= 0 ? 48 : Height);
             SetVitals(p.HPPercent, 1f);
         }
 
@@ -411,19 +428,47 @@ namespace Goose2Client.Character
         public override void _Process(double delta)
         {
             ProcessLocalInput(delta);
-
-            if (_moving)
-            {
-                float speed = CharacterMotion.PixelsPerSecond(MoveSpeed);
-                Position = Position.MoveToward(_targetPosition, speed * (float)delta);
-                if (Position.IsEqualApprox(_targetPosition))
-                {
-                    _moving = false;
-                    PlayState();   // back to idle/mounted-idle
-                }
-            }
+            UpdateTileMovement(delta);
             TickAttackLock(delta);   // defined in Task 8
             ApplyBarVisibility();
+        }
+
+        /// <summary>Lerp toward the current tile target. On arrival, local players may chain the
+        /// next held step in the same frame (no idle flash) and spend leftover step distance so
+        /// high MoveSpeed doesn't stutter between tiles.</summary>
+        private void UpdateTileMovement(double delta)
+        {
+            if (!_moving) return;
+
+            float remaining = CharacterMotion.PixelsPerSecond(MoveSpeed) * (float)delta;
+            // Cap tiles advanced per frame so a bogus MoveSpeed can't infinite-loop.
+            const int maxTilesPerFrame = 8;
+            for (int n = 0; n < maxTilesPerFrame; n++)
+            {
+                float dist = Position.DistanceTo(_targetPosition);
+                Position = Position.MoveToward(_targetPosition, remaining);
+                remaining = CharacterMotion.RemainingStepBudget(remaining, dist);
+
+                if (!Position.IsEqualApprox(_targetPosition))
+                    return;   // still mid-tile
+
+                // Snap exactly onto the tile anchor (avoids float drift on IsEqualApprox).
+                Position = _targetPosition;
+                _moving = false;
+
+                // Same-frame chain: keep walking if a held key can start the next step.
+                // Only fall back to idle when nothing is chained (key released / blocked / remote).
+                bool chained = TryChainLocalStep();
+                if (CharacterMotion.ShouldPlayIdleAfterStep(chained))
+                {
+                    PlayState();   // idle / mounted-idle
+                    return;
+                }
+
+                // Chained — MoveTo set _moving and walk; spend any leftover distance this frame.
+                if (remaining <= 0.0001f)
+                    return;
+            }
         }
 
         private const double MoveStartDelay = 0.1;   // Unity hold threshold: short release → turn in place
@@ -482,7 +527,41 @@ namespace Goose2Client.Character
             _movePressedTime += delta;
             if (_movePressedTime < MoveStartDelay) return;
 
-            var (dx, dy) = Delta(dir.Value);
+            TryCommitStep(dir.Value, nextWasMovingVertical);
+        }
+
+        /// <summary>Start the next tile step from currently held keys if input allows.
+        /// Used on tile arrival so continuous walking never flashes idle between tiles.
+        /// Skips the 0.1s standstill delay (already walking).</summary>
+        private bool TryChainLocalStep()
+        {
+            if (!IsLocalPlayer) return false;
+            if (GameManager.Instance.IsTargeting) return false;
+            if (GetViewport().GuiGetFocusOwner() is LineEdit) return false;
+
+            bool nextWasMovingVertical = _wasMovingVertical;
+            Direction? dir = MovementInput.Resolve(
+                Input.IsActionPressed("MoveUp"),
+                Input.IsActionPressed("MoveDown"),
+                Input.IsActionPressed("MoveLeft"),
+                Input.IsActionPressed("MoveRight"),
+                ref nextWasMovingVertical);
+
+            if (dir == null)
+            {
+                _heldDir = null;
+                return false;
+            }
+
+            _heldDir = dir;
+            // Chaining mid-run: hold delay already satisfied when the first step began.
+            return TryCommitStep(dir.Value, nextWasMovingVertical);
+        }
+
+        /// <summary>Validate and start one predicted step in <paramref name="dir"/>. Returns true if MoveTo ran.</summary>
+        private bool TryCommitStep(Direction dir, bool nextWasMovingVertical)
+        {
+            var (dx, dy) = Delta(dir);
             int nx = X + dx, ny = Y + dy;
             var map = GetParent()?.GetParent() as Goose2Client.MapManager;   // Characters -> Map(MapManager)
             bool isValidMove = map != null && map.IsValidMove(nx, ny);
@@ -490,13 +569,16 @@ namespace Goose2Client.Character
                                                 ref _wasMovingVertical))
             {
                 MoveTo(nx, ny);
-                GameManager.Instance.NetworkClient.Move(dir.Value);
+                GameManager.Instance.NetworkClient.Move(dir);
+                return true;
             }
-            else if (Facing != dir.Value)
+
+            if (Facing != dir)
             {
-                SetFacing(dir.Value);
-                GameManager.Instance.NetworkClient.Face(dir.Value);
+                SetFacing(dir);
+                GameManager.Instance.NetworkClient.Face(dir);
             }
+            return false;
         }
 
         private static (int dx, int dy) Delta(Direction d) => d switch
@@ -520,7 +602,9 @@ namespace Goose2Client.Character
         }
 
         /// <summary>Fan the current state out to every slot. The Mount slot itself always plays its
-        /// own non-mounted pose (Unity forces the mount to BodyState 3); rider slots use mounted-*.</summary>
+        /// own non-mounted pose (Unity forces the mount to BodyState 3); rider slots use mounted-*.
+        /// Slots with no matching clip (notably Shield/Weapon while mounted — Hands never ship
+        /// mounted art) are hidden, matching Unity's Blank override.</summary>
         protected void PlayCurrent()
         {
             foreach (var (slot, s) in _slots)
@@ -529,11 +613,19 @@ namespace Goose2Client.Character
                 string motion = CharacterMotion.State(IsMoving, _lockedMotion, slotMounted);
                 // The mount itself always animates as an unmounted walking body (Unity forces state 3).
                 int state = slot == CharacterSlot.Mount ? 3 : BodyState;
-                if (ResolveClip(s, motion, state) is not { } clip) continue;
+                if (ResolveClip(s, motion, state) is not { } clip)
+                {
+                    s.Sprite.Visible = false;
+                    continue;
+                }
 
+                s.Sprite.Visible = true;
                 int h = _heights.GetHeight($"{HeightPrefix(slot)}-{s.GraphicId}-{clip}");
                 s.Sprite.Offset = new Vector2(0, CharacterAnchor.OffsetY(h));
-                s.Sprite.Play(clip);
+                // Keep an already-playing walk cycle running across chained tiles; restarting
+                // every step is what made high move-speed look jittery.
+                if (s.Sprite.Animation != clip || !s.Sprite.IsPlaying())
+                    s.Sprite.Play(clip);
             }
 
             // Overlays use resting-pose Height; still refresh after mount/appearance-driven PlayCurrent.
@@ -541,16 +633,18 @@ namespace Goose2Client.Character
         }
 
         /// <summary>First candidate clip (per BodyState/equip/weapon-type) that this slot's
-        /// SpriteFrames actually contains. Falls back to the first animation on the sheet so
-        /// equip-only Hands graphics still draw and receive a height-based Offset.</summary>
+        /// SpriteFrames actually contains. Missing art returns null (Unity Blank / invisible) —
+        /// never substitutes a different motion (e.g. idle during attack) or an arbitrary first
+        /// animation on the sheet.</summary>
         private string ResolveClip(Slot s, string motion, int state)
         {
             var frames = s.Sprite.SpriteFrames;
             if (frames == null) return null;
             foreach (var cand in AnimationNames.Candidates(motion, state, Facing))
                 if (frames.HasAnimation(cand)) return cand;
-            var names = frames.GetAnimationNames();
-            return names.Length > 0 ? names[0] : null;
+
+            // Unity CharacterAnimation.SetGraphic: missing clip → Animations/Blank (invisible).
+            return null;
         }
 
         public void AddBattleText(BattleTextType type, string text)

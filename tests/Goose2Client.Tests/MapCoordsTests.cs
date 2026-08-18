@@ -36,4 +36,13 @@ public class MapCoordsTests
         Assert.Equal(-1, x);
         Assert.Equal(-1, y);
     }
+
+    [Theory]
+    [InlineData(32, 32, 0)]   // full cell: no shift
+    [InlineData(48, 64, 16)]  // common tall art: feet on bottom edge
+    [InlineData(8, 12, -10)]  // short art: still bottom-aligned
+    public void BottomCenterTextureOrigin_AlignsSpriteFeetToCellBottom(int w, int h, int expectedY)
+    {
+        Assert.Equal(new Vector2I(0, expectedY), MapCoords.BottomCenterTextureOrigin(w, h));
+    }
 }

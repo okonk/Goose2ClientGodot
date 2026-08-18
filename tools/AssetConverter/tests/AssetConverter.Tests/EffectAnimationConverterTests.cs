@@ -7,29 +7,33 @@ namespace AssetConverter.Tests;
 
 public class EffectAnimationConverterTests
 {
-    private static (int sheet, int animationId) FindFirstUncompiledAnimation()
+    /// <summary>First animation on a sheet no compiled animation claims — an effect sheet.</summary>
+    private static (int sheet, int animationId) FindFirstEffectSheetAnimation()
     {
         var compiled = new CompiledEnc(Paths.CompiledEnc);
-        var compiledIds = compiled.CompiledAnimations
-            .SelectMany(c => c.AnimationIndexes)
-            .Where(id => id != 0)
-            .ToHashSet();
 
         foreach (var file in Directory.EnumerateFiles(Paths.IllutiaData, "*.adf").OrderBy(p => p))
         {
             var adf = new AdfFile(file);
-            if (adf.Type != AdfType.Graphic || adf.Animations is null) continue;
+            if (adf.Type != AdfType.Graphic || adf.AnimationCount == 0 || adf.Animations is null)
+                continue;
+            if (compiled.SheetToAnimation.ContainsKey(adf.FileNumber))
+                continue;
+
             foreach (var id in adf.Animations.Keys.OrderBy(id => id))
-                if (!compiledIds.Contains(id)) return (adf.FileNumber, id);
+                return (adf.FileNumber, id);
         }
 
-        throw new InvalidOperationException("No uncompiled animation fixture found");
+        throw new InvalidOperationException("No effect sheet fixture found");
     }
 
+    private static string EffectPath(string outRoot, int effectId) =>
+        Path.Combine(outRoot, $"Assets/Sprites/Effects/{effectId}/animations.tres");
+
     [Fact]
-    public void Convert_WritesUncompiledEffectAnimationsAndSkipsCompiledIds()
+    public void Convert_WritesEffectSheetAnimationsAndSkipsCompiledIds()
     {
-        var (sheet, effectId) = FindFirstUncompiledAnimation();
+        var (sheet, effectId) = FindFirstEffectSheetAnimation();
         var outRoot = Path.Combine(Path.GetTempPath(), "ac_effect_" + Guid.NewGuid().ToString("N"));
         try
         {
@@ -57,7 +61,7 @@ public class EffectAnimationConverterTests
     [Fact]
     public void Convert_EffectsDisabled_ByDefault()
     {
-        var (sheet, effectId) = FindFirstUncompiledAnimation();
+        var (sheet, effectId) = FindFirstEffectSheetAnimation();
         var outRoot = Path.Combine(Path.GetTempPath(), "ac_effect_default_" + Guid.NewGuid().ToString("N"));
         try
         {
@@ -80,7 +84,7 @@ public class EffectAnimationConverterTests
     [Fact]
     public void Convert_EffectsIncludeHeightMetadataForNonStandardHeight()
     {
-        var (sheet, effectId) = FindFirstUncompiledAnimation();
+        var (sheet, effectId) = FindFirstEffectSheetAnimation();
         var outRoot = Path.Combine(Path.GetTempPath(), "ac_effect_height_" + Guid.NewGuid().ToString("N"));
         try
         {
@@ -118,7 +122,7 @@ public class EffectAnimationConverterTests
     [Fact]
     public void Convert_EffectsDoNotWriteAnimationToFirstFrame()
     {
-        var (sheet, effectId) = FindFirstUncompiledAnimation();
+        var (sheet, effectId) = FindFirstEffectSheetAnimation();
         var outRoot = Path.Combine(Path.GetTempPath(), "ac_effect_ff_" + Guid.NewGuid().ToString("N"));
         try
         {
@@ -139,6 +143,95 @@ public class EffectAnimationConverterTests
             // (effect ids are numeric and shouldn't appear as "Type-Id" keys)
             var lines = firstFrame.Split('\n', StringSplitOptions.RemoveEmptyEntries);
             Assert.DoesNotContain(lines, l => l.StartsWith(effectId.ToString() + ","));
+        }
+        finally
+        {
+            if (Directory.Exists(outRoot)) Directory.Delete(outRoot, recursive: true);
+        }
+    }
+
+    /// <summary>
+    /// Spell animation 267653 is defined twice: the 9-frame 96x96 effect on sheet 2903 and a
+    /// 5-frame 32x32 Body def on sheet 2177. compiled.enc references the id, so an id-level
+    /// filter dropped the spell entirely; the sheet rule must emit it from 2903.
+    /// </summary>
+    [Fact]
+    public void Convert_PicksEffectSheetDefinition_ForIdAlsoUsedByCompiledAnimation()
+    {
+        var outRoot = Path.Combine(Path.GetTempPath(), "ac_effect_dup_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var result = AnimationBatchConverter.Convert(
+                Paths.IllutiaData,
+                Paths.CompiledEnc,
+                outRoot,
+                only: _ => false,
+                includeEffects: true,
+                onlyEffectsFromSheets: new[] { 2903, 2177 });
+
+            Assert.Equal(1, result.EffectsWritten);
+
+            var tres = File.ReadAllText(EffectPath(outRoot, 267653));
+            Assert.Contains("res://Assets/Sprites/sheets/2903.png", tres);
+            Assert.DoesNotContain("2177.png", tres);
+            Assert.Equal(9, tres.Split("[sub_resource type=\"AtlasTexture\"").Length - 1);
+        }
+        finally
+        {
+            if (Directory.Exists(outRoot)) Directory.Delete(outRoot, recursive: true);
+        }
+    }
+
+    /// <summary>
+    /// Sheet 6324 belongs to compiled Chest-108 but also carries an unreferenced 48x64 def
+    /// (408048). Those equipment leftovers are not effects and must not be emitted.
+    /// </summary>
+    [Fact]
+    public void Convert_SkipsLeftoverAnimationsOnCharacterSheets()
+    {
+        var outRoot = Path.Combine(Path.GetTempPath(), "ac_effect_leftover_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var result = AnimationBatchConverter.Convert(
+                Paths.IllutiaData,
+                Paths.CompiledEnc,
+                outRoot,
+                only: _ => false,
+                includeEffects: true,
+                onlyEffectsFromSheets: new[] { 6324 });
+
+            Assert.Equal(0, result.EffectsWritten);
+            Assert.False(File.Exists(EffectPath(outRoot, 408048)));
+        }
+        finally
+        {
+            if (Directory.Exists(outRoot)) Directory.Delete(outRoot, recursive: true);
+        }
+    }
+
+    /// <summary>
+    /// Spell animation 267593 exists only on sheet 2174, which compiled Body-110 claims, so the
+    /// sheet rule alone cannot reach it — it is force-included.
+    /// </summary>
+    [Fact]
+    public void Convert_ForceIncludesSharedEffectAnimationsOnCharacterSheets()
+    {
+        var outRoot = Path.Combine(Path.GetTempPath(), "ac_effect_forced_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var result = AnimationBatchConverter.Convert(
+                Paths.IllutiaData,
+                Paths.CompiledEnc,
+                outRoot,
+                only: _ => false,
+                includeEffects: true,
+                onlyEffectsFromSheets: new[] { 2174 });
+
+            Assert.Equal(1, result.EffectsWritten);
+
+            var tres = File.ReadAllText(EffectPath(outRoot, 267593));
+            Assert.Contains("res://Assets/Sprites/sheets/2174.png", tres);
+            Assert.Contains("\"name\": &\"267593\"", tres);
         }
         finally
         {

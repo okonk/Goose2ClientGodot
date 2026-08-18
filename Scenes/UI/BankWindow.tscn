@@ -32,6 +32,18 @@ offset_right = 168.0
 offset_bottom = 19.0
 mouse_filter = 0
 
+[node name="TitleLabel" type="Label" parent="TitleBar"]
+layout_mode = 2
+anchors_preset = 0
+offset_left = 6.0
+offset_top = 4.0
+offset_right = 145.0
+offset_bottom = 15.0
+mouse_filter = 2
+theme_override_font_sizes/font_size = 9
+text = ""
+clip_text = true
+
 [node name="CloseButton" type="Button" parent="TitleBar"]
 layout_mode = 2
 anchors_preset = 0

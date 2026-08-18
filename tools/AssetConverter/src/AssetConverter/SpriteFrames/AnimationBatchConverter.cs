@@ -73,12 +73,6 @@ public static class AnimationBatchConverter
             return new AnimationBatchResult(0, 0, 1, warnings, new[] { $"Failed to parse compiled.enc: {ex.Message}" });
         }
 
-        // 2b. Build set of all compiled animation ids (non-zero) to avoid duplicating as effects
-        var compiledAnimationIds = compiled.CompiledAnimations
-            .SelectMany(c => c.AnimationIndexes)
-            .Where(id => id != 0)
-            .ToHashSet();
-
         // 3. For each compiled animation, build a resource
         var allResources = new List<CompiledSpriteFramesResource>();
 
@@ -125,54 +119,38 @@ public static class AnimationBatchConverter
             }
         }
 
-        // 5. Process effect animations (uncompiled ADF animations not in compiled set)
+        // 5. Process effect animations (animations living on non-character sheets)
         var effectHeights = new Dictionary<string, int>();
         if (includeEffects)
         {
             var onlySheets = onlyEffectsFromSheets is not null ? new HashSet<int>(onlyEffectsFromSheets) : null;
 
-            foreach (var adf in adfs.Values)
+            foreach (var (animationId, adf, animation) in SelectEffectAnimations(adfs, compiled, onlySheets, warnings))
             {
-                if (adf.Type != AdfType.Graphic || adf.Animations is null)
-                    continue;
+                string effectId = animationId.ToString();
+                string texturePath = $"res://Assets/Sprites/sheets/{adf.FileNumber}.png";
+                string relativePath = $"Assets/Sprites/Effects/{effectId}/animations.tres";
+                string fullPath = Path.Combine(outRoot, relativePath);
 
-                if (onlySheets is not null && !onlySheets.Contains(adf.FileNumber))
-                    continue;
-
-                foreach (var kvp in adf.Animations)
+                try
                 {
-                    int animationId = kvp.Key;
-                    Animation animation = kvp.Value;
+                    var spec = SpriteFramesAnimationSpec.FromFrames(effectId, adf.FileNumber, texturePath, animation.Frames);
+                    Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
+                    string tres = SpriteFramesWriter.Build(new[] { spec });
+                    File.WriteAllText(fullPath, tres);
+                    effectsWritten++;
 
-                    // Skip if this animation id is already compiled
-                    if (compiledAnimationIds.Contains(animationId))
-                        continue;
-
-                    string effectId = animationId.ToString();
-                    string texturePath = $"res://Assets/Sprites/sheets/{adf.FileNumber}.png";
-                    string relativePath = $"Assets/Sprites/Effects/{effectId}/animations.tres";
-                    string fullPath = Path.Combine(outRoot, relativePath);
-
-                    try
+                    // Record height metadata if max frame height != 64
+                    int maxHeight = animation.Frames.Max(f => f.H);
+                    if (maxHeight != 64)
                     {
-                        var spec = SpriteFramesAnimationSpec.FromFrames(effectId, adf.FileNumber, texturePath, animation.Frames);
-                        Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
-                        string tres = SpriteFramesWriter.Build(new[] { spec });
-                        File.WriteAllText(fullPath, tres);
-                        effectsWritten++;
-
-                        // Record height metadata if max frame height != 64
-                        int maxHeight = animation.Frames.Max(f => f.H);
-                        if (maxHeight != 64)
-                        {
-                            effectHeights[effectId] = maxHeight;
-                        }
+                        effectHeights[effectId] = maxHeight;
                     }
-                    catch (Exception ex)
-                    {
-                        failed++;
-                        failures.Add($"Effect {effectId}: failed to write {relativePath}: {ex.Message}");
-                    }
+                }
+                catch (Exception ex)
+                {
+                    failed++;
+                    failures.Add($"Effect {effectId}: failed to write {relativePath}: {ex.Message}");
                 }
             }
         }
@@ -196,6 +174,90 @@ public static class AnimationBatchConverter
         }
 
         return new AnimationBatchResult(resourcesWritten, effectsWritten, failed, warnings, failures);
+    }
+
+    /// <summary>
+    /// Spell animations that exist <em>only</em> on a sheet some compiled character animation
+    /// claims, so <see cref="SelectEffectAnimations"/>'s sheet rule cannot reach them. Both are
+    /// small (32x32, 44x44) two-frame defs parked on Body sheets and referenced by the server's
+    /// Spell Effects <c>animation</c> column, so they are force-included.
+    /// </summary>
+    private static readonly int[] SharedEffectAnimationIds = { 267593, 267989 };
+
+    /// <summary>
+    /// Picks the effect animations to emit, keyed by animation id.
+    /// </summary>
+    /// <remarks>
+    /// Selection is per <em>sheet</em>, not per animation id: Illutia keeps spell and emote
+    /// animations on graphic sheets that no compiled animation claims, while equipment sheets
+    /// carry leftover character defs that are not effects. Filtering by id instead (the old
+    /// "not in compiled.enc" rule) both dropped real spell animations whose id a compiled slot
+    /// happens to reference — e.g. 267653, whose effect def is the 9-frame 96x96 one on sheet
+    /// 2903, not the 5-frame 32x32 Body def on sheet 2177 — and emitted equipment leftovers.
+    /// </remarks>
+    private static List<(int Id, AdfFile Adf, Animation Animation)> SelectEffectAnimations(
+        IReadOnlyDictionary<int, AdfFile> adfs,
+        CompiledEnc compiled,
+        HashSet<int>? onlySheets,
+        List<string> warnings)
+    {
+        var picked = new Dictionary<int, (AdfFile Adf, Animation Animation)>();
+
+        // Richest definition wins, lowest sheet number breaks ties, so the pick does not
+        // depend on ADF enumeration order.
+        void Offer(AdfFile adf, int id, Animation animation)
+        {
+            if (!picked.TryGetValue(id, out var current))
+            {
+                picked[id] = (adf, animation);
+                return;
+            }
+
+            bool replace = animation.Frames.Count > current.Animation.Frames.Count
+                || (animation.Frames.Count == current.Animation.Frames.Count
+                    && adf.FileNumber < current.Adf.FileNumber);
+
+            warnings.Add(
+                $"Effect {id}: defined on sheets {current.Adf.FileNumber} " +
+                $"({current.Animation.Frames.Count} frames) and {adf.FileNumber} " +
+                $"({animation.Frames.Count} frames); using " +
+                $"{(replace ? adf.FileNumber : current.Adf.FileNumber)}");
+
+            if (replace)
+                picked[id] = (adf, animation);
+        }
+
+        bool IsEffectCandidate(AdfFile adf) =>
+            adf.Type == AdfType.Graphic
+            && adf.AnimationCount > 0
+            && adf.Animations is not null
+            && (onlySheets is null || onlySheets.Contains(adf.FileNumber));
+
+        foreach (var adf in adfs.Values)
+        {
+            if (!IsEffectCandidate(adf) || compiled.SheetToAnimation.ContainsKey(adf.FileNumber))
+                continue;
+
+            foreach (var (id, animation) in adf.Animations!)
+                Offer(adf, id, animation);
+        }
+
+        foreach (int id in SharedEffectAnimationIds)
+        {
+            if (picked.ContainsKey(id))
+                continue;
+
+            foreach (var adf in adfs.Values)
+            {
+                if (IsEffectCandidate(adf) && adf.Animations!.TryGetValue(id, out var animation))
+                    Offer(adf, id, animation);
+            }
+        }
+
+        return picked
+            .OrderBy(kvp => kvp.Key)
+            .Select(kvp => (kvp.Key, kvp.Value.Adf, kvp.Value.Animation))
+            .ToList();
     }
 
     /// <summary>

@@ -49,9 +49,10 @@ public partial class ChatWindow : Control
         _input.TextSubmitted += OnTextSubmitted;
         _input.GuiInput += OnInputGuiInput;
 
-        // Hover alpha
-        MouseEntered += () => SetAlpha(1f);
-        MouseExited += () => SetAlpha(0.7f);
+        // Hover alpha — listen on the Panel (the visual background) rather than the root
+        // Control, which is covered by its children and never receives mouse_enter/exit.
+        _panel.MouseEntered += () => SetAlpha(1f);
+        _panel.MouseExited += () => SetAlpha(0.7f);
 
         // Populate aliases (lowercase keys)
         _aliases["/t"] = "/tell";

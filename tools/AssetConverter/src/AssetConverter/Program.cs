@@ -65,7 +65,7 @@ if (args.Length >= 1 && args[0] == "aspereta")
 
     Console.WriteLine($"Aspereta sheets: {sheets.Succeeded} ok, {sheets.Failed} failed");
     Console.WriteLine($"Aspereta maps: {maps.Converted} converted, {maps.Failures.Count} failed, {maps.Warnings.Count} warnings");
-    Console.WriteLine($"Aspereta effects: {fx.EffectsWritten} written, {fx.Failed} failed");
+    Console.WriteLine($"Aspereta effects: {fx.EffectsWritten} written, {fx.Failed} failed, {fx.SkippedOutOfRange} out-of-range skipped");
     foreach (var w in maps.Warnings) Console.WriteLine($"  WARN {w}");
     foreach (var f in sheets.Failures.Concat(maps.Failures).Concat(fx.Failures))
         Console.WriteLine($"  FAIL {f}");
@@ -193,7 +193,7 @@ if (args.Length >= 1 && args[0] == "all")
     Console.WriteLine($"Maps: {maps.Copied} copied, {maps.Failures.Count} failed");
     Console.WriteLine($"Aspereta sheets: {aspBatch.Succeeded} ok, {aspBatch.Failed} failed");
     Console.WriteLine($"Aspereta maps: {aspMaps.Converted} converted, {aspMaps.Failures.Count} failed, {aspMaps.Warnings.Count} warnings");
-    Console.WriteLine($"Aspereta effects: {fx.EffectsWritten} written, {fx.Failed} failed");
+    Console.WriteLine($"Aspereta effects: {fx.EffectsWritten} written, {fx.Failed} failed, {fx.SkippedOutOfRange} out-of-range skipped");
     foreach (var w in aspMaps.Warnings) Console.WriteLine($"  WARN {w}");
     foreach (var f in aspBatch.Failures.Concat(aspMaps.Failures).Concat(fx.Failures))
         Console.WriteLine($"  FAIL {f}");

@@ -47,4 +47,40 @@ public class AsperetaEffectsConverterTests
             if (Directory.Exists(outRoot)) Directory.Delete(outRoot, true);
         }
     }
+
+    /// <summary>
+    /// Only emotes (<c>700xxx</c>) and spell effects (<c>815xxx</c>) are effects. Uncompiled
+    /// defs in the character buckets (55xxx/95xxx/96xxx/97xxx, i.e. <c>755xxx</c>/<c>795xxx</c>+
+    /// once offset) are strays nothing plays, and must be counted rather than emitted.
+    /// </summary>
+    [Fact]
+    public void EmitsOnlyEmoteAndSpellIdRanges()
+    {
+        string outRoot = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        try
+        {
+            var result = AsperetaEffectsConverter.Convert(
+                Paths.AsperetaData, Paths.AsperetaCompiledEnc, outRoot);
+
+            Assert.Empty(result.Failures);
+            Assert.True(result.SkippedOutOfRange > 0);
+
+            var ids = Directory.GetDirectories(Path.Combine(outRoot, "Assets", "Sprites", "Effects"))
+                .Select(d => int.Parse(Path.GetFileName(d)))
+                .ToList();
+
+            Assert.Equal(result.EffectsWritten, ids.Count);
+            Assert.All(ids, id => Assert.True(
+                AsperetaEffectsConverter.IsEffectId(id - AsperetaSheets.GraphicBase),
+                $"effect {id} is outside the emote and spell id ranges"));
+
+            // Both ranges are represented: emotes at 700000+ and spell effects at 815000+.
+            Assert.Contains(ids, id => id - AsperetaSheets.GraphicBase <= AsperetaEffectsConverter.EmoteIdMax);
+            Assert.Contains(ids, id => id - AsperetaSheets.GraphicBase >= AsperetaEffectsConverter.SpellIdMin);
+        }
+        finally
+        {
+            if (Directory.Exists(outRoot)) Directory.Delete(outRoot, true);
+        }
+    }
 }

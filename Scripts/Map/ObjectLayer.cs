@@ -8,8 +8,8 @@ namespace Goose2Client.Map;
 /// bottom-anchored Sprite2D nodes so they Y-sort per-object against the characters, which share this
 /// node's z_index. Mirrors Unity, where the "Objects 1" tilemap is Individual-mode + BottomLeft sort
 /// on the same sorting layer as characters: the player passes in front of an object's base and behind
-/// its top. (The flat ground/roof layers stay in the immediate-draw MapLayer, which can't Y-sort
-/// against sibling character nodes because it draws a whole layer as one node.)</summary>
+/// its top. (Flat ground/roof layers use TileMapLayer MapLayer nodes, which can't interleave
+/// per-cell with sibling character nodes the way individual Sprite2Ds can.)</summary>
 public partial class ObjectLayer : Node2D
 {
     private MapFile _map;

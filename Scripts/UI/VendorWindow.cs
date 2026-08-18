@@ -15,6 +15,7 @@ public partial class VendorWindow : BaseWindow, IWindow, INpcWindow
     private static readonly PackedScene SlotScene = GD.Load<PackedScene>("res://Scenes/UI/ItemSlot.tscn");
 
     private ItemSlot[] _slots;
+    private Button _closeButton;
     private bool _listenersRegistered;
 
     public int WindowId { get; private set; }
@@ -27,6 +28,11 @@ public partial class VendorWindow : BaseWindow, IWindow, INpcWindow
 
         // Server-spawned — hidden until a MakeWindow/EndWindow for this frame arrives.
         Visible = false;
+
+        // Bottom Close — shown only when MakeWindow.Buttons enables Close.
+        _closeButton = GetNode<Button>("Content/CloseButton");
+        _closeButton.Visible = false;
+        _closeButton.Pressed += OnClosePressed;
 
         _slots = new ItemSlot[VendorSlots];
         var grid = GetNode<GridContainer>("Content/SlotGrid");
@@ -65,6 +71,10 @@ public partial class VendorWindow : BaseWindow, IWindow, INpcWindow
         NpcId = p.NpcId;
         Title = p.Title;
         WindowId = p.WindowId;
+
+        // Bottom Close visibility comes from MakeWindow.Buttons (Goose2 enum).
+        // Typical vendor shop: Close only (e.g. 0,1,0,0,0).
+        _closeButton.Visible = WindowButtonFlags.IsEnabled(p.Buttons, WindowButtons.Close);
     }
 
     private void OnEndWindow(object o)

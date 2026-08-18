@@ -39,10 +39,14 @@ public abstract partial class BaseMultipleWindow : BaseWindow, IWindow
         // Server-spawned — hidden until a MakeWindow/EndWindow pair arrives.
         Visible = false;
 
-        // Resolve paging/close buttons (Back/Close/Next along the bottom, like the Unity client)
+        // Resolve paging/close buttons (Back/Close/Next along the bottom).
+        // Hidden until MakeWindow.Buttons says otherwise.
         _backButton = GetNode<Button>("Content/BackButton");
         _nextButton = GetNode<Button>("Content/NextButton");
         _closeButton = GetNode<Button>("Content/CloseButton");
+        _backButton.Visible = false;
+        _nextButton.Visible = false;
+        _closeButton.Visible = false;
         _backButton.Pressed += BackClicked;
         _nextButton.Pressed += NextClicked;
         _closeButton.Pressed += CloseWindow;
@@ -70,13 +74,10 @@ public abstract partial class BaseMultipleWindow : BaseWindow, IWindow
         Title = packet.Title;
         WindowId = packet.WindowId;
 
-        // Buttons is bool[5] indexed by (enum value - 1): Close=2→1, Back=3→2, Next=4→3
-        if (packet.Buttons != null && packet.Buttons.Length >= 4)
-        {
-            _closeButton.Visible = packet.Buttons[(int)WindowButtons.Close - 1];
-            _backButton.Visible = packet.Buttons[(int)WindowButtons.Back - 1];
-            _nextButton.Visible = packet.Buttons[(int)WindowButtons.Next - 1];
-        }
+        // Bottom Close/Back/Next visibility comes from MakeWindow.Buttons (Goose2 enum).
+        _closeButton.Visible = WindowButtonFlags.IsEnabled(packet.Buttons, WindowButtons.Close);
+        _backButton.Visible = WindowButtonFlags.IsEnabled(packet.Buttons, WindowButtons.Back);
+        _nextButton.Visible = WindowButtonFlags.IsEnabled(packet.Buttons, WindowButtons.Next);
 
         // Clear all lines
         foreach (var l in _lines)

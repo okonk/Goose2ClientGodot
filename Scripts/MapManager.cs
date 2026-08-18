@@ -5,13 +5,14 @@ using Goose2Client.Network.Packets;
 namespace Goose2Client;
 
 /// <summary>World root for the active map (port of Unity MapManager, map/tile/item subset;
-/// character handling is Step 6). Builds the 5 MapLayer nodes, runs the Camera2D, and handles
-/// TileUpdate / MapObject / EraseObject / SetYourPosition.</summary>
+/// character handling is Step 6). Builds flat TileMapLayer bands + a Y-sorted ObjectLayer,
+/// runs the Camera2D, and handles TileUpdate / MapObject / EraseObject / SetYourPosition.</summary>
 public partial class MapManager : Node2D
 {
     private MapFile _map;
     private SpriteCache _cache;
-    private readonly MapLayer[] _layers = new MapLayer[5];   // immediate-draw bands; [2] is null (see _objectLayer)
+    private MapTileCatalog _tileCatalog;
+    private readonly MapLayer[] _layers = new MapLayer[5];   // TileMapLayer bands; [2] is null (see _objectLayer)
     private ObjectLayer _objectLayer;   // layer 2 ("Objects 1") as per-object Y-sortable sprites
     private Node2D _objects;     // dropped-item container
     private Camera2D _camera;
@@ -40,6 +41,7 @@ public partial class MapManager : Node2D
     {
         _map = GameManager.Instance.CurrentMap;
         _cache = new SpriteCache();
+        _tileCatalog = new MapTileCatalog(_cache);
         _objects = GetNode<Node2D>("Objects");
         _characterRoot = GetNode<Node2D>("Characters");
         _camera = GetNode<Camera2D>("Camera2D");
@@ -52,7 +54,7 @@ public partial class MapManager : Node2D
             if (i == 2) continue;   // layer 2 is the Y-sorted ObjectLayer (built below), not a flat band
             var layer = new MapLayer { Name = $"Layer{i}" };
             layersRoot.AddChild(layer);
-            layer.Setup(_map, i, _cache);
+            layer.Setup(_map, i, _tileCatalog);
             _layers[i] = layer;
         }
 
@@ -319,7 +321,7 @@ public partial class MapManager : Node2D
             l.Graphic = sheet == 0 ? 0 : graphic;                      // sheet 0 ⇒ empty cell
             l.Sheet   = sheet;
             if (layer == 2) _objectLayer.RefreshCell(p.X, p.Y);        // Y-sorted layer: rebuild the cell
-            else _layers[layer].QueueRedraw();                         // flat band: repaint the layer
+            else _layers[layer].RefreshCell(p.X, p.Y);                 // TileMapLayer: update one cell
         }
     }
 

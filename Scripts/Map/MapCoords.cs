@@ -22,4 +22,19 @@ public static class MapCoords
     /// coordinates map to negative tile indices (e.g. -0.5 px → tile -1).</summary>
     public static (int x, int y) WorldToTile(Vector2 world)
         => (Mathf.FloorToInt(world.X / TileSize), Mathf.FloorToInt(world.Y / TileSize));
+
+    /// <summary>
+    /// <see cref="TileData.TextureOrigin"/> that bottom-center-anchors a w×h sprite on a TileSize
+    /// cell. Godot draws a tile centered on <see cref="TileCenter"/> then subtracts texture_origin;
+    /// this shifts tall art so its feet sit on the cell's bottom edge (same as the old
+    /// <c>DrawTexture</c> path).
+    /// </summary>
+    public static Vector2I BottomCenterTextureOrigin(int width, int height)
+    {
+        // Horizontal centering is free (TileMap centers the texture on the cell). Only Y needs a
+        // shift so the sprite's bottom edge sits on the cell bottom. `width` is accepted so call
+        // sites pass the full sprite size.
+        _ = width;
+        return new Vector2I(0, (int)System.Math.Round(height / 2.0 - TileSize / 2.0));
+    }
 }

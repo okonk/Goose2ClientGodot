@@ -43,33 +43,49 @@ public class AnimationNamesTests
         => Assert.Equal(expectedFirst, AnimationNames.Candidates(motion, bodyState, d)[0]);
 
     [Fact]
+    public void Candidates_mounted_does_not_fall_back_to_foot_walk()
+    {
+        // Hands/shields have no mounted sheets. Candidates must not offer walk/idle, or
+        // ResolveClip would show foot-walk weapon art while mounted (Unity uses Blank).
+        var walk = AnimationNames.Candidates("mounted-walk", 4, Direction.Down);
+        Assert.Equal(new[] { "mounted-walk-down" }, walk);
+
+        var idle = AnimationNames.Candidates("mounted-idle", 4, Direction.Left);
+        Assert.Equal(new[] { "mounted-idle-left" }, idle);
+    }
+
+    [Fact]
     public void Candidates_fall_back_through_generic_for_weapon_slots()
     {
-        // A Hands sprite only has idle-equip / walk-equip / attack-<type>; equipped idle must offer
-        // idle-equip first, and an attack must offer the weapon clip then degrade to idle.
+        // Hands sheets only have idle-equip / walk-equip / attack-<type>. Equipped idle offers
+        // idle-equip first. Attack stays in the attack family only — no idle fallback (Unity Blank).
         var idle = AnimationNames.Candidates("idle", 4, Direction.Down);
         Assert.Equal("idle-equip-down", idle[0]);
 
         var atk = AnimationNames.Candidates("attack", 4, Direction.Down);
         Assert.Equal("attack-1hand-down", atk[0]);
-        Assert.Contains("idle-equip-down", atk);   // graceful fallback for slots lacking an attack clip
+        Assert.DoesNotContain("idle-equip-down", atk);
+        Assert.DoesNotContain("idle-down", atk);
+        Assert.Equal(new[] { "attack-1hand-down", "attack-down", "attack-no-equip-down" }, atk);
+
+        // Staff prefers attack-staff, still offers attack-1hand for mixed hand sheets.
+        var staff = AnimationNames.Candidates("attack", 5, Direction.Down);
+        Assert.Equal(new[] { "attack-staff-down", "attack-1hand-down", "attack-down", "attack-no-equip-down" }, staff);
     }
 
     [Fact]
-    public void Candidates_cast_equipped_falls_back_to_idle_equip()
+    public void Candidates_attack_unarmed_does_not_fall_back_to_idle()
     {
-        // Equipped (bodyState 4) + down => cast-down, idle-equip-down, idle-down
-        var cast = AnimationNames.Candidates("cast", 4, Direction.Down);
-        Assert.Equal(new[] { "cast-down", "idle-equip-down", "idle-down" }, cast);
+        var atk = AnimationNames.Candidates("attack", 3, Direction.Down);
+        Assert.Equal(new[] { "attack-no-equip-down", "attack-down" }, atk);
     }
 
     [Fact]
-    public void Candidates_cast_unarmed_falls_back_to_idle_no_equip()
+    public void Candidates_cast_is_cast_only_no_idle_fallback()
     {
-        // Unarmed (bodyState 3) + left => cast-left, idle-no-equip-left, idle-left, idle-equip-left
-        // (idle-equip last so Hands weapon sheets still resolve when BodyState is unarmed)
-        var cast = AnimationNames.Candidates("cast", 3, Direction.Left);
-        Assert.Equal(new[] { "cast-left", "idle-no-equip-left", "idle-left", "idle-equip-left" }, cast);
+        // Missing cast clip → ResolveClip blanks the slot (Unity Blank), not idle.
+        Assert.Equal(new[] { "cast-down" }, AnimationNames.Candidates("cast", 4, Direction.Down));
+        Assert.Equal(new[] { "cast-left" }, AnimationNames.Candidates("cast", 3, Direction.Left));
     }
 
     [Fact]

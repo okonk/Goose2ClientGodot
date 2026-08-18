@@ -17,6 +17,11 @@ namespace Goose2Client
         public const string NamesLayer = "Names";
         public const string HealthBarsLayer = "HealthBars";
         public const string TooltipsLayer = "Tooltips";
+
+        /// <summary>Absolute z for overhead name labels. Above all map TileMapLayers
+        /// (ground 0–30, roofs 40) and Y-sorted objects/characters (15), matching Unity's
+        /// dedicated Names sorting layer — names always float on top of world geometry.</summary>
+        public const int NamesZIndex = 100;
     }
 
     public enum ItemUseType

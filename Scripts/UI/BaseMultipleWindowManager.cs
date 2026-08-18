@@ -41,14 +41,42 @@ public abstract partial class BaseMultipleWindowManager<T> : Node where T : Base
 
         if (!_windows.TryGetValue(p.WindowId, out var w))
         {
-            var scene = GD.Load<PackedScene>(PrefabPath);
-            w = scene.Instantiate<T>();
-            AddChild(w);
-            w.OnCloseWindow = OnCloseWindow;
+            // Paging (Back/Next) makes the server send a fresh WindowId for the next page of the
+            // same conversation. Reuse the window already open for that NPC — re-keyed to the new
+            // id — instead of stacking a second window on top of it.
+            w = FindByNpc(p.NpcId);
+            if (w != null)
+            {
+                _windows.Remove(w.WindowId);
+            }
+            else
+            {
+                var scene = GD.Load<PackedScene>(PrefabPath);
+                w = scene.Instantiate<T>();
+                AddChild(w);
+                w.OnCloseWindow = OnCloseWindow;
+            }
+
             _windows[p.WindowId] = w;
         }
 
         w.OnMakeWindow(p);
+    }
+
+    /// <summary>
+    /// Finds the open window belonging to an NPC. NpcId 0 means "not tied to an NPC",
+    /// so those windows are always independent and never reused.
+    /// </summary>
+    private T FindByNpc(int npcId)
+    {
+        if (npcId == 0) return null;
+
+        foreach (var w in _windows.Values)
+        {
+            if (w.NpcId == npcId) return w;
+        }
+
+        return null;
     }
 
     public void OnCloseWindow(BaseMultipleWindow window)

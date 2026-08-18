@@ -30,9 +30,11 @@ public partial class BankWindow : BaseWindow, IWindow
         // Server-spawned — hidden until a MakeWindow/EndWindow for this frame arrives.
         Visible = false;
 
-        // Resolve paging buttons
+        // Resolve paging buttons — hidden until MakeWindow.Buttons says otherwise.
         _backButton = GetNode<Button>("Content/BackButton");
         _nextButton = GetNode<Button>("Content/NextButton");
+        _backButton.Visible = false;
+        _nextButton.Visible = false;
         _backButton.Pressed += BackClicked;
         _nextButton.Pressed += NextClicked;
 
@@ -74,12 +76,9 @@ public partial class BankWindow : BaseWindow, IWindow
         Title = p.Title;
         WindowId = p.WindowId;
 
-        // Buttons is bool[5]; Back=3 → index 2, Next=4 → index 3
-        if (p.Buttons != null && p.Buttons.Length >= 4)
-        {
-            _backButton.Visible = p.Buttons[(int)WindowButtons.Back - 1];
-            _nextButton.Visible = p.Buttons[(int)WindowButtons.Next - 1];
-        }
+        // Bottom Back/Next visibility comes from MakeWindow.Buttons (Goose2 enum).
+        _backButton.Visible = WindowButtonFlags.IsEnabled(p.Buttons, WindowButtons.Back);
+        _nextButton.Visible = WindowButtonFlags.IsEnabled(p.Buttons, WindowButtons.Next);
     }
 
     private void OnEndWindow(object o)

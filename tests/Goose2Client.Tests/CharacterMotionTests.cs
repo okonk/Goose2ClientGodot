@@ -40,4 +40,21 @@ public class CharacterMotionTests
     [Fact]
     public void PixelsPerSecond_guards_zero_movespeed()
         => Assert.True(CharacterMotion.PixelsPerSecond(0) > 0);
+
+    [Fact]
+    public void ShouldPlayIdleAfterStep_only_when_not_chained()
+    {
+        Assert.False(CharacterMotion.ShouldPlayIdleAfterStep(chainedNextStep: true));
+        Assert.True(CharacterMotion.ShouldPlayIdleAfterStep(chainedNextStep: false));
+    }
+
+    [Fact]
+    public void RemainingStepBudget_carries_leftover_past_tile()
+    {
+        // 20px budget, 12px left to target → 8px leftover for the next tile.
+        Assert.Equal(8f, CharacterMotion.RemainingStepBudget(20f, 12f), 3);
+        Assert.Equal(0f, CharacterMotion.RemainingStepBudget(10f, 12f), 3);
+        Assert.Equal(0f, CharacterMotion.RemainingStepBudget(0f, 5f), 3);
+        Assert.Equal(5f, CharacterMotion.RemainingStepBudget(5f, 0f), 3);
+    }
 }
