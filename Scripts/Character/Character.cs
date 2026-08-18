@@ -136,8 +136,8 @@ namespace Goose2Client.Character
         public override void _Ready() => EnsureHeights();
 
         private static void EnsureHeights() =>
-            _heights ??= AnimationHeights.Load(
-                ProjectSettings.GlobalizePath("res://Assets/Resources/AnimationHeights.txt"));
+            _heights ??= AnimationHeights.Parse(
+                ResourceText.ReadAll("res://Assets/Resources/AnimationHeights.txt"));
 
         /// <summary>(Re)build every slot from an MKC spawn packet (position + appearance).</summary>
         public void SetAppearance(MakeCharacterPacket p)

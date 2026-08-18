@@ -11,11 +11,17 @@ namespace Goose2Client.Character
 
         private AnimationHeights(Dictionary<string, int> heights) => _heights = heights;
 
-        public static AnimationHeights Load(string path)
+        public static AnimationHeights Load(string path) => Parse(File.ReadAllLines(path));
+
+        public static AnimationHeights Parse(string text) =>
+            Parse(text.Split('\n'));
+
+        public static AnimationHeights Parse(IEnumerable<string> lines)
         {
             var dict = new Dictionary<string, int>();
-            foreach (var line in File.ReadAllLines(path))
+            foreach (var raw in lines)
             {
+                var line = raw.TrimEnd('\r');
                 if (string.IsNullOrWhiteSpace(line)) continue;
                 int comma = line.LastIndexOf(',');
                 if (comma <= 0) continue;

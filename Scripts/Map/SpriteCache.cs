@@ -15,7 +15,9 @@ public sealed class SpriteCache
     private readonly Dictionary<int, Texture2D> _sheets = new();
     private readonly Dictionary<(int, int), AtlasTexture> _tiles = new();
 
-    public SpriteCache() : this(SpriteManifest.Load(ProjectSettings.GlobalizePath(ManifestPath))) { }
+    // Reads through Godot.FileAccess: the manifest lives in the .pck in an exported
+    // build, where a globalized res:// path does not exist on disk.
+    public SpriteCache() : this(SpriteManifest.Parse(ResourceText.ReadAll(ManifestPath))) { }
     public SpriteCache(SpriteManifest manifest) => _manifest = manifest;
 
     /// <summary>The AtlasTexture for (sheet, graphic), or null when sheet==0, the manifest has no
