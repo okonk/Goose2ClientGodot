@@ -6,6 +6,9 @@
 /export/
 *.translation
 
+# Build stamp written by build.sh, removed on exit
+/build_id.txt
+
 # ---- .NET / C# (Godot C# game project + tools/AssetConverter) ----
 bin/
 obj/
@@ -16,10 +19,14 @@ obj/
 mono_crash.*
 
 # ---- Generated assets (regenerated from ~/code/Illutia via tools/AssetConverter) ----
-# Everything under Assets/ is derived output (decoded spritesheets, per-id SpriteFrames
-# .tres, Maps, and the AnimationHeights/AnimationToFirstFrame metadata). Regenerate with
-# `dotnet run --project tools/AssetConverter/src/AssetConverter -- batch`. Drop this line
-# if you later decide to commit them for reproducible builds without the source data.
+# Assets/Maps, Assets/Resources, and Assets/Sprites are derived output (decoded
+# spritesheets, per-id SpriteFrames .tres, Maps, and the AnimationHeights/
+# AnimationToFirstFrame metadata). Assets/UI is hand-made and IS tracked — it stays
+# checked in because the tracked files there override this rule. Regenerate the rest
+# with the full pipeline (`batch` alone only produces sprite sheets):
+#   ILLUTIA_DATA=... ILLUTIA_MAPS=... ASPERETA_DATA=... ASPERETA_MAPS=... \
+#     dotnet run --project tools/AssetConverter/src/AssetConverter -- all "$PWD"
+# See tools/AssetConverter/src/AssetConverter/Paths.cs for the source paths.
 /Assets/
 
 # ---- Local editor/agent config ----

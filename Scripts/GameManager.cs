@@ -66,6 +66,12 @@ namespace Goose2Client
             UiLayer.Name = "UiLayer";
             AddChild(UiLayer);
 
+            // Always-on-top build stamp. Its own CanvasLayer at 128 so HUD windows on
+            // UiLayer can never draw over it. Added first on purpose: anything below can
+            // throw (asset loading did), and a stamp that vanishes exactly when startup
+            // breaks is useless for identifying which build broke.
+            AddChild(new UI.BuildStampOverlay());
+
             // Listen for class table updates for the lifetime of the app.
             PacketManager.Listen<ClassUpdatePacket>(OnClassUpdate);
             PacketManager.Listen<PingPacket>(OnPing);

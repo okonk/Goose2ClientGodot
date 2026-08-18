@@ -13,4 +13,7 @@
   <ItemGroup>
     <Compile Include="../../Scripts/**/*.cs" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="Fixtures/**" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>
