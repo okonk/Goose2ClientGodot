@@ -503,7 +503,9 @@ namespace Goose2Client.Character
         {
             if (!IsLocalPlayer) return;
             if (GameManager.Instance.IsTargeting) return;   // spell targeting consumes movement/attack input
-            if (GetViewport().GuiGetFocusOwner() is LineEdit) return;   // ignore movement/attack while typing in chat
+            // Root viewport explicitly: world nodes' own viewport is the map sub-viewport, whose
+            // GUI focus owner is always null — the chat LineEdit focus lives on the root.
+            if (GetTree().Root.GuiGetFocusOwner() is LineEdit) return;   // ignore movement/attack while typing in chat
 
             // Unity suppresses attacks entirely while mounted; gate input before AttackGate.
             if (!IsMounted && Input.IsActionPressed("Attack"))
@@ -560,7 +562,7 @@ namespace Goose2Client.Character
         {
             if (!IsLocalPlayer) return false;
             if (GameManager.Instance.IsTargeting) return false;
-            if (GetViewport().GuiGetFocusOwner() is LineEdit) return false;
+            if (GetTree().Root.GuiGetFocusOwner() is LineEdit) return false;   // root viewport — see ProcessLocalInput
 
             bool nextWasMovingVertical = _wasMovingVertical;
             Direction? dir = MovementInput.Resolve(

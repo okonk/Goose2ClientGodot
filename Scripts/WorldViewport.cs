@@ -101,6 +101,27 @@ namespace Goose2Client
             return Current.GetCanvasTransform().AffineInverse() * vp;
         }
 
+        /// <summary>
+        /// Window mouse clicks → world clicks. Sub-viewport nodes never receive window input
+        /// (handle_input_locally=false), so the map's own _UnhandledInput is dead; convert
+        /// explicitly at the root and dispatch to the MapManager. mb.Position is root-window
+        /// coordinates (root viewport is 1:1 with the window). The display-rect gate is
+        /// mandatory, not cosmetic: with the camera centered inside a large map, a click 1px
+        /// into a gutter converts to a valid tile at the camera-view edge and would otherwise
+        /// be sent to the server. HUD windows are Controls and consume their own clicks before
+        /// unhandled input reaches this node.
+        /// </summary>
+        public override void _UnhandledInput(InputEvent e)
+        {
+            if (e is not InputEventMouseButton mb || !mb.Pressed) return;
+            if (mb.ButtonIndex != MouseButton.Left && mb.ButtonIndex != MouseButton.Right) return;
+            if (Current == null) return;
+            if (!WorldViewportScale.IsInsideDisplay(Layout, (Vector2I)mb.Position)) return;   // gutters are not the world
+            var mm = GameManager.Instance.CurrentMapManager;
+            if (mm == null || !GodotObject.IsInstanceValid(mm)) return;
+            mm.HandleWorldClick(mb.ButtonIndex, WindowToWorld(mb.Position));
+        }
+
         private void OnWindowResized()
         {
             var rootSize = (Vector2I)GetTree().Root.GetVisibleRect().Size;

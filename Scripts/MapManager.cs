@@ -225,23 +225,20 @@ public partial class MapManager : Node2D
         }
     }
 
-    public override void _UnhandledInput(InputEvent @event)
+    /// <summary>World-space click. `worldPos` is in map pixels (see WorldViewport.WindowToWorld).</summary>
+    public void HandleWorldClick(MouseButton button, Vector2 worldPos)
     {
         if (GameManager.Instance.IsTargeting) return;   // spell targeting suppresses world clicks
-        if (@event is not InputEventMouseButton mb || !mb.Pressed) return;
-        if (mb.ButtonIndex != MouseButton.Left && mb.ButtonIndex != MouseButton.Right) return;
-
-        var mouseWorld = GetGlobalMousePosition();
         Character.Character hit = null;
         foreach (var child in _characterRoot.GetChildren())
         {
             if (child is not Character.Character c || !GodotObject.IsInstanceValid(c)) continue;
-            if (c.ContainsPoint(mouseWorld)) hit = c;   // later children draw on top → last match is topmost
+            if (c.ContainsPoint(worldPos)) hit = c;   // later children draw on top → last match is topmost
         }
         int tx, ty;
         if (hit != null) { tx = hit.X; ty = hit.Y; }
-        else { (tx, ty) = MapCoords.WorldToTile(mouseWorld); }
-        if (mb.ButtonIndex == MouseButton.Left)
+        else { (tx, ty) = MapCoords.WorldToTile(worldPos); }
+        if (button == MouseButton.Left)
             GameManager.Instance.NetworkClient.LeftClick(tx, ty);
         else
             GameManager.Instance.NetworkClient.RightClick(tx, ty);
