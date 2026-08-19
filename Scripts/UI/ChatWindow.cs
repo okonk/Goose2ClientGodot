@@ -170,9 +170,17 @@ public partial class ChatWindow : Control
         if (@event is InputEventKey k && k.Pressed)
         {
             if (k.Keycode == Key.Up)
+            {
                 HistoryUp();
+                // Without this, LineEdit's own KEY_UP handling runs after our signal and
+                // moves the caret back to column 0, so the caret-set in HistoryUp is lost.
+                GetViewport().SetInputAsHandled();
+            }
             else if (k.Keycode == Key.Down)
+            {
                 HistoryDown();
+                GetViewport().SetInputAsHandled();
+            }
             else if (k.Keycode == Key.Escape)
             {
                 ClearAndUnfocus();

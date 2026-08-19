@@ -38,8 +38,6 @@ public partial class HotbarWindow : BaseWindow, IWindow
     public int WindowId => (int)WindowFrame;
     public WindowFrames WindowFrame => WindowFrames.Hotbar;
 
-    protected override bool UseFixedDockLayout => true;
-
     public override void _Ready()
     {
         base._Ready();
@@ -57,6 +55,11 @@ public partial class HotbarWindow : BaseWindow, IWindow
         _xpBar.MouseExited += () => TooltipManager.Instance.HideTextTooltip();
         _xpText.MouseEntered += () => TooltipManager.Instance.ShowTextTooltip(_xpTooltip, _xpText);
         _xpText.MouseExited += () => TooltipManager.Instance.HideTextTooltip();
+
+        // Window drag: grab the XP bar. The XpText label sits on top of the bar with
+        // MouseFilter=Pass and swallows clicks there, so it needs the same drag wiring.
+        MakeDragHandle(_xpBar);
+        MakeDragHandle(_xpText);
 
         // Back / Next buttons
         _backButton.Pressed += OnBackClicked;

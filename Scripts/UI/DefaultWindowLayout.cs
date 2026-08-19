@@ -11,7 +11,10 @@ public static class DefaultWindowLayout
         ["Inventory"] = new Vector2(900, 360),
         ["Character"] = new Vector2(380, 120),
         ["Spellbook"] = new Vector2(700, 120),
-        ["Hotbar"]    = new Vector2(410, 600),
+        // x=520 clears the chat window (bottom-left, ends at x=508); y=679 puts the hotbar's
+        // bottom (679+36=715) on the same line as the chat window's bottom (5px above a 720p
+        // viewport).
+        ["Hotbar"]    = new Vector2(520, 679),
         ["Vendor"]    = new Vector2(300, 200),
         ["Bank"]      = new Vector2(300, 200),
         ["CombineBag"]= new Vector2(540, 220),

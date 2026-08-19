@@ -22,7 +22,7 @@ layout_mode = 3
 offset_left = 0.0
 offset_top = 0.0
 offset_right = 240.0
-offset_bottom = 100.0
+offset_bottom = 108.0
 WindowName = "Options"
 
 [node name="Background" type="Panel" parent="."]
@@ -79,3 +79,13 @@ offset_right = 232.0
 offset_bottom = 52.0
 mouse_filter = 1
 text = "Target Filtering"
+
+[node name="ShowSpiritBarCheck" type="CheckBox" parent="Content"]
+layout_mode = 2
+anchors_preset = 0
+offset_left = 8.0
+offset_top = 56.0
+offset_right = 232.0
+offset_bottom = 80.0
+mouse_filter = 1
+text = "Show Spirit Bar"

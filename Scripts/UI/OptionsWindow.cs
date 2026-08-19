@@ -10,6 +10,7 @@ namespace Goose2Client.UI;
 public partial class OptionsWindow : BaseWindow
 {
     private CheckBox _targetFiltering;
+    private CheckBox _showSpiritBar;
 
     public override void _Ready()
     {
@@ -21,11 +22,20 @@ public partial class OptionsWindow : BaseWindow
         _targetFiltering = GetNode<CheckBox>("Content/TargetFilteringCheck");
         _targetFiltering.ButtonPressed = GameManager.Instance.CharacterSettings.GetOption<bool>(Options.TargetFiltering, true);
         _targetFiltering.Toggled += OnTargetFilteringChanged;
+
+        _showSpiritBar = GetNode<CheckBox>("Content/ShowSpiritBarCheck");
+        _showSpiritBar.ButtonPressed = GameManager.Instance.CharacterSettings.GetOption<bool>(Options.ShowSpiritBar, true);
+        _showSpiritBar.Toggled += OnShowSpiritBarChanged;
     }
 
     private void OnTargetFilteringChanged(bool pressed)
     {
         GameManager.Instance.CharacterSettings.Options[Options.TargetFiltering] = pressed;
+    }
+
+    private void OnShowSpiritBarChanged(bool pressed)
+    {
+        GameManager.Instance.CharacterSettings.Options[Options.ShowSpiritBar] = pressed;
     }
 
     public void ToggleWindow()
