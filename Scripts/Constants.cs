@@ -136,5 +136,7 @@ namespace Goose2Client
     public static class Options
     {
         public const string TargetFiltering = "TargetFiltering";
+        public const string ShowSpiritBar = "ShowSpiritBar";
+        public const string SpiritBarShown = "SpiritBarShown";
     }
 }
