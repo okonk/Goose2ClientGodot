@@ -14,11 +14,17 @@ public abstract partial class BaseMultipleWindow : BaseWindow, IWindow
 {
     public const int LineCount = 20;
 
-    // The server pre-wraps each line for the original window width at this font size (matches the
-    // Unity client's LiberationSans @ 10). Code-created labels otherwise fall back to Godot's
-    // built-in 16px default — the theme's default_font_size isn't applied to runtime children —
-    // which overflows the fixed-width window. Keep this in sync with the line wrapping the server assumes.
     private const int LineFontSize = 10;
+    // Row pitch copied from Unity's line prefabs (m_SizeDelta.y = 11.18). Unity's TMP renders
+    // size-10 LiberationSans with ~11.2 px line height (ascent+descent), but Godot's Label
+    // derives line height from hhea metrics: 13 px per line at size 10 — 1.8 px extra per line,
+    // which accumulates to ~1 line of overflow in these fixed-height windows. So the labels are
+    // positioned manually at this pitch (like Unity's fixed 11.18 px rows) instead of being
+    // stacked in a VBoxContainer. Each label keeps its natural 13 px height, so a row's ink
+    // overlaps the next by 1.8 px — the same overlap Unity's 11.18 px rows have.
+    private const float LineRowHeight = 11.18f;
+    // Top-left of the line area in both InfoWindow and QuestWindow (matches the old Lines rect).
+    private static readonly Vector2 LinesOrigin = new(6, 22);
     private const int ButtonFontSize = 12;
 
     private Label[] _lines;
@@ -53,16 +59,15 @@ public abstract partial class BaseMultipleWindow : BaseWindow, IWindow
         foreach (var b in new[] { _backButton, _nextButton, _closeButton })
             b.AddThemeFontSizeOverride("font_size", ButtonFontSize);
 
-        // Create line labels at runtime. Pack them tight (separation 0) and pin the font size so
-        // the server's pre-wrapped lines fit the window exactly as they do in the Unity client.
+        // Create line labels at runtime, stacked at Unity's 11.18 px row pitch (see LineRowHeight).
         _lines = new Label[LineCount];
-        var linesContainer = GetNode<VBoxContainer>("Content/Lines");
-        linesContainer.AddThemeConstantOverride("separation", 0);
+        var content = GetNode<Control>("Content");
         for (int i = 0; i < LineCount; i++)
         {
             var label = new Label { Text = " " };
             label.AddThemeFontSizeOverride("font_size", LineFontSize);
-            linesContainer.AddChild(label);
+            label.Position = LinesOrigin + new Vector2(0, i * LineRowHeight);
+            content.AddChild(label);
             _lines[i] = label;
         }
     }
