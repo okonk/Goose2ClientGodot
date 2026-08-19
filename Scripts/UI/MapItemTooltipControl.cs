@@ -38,12 +38,30 @@ namespace Goose2Client.UI
             }
 
             // Size to content so the full-rect Background wraps the name (+ bind line when shown).
-            // The Bind label sits at a fixed y=24, so the height is one or two fixed rows.
-            float width = _nameLabel.GetCombinedMinimumSize().X;
+            // Labels are sized to their actual text height so there is no leftover row padding.
+            const float LeftMargin = 6f;
+            const float TopMargin = 4f;
+            const float RowGap = 2f;
+            const float BottomMargin = 4f;
+
+            Vector2 nameMin = _nameLabel.GetCombinedMinimumSize();
+            _nameLabel.Position = new Vector2(LeftMargin, TopMargin);
+            _nameLabel.Size = new Vector2(400f, nameMin.Y);
+
+            float width = nameMin.X;
+            float height = TopMargin + nameMin.Y + BottomMargin;
+
             if (_bindLabel.Visible)
-                width = Mathf.Max(width, _bindLabel.GetCombinedMinimumSize().X);
-            float height = _bindLabel.Visible ? 40f : 24f;
-            Size = new Vector2(width + 8f, height);
+            {
+                Vector2 bindMin = _bindLabel.GetCombinedMinimumSize();
+                _bindLabel.Position = new Vector2(LeftMargin, TopMargin + nameMin.Y + RowGap);
+                _bindLabel.Size = new Vector2(400f, bindMin.Y);
+                width = Mathf.Max(width, bindMin.X);
+                height += RowGap + bindMin.Y;
+            }
+
+            // LeftMargin on the left, same on the right.
+            Size = new Vector2(width + LeftMargin * 2f, height);
 
             PositionTooltip();
         }
