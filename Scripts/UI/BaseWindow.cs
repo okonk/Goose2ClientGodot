@@ -21,10 +21,6 @@ public partial class BaseWindow : Control
 
     public string Title { set { if (TitleLabel != null) TitleLabel.Text = value; } }
 
-    /// <summary>When true, BaseWindow leaves Position alone so the scene's anchors govern
-    /// placement. Used by always-docked, non-draggable windows like the Hotbar.</summary>
-    protected virtual bool UseFixedDockLayout => false;
-
     public override void _Ready()
     {
         _titleBar = GetNodeOrNull<Control>("TitleBar");
@@ -41,9 +37,8 @@ public partial class BaseWindow : Control
         if (Content != null)
             Content.MouseFilter = MouseFilterEnum.Ignore;
 
-        // Restore persisted position (or first-run default). Skipped for fixed-dock windows
-        // (e.g. the Hotbar), which anchor themselves in their scene and aren't draggable.
-        if (WindowName != null && !UseFixedDockLayout)
+        // Restore persisted position (or first-run default).
+        if (WindowName != null)
         {
             var ws = GameManager.Instance.CharacterSettings.GetWindowSettings(WindowName);
             Position = ws != null ? ws.Position : DefaultWindowLayout.For(WindowName);
@@ -52,7 +47,7 @@ public partial class BaseWindow : Control
 
         // Title-bar drag
         if (_titleBar != null)
-            _titleBar.GuiInput += OnTitleBarGuiInput;
+            MakeDragHandle(_titleBar);
 
         // Hover transparency (Unity WindowTransparency)
         MouseEntered += OnMouseEntered;
@@ -71,6 +66,12 @@ public partial class BaseWindow : Control
             MoveChild(_titleBar, GetChildCount() - 1);
     }
 
+    /// <summary>Makes a control a drag handle for this window (e.g. the hotbar's XP bar).
+    /// Handles must receive mouse input (not MouseFilter.Ignore) and be sized to the
+    /// region the user can grab.</summary>
+    protected void MakeDragHandle(Control handle)
+        => handle.GuiInput += OnTitleBarGuiInput;
+
     private void OnTitleBarGuiInput(InputEvent @event)
     {
         if (@event is InputEventMouseButton mb && mb.ButtonIndex == MouseButton.Left)
@@ -83,7 +84,7 @@ public partial class BaseWindow : Control
             {
                 _dragging = false;
                 if (WindowName != null)
-                    GameManager.Instance.CharacterSettings.SetWindowSetting(WindowName, Position);
+                    GameManager.Instance.CharacterSettings.SetWindowSetting(WindowName, Position, Visible);
             }
         }
         else if (@event is InputEventMouseMotion motion && _dragging)
@@ -92,7 +93,7 @@ public partial class BaseWindow : Control
             {
                 _dragging = false;
                 if (WindowName != null)
-                    GameManager.Instance.CharacterSettings.SetWindowSetting(WindowName, Position);
+                    GameManager.Instance.CharacterSettings.SetWindowSetting(WindowName, Position, Visible);
                 return;
             }
             Position += motion.Relative;
