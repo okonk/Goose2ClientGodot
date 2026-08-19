@@ -14,6 +14,10 @@ public partial class BaseWindow : Control
     private Control _titleBar;
     private Button _closeButton;
     private bool _dragging;
+    private bool _hovered;
+
+    private const float HoverOpacity = 1f;
+    private const float UnhoveredOpacity = 0.7f;
 
     protected Label TitleLabel { get; private set; }
     protected Control Content { get; private set; }
@@ -49,10 +53,13 @@ public partial class BaseWindow : Control
         if (_titleBar != null)
             MakeDragHandle(_titleBar);
 
-        // Hover transparency (Unity WindowTransparency)
-        MouseEntered += OnMouseEntered;
-        MouseExited += OnMouseExited;
-        Modulate = new Color(1, 1, 1, 0.7f);
+        // Hover transparency (Unity WindowTransparency). The cursor position is
+        // checked against the window rect in _Process instead of using this
+        // control's own MouseEntered/MouseExited: the viewport tracks only the
+        // topmost control under the cursor, so moving onto a slot (Panel,
+        // MouseFilter.Stop) fires mouse_exited on THIS window and would fade it
+        // to 70% even though the cursor is still on the window.
+        Modulate = new Color(1, 1, 1, UnhoveredOpacity);
 
         // Close button
         if (_closeButton != null)
@@ -100,9 +107,15 @@ public partial class BaseWindow : Control
         }
     }
 
-    private void OnMouseEntered() => Modulate = new Color(1, 1, 1, 1);
-
-    private void OnMouseExited() => Modulate = new Color(1, 1, 1, 0.7f);
+    public override void _Process(double delta)
+    {
+        bool inside = Visible && GetGlobalRect().HasPoint(GetGlobalMousePosition());
+        if (inside != _hovered)
+        {
+            _hovered = inside;
+            Modulate = new Color(1, 1, 1, inside ? HoverOpacity : UnhoveredOpacity);
+        }
+    }
 
     public void Toggle()
     {

@@ -327,6 +327,8 @@ public partial class HotbarWindow : BaseWindow, IWindow
 
     public override void _Process(double delta)
     {
+        base._Process(delta); // window hover opacity — must not be skipped
+
         _repeatTimer += (float)delta;
         bool repeatTick = _repeatTimer >= 0.1f;
         if (repeatTick) _repeatTimer = 0;
