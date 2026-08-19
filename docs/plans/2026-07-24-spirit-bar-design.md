@@ -1,7 +1,7 @@
 # Spirit Bar in Vitals Window — Design
 
 Date: 2026-07-24
-Status: approved
+Status: approved (revised 2026-07-24: SP panel as separate outline, original skin untouched)
 
 ## Summary
 
@@ -16,22 +16,33 @@ SP is **local-player only** — no overhead bars, no party UI, no protocol chang
 ## Constraints (from user)
 
 - The existing HP/MP layout must stay pixel-identical; when the SP bar is hidden, the
-  window must look exactly like today.
+  window must look **exactly** like today (reviewer finding M2 → approach B chosen).
 - The SP bar is a plain **rectangle** (flat left and right edges).
 - SP bar left edge starts at the same x as the MP bar's left edge (window x49).
 - SP bar right edge ends where the MP bar's 45° bevel meets its bottom edge (window x141).
 - Spacing between MP and SP = spacing between HP and MP: no gap except the 1px black
   outline line between panels.
-- Window may expand with blank space to fit the bar.
 - Bar height: 2–4px less tall than the MP bar (17px) → **14px**.
 - Colour: green/yellow, not pure yellow (too bright).
+- Instead of a second full-window background: a **dedicated small SP outline texture**
+  composited onto the original (reviewer round 2, user-approved).
+
+## Approach
+
+`Assets/UI/vitals-outline.png` (183×55) is **untouched**. A new 96×16 texture
+(`vitals-sp-outline.png`) contains the SP panel — including the top black line that
+extends the MP panel's existing bottom line — and is placed at window (47,45). Godot
+controls don't clip children, so the SP bar and panel draw below the 55px window frame
+with **no resizing of the root or Background** and no runtime texture swapping of the
+main skin. When hidden, the three SP nodes are simply invisible → the window renders
+byte-identically to today.
 
 ## Assets
 
 ### `Assets/UI/vitals-sp-bar.png` (new, 93×14, RGBA)
 
-Plain rectangle, window coords x49–141 (93px wide), 14px tall. Same three-tone vertical
-striping as the MP bar texture (`vitals-mp-bar.png`):
+Plain rectangle, window coords x49–141 (93px wide), 14px tall. Three-tone vertical
+striping matching the MP bar texture's scheme:
 
 | Row | Colour | RGB |
 |-----|--------|-----|
@@ -40,69 +51,60 @@ striping as the MP bar texture (`vitals-mp-bar.png`):
 | y13 (bottom) | dark | (82, 82, 23) |
 
 No bevels, no transparent margins — the shape fills the texture edge to edge.
-(Colors are a starting point; tunable without layout impact.)
 
-### `Assets/UI/vitals-outline.png` (modified: 183×55 → 183×61)
+### `Assets/UI/vitals-sp-outline.png` (new, 96×16, RGBA)
 
-Precise paint spec (existing MP panel reference geometry: black line rows, 1px black
-side borders, interior (59,59,59) first row / (96,96,96) middle / (166,166,166) last row):
+The SP panel, positioned at window (47,45), so texture (tx,ty) = window (x47+tx, y45+ty):
 
-1. Start from the current 183×55 image. Rows y0–y44 untouched.
-2. Extend the existing black line at y45 (currently x47–140) rightward to x47–142 —
-   it becomes the shared MP-bottom / SP-top line (same as y27 for HP/MP).
-3. Paint the rectangular SP panel, rows y46–y59 (rows y46–y54 already exist with only
-   the portrait-circle arc on the left — paint only x47–142; rows y55–y59 are new):
-   - rows y46–y59: black border at x47 and x142
-   - y46: fill x48–141 = (59,59,59)
-   - y47–y58: fill x48–141 = (96,96,96)
-   - y59: fill x48–141 = (166,166,166)
-4. Append row y60: black x47–142, rest transparent. New size 183×61.
+- row ty0 (y45): **full-width black line** (x47–142) — overwrites the MP bottom line's
+  x47–140 identically and extends it to x142.
+- rows ty1–ty14 (y46–y59): transparent at tx0; black border at tx1 (x48) and tx95 (x142);
+  fill tx2–tx94 (x49–141): ty1 = (59,59,59), ty2–ty13 = (96,96,96), ty14 = (166,166,166)
+  — same 3-shade track treatment as the HP/MP panels (border 1px left of the bar edge,
+  matching the MP panel's own pattern at row y44).
+- row ty15 (y60): transparent at tx0; black tx1–tx95 (x48–142).
 
-The SP bar (scene rows y46–59) sits on top of this track; the MP bar's dark bottom row
-(y44) + shared black line (y45) reproduce the exact HP/MP inter-bar spacing. The
-portrait circle (arc ends at y54) and level circle keep their positions; ~6px of
-transparent space remains below the circle.
+### `Assets/UI/vitals-outline.png` — unchanged.
 
 ### Scene geometry (`Scenes/UI/VitalsWindow.tscn`)
 
 | Node | Change |
 |------|--------|
-| `VitalsWindow` (root) | `offset_bottom` 63 → 69 (window 55 → 61 tall) |
-| `Background` (TextureRect) | `offset_bottom` 55 → 61 |
+| root `VitalsWindow`, `Background`, all existing nodes | **unchanged** |
+| `SpOutline` (new TextureRect) | x47–143, y45–61 (96×16), texture = vitals-sp-outline.png, `mouse_filter` = 2 (Ignore), added after `MpText` so it draws above the Background and below the two nodes added after it |
 | `SpBar` (new TextureProgressBar) | x49–142, y46–60 (93×14), `texture_progress` = vitals-sp-bar.png, `fill_mode` = 0, `mouse_filter` = 0, `max_value` = 1 |
 | `SpText` (new Label) | mirrors `MpText` (mouse_filter=1, left-aligned, bottom-v-aligned) at x59–152, y46–60 |
-
-`HpBar`, `MpBar`, `HpText`, `MpText`, `Portrait`, `LevelCircle`, `LevelText`: unchanged.
 
 ## Behaviour (`Scripts/UI/VitalsWindow.cs`)
 
 - On `SNF` (`StatusInfoPacket`): set `_spBar.Value = MaxSP == 0 ? 0 : CurrentSP/MaxSP`,
   `SpText` to `CurrentSP.ToString("N0")`, tooltip to `Spirit: {CurrentSP:N0} / {MaxSP:N0}`
-  (same pattern as HP/MP, including hover wiring on bar + label).
-- **Visibility** (evaluated on every `SNF` and on option change; cheap direct read):
+  (same pattern as HP/MP, including hover wiring on bar + label). Mark `_snfReceived`.
+- **Visibility** — evaluated every `_Process` (cheap direct option read, same
+  read-on-demand pattern as `SpellTargetManager` for Target Filtering):
 
   ```
-  shown = ShowSpiritBar option (default true)
-        && (SpiritBarShown latch  ||  p.MaxSP > 0)
+  shown = _snfReceived
+        && ShowSpiritBar option (default true)
+        && (SpiritBarShown latch  ||  MaxSP > 0)
   ```
 
-  - When `MaxSP > 0`: set latch → save (once); bar shows.
-  - When `MaxSP == 0` and never latched: bar hidden.
+  - Hidden before the first SNF (no ghost bar for latched characters).
+  - When `MaxSP > 0`: set latch → save once; bar shows.
+  - When `MaxSP == 0` and never latched: hidden.
   - Latch persists per character in `CharacterSettings.Options["SpiritBarShown"]`
-    (bool), surviving relogins. `CharacterSettings.Save()` on flip.
+    (bool), surviving relogins (`CharacterSettings.Save()` on flip).
   - Toggle off forces hidden regardless of latch.
-- Initial visibility before first `SNF`: hidden.
+- Show/hide applies to **all three** SP nodes (`SpOutline`, `SpBar`, `SpText`).
 
 ## Toggle (`Scripts/UI/OptionsWindow.cs` + `Scenes/UI/OptionsWindow.tscn`)
 
-- `Constants.Options`: add `public const string ShowSpiritBar = "ShowSpiritBar";`
+- `Constants.Options`: add `ShowSpiritBar` and `SpiritBarShown` key constants.
 - Options window: add `ShowSpiritBarCheck` CheckBox under `TargetFilteringCheck`
   (offsets 56–80; grow window `offset_bottom` 100 → 108).
 - Wire exactly like `TargetFilteringCheck`: initialize from
   `CharacterSettings.GetOption<bool>(Options.ShowSpiritBar, true)`, write back on
   `Toggled`, `Save()` on window close.
-- VitalsWindow reads the option live (no signal needed — same read-on-demand pattern as
-  `SpellTargetManager` for Target Filtering).
 
 ## Out of scope
 
@@ -110,14 +112,17 @@ transparent space remains below the circle.
   SP is never shown to other players.
 - Party window spirit bars.
 - Protocol changes.
+- Modifying `vitals-outline.png` (the SP panel is a separate texture).
 
 ## Testing
 
 - Unit test the visibility decision (option × latch × MaxSP>0) as a small pure function
-  (e.g. `SpiritBarVisibility.ShouldShow(optionOn, latched, maxSp)`) in
-  `tests/Goose2Client.Tests`.
+  (`SpiritBarVisibility.ShouldShow`) in `tests/Goose2Client.Tests`.
+  (Settings-bool round-trip is already covered by
+  `CharacterSettingsJsonTests.RoundTrip_SerializesAndDeserializesAllFields`.)
 - Existing suite must stay green (262 passing at baseline).
-- Manual: toggle on/off, SNF with SP 0 then >0, relogin latch persistence.
+- Manual: toggle on/off, SNF with SP 0 then >0, relogin latch persistence, hidden-state
+  window byte-identical to pre-change.
 
 ## Task estimate
 
