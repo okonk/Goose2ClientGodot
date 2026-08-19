@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate Assets/UI/vitals-sp-bar.png (93x14) and Assets/UI/vitals-sp-outline.png
+"""Generate Assets/UI/vitals-sp-bar.png (92x14) and Assets/UI/vitals-sp-outline.png
 (96x16, the SP panel incl. its top line). Pure stdlib (no PIL in this environment).
 Purely additive: never touches Assets/UI/vitals-outline.png.
 Re-run note: overwrites the two generated PNGs; run the godot import step afterwards
@@ -42,14 +42,22 @@ for x in range(1, OUT_W):
     setp(x, 15, BLACK)
 encode('Assets/UI/vitals-sp-outline.png', OUT_W, OUT_H, px)
 
-# ---------- SP bar: 93x14 plain rectangle, window x49..141 / y46..59 ----------
-BAR_W, BAR_H = 93, 14
+# ---------- SP bar: 92x14, window x49..140 / y46..59 ----------
+# 3-tone vertical striping (highlight row 0 / body rows 1..12 / shadow row 13),
+# same relative ratios as the original olive scheme, recomputed from base #C2BB0D.
+BAR_W, BAR_H = 92, 14
+SP_BASE = (194, 187, 13)  # #C2BB0D
+_OLD_BODY, _OLD_HI, _OLD_DK = (125, 125, 35), (190, 190, 90), (82, 82, 23)
+def _rescale(base, old_body, old_tone):
+    return tuple(min(255, round(b * t / ob)) for b, ob, t in zip(base, old_body, old_tone))
+SP_HI = _rescale(SP_BASE, _OLD_BODY, _OLD_HI)   # -> (255, 255, 33)
+SP_DK = _rescale(SP_BASE, _OLD_BODY, _OLD_DK)   # -> (127, 123, 9)
 bar = bytearray(BAR_W * BAR_H * 4)
 for y in range(BAR_H):
-    c = (190,190,90,255) if y == 0 else ((82,82,23,255) if y == BAR_H-1 else (125,125,35,255))
+    c = SP_HI if y == 0 else (SP_DK if y == BAR_H - 1 else SP_BASE)
     for x in range(BAR_W):
         i = (y * BAR_W + x) * 4
-        bar[i:i+4] = bytes(c)
+        bar[i:i+4] = bytes(c + (255,))
 encode('Assets/UI/vitals-sp-bar.png', BAR_W, BAR_H, bar)
 
 # ---------- verify (re-decode; index with the DECODED width, not the generation consts) ----------
@@ -105,8 +113,10 @@ for x in range(1, w):
     assert tuple(npx[(15*w+x)*4:(15*w+x)*4+4]) == BLACK
 w, h, npx = load('Assets/UI/vitals-sp-bar.png')
 assert (w, h) == (BAR_W, BAR_H), (w, h)
-assert tuple(npx[0:4]) == (190,190,90,255)
-assert tuple(npx[(7*w+40)*4:(7*w+40)*4+4]) == (125,125,35,255)
-i = (13*w+92)*4
-assert tuple(npx[i:i+4]) == (82,82,23,255)
+# independent literals mirroring the generation values (full-coverage check)
+assert all(tuple(npx[x*4:x*4+4]) == (255,255,33,255) for x in range(w)), 'row0'
+for y in range(1, BAR_H - 1):
+    assert all(tuple(npx[(y*w+x)*4:(y*w+x)*4+4]) == (194,187,13,255) for x in range(w)), y
+last = (BAR_H - 1) * w
+assert all(tuple(npx[(last+x)*4:(last+x)*4+4]) == (127,123,9,255) for x in range(w)), 'lastrow'
 print("ALL CHECKS PASSED")
