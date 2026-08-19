@@ -41,7 +41,12 @@ namespace Goose2Client.UI
             {
                 var src = d["slot"].As<HotbarSlot>();
                 if (src != null && !src.IsEmpty)
+                {
                     src.Clear();
+                    // Persist the cleared slot, same as every other hotbar mutation path —
+                    // otherwise it reappears from the settings file on next login.
+                    src.OnSaveSlots?.Invoke();
+                }
             }
         }
     }
