@@ -395,24 +395,43 @@ namespace Goose2Client.Character
             return 0.5;
         }
 
+        /// <summary>Deltas beyond this (per axis, in tiles) mean the server teleported the
+        /// character (summon/follow/recall), not a walk. Walking tile-by-tile across the map is
+        /// the bug this guards against. Local prediction only ever sends single-tile steps, so
+        /// this never affects the local player.</summary>
+        private const int TeleportSnapDistance = 2;
+
         /// <summary>Server (or local prediction) says this character stepped to (x,y).</summary>
         public void MoveTo(int x, int y)
         {
+            // Large delta = server-side teleport: snap instead of walking the path.
+            int sdx = x - X, sdy = y - Y;
+            if (System.Math.Abs(sdx) > TeleportSnapDistance || System.Math.Abs(sdy) > TeleportSnapDistance)
+            {
+                ApplyDeltaFacing(sdx, sdy);
+                TeleportTo(x, y);
+                return;
+            }
+
             // Snap to previous target if a chained packet arrives mid-move
             if (_moving) Position = _targetPosition;
 
-            // Facing priority: Down > Right > Up > Left; zero delta preserves facing
-            int dx = x - X, dy = y - Y;
-            if (dy > 0) Facing = Direction.Down;
-            else if (dx > 0) Facing = Direction.Right;
-            else if (dy < 0) Facing = Direction.Up;
-            else if (dx < 0) Facing = Direction.Left;
+            ApplyDeltaFacing(x - X, y - Y);
 
             X = x; Y = y;
             _targetPosition = Goose2Client.Map.MapCoords.TileBottomCenter(x, y);
             _moving = true;
             ApplyDrawOrder();   // facing may have changed -> reorder shield/weapon
             PlayState();
+        }
+
+        /// <summary>Facing priority: Down > Right > Up > Left; zero delta preserves facing.</summary>
+        private void ApplyDeltaFacing(int dx, int dy)
+        {
+            if (dy > 0) Facing = Direction.Down;
+            else if (dx > 0) Facing = Direction.Right;
+            else if (dy < 0) Facing = Direction.Up;
+            else if (dx < 0) Facing = Direction.Left;
         }
 
         /// <summary>Instant placement (spawn / SUP teleport) — no walk animation.</summary>
