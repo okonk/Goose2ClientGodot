@@ -90,6 +90,10 @@ namespace Goose2Client.Character
             if (_mpBar != null) _mpBar.Visible = visible;
         }
 
+        /// <summary>Distance from the head (resting-pose body height) to the top edge of the name
+        /// label. Shared by name layout and chat-bubble placement so the two stay in sync.</summary>
+        private const float NameTopOffset = 26f;
+
         private void EnsureNameLabel()
         {
             if (_nameLabel != null) return;
@@ -131,7 +135,7 @@ namespace Goose2Client.Character
             float w = Mathf.Max(min.X, 8f);
             float h = Mathf.Max(min.Y, 16f);
             _nameLabel.Size = new Vector2(w, h);
-            _nameLabel.Position = new Vector2(-w / 2f, -(bodyHeight + 26));
+            _nameLabel.Position = new Vector2(-w / 2f, -(bodyHeight + NameTopOffset));
         }
 
         // The converter's height-prefix uses its AnimationType name, which differs from the
@@ -685,21 +689,18 @@ namespace Goose2Client.Character
             if (GodotObject.IsInstanceValid(_chatBubble))
                 _chatBubble.QueueFree();
 
-            _chatBubble = new Overlays.ChatBubble
-            {
-                Name = "ChatBubble",
-                ZIndex = 20,
-            };
+            _chatBubble = new Overlays.ChatBubble { Name = "ChatBubble" };
             AddChild(_chatBubble);
             _chatBubble.SetText(message);
 
-            // Position above head — faithful pixel port of Unity formula.
-            // Unity: localPosition = (0, character.Height/32 + (bubbleHeight - 0.4355469f)/2f)
-            // Godot pixels: Height is already in px, 0.4355469 * 32 = 13.9375px
-            // Godot Y is down, so negate for "above". The Unity formula was anchored at its tile-center
-            // character origin; this port's Character node origin is the feet (tile bottom edge), so lift
-            // by half a tile to match — same feet->center correction ShowEmote/ShowSpell apply.
-            _chatBubble.Position = new Vector2(0, -(Height + (_chatBubble.BackgroundHeight - 0.4355469f * 32f) / 2f) - Goose2Client.Map.MapCoords.TileSize / 2f - Overlays.ChatBubbleLayout.VerticalGap);
+            // The bubble draws on top of the name (its z is NamesZIndex + 2), so anchor it
+            // above the nameplate: its bottom edge VerticalGap px above the name's top edge
+            // (the node origin is the background's bottom-left, so no height math here). Shift
+            // left by half the width to center it on the character.
+            float nameTop = -(Height + NameTopOffset);
+            _chatBubble.Position = new Vector2(
+                -_chatBubble.BackgroundWidth / 2f,
+                nameTop - Overlays.ChatBubbleLayout.VerticalGap);
         }
 
         /// <summary>Show a spell impact animation at this character's origin. Spells stack (no replacement).</summary>

@@ -26,8 +26,8 @@ public class ChatBubbleLayoutTests
     public void BackgroundSize_AddsPadding()
     {
         var size = ChatBubbleLayout.BackgroundSize(new Vector2(100f, 20f));
-        Assert.Equal(107f, size.X); // 100 + 7
-        Assert.Equal(25f, size.Y); // 20 + 5
+        Assert.Equal(114f, size.X); // 100 + 2*7
+        Assert.Equal(30f, size.Y); // 20 + 2*5
     }
 
     [Fact]
