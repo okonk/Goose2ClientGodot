@@ -30,12 +30,20 @@ def setp(x, y, c):
     px[i:i+4] = bytes(c)
 for x in range(OUT_W):        # ty0 (y45): full black line — extends MP bottom line x47..140 -> x47..141
     setp(x, 0, BLACK)
-for y in range(1, 15):        # ty1..ty14 (y46..y59): border tx1/tx94, fill tx2..93
-    fill = DARK if y == 1 else (LIGHT if y == 14 else MID)
+for y in range(1, 15):        # ty1..ty14 (y46..y59): border tx1/tx94, inset bevel fill
     setp(0, y, T)
     setp(1, y, BLACK)
-    for x in range(2, 94):
-        setp(x, y, fill)
+    if y == 1:                # top row: full DARK (matches HP/MP panels)
+        for x in range(2, 94):
+            setp(x, y, DARK)
+    elif y == 14:             # bottom row: full LIGHT (matches HP/MP panels)
+        for x in range(2, 94):
+            setp(x, y, LIGHT)
+    else:                     # reversed bevel vs the bar: shadow left, highlight right
+        setp(2, y, DARK)      # 1px in from the left border
+        for x in range(3, 93):
+            setp(x, y, MID)
+        setp(93, y, LIGHT)    # 1px left of the right border
     setp(94, y, BLACK)
 setp(0, 15, T)                # ty15 (y60): black tx1..94 (x48..141)
 for x in range(1, OUT_W):
@@ -43,8 +51,9 @@ for x in range(1, OUT_W):
 encode('Assets/UI/vitals-sp-outline.png', OUT_W, OUT_H, px)
 
 # ---------- SP bar: 92x14, window x49..140 / y46..59 ----------
-# 3-tone vertical striping (highlight row 0 / body rows 1..12 / shadow row 13),
-# same relative ratios as the original olive scheme, recomputed from base #6D31AE.
+# Raised bevel: highlight top row + left column, shadow bottom row + right column,
+# body in between (rows win at the corners).
+# Same relative ratios as the original olive scheme, recomputed from base #6D31AE.
 BAR_W, BAR_H = 92, 14
 SP_BASE = (109, 49, 174)  # #6D31AE
 _OLD_BODY, _OLD_HI, _OLD_DK = (125, 125, 35), (190, 190, 90), (82, 82, 23)
@@ -54,8 +63,15 @@ SP_HI = _rescale(SP_BASE, _OLD_BODY, _OLD_HI)   # -> (166, 74, 255)
 SP_DK = _rescale(SP_BASE, _OLD_BODY, _OLD_DK)   # -> (72, 32, 114)
 bar = bytearray(BAR_W * BAR_H * 4)
 for y in range(BAR_H):
-    c = SP_HI if y == 0 else (SP_DK if y == BAR_H - 1 else SP_BASE)
     for x in range(BAR_W):
+        if y == 0:
+            c = SP_HI
+        elif y == BAR_H - 1:
+            c = SP_DK
+        elif x == 0:
+            c = SP_HI
+        else:
+            c = SP_DK if x == BAR_W - 1 else SP_BASE
         i = (y * BAR_W + x) * 4
         bar[i:i+4] = bytes(c + (255,))
 encode('Assets/UI/vitals-sp-bar.png', BAR_W, BAR_H, bar)
@@ -102,12 +118,17 @@ assert (w, h) == (OUT_W, OUT_H), (w, h)
 for x in range(w):
     assert tuple(npx[x*4:x*4+4]) == BLACK, x
 for y in range(1, 15):
-    fill = DARK if y == 1 else (LIGHT if y == 14 else MID)
-    assert npx[y*w*4 + 3] == 0
-    assert tuple(npx[(y*w+1)*4:(y*w+1)*4+4]) == BLACK
-    for x in (2, 50, 93):
-        assert tuple(npx[(y*w+x)*4:(y*w+x)*4+4]) == fill, (y, x)
-    assert tuple(npx[(y*w+94)*4:(y*w+94)*4+4]) == BLACK
+    base = y * w
+    assert npx[base*4 + 3] == 0
+    assert tuple(npx[(base+1)*4:(base+1)*4+4]) == BLACK
+    assert tuple(npx[(base+94)*4:(base+94)*4+4]) == BLACK
+    if y in (1, 14):
+        edge = DARK if y == 1 else LIGHT
+        assert all(tuple(npx[(base+x)*4:(base+x)*4+4]) == edge for x in range(2, 94)), y
+    else:
+        assert tuple(npx[(base+2)*4:(base+2)*4+4]) == DARK, y
+        assert all(tuple(npx[(base+x)*4:(base+x)*4+4]) == MID for x in range(3, 93)), y
+        assert tuple(npx[(base+93)*4:(base+93)*4+4]) == LIGHT, y
 assert npx[15*w*4 + 3] == 0
 for x in range(1, w):
     assert tuple(npx[(15*w+x)*4:(15*w+x)*4+4]) == BLACK
@@ -116,7 +137,11 @@ assert (w, h) == (BAR_W, BAR_H), (w, h)
 # independent literals mirroring the generation values (full-coverage check)
 assert all(tuple(npx[x*4:x*4+4]) == (166,74,255,255) for x in range(w)), 'row0'
 for y in range(1, BAR_H - 1):
-    assert all(tuple(npx[(y*w+x)*4:(y*w+x)*4+4]) == (109,49,174,255) for x in range(w)), y
+    base = y * w
+    assert tuple(npx[base*4:base*4+4]) == (166,74,255,255), (y, 'left')
+    for x in range(1, w - 1):
+        assert tuple(npx[(base+x)*4:(base+x)*4+4]) == (109,49,174,255), (y, x)
+    assert tuple(npx[(base+w-1)*4:(base+w-1)*4+4]) == (72,32,114,255), (y, 'right')
 last = (BAR_H - 1) * w
 assert all(tuple(npx[(last+x)*4:(last+x)*4+4]) == (72,32,114,255) for x in range(w)), 'lastrow'
 print("ALL CHECKS PASSED")
