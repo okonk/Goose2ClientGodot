@@ -11,6 +11,7 @@ public partial class OptionsWindow : BaseWindow
 {
     private CheckBox _targetFiltering;
     private CheckBox _showSpiritBar;
+    private CheckBox _nativeRender;
 
     public override void _Ready()
     {
@@ -26,6 +27,10 @@ public partial class OptionsWindow : BaseWindow
         _showSpiritBar = GetNode<CheckBox>("Content/ShowSpiritBarCheck");
         _showSpiritBar.ButtonPressed = GameManager.Instance.CharacterSettings.GetOption<bool>(Options.ShowSpiritBar, true);
         _showSpiritBar.Toggled += OnShowSpiritBarChanged;
+
+        _nativeRender = GetNode<CheckBox>("Content/NativeRenderCheck");
+        _nativeRender.ButtonPressed = GameManager.Instance.CharacterSettings.GetOption<bool>(Options.RenderMode, false);
+        _nativeRender.Toggled += OnNativeRenderChanged;
     }
 
     private void OnTargetFilteringChanged(bool pressed)
@@ -36,6 +41,13 @@ public partial class OptionsWindow : BaseWindow
     private void OnShowSpiritBarChanged(bool pressed)
     {
         GameManager.Instance.CharacterSettings.Options[Options.ShowSpiritBar] = pressed;
+    }
+
+    private void OnNativeRenderChanged(bool pressed)
+    {
+        GameManager.Instance.CharacterSettings.Options[Options.RenderMode] = pressed;
+        GameManager.Instance.CharacterSettings.Save();
+        GameManager.Instance.WorldViewport.ApplyMode(pressed ? WorldRenderMode.Native1x : WorldRenderMode.Integer2x);
     }
 
     public void ToggleWindow()
