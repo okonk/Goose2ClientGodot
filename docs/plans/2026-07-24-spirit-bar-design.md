@@ -71,9 +71,9 @@ The SP panel, positioned at window (47,45), so texture (tx,ty) = window (x47+tx,
 | Node | Change |
 |------|--------|
 | root `VitalsWindow`, `Background`, all existing nodes | **unchanged** |
-| `SpOutline` (new TextureRect) | x47–143, y45–61 (96×16), texture = vitals-sp-outline.png, `mouse_filter` = 2 (Ignore), added after `MpText` so it draws above the Background and below the two nodes added after it |
-| `SpBar` (new TextureProgressBar) | x49–142, y46–60 (93×14), `texture_progress` = vitals-sp-bar.png, `fill_mode` = 0, `mouse_filter` = 0, `max_value` = 1 |
-| `SpText` (new Label) | mirrors `MpText` (mouse_filter=1, left-aligned, bottom-v-aligned) at x59–152, y46–60 |
+| `SpOutline` (new TextureRect) | x47–143, y45–61 (96×16), texture = vitals-sp-outline.png, `mouse_filter` = 2 (Ignore), `visible` = false. **All three SP nodes are inserted after `MpText`, before `Portrait`** — child order = draw order, and the level circle (x37–55, y36–55) overlaps the panel's x47–55 corner and must render above the SP nodes, exactly as it renders above the MP panel today |
+| `SpBar` (new TextureProgressBar) | x49–142, y46–60 (93×14), `texture_progress` = vitals-sp-bar.png, `fill_mode` = 0, `mouse_filter` = 0, `max_value` = 1, `visible` = false |
+| `SpText` (new Label) | mirrors `MpText` (mouse_filter=1, left-aligned, bottom-v-aligned) at x59–152, y46–60, `visible` = false; shows the current value only (the `x / y` total lives in the tooltip) |
 
 ## Behaviour (`Scripts/UI/VitalsWindow.cs`)
 
@@ -88,6 +88,10 @@ The SP panel, positioned at window (47,45), so texture (tx,ty) = window (x47+tx,
         && ShowSpiritBar option (default true)
         && (SpiritBarShown latch  ||  MaxSP > 0)
   ```
+
+  The whole rule lives in one pure function —
+  `SpiritBarVisibility.ShouldShow(bool snfReceived, bool optionOn, bool latched, long maxSp)`
+  — so every branch (incl. the pre-SNF gate) is unit-testable.
 
   - Hidden before the first SNF (no ghost bar for latched characters).
   - When `MaxSP > 0`: set latch → save once; bar shows.

@@ -1,10 +1,12 @@
 # Spirit Bar (Vitals Window) Implementation Plan
 
+> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
+
 **Goal:** Add a toggleable, auto-latching Spirit (SP) bar below the MP bar in the Vitals window, using a new 93×14 bar texture plus a separate 96×16 SP panel outline (original window skin untouched), with an Options-window toggle and per-character persistence.
 
-**Architecture:** Pure client-side UI. Data already arrives via `StatusInfoPacket` (SNF, `MaxSP`/`CurrentSP`). Assets are generated with a checked-in Python script (no PIL in this environment — pure-stdlib PNG codec). The SP panel is a small standalone texture placed at window (47,45); Godot controls don't clip children, so the bar draws below the 55px window frame with no root/Background resizing. When hidden, the three SP nodes are invisible and the window renders byte-identically to today. Visibility = first-SNF-received AND option AND (persisted latch OR MaxSP > 0).
+**Architecture:** Pure client-side UI. Data already arrives via `StatusInfoPacket` (SNF, `MaxSP`/`CurrentSP`). Assets are generated with a checked-in Python script (no PIL in this environment — pure-stdlib PNG codec). The SP panel is a small standalone texture placed at window (47,45); Godot controls don't clip children, so the bar draws below the 55px window frame with no root/Background resizing and no runtime texture swapping of the main skin. The three SP nodes start `visible = false` in the scene; showing/hiding is driven by one pure rule — `snfReceived && option && (latch || MaxSP > 0)`.
 
-**Tech Stack:** Godot 4.6 C# (GDScript scenes), Python 3 stdlib for asset generation.
+**Tech Stack:** Godot C# (GDScript scenes); Python 3 stdlib for asset generation. Engine: use `GODOT="${GODOT:-/usr/local/bin/godot}"` — 4.6.2 mono is the only engine installed in this environment (build.sh's default `/usr/bin/godot-mono` does not exist here). The project targets the 4.7 feature tag, but import/check/scene-load on 4.6.2 was verified working; the test project pins GodotSharp 4.6.2 (pre-existing mismatch, out of scope). xUnit 2.9 / net10.0.
 
 Design doc: `docs/plans/2026-07-24-spirit-bar-design.md` (approved, revised for the separate-SP-outline approach).
 
@@ -17,7 +19,7 @@ Design doc: `docs/plans/2026-07-24-spirit-bar-design.md` (approved, revised for 
 | `StatusInfoPacket.MaxSP` / `.CurrentSP` (long) | `Scripts/Network/Packets/StatusInfoPacket.cs:14,17` |
 | `CharacterSettings.Options` (Dictionary<string,object>) | `Scripts/CharacterSettings.cs:46` |
 | `CharacterSettings.GetOption<T>(key, default)` | `Scripts/CharacterSettings.cs:189` |
-| `CharacterSettings.Save()` (writes `{char}-settings.json`) | `Scripts/CharacterSettings.cs:143` |
+| `CharacterSettings.Save()` (writes `{char}-settings.json` via `GlobalizePath("user://")`) | `Scripts/CharacterSettings.cs:143,63-65` |
 | `CharacterSettings` parameterless ctor / public `ApplyDefaults` | `Scripts/CharacterSettings.cs:52,102` |
 | `GameManager.Instance.CharacterSettings` | `Scripts/GameManager.cs:24`; created at login (`LoginScene.cs:103`) strictly before HUD (`MapManager.cs:93` → `GameManager.cs:196`) — unguarded reads in HUD `_Ready`/`_Process` are safe |
 | `Constants.Options` static class | `Scripts/Constants.cs:136-139` |
@@ -26,8 +28,8 @@ Design doc: `docs/plans/2026-07-24-spirit-bar-design.md` (approved, revised for 
 | SNF → VitalsWindow wiring (`Listen<StatusInfoPacket>(OnStatusInfo)`) | `Scripts/UI/VitalsWindow.cs:49` (hover wiring `:36-46`; class has no `_Process` today) |
 | `TextureProgressBar` scene props (`fill_mode=0`, `mouse_filter=0`, `step=0.0`, `max_value=1.0`) | `Scenes/UI/VitalsWindow.tscn` (`MpBar` node) |
 | MP panel left-edge pattern (border 1px left of bar edge; row y44 = black x48, fill x49+) | decoded `Assets/UI/vitals-outline.png` rows y43–45 |
-| `godot --headless --path . --import` regenerates `.import` files (Godot 4.6 at `/usr/local/bin/godot`) | verified engine 4.6.2 |
-| `tools/check_scene.gd` usage: `godot --headless --script tools/check_scene.gd -- res://...tscn` | `tools/check_scene.gd:2` |
+| Level circle node rect (x37–55, y36–55) overlaps the SP panel corner → SP nodes must insert **before** `Portrait`/`LevelCircle` in child order | `Scenes/UI/VitalsWindow.tscn` (`LevelCircle` node) |
+| `"$GODOT" --headless --path . --import` regenerates `.import` files; `tools/check_scene.gd` usage `"$GODOT" --headless --script tools/check_scene.gd -- res://...tscn` | verified on engine 4.6.2; `tools/check_scene.gd:2` |
 | Test project is **xUnit** (2.9.2, net10.0); bool option round-trip already covered | `tests/Goose2Client.Tests/CharacterSettingsJsonTests.cs:13,31` |
 | `vitals-outline.png` referenced only by `VitalsWindow.tscn` (stays untouched anyway) | grep: single `ext_resource` reference |
 
@@ -46,8 +48,8 @@ Baseline: 262 tests passing.
 **Mutation impact:**
 - Source of truth: **none existing** — two new asset files, purely additive. `Assets/UI` is tracked (the tracked exception to `/Assets/` in `.gitignore`); `vitals-outline.png` is NOT modified.
 - Important readers: none until Task 2 adds the scene nodes.
-- Derived/cached state: `.import` metadata — regenerated by `godot --headless --path . --import`.
-- Invariants to preserve: `Assets/UI/vitals-outline.png` and all other existing files byte-identical (this task creates, never overwrites existing files — the generator only writes the two new paths).
+- Derived/cached state: `.import` metadata — regenerated by `"$GODOT" --headless --path . --import`.
+- Invariants to preserve: `Assets/UI/vitals-outline.png` and all other existing files byte-identical (the generator only writes the two new paths).
 - Observable proof required: in-script assertions on both new PNGs (below), plus `git status` showing only the new files.
 
 **Step 1: Write the generator script**
@@ -59,8 +61,8 @@ Baseline: 262 tests passing.
 """Generate Assets/UI/vitals-sp-bar.png (93x14) and Assets/UI/vitals-sp-outline.png
 (96x16, the SP panel incl. its top line). Pure stdlib (no PIL in this environment).
 Purely additive: never touches Assets/UI/vitals-outline.png.
-Re-run note: overwrites the two generated PNGs; run `godot --headless --path . --import`
-afterwards to refresh .import files."""
+Re-run note: overwrites the two generated PNGs; run the godot import step afterwards
+to refresh .import files."""
 import struct, zlib
 
 def encode(path, w, h, px):
@@ -80,37 +82,36 @@ BLACK = (0,0,0,255); MID = (96,96,96,255); DARK = (59,59,59,255); LIGHT = (166,1
 T = (0,0,0,0)
 
 # ---------- SP panel outline: 96x16, placed at window (47,45) ----------
-# texture (tx,ty) = window (x47+tx, y45+ty)
-W, H = 96, 16
-px = bytearray(W * H * 4)
+OUT_W, OUT_H = 96, 16
+px = bytearray(OUT_W * OUT_H * 4)
 def setp(x, y, c):
-    i = (y * W + x) * 4
+    i = (y * OUT_W + x) * 4
     px[i:i+4] = bytes(c)
-for x in range(96):            # ty0 (y45): full black line — extends MP bottom line x47..140 -> x47..142
+for x in range(OUT_W):        # ty0 (y45): full black line — extends MP bottom line x47..140 -> x47..142
     setp(x, 0, BLACK)
-for y in range(1, 15):         # ty1..ty14 (y46..y59): border tx1/tx95, fill tx2..94
+for y in range(1, 15):        # ty1..ty14 (y46..y59): border tx1/tx95, fill tx2..94
     fill = DARK if y == 1 else (LIGHT if y == 14 else MID)
     setp(0, y, T)
     setp(1, y, BLACK)
     for x in range(2, 95):
         setp(x, y, fill)
     setp(95, y, BLACK)
-setp(0, 15, T)                 # ty15 (y60): black tx1..95 (x48..142)
-for x in range(1, 96):
+setp(0, 15, T)                # ty15 (y60): black tx1..95 (x48..142)
+for x in range(1, OUT_W):
     setp(x, 15, BLACK)
-encode('Assets/UI/vitals-sp-outline.png', W, H, px)
+encode('Assets/UI/vitals-sp-outline.png', OUT_W, OUT_H, px)
 
 # ---------- SP bar: 93x14 plain rectangle, window x49..141 / y46..59 ----------
-W, H = 93, 14
-bar = bytearray(W * H * 4)
-for y in range(H):
-    c = (190,190,90,255) if y == 0 else ((82,82,23,255) if y == H-1 else (125,125,35,255))
-    for x in range(W):
-        i = (y * W + x) * 4
+BAR_W, BAR_H = 93, 14
+bar = bytearray(BAR_W * BAR_H * 4)
+for y in range(BAR_H):
+    c = (190,190,90,255) if y == 0 else ((82,82,23,255) if y == BAR_H-1 else (125,125,35,255))
+    for x in range(BAR_W):
+        i = (y * BAR_W + x) * 4
         bar[i:i+4] = bytes(c)
-encode('Assets/UI/vitals-sp-bar.png', W, H, bar)
+encode('Assets/UI/vitals-sp-bar.png', BAR_W, BAR_H, bar)
 
-# ---------- verify (re-decode) ----------
+# ---------- verify (re-decode; index with the DECODED width, not the generation consts) ----------
 def load(path):
     d = open(path, 'rb').read()
     assert d[:8] == b'\x89PNG\r\n\x1a\n'
@@ -148,24 +149,24 @@ def load(path):
     return w, h, out
 
 w, h, npx = load('Assets/UI/vitals-sp-outline.png')
-assert (w, h) == (96, 16)
-for x in range(96):
+assert (w, h) == (OUT_W, OUT_H), (w, h)
+for x in range(w):
     assert tuple(npx[x*4:x*4+4]) == BLACK, x
 for y in range(1, 15):
     fill = DARK if y == 1 else (LIGHT if y == 14 else MID)
-    assert npx[y*W*4 + 3] == 0
-    assert tuple(npx[(y*W+1)*4:(y*W+1)*4+4]) == BLACK
+    assert npx[y*w*4 + 3] == 0
+    assert tuple(npx[(y*w+1)*4:(y*w+1)*4+4]) == BLACK
     for x in (2, 50, 94):
-        assert tuple(npx[(y*W+x)*4:(y*W+x)*4+4]) == fill, (y, x)
-    assert tuple(npx[(y*W+95)*4:(y*W+95)*4+4]) == BLACK
-assert npx[15*W*4 + 3] == 0
-for x in range(1, 96):
-    assert tuple(npx[(15*W+x)*4:(15*W+x)*4+4]) == BLACK
+        assert tuple(npx[(y*w+x)*4:(y*w+x)*4+4]) == fill, (y, x)
+    assert tuple(npx[(y*w+95)*4:(y*w+95)*4+4]) == BLACK
+assert npx[15*w*4 + 3] == 0
+for x in range(1, w):
+    assert tuple(npx[(15*w+x)*4:(15*w+x)*4+4]) == BLACK
 w, h, npx = load('Assets/UI/vitals-sp-bar.png')
-assert (w, h) == (93, 14)
+assert (w, h) == (BAR_W, BAR_H), (w, h)
 assert tuple(npx[0:4]) == (190,190,90,255)
-assert tuple(npx[(7*93+40)*4:(7*93+40)*4+4]) == (125,125,35,255)
-i = (13*93+92)*4
+assert tuple(npx[(7*w+40)*4:(7*w+40)*4+4]) == (125,125,35,255)
+i = (13*w+92)*4
 assert tuple(npx[i:i+4]) == (82,82,23,255)
 print("ALL CHECKS PASSED")
 ```
@@ -180,14 +181,15 @@ Expected: `ALL CHECKS PASSED`.
 **Step 3: Regenerate .import files + confirm additive-only**
 
 ```bash
-godot --headless --path . --import 2>&1 | tail -3
+export GODOT="${GODOT:-/usr/local/bin/godot}"
+"$GODOT" --headless --path . --import 2>&1 | tail -3
 git status --porcelain Assets/UI
 ```
 Expected: only `?? Assets/UI/vitals-sp-bar.png`, `?? Assets/UI/vitals-sp-bar.png.import`,
 `?? Assets/UI/vitals-sp-outline.png`, `?? Assets/UI/vitals-sp-outline.png.import` —
 **no** modifications to existing files. (If re-running this task after a partial failure,
-the two generated PNGs are simply overwritten — there is nothing to `git checkout` since
-no existing file is touched.)
+the two generated PNGs are simply overwritten — nothing to `git checkout` since no
+existing file is touched.)
 
 **Step 4: Commit**
 
@@ -204,14 +206,16 @@ git commit -m "feat(ui): generate SP bar and SP panel outline textures"
 - Modify: `Scenes/UI/VitalsWindow.tscn`
 
 **Mutation impact:**
-- Source of truth changed: window scene — three nodes appended, one `load_steps` bump. Root, `Background`, and all existing nodes: **zero offset/property changes**.
+- Source of truth changed: window scene — three nodes inserted, one `load_steps` bump. Root, `Background`, and all existing nodes: **zero offset/property changes**.
 - Important readers: `Scripts/UI/VitalsWindow.cs` (`GetNode` by name — no new `GetNode` calls until Task 3, so nothing breaks between tasks). `VitalsWindow` is a plain `Control` (not a `BaseWindow`), fixed at offset (8,8) via `GameHud.cs:56`, with no size- or position-persistence — appending nodes changes nothing else.
 - Derived/cached state: none.
 - Invariants to preserve:
   - Existing nodes byte-identical (no offset changes).
-  - Node order: `SpOutline` before `SpBar` before `SpText` (child order = draw order; the panel must render under the bar/text).
+  - **Insertion point: after `MpText`, before `Portrait`** (child order = draw order). `LevelCircle` (x37–55, y36–55) overlaps the SP panel's x47–55 / y45–55 corner and must render **above** the SP nodes — exactly as it renders above the MP panel today. Appending after `LevelText` would paint the panel/bar over the level circle's lower-right.
+  - `SpOutline` before `SpBar` before `SpText` among the three (panel under bar under text).
+  - All three nodes `visible = false` in the scene → the Task 2 commit is independently correct (window renders exactly like today), independent of Task 3's script initialization.
   - Controls don't clip children by default (`clip_contents` unset) — the SP nodes at y45–60 draw below the 55px window frame without any root resize.
-- Observable proof required: `check_scene` loads the scene; manual check in Task 4 (hidden state renders exactly like today — the three nodes start hidden… note: they start *visible=false* only after Task 3's `_Ready`; between Task 2 and Task 3 the SP nodes render visible — acceptable within the branch, final state is what ships).
+- Observable proof required: `check_scene` loads the scene; manual check in Task 4 (hidden state renders exactly like today).
 
 **Step 1: Edit the scene**
 
@@ -222,10 +226,11 @@ In `Scenes/UI/VitalsWindow.tscn`:
    [ext_resource type="Texture2D" path="res://Assets/UI/vitals-sp-bar.png" id="sp_bar_tex"]
    [ext_resource type="Texture2D" path="res://Assets/UI/vitals-sp-outline.png" id="sp_out_tex"]
    ```
-2. Append after the `LevelText` node (mirrors `MpBar`/`MpText` property style):
+2. Insert **after the `MpText` node and before the `Portrait` node** (mirrors `MpBar`/`MpText` property style):
 
 ```
 [node name="SpOutline" type="TextureRect" parent="."]
+visible = false
 layout_mode = 0
 offset_left = 47.0
 offset_top = 45.0
@@ -235,6 +240,7 @@ texture = ExtResource("sp_out_tex")
 mouse_filter = 2
 
 [node name="SpBar" type="TextureProgressBar" parent="."]
+visible = false
 layout_mode = 0
 offset_left = 49.0
 offset_top = 46.0
@@ -247,6 +253,7 @@ step = 0.0
 max_value = 1.0
 
 [node name="SpText" type="Label" parent="."]
+visible = false
 layout_mode = 0
 offset_left = 59.0
 offset_top = 46.0
@@ -263,7 +270,8 @@ Geometry rationale (design doc): bar = 93×14 at window x49–141 / y46–59 (`o
 
 ```bash
 dotnet build Goose2ClientGodot.sln 2>&1 | tail -2
-godot --headless --script tools/check_scene.gd -- res://Scenes/UI/VitalsWindow.tscn
+export GODOT="${GODOT:-/usr/local/bin/godot}"
+"$GODOT" --headless --script tools/check_scene.gd -- res://Scenes/UI/VitalsWindow.tscn
 ```
 Expected: build succeeds; `OK load: res://Scenes/UI/VitalsWindow.tscn` with exit 0.
 Note: stderr will show expected noise in a fresh worktree (autoload script not inheriting
@@ -280,15 +288,17 @@ git commit -m "feat(ui): add SpOutline/SpBar/SpText nodes to vitals window"
 
 ---
 
-### Task 3: Vitals window behaviour — SP value, latch, persistence
+### Task 3: Option key constants + vitals window behaviour — SP value, latch, persistence
 
 **Files:**
+- Modify: `Scripts/Constants.cs:136-139` (`Options` static class)
 - Create: `Scripts/UI/SpiritBarVisibility.cs`
 - Modify: `Scripts/UI/VitalsWindow.cs`
 - Test: `tests/Goose2Client.Tests/SpiritBarVisibilityTests.cs`
 
 **Mutation impact:**
 - Source of truth changed: `CharacterSettings.Options["SpiritBarShown"]` — a **new** key in the per-character settings JSON (`{char}-settings.json`, `CharacterSettings.cs:143` `Save()`). No existing reader iterates `Options` keys; the dict round-trips generically through `JsonSerializer` (`CharacterSettings.cs:46,189`). Bool-option round-trip is already proven by the existing test (`"showTooltips": true`, `CharacterSettingsJsonTests.cs:31`) — no new round-trip test is added.
+- New `Options` key constants: additive; no existing readers of the `Constants.Options` class break.
 - Important readers: `CharacterSettings.GetOption<T>` (used by new `VitalsWindow` code).
 - Derived/cached state: none — `VitalsWindow` keeps its own in-memory `_spLatch` seeded from the option at `_Ready`.
 - Required propagation sequence (latch flip):
@@ -301,12 +311,24 @@ git commit -m "feat(ui): add SpOutline/SpBar/SpText nodes to vitals window"
   - Latch only flips false→true; at most one `Save()` per flip (guarded by `!_spLatch`).
   - Existing characters' settings files gain the key only after the first non-zero SNF (no migration; `GetOption` default `false` keeps old files "hidden until SP seen").
   - Persistence strategy: automatic forward-only (new optional key, no migration of existing files).
-  - Hidden before first SNF (`_snfReceived` gate) — no ghost bar for latched characters on login.
+  - Hidden before first SNF — the `_snfReceived` gate is part of the pure rule (unit-testable), so no ghost bar for latched characters on login.
 - Observable proof required:
-  - `SpiritBarVisibility` table tests (incl. the adversarial latch case).
-  - Integration path (SNF → latch → Save → reload) is covered **manually** (Task 4 step 5.4) — unit-testing a Godot node's `_Ready`/`_Process` is out of scope for this test project; stated as an explicit coverage limit.
+  - `SpiritBarVisibility` table tests (incl. the adversarial latch and pre-SNF cases).
+  - Integration path (SNF → latch → Save → reload) is covered **manually** (Task 4 step 4.5) — unit-testing a Godot node's `_Ready`/`_Process` is out of scope for this test project; stated as an explicit coverage limit.
 
-**Step 1: Write the failing tests**
+**Step 1: Add the option key constants**
+
+`Scripts/Constants.cs` — in `public static class Options`:
+
+```csharp
+public const string TargetFiltering = "TargetFiltering";
+public const string ShowSpiritBar = "ShowSpiritBar";
+public const string SpiritBarShown = "SpiritBarShown";
+```
+
+(Added here rather than Task 4 because the `VitalsWindow` code below consumes both keys — Task 4 only adds the checkbox UI.)
+
+**Step 2: Write the failing tests**
 
 `tests/Goose2Client.Tests/SpiritBarVisibilityTests.cs` (test project is **xUnit** — `[Fact]`/`Assert.*` from `Xunit`; mirror `tests/Goose2Client.Tests/CharacterSettingsJsonTests.cs:1-8`):
 
@@ -318,34 +340,37 @@ namespace Goose2Client.Tests
 {
     public class SpiritBarVisibilityTests
     {
+        [Fact] public void NoSnf_Hides_EvenWhenLatchedOptionOnAndSpExists()
+            => Assert.False(SpiritBarVisibility.ShouldShow(false, true, true, 500));
+
         [Fact] public void OptionOff_Hides_EvenWhenLatchedAndSpExists()
-            => Assert.False(SpiritBarVisibility.ShouldShow(false, true, 500));
+            => Assert.False(SpiritBarVisibility.ShouldShow(true, false, true, 500));
 
         [Fact] public void OptionOn_NotLatched_ZeroMaxSp_Hidden()   // default state
-            => Assert.False(SpiritBarVisibility.ShouldShow(true, false, 0));
+            => Assert.False(SpiritBarVisibility.ShouldShow(true, true, false, 0));
 
         [Fact] public void OptionOn_NotLatched_NonZeroMaxSp_Shown()
-            => Assert.True(SpiritBarVisibility.ShouldShow(true, false, 1));
+            => Assert.True(SpiritBarVisibility.ShouldShow(true, true, false, 1));
 
         // Adversarial: "keep it visible forever after" — latch must win even when
         // MaxSP later drops back to 0 (a wrong impl keying on live MaxSP only fails here).
         [Fact] public void OptionOn_Latched_ZeroMaxSp_StillShown()
-            => Assert.True(SpiritBarVisibility.ShouldShow(true, true, 0));
+            => Assert.True(SpiritBarVisibility.ShouldShow(true, true, true, 0));
 
         [Fact] public void OptionOn_Latched_NonZeroMaxSp_Shown()
-            => Assert.True(SpiritBarVisibility.ShouldShow(true, true, 250));
+            => Assert.True(SpiritBarVisibility.ShouldShow(true, true, true, 250));
     }
 }
 ```
 
-**Step 2: Run tests — verify red**
+**Step 3: Run tests — verify red**
 
 ```bash
 dotnet test tests/Goose2Client.Tests --filter FullyQualifiedName~SpiritBarVisibility
 ```
 Expected: FAIL (compile error: `SpiritBarVisibility` does not exist).
 
-**Step 3: Implement**
+**Step 4: Implement**
 
 `Scripts/UI/SpiritBarVisibility.cs`:
 
@@ -354,12 +379,13 @@ namespace Goose2Client.UI;
 
 /// <summary>Pure visibility rule for the optional spirit bar.
 /// Design: docs/plans/2026-07-24-spirit-bar-design.md.
-/// Option off → hidden. Otherwise shown once SP has ever been non-zero (latch,
-/// persisted per character) or the current MaxSP is non-zero.</summary>
+/// Hidden until the first SNF arrives; option off → hidden. Otherwise shown once
+/// SP has ever been non-zero (latch, persisted per character) or the current
+/// MaxSP is non-zero.</summary>
 public static class SpiritBarVisibility
 {
-    public static bool ShouldShow(bool optionOn, bool latched, long maxSp)
-        => optionOn && (latched || maxSp > 0);
+    public static bool ShouldShow(bool snfReceived, bool optionOn, bool latched, long maxSp)
+        => snfReceived && optionOn && (latched || maxSp > 0);
 }
 ```
 
@@ -390,7 +416,8 @@ public static class SpiritBarVisibility
     _spText.MouseEntered += () => TooltipManager.Instance.ShowTextTooltip(_spTooltip, _spText);
     _spText.MouseExited += () => TooltipManager.Instance.HideTextTooltip();
     ```
-  - Initial hidden state: `_spBar.Visible = _spText.Visible = _spOutline.Visible = false;`
+  - Initial hidden state (defensive — the scene already sets `visible = false`):
+    `_spBar.Visible = _spText.Visible = _spOutline.Visible = false;`
 - `OnStatusInfo(object packetObj)` additions (after the MP lines):
   ```csharp
   _snfReceived = true;
@@ -411,7 +438,6 @@ public static class SpiritBarVisibility
   ```csharp
   public override void _Process(double delta)
   {
-      if (!_snfReceived) return;   // no ghost bar before the first SNF
       bool optionOn = GameManager.Instance.CharacterSettings
           .GetOption<bool>(Options.ShowSpiritBar, true);
       ApplySpVisibility(optionOn);
@@ -419,7 +445,7 @@ public static class SpiritBarVisibility
 
   private void ApplySpVisibility(bool optionOn)
   {
-      bool show = SpiritBarVisibility.ShouldShow(optionOn, _spLatch, _lastMaxSp);
+      bool show = SpiritBarVisibility.ShouldShow(_snfReceived, optionOn, _spLatch, _lastMaxSp);
       if (show != _spBar.Visible)
       {
           _spBar.Visible = show;
@@ -434,17 +460,17 @@ public static class SpiritBarVisibility
 - Update the class doc comment: "HP/MP/SP bars…" and note SP visibility is gated on
   first-SNF, option, and latch.
 
-**Step 4: Run tests — verify green**
+**Step 5: Run tests — verify green**
 
 ```bash
 dotnet test tests/Goose2Client.Tests 2>&1 | tail -2
 ```
-Expected: all pass (262 baseline + 5 new).
+Expected: all pass (262 baseline + 6 new).
 
-**Step 5: Commit**
+**Step 6: Commit**
 
 ```bash
-git add Scripts/UI/SpiritBarVisibility.cs Scripts/UI/VitalsWindow.cs tests/Goose2Client.Tests/SpiritBarVisibilityTests.cs
+git add Scripts/Constants.cs Scripts/UI/SpiritBarVisibility.cs Scripts/UI/VitalsWindow.cs tests/Goose2Client.Tests/SpiritBarVisibilityTests.cs
 git commit -m "feat(ui): spirit bar value, persisted latch, option-gated visibility"
 ```
 
@@ -453,28 +479,17 @@ git commit -m "feat(ui): spirit bar value, persisted latch, option-gated visibil
 ### Task 4: Options window toggle
 
 **Files:**
-- Modify: `Scripts/Constants.cs:136-139` (`Options` static class)
 - Modify: `Scenes/UI/OptionsWindow.tscn`
 - Modify: `Scripts/UI/OptionsWindow.cs`
 
 **Mutation impact:**
-- Source of truth: `CharacterSettings.Options["ShowSpiritBar"]` (new key; same forward-only strategy as `SpiritBarShown` — default `true` via `GetOption` when absent, so existing files behave as "auto" with no migration).
+- Source of truth: `CharacterSettings.Options["ShowSpiritBar"]` (key constant added in Task 3; same forward-only strategy as `SpiritBarShown` — default `true` via `GetOption` when absent, so existing files behave as "auto" with no migration).
 - Important readers: `VitalsWindow._Process` (Task 3) reads it live every frame — no notification mechanism needed; the write in `OnShowSpiritBarChanged` mutates the in-memory dict that `_Process` reads the same frame.
 - Derived/cached state: none.
 - Invariants: checkbox initial state == persisted option; `Save()` called on window close (existing behaviour, `OptionsWindow.cs:33-45`).
 - Observable proof: manual (below).
 
-**Step 1: Constants**
-
-`Scripts/Constants.cs` — in `public static class Options`:
-
-```csharp
-public const string TargetFiltering = "TargetFiltering";
-public const string ShowSpiritBar = "ShowSpiritBar";
-public const string SpiritBarShown = "SpiritBarShown";
-```
-
-**Step 2: Scene**
+**Step 1: Scene**
 
 `Scenes/UI/OptionsWindow.tscn`:
 - Root `offset_bottom = 100.0` → `108.0` (per approved design).
@@ -492,7 +507,7 @@ mouse_filter = 1
 text = "Show Spirit Bar"
 ```
 
-**Step 3: Wiring (mirror `TargetFilteringCheck`, `OptionsWindow.cs:18-32`)**
+**Step 2: Wiring (mirror `TargetFilteringCheck`, `OptionsWindow.cs:18-32`)**
 
 `Scripts/UI/OptionsWindow.cs`:
 
@@ -510,7 +525,7 @@ private void OnShowSpiritBarChanged(bool pressed)
 ```
 (`Save()` on window close already exists and covers the new key.)
 
-**Step 4: Compile + tests**
+**Step 3: Compile + tests**
 
 ```bash
 dotnet build Goose2ClientGodot.sln 2>&1 | tail -2
@@ -518,21 +533,23 @@ dotnet test tests/Goose2Client.Tests 2>&1 | tail -2
 ```
 Expected: build succeeds; all tests pass.
 
-**Step 5: Manual verification (needs a live server)**
+**Step 4: Manual verification (needs a live server)**
 
 Run the game (Godot editor, or `run.sh` from the main workspace — it is gitignored and
-not present in the worktree; `godot --path <worktree>` also works).
+not present in the worktree; `"$GODOT" --path <worktree>` also works).
 
 Checklist:
 1. **Hidden state = today's window**: fresh character / toggle off → Vitals window renders
    exactly like before this branch (no SP slot, no empty track, no size change).
 2. Login with a character that has SP (MaxSP > 0): SP panel + olive bar appear under the
-   MP bar with `N / N` text and "Spirit: x / y" hover tooltip; no ghost bar flicker before
-   the first SNF.
+   MP bar showing the current value (e.g. `1,234` — the `x / y` total is in the hover
+   tooltip "Spirit: x / y"); no ghost bar flicker before the first SNF.
 3. SP bar geometry: left edge flush with the MP bar's bottom-left (x49); right edge
    vertical exactly under where the MP 45° bevel meets its bottom (x141); the left/right
-   panel borders frame the bar with 1px black + no stray gray gutter; 1px black line
-   between MP and SP (same as the HP/MP gap).
+   panel borders frame the bar with 1px black and no stray gray gutter; 1px black line
+   between MP and SP (same as the HP/MP gap); level circle unaffected (its lower-right
+   corner, which overlaps the panel, must render above the SP panel as it does above the
+   MP panel today).
 4. Options → untick "Show Spirit Bar" → bar hides instantly (back to today's window);
    re-tick → shows.
 5. Relogin → bar still visible (latch persisted): inspect
@@ -541,10 +558,10 @@ Checklist:
    `"SpiritBarShown": true`.
 6. Toggle off + relogin → stays hidden (option respected).
 
-**Step 6: Commit**
+**Step 5: Commit**
 
 ```bash
-git add Scripts/Constants.cs Scenes/UI/OptionsWindow.tscn Scripts/UI/OptionsWindow.cs
+git add Scenes/UI/OptionsWindow.tscn Scripts/UI/OptionsWindow.cs
 git commit -m "feat(ui): show-spirit-bar toggle in options window"
 ```
 
@@ -554,14 +571,16 @@ git commit -m "feat(ui): show-spirit-bar toggle in options window"
 
 | Invariant | Proved by |
 |-----------|-----------|
+| No SNF yet → hidden even when latched + option on | `NoSnf_Hides_EvenWhenLatchedOptionOnAndSpExists` (adversarial) |
 | Hidden by default when no SP | `OptionOn_NotLatched_ZeroMaxSp_Hidden` |
 | Shown once SP exists | `OptionOn_NotLatched_NonZeroMaxSp_Shown` |
 | Stays visible after SP returns to 0 (latch) | `OptionOn_Latched_ZeroMaxSp_StillShown` (adversarial) |
 | Toggle off overrides latch/SP | `OptionOff_Hides_EvenWhenLatchedAndSpExists` (adversarial) |
 | New texture pixel spec | generator in-script assertions (Task 1 step 2) |
 | Settings bool option round-trip | pre-existing `RoundTrip_SerializesAndDeserializesAllFields` (`CharacterSettingsJsonTests.cs:13,31`) |
-| SNF → latch → Save → reload integration | manual only (Task 4 step 5.5) — Godot-node lifecycle is not unit-testable in this project; stated coverage limit |
-| Hidden state byte-identical to today | manual (Task 4 step 5.1) — no automated in-game pixel test exists; deferred |
+| SNF → latch → Save → reload integration | manual only (Task 4 step 4.5) — Godot-node lifecycle is not unit-testable in this project; stated coverage limit |
+| Hidden state byte-identical to today | scene-level `visible = false` (Task 2) + manual (Task 4 step 4.1) |
+| Level circle renders above SP panel | scene insertion order (Task 2, before `Portrait`) + manual (Task 4 step 4.3) |
 | No existing file modified by asset task | `git status` gate (Task 1 step 3) |
 
 ## Out of scope (per design doc)
