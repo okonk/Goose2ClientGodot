@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Text.Json;
 using Godot;
+using Goose2Client.UI;
 using Xunit;
 
 namespace Goose2Client.Tests
@@ -81,6 +82,58 @@ namespace Goose2Client.Tests
             Assert.True(back.WindowSettings["Spellbook"].Visible);
             Assert.True(back.WindowSettings.ContainsKey("Bank"));
             Assert.False(back.WindowSettings["Bank"].Visible);
+        }
+
+        [Fact]
+        public void RoundTrip_WindowCanvasSizeSurvivesWithPositionAndVisible()
+        {
+            // Arrange — a window saved on a 1080p canvas
+            var cs = new CharacterSettings
+            {
+                WindowSettings = new Dictionary<string, WindowSettings>
+                {
+                    { "Hotbar", new WindowSettings { Position = new Vector2(520, 1039), Visible = true, CanvasSize = new Vector2I(1920, 1080) } },
+                },
+            };
+
+            // Act — serialize, then deserialize through the FromJson entry point
+            var json = JsonSerializer.Serialize(cs, CharacterSettings.JsonOptions);
+            var back = CharacterSettings.FromJson(json);
+
+            // Assert
+            var ws = back.WindowSettings["Hotbar"];
+            Assert.Equal(new Vector2I(1920, 1080), ws.CanvasSize);
+            Assert.Equal(520, ws.Position.X);
+            Assert.Equal(1039, ws.Position.Y);
+            Assert.True(ws.Visible);
+        }
+
+        [Fact]
+        public void LegacyJson_WithoutCanvasSizeField_DeserializesToZero()
+        {
+            // Hand-written JSON mirroring a pre-change user settings file (no CanvasSize key).
+            const string legacyJson = """
+                {
+                    "Hotkeys": null,
+                    "WindowSettings": {
+                        "Hotbar": { "Position": { "X": 520.0, "Y": 679.0 }, "Visible": true }
+                    },
+                    "Options": null,
+                    "MountName": null
+                }
+                """;
+
+            var back = CharacterSettings.FromJson(legacyJson);
+            var ws = back.WindowSettings["Hotbar"];
+
+            // (0,0) is what BaseWindow maps to WindowPlacement.LegacyCanvas (1280x720);
+            // combined with the Resolve identity test this proves old files place windows
+            // exactly as before.
+            Assert.Equal(default(Vector2I), ws.CanvasSize);
+            Assert.Equal(520, ws.Position.X);
+            Assert.Equal(679, ws.Position.Y);
+            Assert.True(ws.Visible);
+            Assert.Equal(new Vector2I(1280, 720), WindowPlacement.LegacyCanvas);
         }
     }
 }

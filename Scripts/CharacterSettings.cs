@@ -30,6 +30,9 @@ namespace Goose2Client
     {
         public Vector2 Position;
         public bool Visible;
+        /// <summary>Canvas the window was saved on (native root window size). Legacy files lack
+        /// the field → (0,0), which BaseWindow maps to <c>WindowPlacement.LegacyCanvas</c>.</summary>
+        public Vector2I CanvasSize;
     }
 
     public class CharacterSettings
@@ -177,12 +180,13 @@ namespace Goose2Client
             Save();
         }
 
-        public void SetWindowSetting(string windowName, Vector2? position, bool visible)
+        public void SetWindowSetting(string windowName, Vector2? position, bool visible, Vector2I canvas)
         {
             var settings = GetOrCreateWindowSettings(windowName);
             if (position.HasValue)
                 settings.Position = position.Value;
             settings.Visible = visible;
+            settings.CanvasSize = canvas;
             Save();
         }
 

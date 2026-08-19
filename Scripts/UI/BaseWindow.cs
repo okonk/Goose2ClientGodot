@@ -41,11 +41,15 @@ public partial class BaseWindow : Control
         if (Content != null)
             Content.MouseFilter = MouseFilterEnum.Ignore;
 
-        // Restore persisted position (or first-run default).
+        // Restore persisted position (or first-run default). Positions were saved in the native
+        // canvas of the window size they were saved on; legacy files (and the 1280x720 design
+        // defaults) are LegacyCanvas. Edge-stick + clamp re-anchors onto the current canvas.
         if (WindowName != null)
         {
             var ws = GameManager.Instance.CharacterSettings.GetWindowSettings(WindowName);
-            Position = ws != null ? ws.Position : DefaultWindowLayout.For(WindowName);
+            var storedOrDefaultPos = ws != null ? ws.Position : DefaultWindowLayout.For(WindowName);
+            var savedCanvas = ws != null && ws.CanvasSize != default ? ws.CanvasSize : WindowPlacement.LegacyCanvas;
+            Position = WindowPlacement.Resolve(storedOrDefaultPos, Size, savedCanvas, (Vector2I)GetTree().Root.GetVisibleRect().Size);
             if (ws != null) Visible = ws.Visible;
         }
 
@@ -91,7 +95,7 @@ public partial class BaseWindow : Control
             {
                 _dragging = false;
                 if (WindowName != null)
-                    GameManager.Instance.CharacterSettings.SetWindowSetting(WindowName, Position, Visible);
+                    GameManager.Instance.CharacterSettings.SetWindowSetting(WindowName, Position, Visible, (Vector2I)GetTree().Root.GetVisibleRect().Size);
             }
         }
         else if (@event is InputEventMouseMotion motion && _dragging)
@@ -100,7 +104,7 @@ public partial class BaseWindow : Control
             {
                 _dragging = false;
                 if (WindowName != null)
-                    GameManager.Instance.CharacterSettings.SetWindowSetting(WindowName, Position, Visible);
+                    GameManager.Instance.CharacterSettings.SetWindowSetting(WindowName, Position, Visible, (Vector2I)GetTree().Root.GetVisibleRect().Size);
                 return;
             }
             Position += motion.Relative;
@@ -121,13 +125,13 @@ public partial class BaseWindow : Control
     {
         Visible = !Visible;
         if (WindowName != null)
-            GameManager.Instance.CharacterSettings.SetWindowSetting(WindowName, Position, Visible);
+            GameManager.Instance.CharacterSettings.SetWindowSetting(WindowName, Position, Visible, (Vector2I)GetTree().Root.GetVisibleRect().Size);
     }
 
     protected virtual void OnClosePressed()
     {
         Hide();
         if (WindowName != null)
-            GameManager.Instance.CharacterSettings.SetWindowSetting(WindowName, Position, false);
+            GameManager.Instance.CharacterSettings.SetWindowSetting(WindowName, Position, false, (Vector2I)GetTree().Root.GetVisibleRect().Size);
     }
 }

@@ -44,6 +44,9 @@ namespace Goose2Client
         /// <summary>The active MapManager node, set/cleared by MapManager itself.</summary>
         public MapManager CurrentMapManager { get; set; }
 
+        /// <summary>Owns the world sub-viewport and its display texture; map scenes attach here.</summary>
+        public WorldViewport WorldViewport { get; private set; }
+
         /// <summary>The persistent HUD root, instantiated once under UiLayer.</summary>
         public GameHud Hud { get; private set; }
 
@@ -61,6 +64,12 @@ namespace Goose2Client
 
         public override void _Ready()
         {
+            // World sub-viewport display — must be added before UiLayer so the root Controls of
+            // Login/LoadingMap scenes draw above the world texture (tree order).
+            WorldViewport = new WorldViewport();
+            WorldViewport.Name = "WorldViewport";
+            AddChild(WorldViewport);
+
             // Persistent UI CanvasLayer — lives in the autoload tree so it survives ChangeSceneToPacked.
             UiLayer = new CanvasLayer();
             UiLayer.Name = "UiLayer";

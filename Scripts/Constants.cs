@@ -138,5 +138,7 @@ namespace Goose2Client
         public const string TargetFiltering = "TargetFiltering";
         public const string ShowSpiritBar = "ShowSpiritBar";
         public const string SpiritBarShown = "SpiritBarShown";
+        /// <summary>World render mode: <c>true</c> = Native1x, <c>false</c> (default) = Integer2x.</summary>
+        public const string RenderMode = "RenderMode";
     }
 }
