@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Generate Assets/UI/vitals-sp-bar.png (92x14) and Assets/UI/vitals-sp-outline.png
-(96x16, the SP panel incl. its top line). Pure stdlib (no PIL in this environment).
+(95x16, the SP panel incl. its top line). Pure stdlib (no PIL in this environment).
 Purely additive: never touches Assets/UI/vitals-outline.png.
 Re-run note: overwrites the two generated PNGs; run the godot import step afterwards
 to refresh .import files."""
@@ -22,36 +22,36 @@ def encode(path, w, h, px):
 BLACK = (0,0,0,255); MID = (96,96,96,255); DARK = (59,59,59,255); LIGHT = (166,166,166,255)
 T = (0,0,0,0)
 
-# ---------- SP panel outline: 96x16, placed at window (47,45) ----------
-OUT_W, OUT_H = 96, 16
+# ---------- SP panel outline: 95x16, placed at window (47,45) ----------
+OUT_W, OUT_H = 95, 16
 px = bytearray(OUT_W * OUT_H * 4)
 def setp(x, y, c):
     i = (y * OUT_W + x) * 4
     px[i:i+4] = bytes(c)
-for x in range(OUT_W):        # ty0 (y45): full black line — extends MP bottom line x47..140 -> x47..142
+for x in range(OUT_W):        # ty0 (y45): full black line — extends MP bottom line x47..140 -> x47..141
     setp(x, 0, BLACK)
-for y in range(1, 15):        # ty1..ty14 (y46..y59): border tx1/tx95, fill tx2..94
+for y in range(1, 15):        # ty1..ty14 (y46..y59): border tx1/tx94, fill tx2..93
     fill = DARK if y == 1 else (LIGHT if y == 14 else MID)
     setp(0, y, T)
     setp(1, y, BLACK)
-    for x in range(2, 95):
+    for x in range(2, 94):
         setp(x, y, fill)
-    setp(95, y, BLACK)
-setp(0, 15, T)                # ty15 (y60): black tx1..95 (x48..142)
+    setp(94, y, BLACK)
+setp(0, 15, T)                # ty15 (y60): black tx1..94 (x48..141)
 for x in range(1, OUT_W):
     setp(x, 15, BLACK)
 encode('Assets/UI/vitals-sp-outline.png', OUT_W, OUT_H, px)
 
 # ---------- SP bar: 92x14, window x49..140 / y46..59 ----------
 # 3-tone vertical striping (highlight row 0 / body rows 1..12 / shadow row 13),
-# same relative ratios as the original olive scheme, recomputed from base #C2BB0D.
+# same relative ratios as the original olive scheme, recomputed from base #6D31AE.
 BAR_W, BAR_H = 92, 14
-SP_BASE = (194, 187, 13)  # #C2BB0D
+SP_BASE = (109, 49, 174)  # #6D31AE
 _OLD_BODY, _OLD_HI, _OLD_DK = (125, 125, 35), (190, 190, 90), (82, 82, 23)
 def _rescale(base, old_body, old_tone):
     return tuple(min(255, round(b * t / ob)) for b, ob, t in zip(base, old_body, old_tone))
-SP_HI = _rescale(SP_BASE, _OLD_BODY, _OLD_HI)   # -> (255, 255, 33)
-SP_DK = _rescale(SP_BASE, _OLD_BODY, _OLD_DK)   # -> (127, 123, 9)
+SP_HI = _rescale(SP_BASE, _OLD_BODY, _OLD_HI)   # -> (166, 74, 255)
+SP_DK = _rescale(SP_BASE, _OLD_BODY, _OLD_DK)   # -> (72, 32, 114)
 bar = bytearray(BAR_W * BAR_H * 4)
 for y in range(BAR_H):
     c = SP_HI if y == 0 else (SP_DK if y == BAR_H - 1 else SP_BASE)
@@ -105,18 +105,18 @@ for y in range(1, 15):
     fill = DARK if y == 1 else (LIGHT if y == 14 else MID)
     assert npx[y*w*4 + 3] == 0
     assert tuple(npx[(y*w+1)*4:(y*w+1)*4+4]) == BLACK
-    for x in (2, 50, 94):
+    for x in (2, 50, 93):
         assert tuple(npx[(y*w+x)*4:(y*w+x)*4+4]) == fill, (y, x)
-    assert tuple(npx[(y*w+95)*4:(y*w+95)*4+4]) == BLACK
+    assert tuple(npx[(y*w+94)*4:(y*w+94)*4+4]) == BLACK
 assert npx[15*w*4 + 3] == 0
 for x in range(1, w):
     assert tuple(npx[(15*w+x)*4:(15*w+x)*4+4]) == BLACK
 w, h, npx = load('Assets/UI/vitals-sp-bar.png')
 assert (w, h) == (BAR_W, BAR_H), (w, h)
 # independent literals mirroring the generation values (full-coverage check)
-assert all(tuple(npx[x*4:x*4+4]) == (255,255,33,255) for x in range(w)), 'row0'
+assert all(tuple(npx[x*4:x*4+4]) == (166,74,255,255) for x in range(w)), 'row0'
 for y in range(1, BAR_H - 1):
-    assert all(tuple(npx[(y*w+x)*4:(y*w+x)*4+4]) == (194,187,13,255) for x in range(w)), y
+    assert all(tuple(npx[(y*w+x)*4:(y*w+x)*4+4]) == (109,49,174,255) for x in range(w)), y
 last = (BAR_H - 1) * w
-assert all(tuple(npx[(last+x)*4:(last+x)*4+4]) == (127,123,9,255) for x in range(w)), 'lastrow'
+assert all(tuple(npx[(last+x)*4:(last+x)*4+4]) == (72,32,114,255) for x in range(w)), 'lastrow'
 print("ALL CHECKS PASSED")

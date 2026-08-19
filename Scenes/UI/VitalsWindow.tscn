@@ -78,7 +78,7 @@ visible = false
 layout_mode = 0
 offset_left = 47.0
 offset_top = 45.0
-offset_right = 143.0
+offset_right = 142.0
 offset_bottom = 61.0
 texture = ExtResource("sp_out_tex")
 mouse_filter = 2
@@ -182,10 +182,10 @@ mouse_filter = 2
 
 [node name="LevelText" type="Label" parent="."]
 layout_mode = 0
-offset_left = 37.0
-offset_top = 36.0
-offset_right = 56.0
-offset_bottom = 56.0
+offset_left = 38.0
+offset_top = 37.0
+offset_right = 57.0
+offset_bottom = 57.0
 mouse_filter = 0
 horizontal_alignment = 1
 vertical_alignment = 1
