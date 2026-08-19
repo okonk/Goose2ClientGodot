@@ -1,4 +1,5 @@
-# Headless check for the explicit scene lifecycle used by GameManager.ChangeMap (I7).
+# Self-contained simulation pinning the engine contracts GameManager.ChangeMap relies on
+# (I7) — it does not execute the C# code.
 #
 # Engine contract under test (Godot 4.7; verified headless here):
 #  - Reassigning/removing a current scene NEVER frees it implicitly — the transition must
@@ -73,6 +74,9 @@ func _initialize() -> void:
 	for child in root.get_children():
 		if child != container and not baseline.has(child):
 			strays.append(child)
-	_check(strays.is_empty(), "root has no leftover top-level scene nodes (got: %s)" % strays)
+	if strays.is_empty():
+		_check(true, "root has no leftover top-level scene nodes")
+	else:
+		_check(false, "root has no leftover top-level scene nodes (got: %s)" % strays)
 
 	quit(1 if _failed else 0)

@@ -149,6 +149,8 @@ namespace Goose2Client
                 loading.SetMapName(mapName);
 
                 CurrentMap = LoadMap(mapFile);
+                if (CurrentMap == null) return;
+                // finally: frees loading, unpauses; old world stays live, no DoneLoadingMap sent
 
                 // The Map scene IS its own SubViewport; attaching it to WorldViewport puts it in
                 // the tree, swaps the display texture and sizes it (RefreshFromSettings) — all
