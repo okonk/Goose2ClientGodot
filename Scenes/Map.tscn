@@ -2,18 +2,22 @@
 
 [ext_resource type="Script" path="res://Scripts/MapManager.cs" id="1_mm"]
 
-[node name="Map" type="Node2D"]
+[node name="Map" type="SubViewport"]
+handle_input_locally = false
+transparent_bg = false
+
+[node name="World" type="Node2D" parent="."]
 y_sort_enabled = true
 script = ExtResource("1_mm")
 
-[node name="Camera2D" type="Camera2D" parent="."]
+[node name="Camera2D" type="Camera2D" parent="World"]
 
-[node name="Layers" type="Node2D" parent="."]
+[node name="Layers" type="Node2D" parent="World"]
 
-[node name="Objects" type="Node2D" parent="."]
+[node name="Objects" type="Node2D" parent="World"]
 z_index = 14
 y_sort_enabled = true
 
-[node name="Characters" type="Node2D" parent="."]
+[node name="Characters" type="Node2D" parent="World"]
 z_index = 15
 y_sort_enabled = true

@@ -129,23 +129,50 @@ namespace Goose2Client
                 Hud.Chat?.ClearAndUnfocus();
 
             SetPaused(true);   // buffer gameplay packets during the transition (drained on unpause)
+
+            // Previous world, tracked explicitly (I7) — scene reassignment never frees it:
+            //  - previousMap: the currently attached map (later entries). CurrentScene never
+            //    points at the map: set_current_scene requires a direct root child (Godot 4.7
+            //    scene_tree.cpp:1665), and the map lives under WorldViewport.
+            //  - previousScene: the previous current scene — Login on first entry (main scene),
+            //    null on later entries (the engine nulls it when the freed scene leaves the tree).
+            var previousMap = WorldViewport.Current;
+            var previousScene = GetTree().CurrentScene;
+
+            // Loading overlay: added to root directly, NOT set as a current scene — freed manually.
+            LoadingMapScene loading = null;
             try
             {
-                GetTree().ChangeSceneToPacked(GD.Load<PackedScene>("res://Scenes/LoadingMap.tscn"));
+                loading = GD.Load<PackedScene>("res://Scenes/LoadingMap.tscn").Instantiate<LoadingMapScene>();
+                GetTree().Root.AddChild(loading);
                 await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
-
-                if (GetTree().CurrentScene is LoadingMapScene loading)
-                    loading.SetMapName(mapName);
+                loading.SetMapName(mapName);
 
                 CurrentMap = LoadMap(mapFile);
 
-                GetTree().ChangeSceneToPacked(GD.Load<PackedScene>("res://Scenes/Map.tscn"));
+                // The Map scene IS its own SubViewport; attaching it to WorldViewport puts it in
+                // the tree, swaps the display texture and sizes it (RefreshFromSettings) — all
+                // BEFORE any previous world is freed, so the texture never dangles and there is
+                // no black flash. MapManager._Ready (fired inside Attach's AddChild) has already
+                // registered CurrentMapManager by the time DoneLoadingMap drains packets below.
+                var mapScene = GD.Load<PackedScene>("res://Scenes/Map.tscn").Instantiate<SubViewport>();
+                WorldViewport.Attach(mapScene);
+
+                // Explicit lifecycle ownership: free the previous world only after the new one
+                // is attached and the texture swapped (failure keeps the old world live).
+                if (previousScene != null && GodotObject.IsInstanceValid(previousScene))
+                    previousScene.QueueFree();
+                if (previousMap != null && GodotObject.IsInstanceValid(previousMap))
+                    previousMap.QueueFree();
+
                 await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
 
                 NetworkClient.DoneLoadingMap();   // "DLM" — tells the server we are in the world
             }
             finally
             {
+                if (loading != null && GodotObject.IsInstanceValid(loading))
+                    loading.QueueFree();   // no leaked full-window Control
                 SetPaused(false);   // always drain queued gameplay packets, even if the transition throws
             }
         }
