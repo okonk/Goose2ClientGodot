@@ -30,7 +30,7 @@ public Vector2 WorldToWindow(Vector2 worldPos)
 
 Text is vector-rendered, so sub-pixel screen positions are fine — strict integer scaling (I1) only constrains the texture blit.
 
-**Per-frame pass — driven by `SceneTree.ProcessFrame`, NOT `Node._Process` (frame-ordering decision).** `_Process` runs in tree order: the `GameManager` autoload (bridge's parent) processes before the map scene, so a `_Process` pass would project with last frame's character positions and camera transform — names trail the sprite ~8 screen-px/frame at 250px/s walk, 2×. `ProcessFrame` fires after the whole process stage, before the frame's render: correct transforms guaranteed, works headless. Element lifetimes (bubble 3s, battle-text rise) keep their existing `WorldOverlay._Process`; only the *projection* moves to `ProcessFrame`.
+**Per-frame pass — driven by the bridge's own `_Process` at `ProcessPriority = 100` (frame-ordering decision, probed headless).** Two rejected alternatives: `SceneTree.process_frame` is emitted *before* node `_process` callbacks (probed, `tools/tests/text_bridge_order.gd`) — a process-frame projector would read last frame's positions (names trail the sprite); and default-priority `_Process` runs in tree order, where the `GameManager` autoload (bridge's parent) processes *before* the map scene. Priority 100 runs after every world node (all default 0: `Character`, `MapManager` camera, `WorldOverlay`) within the same processing stage, before rendering. The probe pins both engine facts; if it fails on an engine build, the design must be re-derived. Element lifetimes (bubble 3s, battle-text rise) keep their existing `WorldOverlay._Process`; only the *projection* uses the priority-100 pass.
 
 Pass body:
 1. If `WorldViewport.Current == null` (no map) → hide all elements, return.
@@ -82,7 +82,7 @@ A 1-frame visual pop during a mid-flight resize (bubble re-measure, lines re-fon
 
 **Manual checklist** (live server, Stage 1 Task-6 shape):
 1. **Crispness (the point):** at 1080p (S=2) and 4K (S=3) names/bubbles/battle text pixel-crisp vs Stage 1's soft upscale; on-screen *size* unchanged (12 world-px → 24/36 screen px); 1× mode → 12px = today's in-world rendering.
-2. **Tracking:** walk + camera lerp — text glued, no per-frame lag (the `ProcessFrame` fix), crisp during sub-pixel camera scroll.
+2. **Tracking:** walk + camera lerp — text glued, no per-frame lag (the priority-100 `_Process` decision; engine contract covered by `tools/tests/text_bridge_order.gd`), crisp during sub-pixel camera scroll.
 3. **Bubbles:** long-message wrap proportional at 2×/3×; anchored above nameplate, centered, incl. long names.
 4. **Battle text:** spread/rise unchanged; 1s free.
 5. **Ordering:** bubble > name > world; battle text below name (as today).
@@ -92,4 +92,4 @@ A 1-frame visual pop during a mid-flight resize (bubble re-measure, lines re-fon
 9. **Culling:** odd-sized window (1921×1081), text hidden in the gutter, reappears on re-entry.
 10. **Regression:** full Stage 1 checklist (I1–I7) still passes — especially I6 input and I7 lifecycle.
 
-**Scope:** single plan, ~5–6 tasks (projection helper + tests; bridge node + viewport event + ProcessFrame wiring; name label migration; bubble migration; battle text migration; manual verification). No split.
+**Scope:** single plan, ~5–6 tasks (projection helper + tests; bridge node + ordering probe + viewport event + wiring; name label migration; bubble migration; battle text migration; manual verification). No split.

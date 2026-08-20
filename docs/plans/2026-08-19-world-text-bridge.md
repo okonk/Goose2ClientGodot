@@ -2,7 +2,7 @@
 
 **Goal:** Render character names, chat bubbles, and battle text at native window resolution via a root-viewport `CanvasLayer`, so in-world text is pixel-crisp at any integer scale instead of Stage 1's soft 2×/3× upscale (closes I5).
 
-**Architecture:** `WorldTextBridge` (a `CanvasLayer` between `WorldViewport` and `UiLayer`) owns the three text element types as its children. Each element keeps its existing layout math but (a) sizes all visual constants in screen px = world value × `Layout.Scale` (font re-rasterizes at the larger size — node/`Control` scale is forbidden, it would stretch the glyph rasterization), and (b) stores its anchor offset in **world units**. A per-frame pass driven by `SceneTree.ProcessFrame` (NOT `Node._Process` — the autoload tree processes before the map scene, so `_Process` would project with last frame's positions/camera and text would trail the sprite) sets `Position = WorldToWindow(owner.GlobalPosition) + LocalOffsetWorld × Scale` and culls elements outside the display rect. `WorldViewport.ApplyMode` fires `ScaleChanged` only when the scale actually changes; the bridge re-lays out every element. Element lifetime: the pass `QueueFree`s any child whose owner fails `IsInstanceValid` — no cleanup wiring anywhere else (map changes free all owners at once).
+**Architecture:** `WorldTextBridge` (a `CanvasLayer` between `WorldViewport` and `UiLayer`) owns the three text element types as its children. Each element keeps its existing layout math but (a) sizes all visual constants in screen px = world value × `Layout.Scale` (font re-rasterizes at the larger size — node/`Control` scale is forbidden, it would stretch the glyph rasterization), and (b) stores its anchor offset in **world units**. A per-frame pass driven by the bridge's own `_Process` at an explicit `ProcessPriority = 100` sets `Position = WorldToWindow(owner.GlobalPosition) + LocalOffsetWorld × Scale` and culls elements outside the display rect. **Not** `SceneTree.process_frame` — probed headless: it is emitted *before* node `_process` callbacks, so a process-frame projector would read last frame's positions/camera (names trail the sprite). **Not** default-priority `_Process` either — the autoload tree (bridge's parent) would process before the map scene at equal priority. Priority 100 runs after every world node (all priority 0) within the same processing stage, before rendering — pinned by `tools/tests/text_bridge_order.gd`. `WorldViewport.ApplyMode` fires `ScaleChanged` only when the scale actually changes; the bridge re-lays out every element. Element lifetime: the pass `QueueFree`s any child whose owner fails `IsInstanceValid` — no cleanup wiring anywhere else (map changes free all owners at once).
 
 **Scope (decided):** names, chat bubbles, battle text only. HP/MP bars and the spell reticle stay in-world (solid graphics scale fine).
 
@@ -22,7 +22,8 @@ Design doc: `docs/plans/2026-08-19-world-text-bridge-design.md` (approved 2026-0
 | `WindowToWorld` (inverse of what we add): `(windowPos − DisplayOrigin)/Scale` then `canvasTransform.AffineInverse() * vp` | `Scripts/WorldViewport.cs:158-165` |
 | `Transform2D * Vector2` operator + `AffineInverse()` compile in this codebase | `Scripts/WorldViewport.cs:163` |
 | Bridge insertion point: `WorldViewport` added at `:82`, `UiLayer` at `:87` (bridge goes between) | `Scripts/GameManager.cs:80-87` |
-| `SceneTree.ProcessFrame` subscribe pattern (fires after the process stage, headless-safe) | `Scripts/GameManager.cs:238` (existing use) |
+| **Per-frame ordering (probed headless 4.6.2, `tools/tests/text_bridge_order.gd`):** `process_frame` is emitted BEFORE node `_process`; within the processing stage lower `process_priority` runs first, so a priority-100 node sees a priority-0 node's same-frame mutation; `call_deferred` queued during processing flushes after processing, same frame. ⇒ bridge projects from `_Process` at priority 100, never from `process_frame` | probe, external review |
+| `Label : Control : CanvasItem` (NOT `Node2D`); `Position`/`Visible`/`QueueFree` available on `CanvasItem` (via `Node`) — the bridge's common element base is `CanvasItem` | Godot class hierarchy |
 | CanvasLayer default `Layer = 1` (Godot docs) → bridge sits above `WorldTexture` (root-canvas Control, layer 0); same-layer tie with `UiLayer` broken by tree order (HUD added later draws on top) | Godot `CanvasLayer` docs; `Scripts/GameManager.cs:80-87` |
 | Name label: create (`:97-116`, font 12 `:112`, outline 4 `:113`, `ZIndex = Constants.NamesZIndex`/`ZAsRelative=false` `:105-106`), `RepositionOverlays` `:121-126`, `LayoutNameLabel` sets `Position` `:138`, text update `:184-186`; field `:33`; `NameTopOffset = 26f` `:95` | `Scripts/Character/Character.cs` |
 | `Character.Height` public (resting-pose body height) | `Scripts/Character/Character.cs` (`public int Height`) |
@@ -43,7 +44,7 @@ Design doc: `docs/plans/2026-08-19-world-text-bridge-design.md` (approved 2026-0
 ## Invariants
 
 - **T1 — Crisp at any scale:** on-screen glyph size is `base × S` px *rasterized at that size* (never a scaled rasterization). On-screen size identical to Stage 1's (12 world-px × S).
-- **T2 — Exact tracking:** text position uses the *current frame's* character position and canvas transform (no 1-frame lag) — hence `ProcessFrame`, not `_Process`.
+- **T2 — Exact tracking:** text position uses the *current frame's* character position and canvas transform (no 1-frame lag) — hence the bridge's `_Process` at `ProcessPriority = 100` (after all priority-0 world nodes, before render), never `process_frame` (emitted before node processing — probed).
 - **T3 — Culling:** an element whose screen rect has **disjoint interior** from the display rect is hidden; re-shown on re-entry. Flush on the inside edge stays visible (Godot `Intersects` requires interior overlap — pinned by test).
 - **T4 — Lifetime parity:** name label lives as long as its character; one bubble per character (replace-`QueueFree`); battle-text lines free after 1s; **no element outlives its owner by more than one frame** (map change ⇒ all owners freed ⇒ elements self-free).
 - **T5 — Input parity (Stage 1 I6):** clicking a visible chat bubble still produces a world click (bubble Panel must be `MouseFilter.Ignore` — it would otherwise swallow root clicks); all bridged Controls are `Ignore`.
@@ -53,7 +54,7 @@ Design doc: `docs/plans/2026-08-19-world-text-bridge-design.md` (approved 2026-0
 | Invariant | Proved by |
 |---|---|
 | T1 | Manual 6.1 (headless cannot rasterize); font-size ×S code path reviewed per task |
-| T2 | Manual 6.2 (engine timing — not unit-testable; `ProcessFrame` choice is the design decision) |
+| T2 | `tools/tests/text_bridge_order.gd` headless probe (engine contract: priority ordering + process_frame timing) + manual 6.2 (C# bridge behavior) |
 | T3 | `WorldTextProjectionTests.IsCulled_*` (adversarial: a no-cull implementation fails); manual 6.9 |
 | T4 | Compile-time (pass is the only free path) + manual 6.8 |
 | T5 | Manual 6.6 (adversarial: a missed `MouseFilter.Ignore` is the likely bug) |
@@ -72,22 +73,75 @@ Design doc: `docs/plans/2026-08-19-world-text-bridge-design.md` (approved 2026-0
 **Step 1: Write the failing tests**
 
 ```csharp
-// WorldTextProjectionTests.cs
-public void Project_Identity()            // canvas identity, S=1, origin (0,0) → input unchanged
-public void Project_CameraOffset()        // canvas translation (500,300), S=2, origin (0,0): world (0,0) → (1000,600); world (10,10) → (1020,620)
-public void Project_FractionalCamera()    // canvas translation (100.5, 50.25), S=2 → (201, 100.5) — camera lerp is fractional
-public void Project_OriginOffset()        // canvas identity, S=3, origin (1,0): world (10,10) → (31,30)
-public void RoundTrip_ProjectThenWindowToWorld_ReturnsInput()
-// ADVERSARIAL — mirrors WorldViewport.WindowToWorld's math exactly (WorldViewport.cs:158-165):
-//   p = WorldTextProjection.Project(w, canvas, S, origin);
-//   w2 = canvas.AffineInverse() * ((p - new Vector2((float)origin.X, (float)origin.Y)) / S);
-//   assert w2.DistanceTo(w) < 0.01f  (float precision; IsEqualApprox's 1e-6 default is too tight at ~1000px magnitudes)
-//   — for a non-trivial canvas (scale 1.5 + 90° rotation + translation), S ∈ {1,2,3}, several w.
-//   Fails on any sign/order slip between the forward and inverse transforms.
-public void IsCulled_Inside_False()
-public void IsCulled_FlushInsideEdge_False()  // element interior inside, rect.Right == display.Right → NOT culled (Intersects needs interior overlap)
-public void IsCulled_PastEachEdge_True()  // 4 cases: fully past left/right/top/bottom
-public void IsCulled_OutsideTouchingEdge_True()  // element entirely outside, touching the edge → culled
+// tests/Goose2Client.Tests/WorldTextProjectionTests.cs — global namespace (repo convention, cf. WorldViewportScaleTests.cs)
+using Godot;
+using Goose2Client;
+using Xunit;
+
+public class WorldTextProjectionTests
+{
+    [Fact]
+    public void Project_Identity()  // canvas identity, S=1, origin (0,0) → input unchanged
+        => Assert.Equal(new Vector2(3, -7), WorldTextProjection.Project(new Vector2(3, -7), Transform2D.Identity, 1f, new Vector2I(0, 0)));
+
+    [Fact]
+    public void Project_CameraOffset()  // camera at viewport (500,300), S=2: world → 2× viewport offset
+    {
+        var canvas = Transform2D.Identity.WithTranslation(new Vector2(500, 300));
+        Assert.Equal(new Vector2(1000, 600), WorldTextProjection.Project(Vector2.Zero, canvas, 2f, new Vector2I(0, 0)));
+        Assert.Equal(new Vector2(1020, 620), WorldTextProjection.Project(new Vector2(10, 10), canvas, 2f, new Vector2I(0, 0)));
+    }
+
+    [Fact]
+    public void Project_FractionalCamera()  // camera lerp is fractional
+        => Assert.Equal(new Vector2(201f, 100.5f), WorldTextProjection.Project(Vector2.Zero,
+            Transform2D.Identity.WithTranslation(new Vector2(100.5f, 50.25f)), 2f, new Vector2I(0, 0)));
+
+    [Fact]
+    public void Project_OriginOffset()  // display rect offset (odd-window gutter)
+        => Assert.Equal(new Vector2(31, 30), WorldTextProjection.Project(new Vector2(10, 10), Transform2D.Identity, 3f, new Vector2I(1, 0)));
+
+    [Fact]
+    public void RoundTrip_ProjectThenWindowToWorld_ReturnsInput()
+    {
+        // ADVERSARIAL — mirrors WorldViewport.WindowToWorld's math verbatim (WorldViewport.cs:158-165):
+        //   w2 = canvas.AffineInverse() * ((p - origin) / S)
+        // Fails on any sign/order slip between the forward and inverse transforms.
+        var canvas = Transform2D.Identity
+            .WithRotation(Mathf.DegToRad(90)).WithScale(new Vector2(1.5f, 1.5f)).WithTranslation(new Vector2(321.25f, -88f));
+        foreach (float s in new[] { 1f, 2f, 3f })
+            foreach (var origin in new[] { new Vector2I(0, 0), new Vector2I(1, 0), new Vector2I(13, 7) })
+                foreach (var w in new[] { Vector2.Zero, new Vector2(10, 10), new Vector2(-450.5f, 720.25f), new Vector2(12345, -6789) })
+                {
+                    var p = WorldTextProjection.Project(w, canvas, s, origin);
+                    var w2 = canvas.AffineInverse() * ((p - new Vector2((float)origin.X, (float)origin.Y)) / s);
+                    // 0.01f tolerance: float precision at ~10⁴ magnitudes (IsEqualApprox's 1e-6 default is too tight).
+                    Assert.True(w2.DistanceTo(w) < 0.01f, $"round trip {w} → {p} → {w2} (s={s}, origin={origin})");
+                }
+    }
+
+    [Fact]
+    public void IsCulled_Inside_False()
+        => Assert.False(WorldTextProjection.IsCulled(new Rect2(100, 100, 50, 50), new Rect2(0, 0, 1920, 1080)));
+
+    [Fact]
+    public void IsCulled_FlushInsideEdge_False()  // interior inside, right edge flush with display right → NOT culled (probed semantics)
+        => Assert.False(WorldTextProjection.IsCulled(new Rect2(1870, 100, 50, 50), new Rect2(0, 0, 1920, 1080)));
+
+    [Fact]
+    public void IsCulled_PastEachEdge_True()  // 4 edges, fully outside
+    {
+        var display = new Rect2(0, 0, 1920, 1080);
+        Assert.True(WorldTextProjection.IsCulled(new Rect2(-50, 100, 50, 50), display));    // left
+        Assert.True(WorldTextProjection.IsCulled(new Rect2(1920, 100, 50, 50), display));   // right
+        Assert.True(WorldTextProjection.IsCulled(new Rect2(100, -50, 50, 50), display));    // top
+        Assert.True(WorldTextProjection.IsCulled(new Rect2(100, 1080, 50, 50), display));   // bottom
+    }
+
+    [Fact]
+    public void IsCulled_OutsideTouchingEdge_True()  // entirely outside, touching the edge → no interior overlap → culled
+        => Assert.True(WorldTextProjection.IsCulled(new Rect2(1920, 100, 50, 50), new Rect2(0, 0, 1920, 1080)));
+}
 ```
 
 **Step 2: Red.** `dotnet test tests/Goose2Client.Tests/Goose2Client.Tests.csproj --filter WorldTextProjection -v minimal` → FAIL (type does not exist).
@@ -138,6 +192,7 @@ No unit tests (engine-dependent); proof is compile + Task 6 (invisible on its ow
 **Files:**
 - Create: `Scripts/IBridgedText.cs`
 - Create: `Scripts/WorldTextBridge.cs`
+- Create: `tools/tests/text_bridge_order.gd` (permanent headless probe of the processing-order contract — already written; run it in Step 5)
 - Modify: `Scripts/WorldViewport.cs` (event + `WorldToWindow`)
 - Modify: `Scripts/GameManager.cs:80-87` (creation/wiring) + property
 
@@ -206,14 +261,23 @@ namespace Goose2Client
     /// battle text). Placed in the tree between WorldViewport and UiLayer (GameManager._Ready), so
     /// on the default CanvasLayer Layer=1: above WorldTexture (root-canvas Control) and, by tree
     /// order, below UiLayer (HUD). Owns element Position/Visible per frame and their lifetime.
-    /// Projection runs on SceneTree.ProcessFrame — NOT _Process: the autoload tree processes before
-    /// the map scene, so _Process would project with last frame's positions/camera (T2).</summary>
+    /// Projection runs in the bridge's own _Process at ProcessPriority 100 — NOT from
+    /// SceneTree.process_frame (probed: emitted BEFORE node _process → would lag a frame), and
+    /// not at default priority (the autoload tree processes before the map scene at equal
+    /// priority). Priority 100 runs after every world node (all default 0) in the same stage,
+    /// before rendering (T2; contract pinned by tools/tests/text_bridge_order.gd).</summary>
     public partial class WorldTextBridge : CanvasLayer
     {
+        /// <summary>Must exceed every world node's process priority (all use the default 0 today —
+        /// Character, MapManager, WorldOverlay). Lower priority runs first; see text_bridge_order.gd.</summary>
+        private const int ProjectionProcessPriority = 100;
+
         /// <summary>Current display scale (T7: the only place elements learn S). 1 before first map.</summary>
         public float Scale { get; private set; } = 1f;
 
         private WorldViewport _worldViewport;
+
+        public override void _EnterTree() => ProcessPriority = ProjectionProcessPriority;   // before the first _Process
 
         /// <summary>Wire to the owning WorldViewport. Precondition: worldViewport in tree.
         /// Postcondition: scale changes propagate to all registered elements.</summary>
@@ -226,22 +290,23 @@ namespace Goose2Client
         /// <summary>Publish an element for projection. Precondition: element not in any tree, owner valid.
         /// Postcondition: element is a child, scaled at the current Scale, projected from the next frame.
         /// Teardown needs no unregistration: the per-frame pass frees children with dead owners.
+        /// Constraint is CanvasItem (the common base of Node2D and Control) — name labels are
+        /// Labels/Controls, bubbles/battle text are Node2Ds; Position/Visible are CanvasItem's.
         /// ORDER: ApplyScale BEFORE AddChild — name labels measure via font metrics, which are
         /// correct off-tree, whereas GetMinimumSize() is stale same-frame after a font-size
         /// change (probed). Bubble ApplyScale is a no-op pre-SetText (no message yet); its real
         /// measurement runs in-tree from ShowChatBubble, which needs an in-tree label anyway.</summary>
-        public void Register<T>(T element, Character.Character owner) where T : Node2D, IBridgedText
+        public void Register<T>(T element, Character.Character owner) where T : CanvasItem, IBridgedText
         {
             element.Owner = owner;
             element.ApplyScale(Scale);
             AddChild(element);
         }
 
-        public override void _Ready() => GetTree().ProcessFrame += OnProcessFrame;
+        public override void _Process(double delta) => UpdateProjection();
 
         public override void _ExitTree()
         {
-            GetTree()?.ProcessFrame -= OnProcessFrame;   // GetTree() can be null at exit (codebase pattern, WorldViewport.cs:47-49)
             if (_worldViewport != null) _worldViewport.ScaleChanged -= OnScaleChanged;   // same delegate instance Attach connected
         }
 
@@ -252,7 +317,7 @@ namespace Goose2Client
                 if (GetChild(i) is IBridgedText e) e.ApplyScale(s);
         }
 
-        private void OnProcessFrame()
+        private void UpdateProjection()
         {
             // Current is null only pre-first-map, when the bridge is empty (Attach never clears it),
             // so a plain return is correct here — there is no state to reset.
@@ -264,21 +329,21 @@ namespace Goose2Client
             for (int i = GetChildCount() - 1; i >= 0; i--)   // backwards: pass may QueueFree
             {
                 var child = GetChild(i);
-                if (child is not IBridgedText element || child is not Node2D node) continue;
+                if (child is not CanvasItem item || child is not IBridgedText element) continue;   // CanvasItem: uniform for Control + Node2D elements
                 if (element.Owner == null || !GodotObject.IsInstanceValid(element.Owner))
                 {
-                    node.QueueFree();   // T4: owner gone (char removed / map change) → element dies
+                    item.QueueFree();   // T4: owner gone (char removed / map change) → element dies
                     continue;
                 }
                 // ChangeMap overlap guard: for ~2 frames after a transition the NEW map is Current
                 // while OLD-map characters are still alive (queued free pending) — don't project
                 // them through the new map's canvas transform.
-                if (element.Owner.GetViewport() != _worldViewport.Current) { node.Visible = false; continue; }
-                node.Position = WorldTextProjection.Project(element.Owner.GlobalPosition,   // lockstep with WorldViewport.WorldToWindow
+                if (element.Owner.GetViewport() != _worldViewport.Current) { item.Visible = false; continue; }
+                item.Position = WorldTextProjection.Project(element.Owner.GlobalPosition,   // lockstep with WorldViewport.WorldToWindow
                         _worldViewport.Current.GetCanvasTransform(), scale, _worldViewport.Layout.DisplayOrigin)
                     + element.LocalOffsetWorld * scale;
-                node.Visible = !WorldTextProjection.IsCulled(
-                    new Rect2(node.Position + element.ScreenBounds.Position, element.ScreenBounds.Size), display);   // T3
+                item.Visible = !WorldTextProjection.IsCulled(
+                    new Rect2(item.Position + element.ScreenBounds.Position, element.ScreenBounds.Size), display);   // T3
             }
         }
     }
@@ -294,11 +359,13 @@ AddChild(WorldTextBridge);
 WorldTextBridge.Attach(WorldViewport);
 ```
 
-plus `public WorldTextBridge WorldTextBridge { get; private set; }`. (Bridge `_Ready` fires on `AddChild`, before `Attach` — `OnProcessFrame`'s null guard makes that safe.)
+plus `public WorldTextBridge WorldTextBridge { get; private set; }`. (The bridge's `_Process` starts on `AddChild`, before `Attach` runs — `UpdateProjection`'s `_worldViewport == null` guard makes that safe.)
 
-**Step 5:** `dotnet build` → compiles; run full `dotnet test ... -v minimal` → 325 still pass (no behavior change yet).
+**Step 5:** Run the ordering probe — `godot --headless --path . -s tools/tests/text_bridge_order.gd` → three `PASS` lines, exit 0. **If it fails, stop** — the priority-100 design is unsound on this engine build and Task 2's core assumption must be re-derived before continuing. (Same usage pattern as `tools/tests/scene_lifecycle.gd`; the worktree needs the engine per the Tech Stack note.)
 
-**Step 6: Commit.** `feat: add world text bridge canvas layer with per-frame projection`
+**Step 6:** `dotnet build` → compiles; run full `dotnet test ... -v minimal` → 325 still pass (no behavior change yet).
+
+**Step 7: Commit.** `feat: add world text bridge canvas layer with per-frame projection`
 
 ---
 
@@ -377,16 +444,21 @@ namespace Goose2Client.Overlays
 - `EnsureNameLabel` (`:97-116`): keep `Text`, alignment, z constants, `ClipText`, `MouseFilter.Ignore`, and the `font_outline_color` override; **drop** the font-size/outline overrides (now in `ApplyScale`) and the `Position`/`Size` init (now in `Layout`); restructure so the **guard precedes the assignment** (an unregistered label assigned to `_nameLabel` would be stranded by the `:99` early-return and never shown) and replace `AddChild(_nameLabel)` with `bridge.Register(_nameLabel, this)`:
 
 ```csharp
-if (_nameLabel != null) return;
-if (GameManager.Instance?.WorldTextBridge is not { } bridge) return;   // defensive; can't happen pre-map
+if (_nameLabel != null) return true;
+if (GameManager.Instance?.WorldTextBridge is not { } bridge) return false;   // defensive; can't happen pre-map
 _nameLabel = new Overlays.BridgedNameLabel { /* Text, alignment, z, ClipText, MouseFilter, outline color */ };
 bridge.Register(_nameLabel, this);   // Register: Owner → ApplyScale (font metrics, valid off-tree) → AddChild
 RepositionOverlays();   // existing trailing call, harmless, stays
+return true;
 ```
 
-(`Register`'s `ApplyScale` → `Layout(this)` does the first sizing; the trailing `RepositionOverlays()` re-runs it — harmless.)
+`EnsureNameLabel` **returns bool** — the no-bridge path leaves `_nameLabel` null and every caller must respect that (see the NRE guard below). (`Register`'s `ApplyScale` → `Layout(this)` does the first sizing; the trailing `RepositionOverlays()` re-runs it — harmless.)
 - `LayoutNameLabel` (`:131-138`): body becomes `if (_nameLabel == null) return; _nameLabel.Layout(this);` (the `bodyHeight` parameter is no longer used — remove the parameter and update the two call sites `:126`, `:186`).
-- `:184-186`: `_nameLabel.Text = FullName; _nameLabel.Layout(this);` (re-layout on rename: width changes).
+- `:184-186` (`SetAppearance`): **guard the dereference** — today this line NREs on the no-bridge path because `EnsureNameLabel` can leave `_nameLabel` null:
+
+```csharp
+if (EnsureNameLabel()) { _nameLabel.Text = FullName; _nameLabel.Layout(this); }   // re-layout on rename: width changes
+```
 
 **Step 3:** `dotnet build` + full test run (325 pass).
 
@@ -408,7 +480,7 @@ RepositionOverlays();   // existing trailing call, harmless, stays
 
 **Files:**
 - Modify: `Scripts/Overlays/ChatBubble.cs`
-- Modify: `Scripts/Character/Character.cs:688-706` (`ShowChatBubble`)
+- Modify: `Scripts/Character/Character.cs:121-126` (`RepositionOverlays` → `UpdateAnchor`), `:688-706` (`ShowChatBubble`)
 - `ChatBubbleLayout.cs` is **untouched** — its constants stay world units; `ChatBubble` multiplies the ones it uses by `scale` at the call site.
 
 **Step 1: `ChatBubble.cs` changes**
@@ -417,8 +489,20 @@ RepositionOverlays();   // existing trailing call, harmless, stays
   `public Character.Character Owner { get; set; }`, `public Vector2 LocalOffsetWorld { get; set; }`, `public float DisplayScale { get; private set; } = 1f;` (**named `DisplayScale`, not `Scale`** — `Scale` would shadow `CanvasItem.Scale` (Vector2) with a CS0108 warning and a future trap), `public Rect2 ScreenBounds => new Rect2(0f, -_bgScreen.Y, _bgScreen.X, _bgScreen.Y);` with `private Vector2 _bgScreen;` (the screen-px background size, set in `SetText`), and `private string _message;`.
 - `SetText(string message)` → `SetText(string message, float scale)`: store `_message = message; DisplayScale = scale;`; replace the constants with scaled values — `int fontSize = Mathf.Max(1, Mathf.RoundToInt(12f * scale));` (replaces `const int fontSize = 12`, `:32`), `float maxTextWidth = ChatBubbleLayout.MaxWidth * scale;` (`:86`), `var padding = ChatBubbleLayout.Padding * scale;` (used at `:133-135` in place of `ChatBubbleLayout.Padding` / the `MaxWidth` wrap-width), stylebox corner radii `6f * scale` (`:45-48`), background size `var bgSize = textSize + padding * 2;` (replaces `ChatBubbleLayout.BackgroundSize(textSize)` — same formula, scaled padding).
 - `BackgroundWidth = bgSize.X / scale;` (world units — the units change); `_bgScreen = bgSize;`
-- **Self-anchoring (at the end of `SetText`, after measurement):** `if (Owner != null) LocalOffsetWorld = new Vector2(-BackgroundWidth / 2f, -(Owner.Height + Character.Character.NameTopOffset) - ChatBubbleLayout.VerticalGap);` (qualify as `Character.Character` — from the Overlays namespace the bare name is the `Goose2Client.Character` namespace) — same world-unit math the old `ShowChatBubble` did, now re-derived on every (re)measure so a wrap-line-count change across scales can't leave a stale anchor. Requires `Character.NameTopOffset` to be `internal` (done in Task 3).
-- **Node-reuse + reflow refactor (required, two probed engine behaviors):** (1) the original `SetText` unconditionally creates new `Panel`/`Label` and `AddChild`s them (panel `:35-39`, wrap-branch label `:110`; only the final add at `:137` is already parent-guarded) — a naive re-run would **double-add duplicates** and `:110` would even throw for an already-parented label; restructure so the first call creates `_background`/`_label` and later calls **reuse** them (guard `:39`/`:110` adds with `if (x.GetParent() == null)`, re-apply stylebox/text/wrap/size/position on the existing nodes). (2) **Before re-measuring, if `_label` is already parented, `RemoveChild(_label)` first** — an autowrap OFF→WordSmart transition on an in-tree label does NOT reflow (stale line count and stale min-size at `:113` — probed); the existing flow then re-adds the label in its final state (wrap branch `:110`, or the guarded `:137`), which is the empirically valid setup-before-add state the measurement comment at `:59-68` documents. Wrap→wrap re-measures work without re-adding, but uniform remove-first is simplest and always correct.
+- **Self-anchoring:** `if (Owner != null) LocalOffsetWorld = new Vector2(-BackgroundWidth / 2f, -(Owner.Height + Character.Character.NameTopOffset) - ChatBubbleLayout.VerticalGap);` (qualify as `Character.Character` — from the Overlays namespace the bare name is the `Goose2Client.Character` namespace). Factor this into `public void UpdateAnchor() { if (Owner == null || _message == null) return; <the line above>; }` and call it from two places: the end of `SetText` (anchor after every (re)measure), and `Character.RepositionOverlays` (`Character.cs:121-126`): `if (_chatBubble != null && GodotObject.IsInstanceValid(_chatBubble)) _chatBubble.UpdateAnchor();` — required because appearance/mount changes move the nameplate (`RepositionOverlays` already re-anchors the name) and a live bubble would otherwise keep the stale height-based anchor. (Today's in-world bubble has the same staleness — this is a small behavior improvement, not a regression fix.) — same world-unit math the old `ShowChatBubble` did, now re-derived on every (re)measure so a wrap-line-count change across scales can't leave a stale anchor. Requires `Character.NameTopOffset` to be `internal` (done in Task 3).
+- **Node-reuse + reflow refactor (required, two probed engine behaviors):** (1) the original `SetText` unconditionally creates new `Panel`/`Label` and `AddChild`s them (panel `:35-39`, wrap-branch label `:110`; only the final add at `:137` is already parent-guarded) — a naive re-run would **double-add duplicates** and `:110` would even throw for an already-parented label; restructure so the first call creates `_background`/`_label` and later calls **reuse** them (guard `:39`/`:110` adds with `if (x.GetParent() == null)`, re-apply stylebox/text/wrap/size/position on the existing nodes). (2) **Before re-measuring, if `_label` is already parented, `RemoveChild(_label)` first** — an autowrap OFF→WordSmart transition on an in-tree label does NOT reflow (stale line count and stale min-size at `:113` — probed); the existing flow then re-adds the label in its final state (wrap branch `:110`, or the guarded `:137`), which is the empirically valid setup-before-add state the measurement comment at `:59-68` documents. Wrap→wrap re-measures work without re-adding, but uniform remove-first is simplest and always correct. The reflow-critical section, concretely:
+
+```csharp
+// Top of the measurement section (before the font-metrics check):
+if (_label != null && _label.GetParent() != null)
+    RemoveChild(_label);   // in-tree autowrap OFF→ON does not reflow (probed); the wrap branch
+                           // (:110) or the final guarded add (:137) re-adds it in final state
+// ... existing measurement, unchanged in shape, with scaled constants ...
+// ... end of SetText (after _bgScreen/BackgroundWidth are set):
+UpdateAnchor();
+```
+
+(First call: `_label` is null or parentless → the remove is a no-op and the create path runs; later calls: reuse + valid re-measure.)
 - `_background`: add `MouseFilter = Control.MouseFilterEnum.Ignore;` (T5 — a Stop Panel in the root viewport would swallow world clicks; the label already sets `Ignore`).
 - `public void ApplyScale(float scale) { if (_message == null || DisplayScale == scale) return; SetText(_message, scale); }` — the scale-equality guard makes `Register`'s pre-SetText `ApplyScale` a no-op (no double measure / needless label re-add per bubble show).
 - `_Ready` (Lifetime, z) unchanged.
@@ -459,11 +543,14 @@ _chatBubble.SetText(message, bridge.Scale);   // in-tree (measurement needs it);
 **Step 1: `BattleText.cs`** — class becomes `: Node2D, IBridgedText`; add `Owner`, `LocalOffsetWorld`, and a private `float _scale = 1f;` (no public property needed — the bridge passes the scale in; `Character` reads `bridge.Scale`) and
 
 ```csharp
-/// <summary>Conservative union of line extents (spread x ∈ [−4,12] + centered 100px labels,
-/// rise ≤ 32px up, y0 ∈ [0,16]) in world units, scaled for culling (T3). Over-culling is
-/// harmless: text 1px past the display edge is already clipped by the world blit.
+/// <summary>Local extent of the lines (the (0,−40) anchor is LocalOffsetWorld, NOT in here):
+/// line origins x ∈ [−4,12] (spread), y ∈ [−48,0] (y0 ∈ [−16,0] + rise ≤ 32 up); the 100×16
+/// label is centered on the origin; +4 outline → x ∈ [−58,66], y ∈ [−52,20] world units,
+/// scaled for culling (T3). Sized to the ACTUAL extent: bridge text is root-layer and is NOT
+/// clipped by the world blit, so an oversized rect would UNDER-cull — text stays visible in
+/// gutters where the world itself is cut off.
 /// (No Rect2 * float operator in GodotSharp — scale the components.)</summary>
-public Rect2 ScreenBounds => new Rect2(-72f * _scale, -88f * _scale, 144f * _scale, 104f * _scale);
+public Rect2 ScreenBounds => new Rect2(-58f * _scale, -52f * _scale, 124f * _scale, 72f * _scale);
 
 public void ApplyScale(float scale)
 {
@@ -510,7 +597,7 @@ public void AddBattleText(BattleTextType type, string text)
 Run the client (see Tech Stack note: `run.sh` may need copying into the worktree and its godot binary path fixed for the local engine; alternatively `dotnet run` the app project under a 4.7.x `godot-mono`). Checklist (design §5; Stage 1 invariants must regress-clean):
 
 1. **Crispness (T1, the point of the stage):** at 1080p (S=2) and 4K (S=3): names, bubbles, battle text pixel-crisp vs Stage 1's soft upscale; on-screen size unchanged (12 world-px → 24/36 screen px). 1× mode → 12px, matching today's in-world rendering.
-2. **Tracking (T2):** walk + camera lerp — text glued to characters, no per-frame lag (would be ~8 screen-px trailing at 250px/s walk if the `ProcessFrame` decision was missed), crisp during sub-pixel camera scroll.
+2. **Tracking (T2):** walk + camera lerp — text glued to characters, no per-frame lag (would be ~8 screen-px trailing at 250px/s walk if the priority-100 `_Process` decision was missed — engine contract covered by `tools/tests/text_bridge_order.gd`, C# wiring by this check), crisp during sub-pixel camera scroll.
 3. **Bubbles (T4/T6):** short + long wrapping bubbles crisp at 2×/3×; wrap approximately proportional (a borderline message may gain/lose a line at 3× — accepted, probed; the anchor must stay correct in that case); anchored above nameplate, centered incl. long names; 3s lifetime; replacement clean.
 4. **Battle text:** spread/rise unchanged; 1s free; 18-line cap.
 5. **Ordering (T6):** bubble over name over world; battle text below name.
