@@ -665,16 +665,19 @@ namespace Goose2Client.Character
             return null;
         }
 
+        /// <summary>Spawn a damage/heal/status line above this character on the native-resolution
+        /// text bridge. The container is registered once and re-added if it was freed (e.g. by the
+        /// bridge sweep); LocalOffsetWorld carries the old (0,−40) creation-time Position.</summary>
         public void AddBattleText(BattleTextType type, string text)
         {
-            _battleText ??= new Goose2Client.Overlays.BattleText
+            if (GameManager.Instance?.WorldTextBridge is not { } bridge) return;
+            if (_battleText == null || !GodotObject.IsInstanceValid(_battleText) || _battleText.GetParent() == null)
             {
-                Name = "BattleText",
-                Position = new Vector2(0, -40),   // above the character, adjusted by Part 2
-                ZIndex = 20,
-            };
-            if (_battleText.GetParent() != this) AddChild(_battleText);
-            _battleText.AddText(type, text, Height);
+                _battleText = new Overlays.BattleText { Name = "BattleText", ZIndex = 20 };
+                _battleText.LocalOffsetWorld = new Vector2(0, -40);   // above the character
+                bridge.Register(_battleText, this);
+            }
+            _battleText.AddText(type, text, Height, bridge.DisplayScale);
         }
 
         /// <summary>Show a speech chat bubble above this character's head. Replaces any existing bubble.</summary>
