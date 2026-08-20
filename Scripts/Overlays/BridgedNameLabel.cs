@@ -34,8 +34,8 @@ namespace Goose2Client.Overlays
             // FONT METRICS, not GetMinimumSize(): min-size is stale same-frame after a
             // font-size-override change on a freshly-added label (probed headless) and Register
             // applies the scale before the label is in the tree. Same pattern as the bubble's
-            // one-line branch (ChatBubble.cs:98,100-103). May differ ≤1-2px from today's
-            // min-size-based layout (Character.cs:134) — accepted; centering stays exact.
+            // one-line measurement branch (ChatBubble.SetText). May differ ≤1-2px from Stage 1's
+            // min-size-based layout — accepted; centering stays exact.
             var font = GetThemeFont("font") ?? GetThemeDefaultFont();
             int fontSize = Mathf.Max(1, Mathf.RoundToInt(12f * _scale));
             Vector2 natural = font.GetStringSize(Text, HorizontalAlignment.Left, -1, fontSize);
@@ -43,7 +43,7 @@ namespace Goose2Client.Overlays
             float h = Mathf.Max(font.GetHeight(fontSize), 16f * _scale);
             Size = new Vector2(w, h);
             // 48 fallback mirrors RepositionOverlays' existing `Height <= 0 ? 48 : Height`
-            // (Character.cs:122) — a character without a body slot must not anchor names to its feet.
+            // (Character.cs) — a character without a body slot must not anchor names to its feet.
             int bodyHeight = owner.Height <= 0 ? 48 : owner.Height;
             // Character.Character (not `Character` — from this namespace the bare name is the Goose2Client.Character namespace).
             LocalOffsetWorld = new Vector2(-w / (2f * _scale), -(bodyHeight + Character.Character.NameTopOffset));

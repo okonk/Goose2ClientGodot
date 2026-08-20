@@ -182,6 +182,12 @@ namespace Goose2Client
 
                 loading = GD.Load<PackedScene>("res://Scenes/LoadingMap.tscn").Instantiate<LoadingMapScene>();
                 GetTree().Root.AddChild(loading);
+                // Hide the text bridge for the whole transition. The bridge is a root CanvasLayer
+                // (layer 1) that draws ABOVE the root-canvas LoadingMap control, while old-map
+                // characters (and thus their names/bubbles/battle text) stay alive until the new
+                // map's first presented frame. Without this, old-map text would overlay the loading
+                // UI — Stage 1 text lived inside the world texture and drew BELOW the overlay.
+                WorldTextBridge.Visible = false;
                 await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
                 loading.SetMapName(mapName);
 
@@ -265,6 +271,7 @@ namespace Goose2Client
                 _changingMap = false;   // release on every exit path (early return, throw, normal)
                 if (loading != null && GodotObject.IsInstanceValid(loading))
                     loading.QueueFree();   // no leaked full-window Control
+                WorldTextBridge.Visible = true;   // restore: new-map elements project on their first frame
                 SetPaused(false);   // always drain queued gameplay packets, even if the transition throws
             }
         }
