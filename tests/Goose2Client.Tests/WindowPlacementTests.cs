@@ -71,6 +71,32 @@ public class WindowPlacementTests
     }
 
     [Fact]
+    public void MiddleBand_WideWindowEquidistant_FallsThroughAndKeepsSaved()
+    {
+        // 351px hotbar on a 640px canvas: band threshold = 0.25*640 = 160, and the offsets
+        // around the equidistant point (640 - 144.5 - 351 == 144.5) are below it, so the
+        // final equidistant/keep branch fires (not the band). Wide centered window stays put.
+        var c = new Vector2I(640, 360);
+        Assert.Equal(new Vector2(144.5f, 10),
+            WindowPlacement.Resolve(new Vector2(144.5f, 10), new Vector2(351, 36), c, c));
+
+        // One pixel off equidistant reaches the sub-band left/right-stick branches (identity
+        // on the same canvas — pinned so the branches stay reachable and keep the coordinate).
+        Assert.Equal(144f, WindowPlacement.Resolve(new Vector2(144f, 10), new Vector2(351, 36), c, c).X);
+        Assert.Equal(145f, WindowPlacement.Resolve(new Vector2(145f, 10), new Vector2(351, 36), c, c).X);
+    }
+
+    [Theory]
+    [InlineData(320, 640, 320)] // exactly 1/4 from both edges (centered in 1280) → in the band
+    [InlineData(560, 400, 560)] // left 560, right EXACTLY 1/4 of 1280 → in the band (>= is inclusive)
+    public void MiddleBand_ExactQuarterBoundary_IsInBand(int x, int w, int expectedX)
+    {
+        // If the right offset were below the threshold, case 2 would right-stick to 1920-400-320 = 1200.
+        var p = WindowPlacement.Resolve(new Vector2(x, 10), new Vector2(w, 100), C720, C1080);
+        Assert.Equal(expectedX, p.X);
+    }
+
+    [Fact]
     public void CrossCanvas_RightEdge_SticksToRight()
     {
         // (900, 360) with w=340 → right offset in 1280 canvas = 1280 - (900+340) = 40.

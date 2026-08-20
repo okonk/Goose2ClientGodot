@@ -16,6 +16,9 @@ public static class WindowPlacement
 
     public const int TitleBarHeight = 24;
 
+    // Windows closer than ¼ of the canvas to either edge are edge-parked; the band is the middle 50%.
+    private const float MiddleBandEdgeFraction = 0.25f;
+
     /// <summary>
     /// Middle-band + edge-stick + clamp: per axis, if the window is at least 25% of the saved
     /// canvas away from BOTH edges it is "parked in the middle" and keeps its saved coordinate
@@ -42,12 +45,20 @@ public static class WindowPlacement
     {
         float left = saved;
         float right = savedEdge - (saved + size);
-        // Middle-band: ≥ 25% of the saved canvas from both edges → parked in the middle
-        // (includes the exactly-equidistant case), keep the saved coordinate.
-        if (left >= 0.25f * savedEdge && right >= 0.25f * savedEdge) return saved;
+        // Middle-band: ≥ MiddleBandEdgeFraction of the saved canvas from both edges → parked in
+        // the middle (includes the exactly-equidistant case), keep the saved coordinate.
+        // Known limitation: band-keep does NOT survive clamping onto a smaller canvas — e.g. a
+        // 351px hotbar kept at x=520 is clamped to x=289 on a 640px canvas; if saved there, the
+        // next restore decodes 0px right-edge as an intentional right-edge preference (the old
+        // rule produced the same kind of scar flush-left; recoverable by dragging — a
+        // "re-center when clamped" alternative would re-break round-trips, since a 351px window
+        // cannot be in-band on a 640px canvas at all).
+        if (left >= MiddleBandEdgeFraction * savedEdge && right >= MiddleBandEdgeFraction * savedEdge) return saved;
         if (left < right) return left;                 // closer to the leading edge
         if (right < left) return currentEdge - size - right; // re-stick to the trailing edge
-        return saved;                                  // equidistant / mid-screen: stays put
+        // Equidistant: stays put. The band above intercepts this unless the window is wider
+        // than half the saved canvas (e.g. a 351px hotbar on a 640px canvas), where it still fires.
+        return saved;
     }
 
     /// <summary>

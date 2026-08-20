@@ -24,7 +24,10 @@ public static class DefaultWindowLayout
     /// <summary>
     /// Transient dialog windows that should open centered on first run instead of using
     /// their <see cref="For"/> default; once the user drags one (a position is saved), the
-    /// normal edge-stick <see cref="WindowPlacement.Resolve"/> rule takes over.
+    /// normal edge-stick <see cref="WindowPlacement.Resolve"/> rule takes over. Note the
+    /// middle-band rule intentionally also moves the first-run Spellbook (default 700,120) off
+    /// the right edge at larger canvases — it is top-center at 720p, so keeping it put matches
+    /// the hotbar rationale.
     /// </summary>
     public static bool IsDialog(string windowName) => windowName is "Quest" or "Vendor" or "Info" or "Bank" or "CombineBag";
 
