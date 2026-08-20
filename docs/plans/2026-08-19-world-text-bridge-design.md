@@ -7,7 +7,7 @@
 ## 1. Node structure & ownership
 
 - **`WorldTextBridge : CanvasLayer`** — created in `GameManager._Ready`, added to the tree **between** `WorldViewport` and `UiLayer`. Layer stays default (1); tree order makes the HUD (`UiLayer`, same layer, added after) draw on top, and the bridge sits above `WorldTexture` (a Control on the root viewport's canvas, layer 0). Visual stacking: world < text < HUD (same as today).
-- **Elements are children of the bridge, not of the character.** Each bridged element (name label, one chat bubble per speaker, one battle-text container per character) is a `Node2D` under the bridge storing:
+- **Elements are children of the bridge, not of the character.** Each bridged element (name label, one chat bubble per speaker, one battle-text container per character) is a child of the bridge — the name label is a `Control` (`Label`); the bubble and battle-text container are `Node2D`s (common constraint `CanvasItem`, which has no `Position` — the pass sets it via a `Node2D`/`Control` branch) — storing:
   - a back-reference to its owner `Character`,
   - its local anchor offset in **world units** (name: `(-wWorld/2, -(Height + NameTopOffset))`; bubble: its current `Position`; battle text: `(0, -40)`),
   - a scale-rebuild method (`ApplyScale(S)`, §2).
@@ -33,7 +33,7 @@ Text is vector-rendered, so sub-pixel screen positions are fine — strict integ
 **Per-frame pass — driven by the bridge's own `_Process` at `ProcessPriority = 100` (frame-ordering decision, probed headless).** Two rejected alternatives: `SceneTree.process_frame` is emitted *before* node `_process` callbacks (probed, `tools/tests/text_bridge_order.gd`) — a process-frame projector would read last frame's positions (names trail the sprite); and default-priority `_Process` runs in tree order, where the `GameManager` autoload (bridge's parent) processes *before* the map scene. Priority 100 runs after every world node (all default 0: `Character`, `MapManager` camera, `WorldOverlay`) within the same processing stage, before rendering. The probe pins both engine facts; if it fails on an engine build, the design must be re-derived. Element lifetimes (bubble 3s, battle-text rise) keep their existing `WorldOverlay._Process`; only the *projection* uses the priority-100 pass.
 
 Pass body:
-1. If `WorldViewport.Current == null` (no map) → hide all elements, return.
+1. If `WorldViewport.Current == null` (no map) → return. (The bridge is empty pre-map — all elements are created by `Character` after a map exists — so there is nothing to hide; a plain return suffices.)
 2. For each child element: drop if owner fails `IsInstanceValid`; else `element.Position = WorldToWindow(owner.GlobalPosition) + element.LocalOffset * S`.
 3. Cull: element screen rect ∉ `Rect2(Layout.DisplayOrigin, Layout.DisplaySize)` → `Visible = false` (re-show on re-entry).
 
@@ -62,7 +62,7 @@ A 1-frame visual pop during a mid-flight resize (bubble re-measure, lines re-fon
 
 ## 4. Edge cases & error handling
 
-- **No map attached:** bridge hides all elements, skips projection (`Current == null`). Element creation is impossible pre-map anyway (all created by `Character`).
+- **No map attached:** bridge skips projection (`Current == null`) and returns; the bridge is empty pre-map anyway (all elements created by `Character`), so there is nothing to hide.
 - **Map transition:** old world freed → owners invalid → elements self-`QueueFree` on next pass. No `ChangeMap` changes. ≤1 frame of orphans, behind the loading overlay.
 - **Character removed mid-flight:** same `IsInstanceValid` path frees name/bubble/battle text together; in-progress battle text just disappears.
 - **Resize mid-bubble/mid-rise:** `ScaleChanged` only on real change; in-place re-layout; 1-frame pop accepted.

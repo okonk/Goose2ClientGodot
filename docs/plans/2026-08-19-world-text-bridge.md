@@ -22,7 +22,7 @@ Design doc: `docs/plans/2026-08-19-world-text-bridge-design.md` (approved 2026-0
 | `WindowToWorld` (inverse of what we add): `(windowPos − DisplayOrigin)/Scale` then `canvasTransform.AffineInverse() * vp` | `Scripts/WorldViewport.cs:158-165` |
 | `Transform2D * Vector2` operator + `AffineInverse()` compile in this codebase | `Scripts/WorldViewport.cs:163` |
 | Bridge insertion point: `WorldViewport` added at `:82`, `UiLayer` at `:87` (bridge goes between) | `Scripts/GameManager.cs:80-87` |
-| **Per-frame ordering (probed headless 4.6.2, `tools/tests/text_bridge_order.gd`):** `process_frame` is emitted BEFORE node `_process`; within the processing stage lower `process_priority` runs first, so a priority-100 node sees a priority-0 node's same-frame mutation; `call_deferred` queued during processing flushes after processing, same frame. ⇒ bridge projects from `_Process` at priority 100, never from `process_frame` | probe, external review |
+| **Per-frame ordering (probed headless 4.6.2, `tools/tests/text_bridge_order.gd`):** `process_frame` is emitted BEFORE node `_process`; within the processing stage lower `process_priority` runs first, so a priority-100 node sees a priority-0 node's same-frame mutation. (The probe does **not** cover `call_deferred` flush timing — that semantics is standard Godot behavior, relied on separately by `Register`'s no-flash note.) ⇒ bridge projects from `_Process` at priority 100, never from `process_frame` | probe, external review |
 | `Label : Control : CanvasItem` (NOT `Node2D`). `Position` exists on `Node2D` and `Control` — **NOT on `CanvasItem`** (reflection, both GodotSharp versions); `Visible`/`QueueFree` are on `CanvasItem`/`Node`. ⇒ the pass sets Position via a `Node2D`/`Control` branch; `CanvasItem` is still the right common constraint (reflection + live compile, round-2 review) | reflection, round-2 review |
 | `Transform2D` C# API: **no `With*` methods** (those are GDScript); the equivalents are `Translated(Vector2)` / `Rotated(double)` / `Scaled(Vector2)` (reflection + live compile, round-2 review) | reflection, round-2 review |
 | CanvasLayer default `Layer = 1` (Godot docs) → bridge sits above `WorldTexture` (root-canvas Control, layer 0); same-layer tie with `UiLayer` broken by tree order (HUD added later draws on top) | Godot `CanvasLayer` docs; `Scripts/GameManager.cs:80-87` |
@@ -50,7 +50,7 @@ Design doc: `docs/plans/2026-08-19-world-text-bridge-design.md` (approved 2026-0
 - **T4 — Lifetime parity:** name label lives as long as its character; one bubble per character (replace-`QueueFree`); battle-text lines free after 1s; **no element outlives its owner by more than one frame** (map change ⇒ all owners freed ⇒ elements self-free).
 - **T5 — Input parity (Stage 1 I6):** clicking a visible chat bubble still produces a world click (bubble Panel must be `MouseFilter.Ignore` — it would otherwise swallow root clicks); all bridged Controls are `Ignore`.
 - **T6 — Ordering:** world < battle text (z 40 eff.) < name (z 100) < bubble (z 102) < HUD; z constants unchanged, now sorting within the bridge's canvas.
-- **T7 — Single scale source:** element creation and `ScaleChanged` both flow from the bridge's `DisplayScale` (fed by `WorldViewport.ApplyMode`); elements never read `Layout` directly.
+- **T7 — Single scale source:** element creation, `ScaleChanged`, and the projection pass all use the bridge's `DisplayScale` (fed by `WorldViewport.ApplyMode`); nothing in the bridge reads `Layout.Scale` (only the display rect's origin/size come from `Layout`); elements never read `Layout` directly.
 
 | Invariant | Proved by |
 |---|---|
@@ -60,7 +60,7 @@ Design doc: `docs/plans/2026-08-19-world-text-bridge-design.md` (approved 2026-0
 | T4 | Compile-time (pass is the only free path) + manual 6.8 |
 | T5 | Manual 6.6 (adversarial: a missed `MouseFilter.Ignore` is the likely bug) |
 | T6 | Manual 6.5 |
-| T7 | Code structure (only `Register`/`OnScaleChanged` call `ApplyScale`) |
+| T7 | Code structure (only `Register`/`OnScaleChanged` call `ApplyScale`; the projection pass reads `DisplayScale`, never `Layout.Scale`) |
 | Forward transform = exact inverse of `WindowToWorld` | `WorldTextProjectionTests.RoundTrip_*` (adversarial: a sign/order slip between the two transforms fails) |
 
 ---
@@ -332,7 +332,10 @@ namespace Goose2Client
             // Current is null only pre-first-map, when the bridge is empty (Attach never clears it),
             // so a plain return is correct here — there is no state to reset.
             if (_worldViewport == null || _worldViewport.Current == null) return;
-            float scale = _worldViewport.Layout.Scale;
+            // T7: DisplayScale is the bridge's single scale source (kept in lockstep with
+            // Layout.Scale by the same ScaleChanged event that feeds it) — never read
+            // Layout.Scale here. Only the display rect geometry comes from Layout.
+            float scale = DisplayScale;
             var o = _worldViewport.Layout.DisplayOrigin;
             var s = _worldViewport.Layout.DisplaySize;   // separate statements: project LangVersion predates multi-declarator var
             // No Rect2(Vector2I, …) ctor in GodotSharp — construct from component casts.
@@ -376,7 +379,7 @@ plus `public WorldTextBridge WorldTextBridge { get; private set; }`. (The bridge
 
 **Step 5:** Run the ordering probe — `godot --headless --path . -s tools/tests/text_bridge_order.gd` → three `PASS` lines, exit 0. **If it fails, stop** — the priority-100 design is unsound on this engine build and Task 2's core assumption must be re-derived before continuing. (Same usage pattern as `tools/tests/scene_lifecycle.gd`; the worktree needs the engine per the Tech Stack note.)
 
-**Step 6:** `dotnet build` → compiles; run full `dotnet test ... -v minimal` → 325 still pass (no behavior change yet).
+**Step 6:** `dotnet build` → compiles; run full `dotnet test ... -v minimal` → 334 pass (325 baseline + 9 projection tests; no behavior change yet).
 
 **Step 7: Commit.** `feat: add world text bridge canvas layer with per-frame projection`
 
@@ -473,7 +476,7 @@ return true;
 if (EnsureNameLabel()) { _nameLabel.Text = FullName; _nameLabel.Layout(this); }   // re-layout on rename: width changes
 ```
 
-**Step 3:** `dotnet build` + full test run (325 pass).
+**Step 3:** `dotnet build` + full test run (334 pass: 325 baseline + 9 projection tests).
 
 **Step 4 (manual red→green, needs server):** log in at 1080p: names are **crisp** (was soft 2×), same on-screen size as before, above heads, track movement with no lag; long names (shopkeeper) center and don't clip; rename path (if reachable) re-centers. At a map change, no old-map names linger.
 
@@ -502,7 +505,24 @@ if (EnsureNameLabel()) { _nameLabel.Text = FullName; _nameLabel.Layout(this); } 
   `public Character.Character Owner { get; set; }`, `public Vector2 LocalOffsetWorld { get; set; }`, `public float DisplayScale { get; private set; } = 1f;` (**named `DisplayScale`, not `Scale`** — `Scale` would shadow `CanvasItem.Scale` (Vector2) with a CS0108 warning and a future trap), `public Rect2 ScreenBounds => new Rect2(0f, -_bgScreen.Y, _bgScreen.X, _bgScreen.Y);` with `private Vector2 _bgScreen;` (the screen-px background size, set in `SetText`), and `private string _message;`. (Cull-rect note: the rect covers the **background panel only** — in the wrapped case the label is `MaxWidth·S` wide while the panel hugs the longest line, so the label's transparent overhang can linger a frame or two past the display edge. The overhang carries no visible glyphs (WordSmart hard-breaks keep fragments ≤ wrap width) and the label is `MouseFilter.Ignore`, so this stays the accepted per-rect imperfection (Task 6.9) rather than a wider rect that would under-cull the panel.)
 - `SetText(string message)` → `SetText(string message, float scale)`: store `_message = message; DisplayScale = scale;`; replace the constants with scaled values — `int fontSize = Mathf.Max(1, Mathf.RoundToInt(12f * scale));` (replaces `const int fontSize = 12`, `:32`), `float maxTextWidth = ChatBubbleLayout.MaxWidth * scale;` (`:86`), `var padding = ChatBubbleLayout.Padding * scale;` (used at `:133-135` in place of `ChatBubbleLayout.Padding` / the `MaxWidth` wrap-width), stylebox corner radii `Mathf.RoundToInt(6f * scale)` (`:45-48` — `StyleBoxFlat.CornerRadius*` are **int**), background size `var bgSize = textSize + padding * 2;` (replaces `ChatBubbleLayout.BackgroundSize(textSize)` — same formula, scaled padding).
 - `BackgroundWidth = bgSize.X / scale;` (world units — the units change); `_bgScreen = bgSize;`
-- **Self-anchoring:** `if (Owner != null) LocalOffsetWorld = new Vector2(-BackgroundWidth / 2f, -(Owner.Height + Character.Character.NameTopOffset) - ChatBubbleLayout.VerticalGap);` (qualify as `Character.Character` — from the Overlays namespace the bare name is the `Goose2Client.Character` namespace). Factor this into `public void UpdateAnchor() { if (Owner == null || _message == null) return; <the line above>; }` and call it from two places: the end of `SetText` (anchor after every (re)measure), and `Character.RepositionOverlays` (`Character.cs:121-126`): `if (_chatBubble != null && GodotObject.IsInstanceValid(_chatBubble)) _chatBubble.UpdateAnchor();` — required because appearance/mount changes move the nameplate (`RepositionOverlays` already re-anchors the name) and a live bubble would otherwise keep the stale height-based anchor. (Today's in-world bubble has the same staleness — this is a small behavior improvement, not a regression fix.) Same world-unit math the old `ShowChatBubble` did, now re-derived on every (re)measure so a wrap-line-count change across scales can't leave a stale anchor. Requires `NameTopOffset` to be `internal` (done in Task 3).
+- **Self-anchoring:** factor the anchor math into:
+
+```csharp
+public void UpdateAnchor()
+{
+    if (Owner == null || _message == null) return;
+    // 48 fallback mirrors the name label's `Height <= 0 ? 48 : Height` (BridgedNameLabel, Task 3) —
+    // a character missing body-height metadata must anchor the bubble above the SAME fallback
+    // body height the nameplate uses, or the bubble detaches from the nameplate.
+    int bodyHeight = Owner.Height <= 0 ? 48 : Owner.Height;
+    LocalOffsetWorld = new Vector2(
+        -BackgroundWidth / 2f,
+        -(bodyHeight + Character.Character.NameTopOffset)
+            - ChatBubbleLayout.VerticalGap);   // Character.Character: from Overlays, bare `Character` is the Goose2Client.Character namespace
+}
+```
+
+and call it from two places: the end of `SetText` (anchor after every (re)measure), and `Character.RepositionOverlays` (`Character.cs:121-126`): `if (_chatBubble != null && GodotObject.IsInstanceValid(_chatBubble)) _chatBubble.UpdateAnchor();` — required because appearance/mount changes move the nameplate (`RepositionOverlays` already re-anchors the name) and a live bubble would otherwise keep the stale height-based anchor. (Today's in-world bubble has the same staleness — this is a small behavior improvement, not a regression fix.) Same world-unit math the old `ShowChatBubble` did, now re-derived on every (re)measure so a wrap-line-count change across scales can't leave a stale anchor. Requires `NameTopOffset` to be `internal` (done in Task 3).
 - **Node-reuse + reflow refactor (required, two probed engine behaviors):** (1) the original `SetText` unconditionally creates new `Panel`/`Label` and `AddChild`s them (panel `:35-39`, wrap-branch label `:110`; only the final add at `:137` is already parent-guarded) — a naive re-run would **double-add duplicates** and `:110` would even throw for an already-parented label; restructure so the first call creates `_background`/`_label` and later calls **reuse** them (guard `:39`/`:110` adds with `if (x.GetParent() == null)`, re-apply stylebox/text/wrap/size/position on the existing nodes). (2) **Before re-measuring, if `_label` is already parented, `RemoveChild(_label)` first** — an autowrap OFF→WordSmart transition on an in-tree label does NOT reflow (stale line count and stale min-size at `:113` — probed); the existing flow then re-adds the label in its final state (wrap branch `:110`, or the guarded `:137`), which is the empirically valid setup-before-add state the measurement comment at `:59-68` documents. Wrap→wrap re-measures work without re-adding, but uniform remove-first is simplest and always correct. (3) **Reuse must also reset `AutowrapMode` to `Off` in the one-line branch** — a label that wrapped for the *previous* message still carries `WordSmart`, so a short reused message would reflow onto a clipped second line; set `_label.AutowrapMode = TextServer.AutowrapMode.Off;` in the one-line branch before the final guarded add. The reflow-critical section, concretely:
 
 ```csharp
@@ -533,7 +553,7 @@ _chatBubble.SetText(message, bridge.DisplayScale);   // in-tree (measurement nee
 
 (Order matters: `Register` before `SetText` — the wrap branch's min-size read requires an in-tree label.)
 
-**Step 3:** `dotnet build` + full test run (325 pass).
+**Step 3:** `dotnet build` + full test run (334 pass: 325 baseline + 9 projection tests).
 
 **Step 4 (manual red→green):** at 1080p a short bubble and a long (wrapping) bubble are crisp, anchored above the nameplate, centered (long names included); wrap width/height proportional vs 1× mode; **clicking on a bubble fires a world click** (T5); a bubble that's up when you toggle 1×↔2× re-measures (≤1-frame pop, no crash); bubble replaces a live bubble cleanly; bubble self-frees at 3s and on character death.
 
@@ -600,7 +620,7 @@ public void AddBattleText(BattleTextType type, string text)
 }
 ```
 
-**Step 4:** `dotnet build` + full test run (325 pass).
+**Step 4:** `dotnet build` + full test run (334 pass: 325 baseline + 9 projection tests).
 
 **Step 5 (manual red→green):** take damage/heals at 1080p: numbers crisp, spread grid and upward rise look unchanged, free after 1s; status effects (STUNNED/MISS keywords) crisp; rapid multi-hit (18-line cap) behaves as before; 1×↔2× toggle mid-rise re-fonts without crash; character death clears its in-flight numbers.
 
@@ -623,7 +643,7 @@ Run the client (see Tech Stack note: `run.sh` may need copying into the worktree
 9. **Culling (T3):** 1921×1081 window, pan so a character's text is in the 1px gutter → hidden; re-enters on re-entry. Accepted imperfection: text whose *owner* is in the gutter may still show until the text's *own rect* exits (per-rect culling, by design).
 10. **Stage 1 regression (I1–I7):** scale/gutters/blit unchanged; world clicks exact-tile; scene lifecycle clean (no ghost maps); HUD placement intact.
 
-**Headless guard:** `dotnet test tests/Goose2Client.Tests/Goose2Client.Tests.csproj -v minimal` → all pass (325 + new).
+**Headless guard:** `dotnet test tests/Goose2Client.Tests/Goose2Client.Tests.csproj -v minimal` → all pass (334 total: 325 baseline + 9 projection tests).
 
 ---
 
