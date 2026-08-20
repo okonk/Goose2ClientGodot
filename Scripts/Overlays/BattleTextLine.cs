@@ -40,8 +40,9 @@ namespace Goose2Client.Overlays
             _label.AddThemeFontSizeOverride("font_size", Mathf.Max(1, Mathf.RoundToInt(12f * scale)));
             _label.AddThemeConstantOverride("outline_size", Mathf.RoundToInt(4f * scale));
             _label.Size = new Vector2(100f, 16f) * scale;
-            // Anchor the label by its CENTER on the node origin (= character center),
-            // so HorizontalAlignment.Center actually centers the text on the character.
+            // Center the label HORIZONTALLY on the node origin (= character center); its top
+            // edge sits AT the origin (y = 0), so HorizontalAlignment.Center centers the text
+            // on the character (see the BattleText.ScreenBounds y-extent derivation).
             _label.Position = new Vector2(-_label.Size.X / 2f, 0);
         }
 
