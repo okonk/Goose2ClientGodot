@@ -53,6 +53,12 @@ namespace Goose2Client
         public event System.Action<Character.Character> CharacterUpdated;
         public void OnCharacterUpdated(Character.Character c) => CharacterUpdated?.Invoke(c);
 
+        // User signal (not a [Signal] delegate — the tests project compiles this file without
+        // the Godot source generator): one-shot winner of the ChangeMap render race, emitted
+        // when the new map's first render pass has completed (frame_post_draw) — or one frame
+        // elapses in a headless run, where frame_post_draw is never emitted.
+        private const string RenderRaceSignal = "world_transition_render_done";
+
         public override void _EnterTree()
         {
             instance = this;
@@ -153,21 +159,56 @@ namespace Goose2Client
                 // finally: frees loading, unpauses; old world stays live, no DoneLoadingMap sent
 
                 // The Map scene IS its own SubViewport; attaching it to WorldViewport puts it in
-                // the tree, swaps the display texture and sizes it (RefreshFromSettings) — all
-                // BEFORE any previous world is freed, so the texture never dangles and there is
-                // no black flash. MapManager._Ready (fired inside Attach's AddChild) has already
-                // registered CurrentMapManager by the time DoneLoadingMap drains packets below.
+                // the tree, forces its first render, and sizes it (RefreshFromSettings). The
+                // display-texture swap is DEFERRED inside Attach to the completion of the next
+                // render pass (RenderingServer.frame_post_draw — this engine's successor to the
+                // old Viewport 'rendered' signal): a fresh sub-viewport's buffer is undefined
+                // before its first render (garbage flash), and WorldTexture still shows the
+                // previous map until the swap (no black flash). MapManager._Ready (fired inside
+                // Attach's AddChild) has already registered CurrentMapManager by the time
+                // DoneLoadingMap drains packets below.
                 var mapScene = GD.Load<PackedScene>("res://Scenes/Map.tscn").Instantiate<SubViewport>();
                 WorldViewport.Attach(mapScene);
 
-                // Explicit lifecycle ownership: free the previous world only after the new one
-                // is attached and the texture swapped (failure keeps the old world live).
-                if (previousScene != null && GodotObject.IsInstanceValid(previousScene))
+                // Present the new map's first clean frame before removing the old world:
+                // WorldTexture still displays the previous map (or black pre-first-map) until
+                // the next render pass completes; freeing the old world earlier would yank the
+                // texture source out from under the display (black flash), and the fresh
+                // sub-viewport's buffer is undefined before its first render (garbage flash).
+                // ProcessFrame is the headless fallback — frame_post_draw is not emitted in
+                // a headless build, so that leg never fires and the frame must carry the
+                // transition (in a real run frame_post_draw fires first: rendering completes
+                // later in the same frame, before the next process_frame). This GodotSharp
+                // has no multi-signal ToSignal, so the race is wired by hand: the first leg
+                // to fire emits the RenderRaceSignal user signal, which is awaited below.
+                bool raceDone = false;
+                System.Action onPostDraw = null;
+                System.Action onFrame = null;
+                void FinishRace()
+                {
+                    if (raceDone) return;
+                    raceDone = true;
+                    RenderingServer.FramePostDraw -= onPostDraw;
+                    GetTree().ProcessFrame -= onFrame;
+                    EmitSignal(RenderRaceSignal);
+                }
+                if (!HasUserSignal(RenderRaceSignal))
+                    AddUserSignal(RenderRaceSignal);
+                onPostDraw = FinishRace;
+                onFrame = FinishRace;
+                RenderingServer.FramePostDraw += onPostDraw;
+                GetTree().ProcessFrame += onFrame;
+                await ToSignal(this, RenderRaceSignal);
+
+                // Explicit lifecycle ownership: free the previous world only after the new map
+                // has rendered its first (now-presented) frame; failure before the await keeps
+                // the old world live.
+                if (previousScene != null && previousScene != mapScene && GodotObject.IsInstanceValid(previousScene))
                     previousScene.QueueFree();
-                if (previousMap != null && GodotObject.IsInstanceValid(previousMap))
+                if (previousMap != null && previousMap != mapScene && GodotObject.IsInstanceValid(previousMap))
                     previousMap.QueueFree();
 
-                await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+                await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);   // let the frees run
 
                 NetworkClient.DoneLoadingMap();   // "DLM" — tells the server we are in the world
             }

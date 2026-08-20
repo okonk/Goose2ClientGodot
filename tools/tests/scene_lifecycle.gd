@@ -8,6 +8,20 @@
 #    back to null (no dangling pointer for the next ChangeMap's GetTree().CurrentScene read).
 #  - A map scene lives under the WorldViewport container, not at root (set_current_scene
 #    requires a direct root child, scene_tree.cpp:1665 — so it can never BE the current scene).
+#  - ChangeMap's transition order (world-subviewport-stage1 flash fix): attach the new map
+#    B, then wait for the completion of the NEXT RENDER PASS —
+#    RenderingServer.frame_post_draw (this engine version's successor to the old Viewport
+#    'rendered' signal, which no longer exists in the 4.7.1 API — the Viewport class exposes
+#    only size_changed/gui_focus_changed) — the moment B's first clean texture is presented
+#    by WorldViewport, and ONLY THEN queue_free the old worlds A/A2. A fresh SubViewport's
+#    buffer is undefined before its first render, and the old map is what the display texture
+#    still shows — so freeing it earlier would flash garbage or black.
+#  - ChangeMap implements that wait as a ToSignal race between frame_post_draw and
+#    SceneTree.process_frame. PROBED on this 4.7.1 headless build: frame_post_draw is NOT
+#    emitted at all in headless (connect succeeds, but never fires), so headless exercises
+#    the process_frame fallback leg of the race, exactly like the C# code would; headed runs
+#    take the frame_post_draw leg (rendering completes later in the same frame, before the
+#    next process_frame).
 #
 # Simulates BOTH entry shapes: first entry (previous scene A = Login, a root child and the
 # current scene) and a later entry (previous map A2 attached under the container).
@@ -16,6 +30,9 @@
 extends SceneTree
 
 var _failed := false
+
+# One-shot winner of the frame_post_draw / process_frame race (emitted in _initialize).
+signal race_win
 
 func _check(cond: bool, label: String) -> void:
 	if cond:
@@ -48,14 +65,34 @@ func _initialize() -> void:
 	container.add_child(a2)
 
 	# New scene B: a SubViewport (the re-rooted Map.tscn), attached under the container —
-	# mimicking WorldViewport.Attach (AddChild + texture swap + sizing).
+	# mimicking WorldViewport.Attach (force first render + AddChild + sizing; the texture
+	# swap itself is deferred to the next frame_post_draw, which ChangeMap awaits before
+	# freeing the old worlds).
 	var b := SubViewport.new()
 	b.name = "Map"
 	container.add_child(b)
 	_check(b.get_texture() != null, "B exposes a texture (WorldTexture can be swapped)")
 
-	# ChangeMap ordering: attach B first, then free the previous worlds explicitly, then
-	# advance one frame so the frees run.
+	# ChangeMap ordering: attach B first, then await completion of the next render pass with
+	# a process_frame fallback — the same ToSignal-style race as the C# code, resolved here
+	# by taking whichever leg fires first. Headless (this run) never emits frame_post_draw,
+	# so the fallback leg is taken (verified empirically, see header).
+	var race_slot := [null]
+	var race := func() -> void:
+		if race_slot[0] == null:
+			return
+		var cb = race_slot[0]
+		race_slot[0] = null
+		RenderingServer.frame_post_draw.disconnect(cb)
+		process_frame.disconnect(cb)
+		race_win.emit()
+	race_slot[0] = race
+	RenderingServer.frame_post_draw.connect(race)
+	process_frame.connect(race)
+	await race_win
+
+	# Only now free the previous worlds (the display already shows B's first clean frame,
+	# or — headless — the new map is at least attached and sized before the frees run).
 	a.queue_free()
 	a2.queue_free()
 	await process_frame

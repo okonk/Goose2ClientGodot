@@ -27,6 +27,9 @@ namespace Goose2Client
         /// <summary>Stored even with no map attached (applied on next <see cref="Attach"/>).</summary>
         public WorldRenderMode Mode { get; private set; } = WorldRenderMode.Integer2x;
 
+        // One-shot first-frame presentation deferred from <see cref="Attach"/> (null = none pending).
+        private System.Action _pendingPresent;
+
         public override void _Ready()
         {
             WorldTexture.Name = "WorldTexture";
@@ -42,20 +45,65 @@ namespace Goose2Client
         {
             if (GetWindow() != null)
                 GetWindow().SizeChanged -= OnWindowResized;
+            // Detach an un-fired first-frame presentation: it is connected to the
+            // RenderingServer singleton (which outlives us), so without this the delegate
+            // would keep this node and its map referenced until the next render pass.
+            if (_pendingPresent != null)
+                RenderingServer.FramePostDraw -= _pendingPresent;
+            _pendingPresent = null;
         }
 
         /// <summary>
-        /// Attaches a map scene as the current sub-viewport and applies the mode from settings.
-        /// Single mode-application point: the map scene itself never applies a mode. The texture
-        /// is assigned before any previous scene is freed (entry-sequence call order guarantees
-        /// this), so the display never shows a freed texture.
+        /// Attaches a map scene as the current sub-viewport and applies the mode from settings
+        /// (single mode-application point: the map scene itself never applies a mode). The
+        /// display texture is presented only after the new map's first render pass completes
+        /// (the next <see cref="RenderingServer.SignalName.FramePostDraw"/> after attach — this
+        /// engine's successor to the old Viewport 'rendered' signal), not now: a freshly
+        /// created SubViewport's ViewportTexture contains undefined/stale GPU memory until its
+        /// first render pass (blitting it immediately flashes garbage for one frame), and until
+        /// that swap <see cref="WorldTexture"/> still shows the previously displayed map (no
+        /// black flash). The caller (GameManager.ChangeMap) must therefore free the previous
+        /// world only after the same frame-post-draw signal fires.
         /// </summary>
         public void Attach(SubViewport mapScene)
         {
             Current = mapScene;
+            // Force the sub-viewport to render its first frame even though its texture is not
+            // displayed yet: the default UpdateMode (WhenVisible) would skip rendering while
+            // WorldTexture still shows the previous map — exactly the frame we wait for —
+            // and the deferred presentation would never fire. Restored to WhenVisible once the
+            // texture is presented (it is visible on WorldTexture then, so rendering resumes).
+            mapScene.RenderTargetUpdateMode = SubViewport.UpdateMode.Always;
             AddChild(mapScene);
-            WorldTexture.Texture = mapScene.GetTexture();
+            // Size the sub-viewport BEFORE its first render so the first frame is at the
+            // right size (no resize pop on frame 2).
             RefreshFromSettings();
+
+            // A second transition can start before this map's first render pass: detach the
+            // superseded handler (it is connected to the RenderingServer singleton, not to
+            // the map, so it must be dropped explicitly — otherwise it would fire on the next
+            // frame and clear the NEW handler's state). The guard below is a second line of
+            // defense: a superseded or freed map can never be re-presented over the newer one.
+            if (_pendingPresent != null)
+                RenderingServer.FramePostDraw -= _pendingPresent;
+
+            System.Action present = () =>
+            {
+                // One-shot: detach from the singleton first so the delegate (and this node
+                // and the map it captures) are not kept alive by the connection. A handler
+                // can never run after being superseded (Attach detaches it explicitly), so
+                // the field still references it when it fires.
+                if (_pendingPresent != null)
+                    RenderingServer.FramePostDraw -= _pendingPresent;
+                _pendingPresent = null;
+                // Stale-handler guard: if a newer map was attached (Current changed) or this
+                // map was freed before its first render pass, do not present it.
+                if (Current != mapScene || !GodotObject.IsInstanceValid(mapScene)) return;
+                WorldTexture.Texture = mapScene.GetTexture();
+                mapScene.RenderTargetUpdateMode = SubViewport.UpdateMode.WhenVisible;   // restore default steady state
+            };
+            _pendingPresent = present;
+            RenderingServer.FramePostDraw += present;
         }
 
         /// <summary>
