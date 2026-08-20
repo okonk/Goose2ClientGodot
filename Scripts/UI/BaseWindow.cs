@@ -44,22 +44,11 @@ public partial class BaseWindow : Control
         // Restore persisted position (or first-run default). Positions were saved in the native
         // canvas of the window size they were saved on; legacy files (and the 1280x720 design
         // defaults) are LegacyCanvas. Edge-stick + clamp re-anchors onto the current canvas.
+        // Reused on live window resize by GameManager.OnWindowResized (restart equivalence).
+        RepositionForCurrentCanvas();
         if (WindowName != null)
         {
             var ws = GameManager.Instance.CharacterSettings.GetWindowSettings(WindowName);
-            var currentCanvas = (Vector2I)GetTree().Root.GetVisibleRect().Size;
-            if (ws == null && DefaultWindowLayout.IsDialog(WindowName))
-            {
-                // First-run transient dialog: open centered; a saved position (after a drag)
-                // always goes through Resolve below, so the edge-stick rule takes over.
-                Position = WindowPlacement.Center(currentCanvas, Size);
-            }
-            else
-            {
-                var storedOrDefaultPos = ws != null ? ws.Position : DefaultWindowLayout.For(WindowName);
-                var savedCanvas = ws != null && ws.CanvasSize != default ? ws.CanvasSize : WindowPlacement.LegacyCanvas;
-                Position = WindowPlacement.Resolve(storedOrDefaultPos, Size, savedCanvas, currentCanvas);
-            }
             if (ws != null) Visible = ws.Visible;
         }
 
@@ -85,6 +74,37 @@ public partial class BaseWindow : Control
         // order follows tree order; last child = drawn on top = picked first.
         if (_titleBar != null)
             MoveChild(_titleBar, GetChildCount() - 1);
+    }
+
+    /// <summary>
+    /// Recomputes this window's Position for the CURRENT root canvas using exactly the
+    /// first-restore branch logic: first-run transient dialog (no saved settings) → centered;
+    /// otherwise the saved/default position through <see cref="WindowPlacement.Resolve"/>
+    /// (saved canvas from settings, LegacyCanvas for legacy files and defaults).
+    /// Idempotent and safe to call any time after <see cref="_Ready"/>; the resize handler
+    /// relies on that to re-anchor windows onto the window edges (restart equivalence).
+    /// Silently skips before the tree/canvas is usable.
+    /// </summary>
+    public void RepositionForCurrentCanvas()
+    {
+        if (WindowName == null || GetTree() == null)
+            return;
+        var currentCanvas = (Vector2I)GetTree().Root.GetVisibleRect().Size;
+        if (currentCanvas.X < 2 || currentCanvas.Y < 2)
+            return;
+        var ws = GameManager.Instance?.CharacterSettings?.GetWindowSettings(WindowName);
+        if (ws == null && DefaultWindowLayout.IsDialog(WindowName))
+        {
+            // First-run transient dialog: open centered; a saved position (after a drag)
+            // always goes through Resolve below, so the edge-stick rule takes over.
+            Position = WindowPlacement.Center(currentCanvas, Size);
+        }
+        else
+        {
+            var storedOrDefaultPos = ws != null ? ws.Position : DefaultWindowLayout.For(WindowName);
+            var savedCanvas = ws != null && ws.CanvasSize != default ? ws.CanvasSize : WindowPlacement.LegacyCanvas;
+            Position = WindowPlacement.Resolve(storedOrDefaultPos, Size, savedCanvas, currentCanvas);
+        }
     }
 
     /// <summary>Makes a control a drag handle for this window (e.g. the hotbar's XP bar).

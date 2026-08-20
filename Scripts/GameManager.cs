@@ -86,6 +86,14 @@ namespace Goose2Client
             UiLayer.Name = "UiLayer";
             AddChild(UiLayer);
 
+            // Re-anchor HUD windows onto the (new) window edges when the OS window resizes
+            // (e.g. windowed → fullscreen), so a live resize yields the same layout as a
+            // restart at the new size. Coexists on the same signal with WorldViewport's own
+            // SizeChanged handler, which only re-lays out the world.
+            var window = GetWindow();
+            if (window != null)
+                window.SizeChanged += OnWindowResized;
+
             // Always-on-top build stamp. Its own CanvasLayer at 128 so HUD windows on
             // UiLayer can never draw over it. Added first on purpose: anything below can
             // throw (asset loading did), and a stamp that vanishes exactly when startup
@@ -307,8 +315,47 @@ namespace Goose2Client
             UiLayer.AddChild(Hud);
         }
 
+        /// <summary>
+        /// OS-window resize handler: re-runs each HUD window's placement against the new canvas
+        /// so edge-stuck windows (e.g. the hotbar) stay stuck to the window edges. Returns
+        /// silently pre-HUD (UiLayer null) or before the root canvas has a real size. Windows
+        /// created lazily later (quest/info dialogs) are picked up on the next resize; they also
+        /// get the correct canvas at creation via BaseWindow._Ready.
+        /// </summary>
+        private void OnWindowResized()
+        {
+            if (UiLayer == null)
+                return;
+            var tree = GetTree();
+            if (tree == null)
+                return;
+            var canvas = (Vector2I)tree.Root.GetVisibleRect().Size;
+            if (canvas.X < 2 || canvas.Y < 2)
+                return;
+            foreach (var w in CollectBaseWindows(UiLayer))
+                w.RepositionForCurrentCanvas();
+        }
+
+        /// <summary>Recursive depth-first walk of <paramref name="root"/>'s children collecting every
+        /// BaseWindow. The subtree is small (few dozen nodes) and resize events are cheap, so a
+        /// plain walk beats a registry; lazily created windows are found on the next walk.</summary>
+        private static IEnumerable<BaseWindow> CollectBaseWindows(Node root)
+        {
+            foreach (var child in root.GetChildren())
+            {
+                if (child is BaseWindow w)
+                    yield return w;
+                foreach (var d in CollectBaseWindows(child))
+                    yield return d;
+            }
+        }
+
         public override void _ExitTree()
         {
+            // Unsubscribe the resize handler (mirrors WorldViewport._ExitTree).
+            var window = GetWindow();
+            if (window != null)
+                window.SizeChanged -= OnWindowResized;
             PacketManager.Remove<ClassUpdatePacket>(OnClassUpdate);
             PacketManager.Remove<PingPacket>(OnPing);
             PacketManager.Remove<SendCurrentMapPacket>(OnSendCurrentMap);
