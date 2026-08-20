@@ -81,7 +81,7 @@ namespace Goose2Client
             // Layout.Scale here. Only the display rect geometry comes from Layout.
             float scale = DisplayScale;
             var o = _worldViewport.Layout.DisplayOrigin;
-            var s = _worldViewport.Layout.DisplaySize;   // separate statements: C# forbids multiple declarators with var (CS0819)
+            var s = _worldViewport.Layout.DisplaySize;
             // No Rect2(Vector2I, …) ctor in GodotSharp — construct from component casts.
             var display = new Rect2(new Vector2((float)o.X, (float)o.Y), new Vector2((float)s.X, (float)s.Y));
             for (int i = GetChildCount() - 1; i >= 0; i--)   // backwards: pass may QueueFree
