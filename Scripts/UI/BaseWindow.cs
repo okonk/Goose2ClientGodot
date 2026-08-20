@@ -47,9 +47,19 @@ public partial class BaseWindow : Control
         if (WindowName != null)
         {
             var ws = GameManager.Instance.CharacterSettings.GetWindowSettings(WindowName);
-            var storedOrDefaultPos = ws != null ? ws.Position : DefaultWindowLayout.For(WindowName);
-            var savedCanvas = ws != null && ws.CanvasSize != default ? ws.CanvasSize : WindowPlacement.LegacyCanvas;
-            Position = WindowPlacement.Resolve(storedOrDefaultPos, Size, savedCanvas, (Vector2I)GetTree().Root.GetVisibleRect().Size);
+            var currentCanvas = (Vector2I)GetTree().Root.GetVisibleRect().Size;
+            if (ws == null && DefaultWindowLayout.IsDialog(WindowName))
+            {
+                // First-run transient dialog: open centered; a saved position (after a drag)
+                // always goes through Resolve below, so the edge-stick rule takes over.
+                Position = WindowPlacement.Center(currentCanvas, Size);
+            }
+            else
+            {
+                var storedOrDefaultPos = ws != null ? ws.Position : DefaultWindowLayout.For(WindowName);
+                var savedCanvas = ws != null && ws.CanvasSize != default ? ws.CanvasSize : WindowPlacement.LegacyCanvas;
+                Position = WindowPlacement.Resolve(storedOrDefaultPos, Size, savedCanvas, currentCanvas);
+            }
             if (ws != null) Visible = ws.Visible;
         }
 

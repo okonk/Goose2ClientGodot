@@ -49,6 +49,28 @@ public class WindowPlacementTests
     }
 
     [Fact]
+    public void CrossCanvas_MiddleBand_KeepsSavedCoordinate()
+    {
+        // Hotbar (520, 679) 351x36 saved at 720p: left = 520 ≥ 320 AND right = 409 ≥ 320
+        // (0.25 of 1280) → middle-parked, keeps x; bottom = 5 < 180 → sticks to bottom.
+        var p = WindowPlacement.Resolve(new Vector2(520, 679), new Vector2(351, 36), C720, C1080);
+        Assert.Equal(new Vector2(520, 1039), p);
+    }
+
+    [Fact]
+    public void CrossCanvas_MiddleBand_RoundTrips()
+    {
+        // 1080p save (520, 1039) → restore at 720p: x left-stick (520 < 1049),
+        // y bottom offset 5 → (520, 679).
+        var p = WindowPlacement.Resolve(new Vector2(520, 1039), new Vector2(351, 36), C1080, C720);
+        Assert.Equal(new Vector2(520, 679), p);
+
+        // Back to 1080p: x middle-band (520 ≥ 480, 1049 ≥ 480), y bottom-stick.
+        var p2 = WindowPlacement.Resolve(p, new Vector2(351, 36), C720, C1080);
+        Assert.Equal(new Vector2(520, 1039), p2);
+    }
+
+    [Fact]
     public void CrossCanvas_RightEdge_SticksToRight()
     {
         // (900, 360) with w=340 → right offset in 1280 canvas = 1280 - (900+340) = 40.
@@ -63,6 +85,16 @@ public class WindowPlacementTests
         // Must NOT jump to an edge at 1080p.
         var p = WindowPlacement.Resolve(new Vector2(480, 160), new Vector2(320, 400), C720, C1080);
         Assert.Equal(new Vector2(480, 160), p);
+    }
+
+    [Theory]
+    [InlineData(1920, 1080, 260, 291, 830, 394)]   // Quest @ 1080p (394.5 truncated)
+    [InlineData(1280, 720, 260, 291, 510, 214)]    // Quest @ 720p (214.5 truncated)
+    [InlineData(640, 360, 900, 900, 0, 0)]         // window larger than canvas → (0, 0)
+    public void Center_FirstRunDialog_CenteredInCanvas(int cw, int ch, int w, int h, int ex, int ey)
+    {
+        Assert.Equal(new Vector2(ex, ey),
+            WindowPlacement.Center(new Vector2I(cw, ch), new Vector2(w, h)));
     }
 
     [Fact]

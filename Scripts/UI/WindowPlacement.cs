@@ -17,10 +17,12 @@ public static class WindowPlacement
     public const int TitleBarHeight = 24;
 
     /// <summary>
-    /// Edge-stick + clamp: the window keeps its offset to the NEARER edge in the saved canvas,
-    /// re-anchored to that same edge in the current canvas; equidistant (mid-screen) windows
-    /// keep their saved coordinate. Identity when savedCanvas == currentCanvas (result is the
-    /// saved position clamped into the canvas).
+    /// Middle-band + edge-stick + clamp: per axis, if the window is at least 25% of the saved
+    /// canvas away from BOTH edges it is "parked in the middle" and keeps its saved coordinate
+    /// (equidistant/mid-screen is the special case — mid-screen stays put). Otherwise it keeps
+    /// its offset to the NEARER edge in the saved canvas, re-anchored to that same edge in the
+    /// current canvas. Identity when savedCanvas == currentCanvas (result is the saved position
+    /// clamped into the canvas).
     /// Postcondition: x ∈ [0, currentCanvas.X − w.X]; y ∈ [0, max(0, currentCanvas.Y − 24)]
     /// (title-bar-only y containment — deliberate future-proofing).
     /// </summary>
@@ -40,8 +42,23 @@ public static class WindowPlacement
     {
         float left = saved;
         float right = savedEdge - (saved + size);
+        // Middle-band: ≥ 25% of the saved canvas from both edges → parked in the middle
+        // (includes the exactly-equidistant case), keep the saved coordinate.
+        if (left >= 0.25f * savedEdge && right >= 0.25f * savedEdge) return saved;
         if (left < right) return left;                 // closer to the leading edge
         if (right < left) return currentEdge - size - right; // re-stick to the trailing edge
         return saved;                                  // equidistant / mid-screen: stays put
+    }
+
+    /// <summary>
+    /// First-run position for transient dialog windows: centered in <c>canvas</c>.
+    /// Result = (canvas − windowSize) / 2 truncated per axis, clamped to ≥ 0
+    /// (a window larger than the canvas lands at (0,0)).
+    /// </summary>
+    public static Vector2 Center(Vector2I canvas, Vector2 windowSize)
+    {
+        float x = Mathf.Max(0f, (int)((canvas.X - windowSize.X) / 2f));
+        float y = Mathf.Max(0f, (int)((canvas.Y - windowSize.Y) / 2f));
+        return new Vector2(x, y);
     }
 }

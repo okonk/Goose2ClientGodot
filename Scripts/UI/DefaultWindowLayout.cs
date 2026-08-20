@@ -21,6 +21,13 @@ public static class DefaultWindowLayout
         ["Options"]   = new Vector2(460, 260),
     };
 
+    /// <summary>
+    /// Transient dialog windows that should open centered on first run instead of using
+    /// their <see cref="For"/> default; once the user drags one (a position is saved), the
+    /// normal edge-stick <see cref="WindowPlacement.Resolve"/> rule takes over.
+    /// </summary>
+    public static bool IsDialog(string windowName) => windowName is "Quest" or "Vendor" or "Info" or "Bank" or "CombineBag";
+
     public static Vector2 For(string windowName)
         => windowName != null && Defaults.TryGetValue(windowName, out var p) ? p : new Vector2(100, 100);
 }
