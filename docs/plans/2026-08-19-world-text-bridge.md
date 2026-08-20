@@ -23,7 +23,8 @@ Design doc: `docs/plans/2026-08-19-world-text-bridge-design.md` (approved 2026-0
 | `Transform2D * Vector2` operator + `AffineInverse()` compile in this codebase | `Scripts/WorldViewport.cs:163` |
 | Bridge insertion point: `WorldViewport` added at `:82`, `UiLayer` at `:87` (bridge goes between) | `Scripts/GameManager.cs:80-87` |
 | **Per-frame ordering (probed headless 4.6.2, `tools/tests/text_bridge_order.gd`):** `process_frame` is emitted BEFORE node `_process`; within the processing stage lower `process_priority` runs first, so a priority-100 node sees a priority-0 node's same-frame mutation; `call_deferred` queued during processing flushes after processing, same frame. ⇒ bridge projects from `_Process` at priority 100, never from `process_frame` | probe, external review |
-| `Label : Control : CanvasItem` (NOT `Node2D`); `Position`/`Visible`/`QueueFree` available on `CanvasItem` (via `Node`) — the bridge's common element base is `CanvasItem` | Godot class hierarchy |
+| `Label : Control : CanvasItem` (NOT `Node2D`). `Position` exists on `Node2D` and `Control` — **NOT on `CanvasItem`** (reflection, both GodotSharp versions); `Visible`/`QueueFree` are on `CanvasItem`/`Node`. ⇒ the pass sets Position via a `Node2D`/`Control` branch; `CanvasItem` is still the right common constraint (reflection + live compile, round-2 review) | reflection, round-2 review |
+| `Transform2D` C# API: **no `With*` methods** (those are GDScript); the equivalents are `Translated(Vector2)` / `Rotated(double)` / `Scaled(Vector2)` (reflection + live compile, round-2 review) | reflection, round-2 review |
 | CanvasLayer default `Layer = 1` (Godot docs) → bridge sits above `WorldTexture` (root-canvas Control, layer 0); same-layer tie with `UiLayer` broken by tree order (HUD added later draws on top) | Godot `CanvasLayer` docs; `Scripts/GameManager.cs:80-87` |
 | Name label: create (`:97-116`, font 12 `:112`, outline 4 `:113`, `ZIndex = Constants.NamesZIndex`/`ZAsRelative=false` `:105-106`), `RepositionOverlays` `:121-126`, `LayoutNameLabel` sets `Position` `:138`, text update `:184-186`; field `:33`; `NameTopOffset = 26f` `:95` | `Scripts/Character/Character.cs` |
 | `Character.Height` public (resting-pose body height) | `Scripts/Character/Character.cs` (`public int Height`) |
@@ -49,7 +50,7 @@ Design doc: `docs/plans/2026-08-19-world-text-bridge-design.md` (approved 2026-0
 - **T4 — Lifetime parity:** name label lives as long as its character; one bubble per character (replace-`QueueFree`); battle-text lines free after 1s; **no element outlives its owner by more than one frame** (map change ⇒ all owners freed ⇒ elements self-free).
 - **T5 — Input parity (Stage 1 I6):** clicking a visible chat bubble still produces a world click (bubble Panel must be `MouseFilter.Ignore` — it would otherwise swallow root clicks); all bridged Controls are `Ignore`.
 - **T6 — Ordering:** world < battle text (z 40 eff.) < name (z 100) < bubble (z 102) < HUD; z constants unchanged, now sorting within the bridge's canvas.
-- **T7 — Single scale source:** element creation and `ScaleChanged` both flow from the bridge's `Scale` (fed by `WorldViewport.ApplyMode`); elements never read `Layout` directly.
+- **T7 — Single scale source:** element creation and `ScaleChanged` both flow from the bridge's `DisplayScale` (fed by `WorldViewport.ApplyMode`); elements never read `Layout` directly.
 
 | Invariant | Proved by |
 |---|---|
@@ -87,7 +88,8 @@ public class WorldTextProjectionTests
     [Fact]
     public void Project_CameraOffset()  // camera at viewport (500,300), S=2: world → 2× viewport offset
     {
-        var canvas = Transform2D.Identity.WithTranslation(new Vector2(500, 300));
+        // C# API: Translated/Rotated/Scaled (the GDScript With* methods do not exist in GodotSharp).
+        var canvas = Transform2D.Identity.Translated(new Vector2(500, 300));
         Assert.Equal(new Vector2(1000, 600), WorldTextProjection.Project(Vector2.Zero, canvas, 2f, new Vector2I(0, 0)));
         Assert.Equal(new Vector2(1020, 620), WorldTextProjection.Project(new Vector2(10, 10), canvas, 2f, new Vector2I(0, 0)));
     }
@@ -95,7 +97,7 @@ public class WorldTextProjectionTests
     [Fact]
     public void Project_FractionalCamera()  // camera lerp is fractional
         => Assert.Equal(new Vector2(201f, 100.5f), WorldTextProjection.Project(Vector2.Zero,
-            Transform2D.Identity.WithTranslation(new Vector2(100.5f, 50.25f)), 2f, new Vector2I(0, 0)));
+            Transform2D.Identity.Translated(new Vector2(100.5f, 50.25f)), 2f, new Vector2I(0, 0)));
 
     [Fact]
     public void Project_OriginOffset()  // display rect offset (odd-window gutter)
@@ -108,7 +110,7 @@ public class WorldTextProjectionTests
         //   w2 = canvas.AffineInverse() * ((p - origin) / S)
         // Fails on any sign/order slip between the forward and inverse transforms.
         var canvas = Transform2D.Identity
-            .WithRotation(Mathf.DegToRad(90)).WithScale(new Vector2(1.5f, 1.5f)).WithTranslation(new Vector2(321.25f, -88f));
+            .Rotated(Mathf.DegToRad(90)).Scaled(new Vector2(1.5f, 1.5f)).Translated(new Vector2(321.25f, -88f));
         foreach (float s in new[] { 1f, 2f, 3f })
             foreach (var origin in new[] { new Vector2I(0, 0), new Vector2I(1, 0), new Vector2I(13, 7) })
                 foreach (var w in new[] { Vector2.Zero, new Vector2(10, 10), new Vector2(-450.5f, 720.25f), new Vector2(12345, -6789) })
@@ -272,8 +274,10 @@ namespace Goose2Client
         /// Character, MapManager, WorldOverlay). Lower priority runs first; see text_bridge_order.gd.</summary>
         private const int ProjectionProcessPriority = 100;
 
-        /// <summary>Current display scale (T7: the only place elements learn S). 1 before first map.</summary>
-        public float Scale { get; private set; } = 1f;
+        /// <summary>Current display scale (T7: the only place elements learn S). 1 before first map.
+        /// Named DisplayScale (not Scale — would shadow the inherited Node.Scale with a CS0108
+        /// warning, the same trap the overlay elements' DisplayScale fields avoid).</summary>
+        public float DisplayScale { get; private set; } = 1f;
 
         private WorldViewport _worldViewport;
 
@@ -291,15 +295,21 @@ namespace Goose2Client
         /// Postcondition: element is a child, scaled at the current Scale, projected from the next frame.
         /// Teardown needs no unregistration: the per-frame pass frees children with dead owners.
         /// Constraint is CanvasItem (the common base of Node2D and Control) — name labels are
-        /// Labels/Controls, bubbles/battle text are Node2Ds; Position/Visible are CanvasItem's.
+        /// Labels/Controls, bubbles/battle text are Node2Ds. (Position must be set through the
+        /// Node2D/Control branch in the pass — CanvasItem has no Position.)
         /// ORDER: ApplyScale BEFORE AddChild — name labels measure via font metrics, which are
         /// correct off-tree, whereas GetMinimumSize() is stale same-frame after a font-size
         /// change (probed). Bubble ApplyScale is a no-op pre-SetText (no message yet); its real
-        /// measurement runs in-tree from ShowChatBubble, which needs an in-tree label anyway.</summary>
+        /// measurement runs in-tree from ShowChatBubble, which needs an in-tree label anyway.
+        /// Visible starts FALSE: Register lands in a mid-frame deferred flush (packet handling),
+        /// which is AFTER this frame's _process but BEFORE its render — the element would
+        /// otherwise draw one frame at (0,0) (window top-left). The next frame's pass sets
+        /// Visible from the projection, so first appearance is already at the correct spot.</summary>
         public void Register<T>(T element, Character.Character owner) where T : CanvasItem, IBridgedText
         {
             element.Owner = owner;
-            element.ApplyScale(Scale);
+            element.ApplyScale(DisplayScale);
+            element.Visible = false;   // no (0,0) flash before the first projection
             AddChild(element);
         }
 
@@ -312,7 +322,7 @@ namespace Goose2Client
 
         private void OnScaleChanged(float s)
         {
-            Scale = s;
+            DisplayScale = s;
             for (int i = 0; i < GetChildCount(); i++)
                 if (GetChild(i) is IBridgedText e) e.ApplyScale(s);
         }
@@ -323,7 +333,8 @@ namespace Goose2Client
             // so a plain return is correct here — there is no state to reset.
             if (_worldViewport == null || _worldViewport.Current == null) return;
             float scale = _worldViewport.Layout.Scale;
-            var o = _worldViewport.Layout.DisplayOrigin, s = _worldViewport.Layout.DisplaySize;
+            var o = _worldViewport.Layout.DisplayOrigin;
+            var s = _worldViewport.Layout.DisplaySize;   // separate statements: project LangVersion predates multi-declarator var
             // No Rect2(Vector2I, …) ctor in GodotSharp — construct from component casts.
             var display = new Rect2(new Vector2((float)o.X, (float)o.Y), new Vector2((float)s.X, (float)s.Y));
             for (int i = GetChildCount() - 1; i >= 0; i--)   // backwards: pass may QueueFree
@@ -339,11 +350,13 @@ namespace Goose2Client
                 // while OLD-map characters are still alive (queued free pending) — don't project
                 // them through the new map's canvas transform.
                 if (element.Owner.GetViewport() != _worldViewport.Current) { item.Visible = false; continue; }
-                item.Position = WorldTextProjection.Project(element.Owner.GlobalPosition,   // lockstep with WorldViewport.WorldToWindow
-                        _worldViewport.Current.GetCanvasTransform(), scale, _worldViewport.Layout.DisplayOrigin)
+                var pos = _worldViewport.WorldToWindow(element.Owner.GlobalPosition)   // calls the shared forward transform (lockstep with WindowToWorld)
                     + element.LocalOffsetWorld * scale;
+                // No Position on CanvasItem — branch on the concrete base (elements are always one or the other):
+                if (item is Node2D n) n.Position = pos;
+                else if (item is Control c) c.Position = pos;
                 item.Visible = !WorldTextProjection.IsCulled(
-                    new Rect2(item.Position + element.ScreenBounds.Position, element.ScreenBounds.Size), display);   // T3
+                    new Rect2(pos + element.ScreenBounds.Position, element.ScreenBounds.Size), display);   // T3
             }
         }
     }
@@ -486,17 +499,20 @@ if (EnsureNameLabel()) { _nameLabel.Text = FullName; _nameLabel.Layout(this); } 
 **Step 1: `ChatBubble.cs` changes**
 
 - Class: `public partial class ChatBubble : WorldOverlay, IBridgedText`; add members:
-  `public Character.Character Owner { get; set; }`, `public Vector2 LocalOffsetWorld { get; set; }`, `public float DisplayScale { get; private set; } = 1f;` (**named `DisplayScale`, not `Scale`** — `Scale` would shadow `CanvasItem.Scale` (Vector2) with a CS0108 warning and a future trap), `public Rect2 ScreenBounds => new Rect2(0f, -_bgScreen.Y, _bgScreen.X, _bgScreen.Y);` with `private Vector2 _bgScreen;` (the screen-px background size, set in `SetText`), and `private string _message;`.
-- `SetText(string message)` → `SetText(string message, float scale)`: store `_message = message; DisplayScale = scale;`; replace the constants with scaled values — `int fontSize = Mathf.Max(1, Mathf.RoundToInt(12f * scale));` (replaces `const int fontSize = 12`, `:32`), `float maxTextWidth = ChatBubbleLayout.MaxWidth * scale;` (`:86`), `var padding = ChatBubbleLayout.Padding * scale;` (used at `:133-135` in place of `ChatBubbleLayout.Padding` / the `MaxWidth` wrap-width), stylebox corner radii `6f * scale` (`:45-48`), background size `var bgSize = textSize + padding * 2;` (replaces `ChatBubbleLayout.BackgroundSize(textSize)` — same formula, scaled padding).
+  `public Character.Character Owner { get; set; }`, `public Vector2 LocalOffsetWorld { get; set; }`, `public float DisplayScale { get; private set; } = 1f;` (**named `DisplayScale`, not `Scale`** — `Scale` would shadow `CanvasItem.Scale` (Vector2) with a CS0108 warning and a future trap), `public Rect2 ScreenBounds => new Rect2(0f, -_bgScreen.Y, _bgScreen.X, _bgScreen.Y);` with `private Vector2 _bgScreen;` (the screen-px background size, set in `SetText`), and `private string _message;`. (Cull-rect note: the rect covers the **background panel only** — in the wrapped case the label is `MaxWidth·S` wide while the panel hugs the longest line, so the label's transparent overhang can linger a frame or two past the display edge. The overhang carries no visible glyphs (WordSmart hard-breaks keep fragments ≤ wrap width) and the label is `MouseFilter.Ignore`, so this stays the accepted per-rect imperfection (Task 6.9) rather than a wider rect that would under-cull the panel.)
+- `SetText(string message)` → `SetText(string message, float scale)`: store `_message = message; DisplayScale = scale;`; replace the constants with scaled values — `int fontSize = Mathf.Max(1, Mathf.RoundToInt(12f * scale));` (replaces `const int fontSize = 12`, `:32`), `float maxTextWidth = ChatBubbleLayout.MaxWidth * scale;` (`:86`), `var padding = ChatBubbleLayout.Padding * scale;` (used at `:133-135` in place of `ChatBubbleLayout.Padding` / the `MaxWidth` wrap-width), stylebox corner radii `Mathf.RoundToInt(6f * scale)` (`:45-48` — `StyleBoxFlat.CornerRadius*` are **int**), background size `var bgSize = textSize + padding * 2;` (replaces `ChatBubbleLayout.BackgroundSize(textSize)` — same formula, scaled padding).
 - `BackgroundWidth = bgSize.X / scale;` (world units — the units change); `_bgScreen = bgSize;`
-- **Self-anchoring:** `if (Owner != null) LocalOffsetWorld = new Vector2(-BackgroundWidth / 2f, -(Owner.Height + Character.Character.NameTopOffset) - ChatBubbleLayout.VerticalGap);` (qualify as `Character.Character` — from the Overlays namespace the bare name is the `Goose2Client.Character` namespace). Factor this into `public void UpdateAnchor() { if (Owner == null || _message == null) return; <the line above>; }` and call it from two places: the end of `SetText` (anchor after every (re)measure), and `Character.RepositionOverlays` (`Character.cs:121-126`): `if (_chatBubble != null && GodotObject.IsInstanceValid(_chatBubble)) _chatBubble.UpdateAnchor();` — required because appearance/mount changes move the nameplate (`RepositionOverlays` already re-anchors the name) and a live bubble would otherwise keep the stale height-based anchor. (Today's in-world bubble has the same staleness — this is a small behavior improvement, not a regression fix.) — same world-unit math the old `ShowChatBubble` did, now re-derived on every (re)measure so a wrap-line-count change across scales can't leave a stale anchor. Requires `Character.NameTopOffset` to be `internal` (done in Task 3).
-- **Node-reuse + reflow refactor (required, two probed engine behaviors):** (1) the original `SetText` unconditionally creates new `Panel`/`Label` and `AddChild`s them (panel `:35-39`, wrap-branch label `:110`; only the final add at `:137` is already parent-guarded) — a naive re-run would **double-add duplicates** and `:110` would even throw for an already-parented label; restructure so the first call creates `_background`/`_label` and later calls **reuse** them (guard `:39`/`:110` adds with `if (x.GetParent() == null)`, re-apply stylebox/text/wrap/size/position on the existing nodes). (2) **Before re-measuring, if `_label` is already parented, `RemoveChild(_label)` first** — an autowrap OFF→WordSmart transition on an in-tree label does NOT reflow (stale line count and stale min-size at `:113` — probed); the existing flow then re-adds the label in its final state (wrap branch `:110`, or the guarded `:137`), which is the empirically valid setup-before-add state the measurement comment at `:59-68` documents. Wrap→wrap re-measures work without re-adding, but uniform remove-first is simplest and always correct. The reflow-critical section, concretely:
+- **Self-anchoring:** `if (Owner != null) LocalOffsetWorld = new Vector2(-BackgroundWidth / 2f, -(Owner.Height + Character.Character.NameTopOffset) - ChatBubbleLayout.VerticalGap);` (qualify as `Character.Character` — from the Overlays namespace the bare name is the `Goose2Client.Character` namespace). Factor this into `public void UpdateAnchor() { if (Owner == null || _message == null) return; <the line above>; }` and call it from two places: the end of `SetText` (anchor after every (re)measure), and `Character.RepositionOverlays` (`Character.cs:121-126`): `if (_chatBubble != null && GodotObject.IsInstanceValid(_chatBubble)) _chatBubble.UpdateAnchor();` — required because appearance/mount changes move the nameplate (`RepositionOverlays` already re-anchors the name) and a live bubble would otherwise keep the stale height-based anchor. (Today's in-world bubble has the same staleness — this is a small behavior improvement, not a regression fix.) Same world-unit math the old `ShowChatBubble` did, now re-derived on every (re)measure so a wrap-line-count change across scales can't leave a stale anchor. Requires `NameTopOffset` to be `internal` (done in Task 3).
+- **Node-reuse + reflow refactor (required, two probed engine behaviors):** (1) the original `SetText` unconditionally creates new `Panel`/`Label` and `AddChild`s them (panel `:35-39`, wrap-branch label `:110`; only the final add at `:137` is already parent-guarded) — a naive re-run would **double-add duplicates** and `:110` would even throw for an already-parented label; restructure so the first call creates `_background`/`_label` and later calls **reuse** them (guard `:39`/`:110` adds with `if (x.GetParent() == null)`, re-apply stylebox/text/wrap/size/position on the existing nodes). (2) **Before re-measuring, if `_label` is already parented, `RemoveChild(_label)` first** — an autowrap OFF→WordSmart transition on an in-tree label does NOT reflow (stale line count and stale min-size at `:113` — probed); the existing flow then re-adds the label in its final state (wrap branch `:110`, or the guarded `:137`), which is the empirically valid setup-before-add state the measurement comment at `:59-68` documents. Wrap→wrap re-measures work without re-adding, but uniform remove-first is simplest and always correct. (3) **Reuse must also reset `AutowrapMode` to `Off` in the one-line branch** — a label that wrapped for the *previous* message still carries `WordSmart`, so a short reused message would reflow onto a clipped second line; set `_label.AutowrapMode = TextServer.AutowrapMode.Off;` in the one-line branch before the final guarded add. The reflow-critical section, concretely:
 
 ```csharp
 // Top of the measurement section (before the font-metrics check):
 if (_label != null && _label.GetParent() != null)
     RemoveChild(_label);   // in-tree autowrap OFF→ON does not reflow (probed); the wrap branch
                            // (:110) or the final guarded add (:137) re-adds it in final state
+// one-line branch (natural width <= maxTextWidth), before the final guarded add:
+_label.AutowrapMode = TextServer.AutowrapMode.Off;   // reset for reuse: a previously-wrapped label
+                                                     // must not reflow the new shorter text
 // ... existing measurement, unchanged in shape, with scaled constants ...
 // ... end of SetText (after _bgScreen/BackgroundWidth are set):
 UpdateAnchor();
@@ -512,7 +528,7 @@ UpdateAnchor();
 ```csharp
 if (GameManager.Instance?.WorldTextBridge is not { } bridge) return;
 bridge.Register(_chatBubble, this);   // ApplyScale no-ops (_message null); Owner is set for SetText's self-anchoring
-_chatBubble.SetText(message, bridge.Scale);   // in-tree (measurement needs it); measures + sets LocalOffsetWorld
+_chatBubble.SetText(message, bridge.DisplayScale);   // in-tree (measurement needs it); measures + sets LocalOffsetWorld
 ```
 
 (Order matters: `Register` before `SetText` — the wrap branch's min-size read requires an in-tree label.)
@@ -540,7 +556,7 @@ _chatBubble.SetText(message, bridge.Scale);   // in-tree (measurement needs it);
 - Modify: `Scripts/Overlays/BattleTextLine.cs`
 - Modify: `Scripts/Character/Character.cs:675-684` (`AddBattleText`)
 
-**Step 1: `BattleText.cs`** — class becomes `: Node2D, IBridgedText`; add `Owner`, `LocalOffsetWorld`, and a private `float _scale = 1f;` (no public property needed — the bridge passes the scale in; `Character` reads `bridge.Scale`) and
+**Step 1: `BattleText.cs`** — class becomes `: Node2D, IBridgedText`; add `Owner`, `LocalOffsetWorld`, and a private `float _scale = 1f;` (no public property needed — the bridge passes the scale in; `Character` reads `bridge.DisplayScale`) and
 
 ```csharp
 /// <summary>Local extent of the lines (the (0,−40) anchor is LocalOffsetWorld, NOT in here):
@@ -580,7 +596,7 @@ public void AddBattleText(BattleTextType type, string text)
         _battleText.LocalOffsetWorld = new Vector2(0, -40);   // was creation-time Position
         bridge.Register(_battleText, this);
     }
-    _battleText.AddText(type, text, Height, bridge.Scale);
+    _battleText.AddText(type, text, Height, bridge.DisplayScale);
 }
 ```
 
