@@ -47,6 +47,9 @@ namespace Goose2Client
         /// <summary>Owns the world sub-viewport and its display texture; map scenes attach here.</summary>
         public WorldViewport WorldViewport { get; private set; }
 
+        /// <summary>CanvasLayer hosting world-anchored text (names, bubbles, battle text) at native resolution.</summary>
+        public WorldTextBridge WorldTextBridge { get; private set; }
+
         /// <summary>The persistent HUD root, instantiated once under UiLayer.</summary>
         public GameHud Hud { get; private set; }
 
@@ -80,6 +83,13 @@ namespace Goose2Client
             WorldViewport = new WorldViewport();
             WorldViewport.Name = "WorldViewport";
             AddChild(WorldViewport);
+
+            // World-anchored text at native resolution — between the world texture and the HUD
+            // in tree order, so it draws above the world and below the HUD.
+            WorldTextBridge = new WorldTextBridge();
+            WorldTextBridge.Name = "WorldTextBridge";
+            AddChild(WorldTextBridge);
+            WorldTextBridge.Attach(WorldViewport);
 
             // Persistent UI CanvasLayer — lives in the autoload tree so it survives ChangeSceneToPacked.
             UiLayer = new CanvasLayer();

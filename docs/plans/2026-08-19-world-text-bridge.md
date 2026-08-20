@@ -2,7 +2,7 @@
 
 **Goal:** Render character names, chat bubbles, and battle text at native window resolution via a root-viewport `CanvasLayer`, so in-world text is pixel-crisp at any integer scale instead of Stage 1's soft 2×/3× upscale (closes I5).
 
-**Architecture:** `WorldTextBridge` (a `CanvasLayer` between `WorldViewport` and `UiLayer`) owns the three text element types as its children. Each element keeps its existing layout math but (a) sizes all visual constants in screen px = world value × `Layout.Scale` (font re-rasterizes at the larger size — node/`Control` scale is forbidden, it would stretch the glyph rasterization), and (b) stores its anchor offset in **world units**. A per-frame pass driven by the bridge's own `_Process` at an explicit `ProcessPriority = 100` sets `Position = WorldToWindow(owner.GlobalPosition) + LocalOffsetWorld × Scale` and culls elements outside the display rect. **Not** `SceneTree.process_frame` — probed headless: it is emitted *before* node `_process` callbacks, so a process-frame projector would read last frame's positions/camera (names trail the sprite). **Not** default-priority `_Process` either — the autoload tree (bridge's parent) would process before the map scene at equal priority. Priority 100 runs after every world node (all priority 0) within the same processing stage, before rendering — pinned by `tools/tests/text_bridge_order.gd`. `WorldViewport.ApplyMode` fires `ScaleChanged` only when the scale actually changes; the bridge re-lays out every element. Element lifetime: the pass `QueueFree`s any child whose owner fails `IsInstanceValid` — no cleanup wiring anywhere else (map changes free all owners at once).
+**Architecture:** `WorldTextBridge` (a `CanvasLayer` between `WorldViewport` and `UiLayer`) owns the three text element types as its children. Each element keeps its existing layout math but (a) sizes all visual constants in screen px = world value × `Layout.Scale` (font re-rasterizes at the larger size — node/`Control` scale is forbidden, it would stretch the glyph rasterization), and (b) stores its anchor offset in **world units**. A per-frame pass driven by the bridge's own `_Process` at an explicit `ProcessPriority = 100` sets `Position = WorldToWindow(owner.GlobalPosition) + LocalOffsetWorld × Scale` and culls elements outside the display rect. **Not** `SceneTree.process_frame` — probed headless: it is emitted *before* node `_process` callbacks, so a process-frame projector would read last frame's positions/camera (names trail the sprite). **Not** default-priority `_Process` either — at equal priority tree order alone would suffice (world nodes live under the earlier-sibling `WorldViewport`, so they process first), but priority 100 additionally covers future world nodes that raise their own priority (probed: at priority 0 the bridge already runs after the world subtree; the margin is what binds). Priority 100 runs after every world node (all priority 0) within the same processing stage, before rendering — pinned by `tools/tests/text_bridge_order.gd`. `WorldViewport.ApplyMode` fires `ScaleChanged` only when the scale actually changes; the bridge re-lays out every element. Element lifetime: the pass `QueueFree`s any child whose owner fails `IsInstanceValid` — no cleanup wiring anywhere else (map changes free all owners at once).
 
 **Scope (decided):** names, chat bubbles, battle text only. HP/MP bars and the spell reticle stay in-world (solid graphics scale fine).
 
@@ -264,10 +264,11 @@ namespace Goose2Client
     /// on the default CanvasLayer Layer=1: above WorldTexture (root-canvas Control) and, by tree
     /// order, below UiLayer (HUD). Owns element Position/Visible per frame and their lifetime.
     /// Projection runs in the bridge's own _Process at ProcessPriority 100 — NOT from
-    /// SceneTree.process_frame (probed: emitted BEFORE node _process → would lag a frame), and
-    /// not at default priority (the autoload tree processes before the map scene at equal
-    /// priority). Priority 100 runs after every world node (all default 0) in the same stage,
-    /// before rendering (T2; contract pinned by tools/tests/text_bridge_order.gd).</summary>
+    /// SceneTree.process_frame (probed: emitted BEFORE node _process → would lag a frame).
+    /// At equal priority the tree order alone would suffice (the world nodes live under the
+    /// earlier-sibling WorldViewport, so they process first); priority 100 additionally covers
+    /// future world nodes that raise their own priority. It runs after every world node in the
+    /// same stage, before rendering (T2; contract pinned by tools/tests/text_bridge_order.gd).</summary>
     public partial class WorldTextBridge : CanvasLayer
     {
         /// <summary>Must exceed every world node's process priority (all use the default 0 today —

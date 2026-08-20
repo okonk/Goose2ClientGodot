@@ -24,6 +24,12 @@ namespace Goose2Client
         /// <summary>Current layout, from the last <see cref="ApplyMode"/> with a map attached.</summary>
         public WorldViewportLayout Layout { get; private set; }
 
+        /// <summary>Fired after ApplyMode has applied a layout whose Scale differs from the previously applied
+        /// one (first application included). Observers may assume Layout is current. Never fires when a resize
+        /// or mode toggle leaves the scale unchanged.</summary>
+        public event System.Action<float> ScaleChanged;
+        private int _lastAppliedScale;
+
         /// <summary>Stored even with no map attached (applied on next <see cref="Attach"/>).</summary>
         public WorldRenderMode Mode { get; private set; } = WorldRenderMode.Integer2x;
 
@@ -137,6 +143,12 @@ namespace Goose2Client
             Current.Size = Layout.SubViewportSize;
             WorldTexture.Position = Layout.DisplayOrigin;
             WorldTexture.Size = Layout.DisplaySize;
+
+            if (Layout.Scale != _lastAppliedScale)
+            {
+                _lastAppliedScale = Layout.Scale;
+                ScaleChanged?.Invoke((float)Layout.Scale);
+            }
         }
 
         /// <summary>
@@ -162,6 +174,13 @@ namespace Goose2Client
             // back (using it forward would displace clicks by ~2x the camera offset).
             return Current.GetCanvasTransform().AffineInverse() * vp;
         }
+
+        /// <summary>World (map) px → root-window px. Exact inverse of <see cref="WindowToWorld"/> —
+        /// keep the two in lockstep (WorldTextProjectionTests.RoundTrip mirrors WindowToWorld's math
+        /// verbatim — update the mirror if either side changes).
+        /// Precondition: <see cref="Current"/> != null (same as <see cref="WindowToWorld"/>).</summary>
+        public Vector2 WorldToWindow(Vector2 worldPos)
+            => WorldTextProjection.Project(worldPos, Current.GetCanvasTransform(), (float)Layout.Scale, Layout.DisplayOrigin);
 
         /// <summary>
         /// Window mouse clicks → world clicks. Sub-viewport nodes never receive window input
