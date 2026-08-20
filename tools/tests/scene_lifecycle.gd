@@ -22,6 +22,9 @@
 #    the process_frame fallback leg of the race, exactly like the C# code would; headed runs
 #    take the frame_post_draw leg (rendering completes later in the same frame, before the
 #    next process_frame).
+#  - (C# load-bearing invariant) Attach only lands in the mid-frame flush AFTER its frame's
+#    process_frame emission because of the loading-overlay await in ChangeMap — do not
+#    remove/hoist that await without re-deriving this ordering (see the race comment there).
 #
 # Simulates BOTH entry shapes: first entry (previous scene A = Login, a root child and the
 # current scene) and a later entry (previous map A2 attached under the container).

@@ -27,8 +27,10 @@ namespace Goose2Client
         /// <summary>Stored even with no map attached (applied on next <see cref="Attach"/>).</summary>
         public WorldRenderMode Mode { get; private set; } = WorldRenderMode.Integer2x;
 
-        // One-shot first-frame presentation deferred from <see cref="Attach"/> (null = none pending).
+        // One-shot first-frame presentation deferred from <see cref="Attach"/>: the connected
+        // handler (null = none pending) and the map whose first render it presents.
         private System.Action _pendingPresent;
+        private SubViewport _presentMap;
 
         public override void _Ready()
         {
@@ -51,6 +53,7 @@ namespace Goose2Client
             if (_pendingPresent != null)
                 RenderingServer.FramePostDraw -= _pendingPresent;
             _pendingPresent = null;
+            _presentMap = null;
         }
 
         /// <summary>
@@ -84,8 +87,14 @@ namespace Goose2Client
             // the map, so it must be dropped explicitly — otherwise it would fire on the next
             // frame and clear the NEW handler's state). The guard below is a second line of
             // defense: a superseded or freed map can never be re-presented over the newer one.
+            // Defense in depth: also restore the orphaned map's update mode — nothing may be
+            // left in UpdateMode.Always without a pending presentation to bring it back.
             if (_pendingPresent != null)
+            {
+                if (_presentMap != null && _presentMap != mapScene && GodotObject.IsInstanceValid(_presentMap))
+                    _presentMap.RenderTargetUpdateMode = SubViewport.UpdateMode.WhenVisible;
                 RenderingServer.FramePostDraw -= _pendingPresent;
+            }
 
             System.Action present = () =>
             {
@@ -96,6 +105,7 @@ namespace Goose2Client
                 if (_pendingPresent != null)
                     RenderingServer.FramePostDraw -= _pendingPresent;
                 _pendingPresent = null;
+                _presentMap = null;
                 // Stale-handler guard: if a newer map was attached (Current changed) or this
                 // map was freed before its first render pass, do not present it.
                 if (Current != mapScene || !GodotObject.IsInstanceValid(mapScene)) return;
@@ -103,6 +113,7 @@ namespace Goose2Client
                 mapScene.RenderTargetUpdateMode = SubViewport.UpdateMode.WhenVisible;   // restore default steady state
             };
             _pendingPresent = present;
+            _presentMap = mapScene;
             RenderingServer.FramePostDraw += present;
         }
 

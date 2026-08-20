@@ -59,6 +59,11 @@ namespace Goose2Client
         // elapses in a headless run, where frame_post_draw is never emitted.
         private const string RenderRaceSignal = "world_transition_render_done";
 
+        // ChangeMap re-entrancy guard (async void): two SendCurrentMap packets drained in the
+        // same flush would otherwise start two concurrent transitions, and the first one's map
+        // would be superseded by the second Attach while no transition is left to free it.
+        private bool _changingMap;
+
         public override void _EnterTree()
         {
             instance = this;
@@ -130,25 +135,33 @@ namespace Goose2Client
         /// </summary>
         public async void ChangeMap(string mapFile, string mapName)
         {
-            // Unity parity: clear and unfocus chat input on every map change
-            if (Hud != null && GodotObject.IsInstanceValid(Hud))
-                Hud.Chat?.ClearAndUnfocus();
-
-            SetPaused(true);   // buffer gameplay packets during the transition (drained on unpause)
-
-            // Previous world, tracked explicitly (I7) — scene reassignment never frees it:
-            //  - previousMap: the currently attached map (later entries). CurrentScene never
-            //    points at the map: set_current_scene requires a direct root child (Godot 4.7
-            //    scene_tree.cpp:1665), and the map lives under WorldViewport.
-            //  - previousScene: the previous current scene — Login on first entry (main scene),
-            //    null on later entries (the engine nulls it when the freed scene leaves the tree).
-            var previousMap = WorldViewport.Current;
-            var previousScene = GetTree().CurrentScene;
+            // Re-entrancy guard (blocking): a second transition started inside the first would
+            // attach a second map whose Attach supersedes the first's pending present handler,
+            // orphaning the first map (never freed, rendering forever in UpdateMode.Always,
+            // running a live-but-invisible MapManager). Clear in the finally on EVERY exit
+            // path — including the missing-map early return and exceptions.
+            if (_changingMap) return;
+            _changingMap = true;
 
             // Loading overlay: added to root directly, NOT set as a current scene — freed manually.
             LoadingMapScene loading = null;
             try
             {
+                // Unity parity: clear and unfocus chat input on every map change
+                if (Hud != null && GodotObject.IsInstanceValid(Hud))
+                    Hud.Chat?.ClearAndUnfocus();
+
+                SetPaused(true);   // buffer gameplay packets during the transition (drained on unpause)
+
+                // Previous world, tracked explicitly (I7) — scene reassignment never frees it:
+                //  - previousMap: the currently attached map (later entries). CurrentScene never
+                //    points at the map: set_current_scene requires a direct root child (Godot 4.7
+                //    scene_tree.cpp:1665), and the map lives under WorldViewport.
+                //  - previousScene: the previous current scene — Login on first entry (main scene),
+                //    null on later entries (the engine nulls it when the freed scene leaves the tree).
+                var previousMap = WorldViewport.Current;
+                var previousScene = GetTree().CurrentScene;
+
                 loading = GD.Load<PackedScene>("res://Scenes/LoadingMap.tscn").Instantiate<LoadingMapScene>();
                 GetTree().Root.AddChild(loading);
                 await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
@@ -181,15 +194,32 @@ namespace Goose2Client
                 // later in the same frame, before the next process_frame). This GodotSharp
                 // has no multi-signal ToSignal, so the race is wired by hand: the first leg
                 // to fire emits the RenderRaceSignal user signal, which is awaited below.
+                // LOAD-BEARING TIMING INVARIANT: the loading-overlay await above forces this
+                // Attach to land in the NEXT mid-frame flush — i.e. AFTER the attach frame's
+                // own process_frame emission. The process_frame race leg therefore cannot win
+                // on the attach frame; if it did, the old world would be freed+destroyed
+                // before that frame's render, bringing the flash back. DO NOT remove/hoist
+                // the loading await without re-deriving this ordering.
+                var tree = GetTree();   // captured so FinishRace can detach without touching `this`
                 bool raceDone = false;
                 System.Action onPostDraw = null;
                 System.Action onFrame = null;
                 void FinishRace()
                 {
+                    // A freed GameManager must not throw inside the FramePostDraw callback
+                    // (and leave a no-op delegate firing every frame): detach both legs via
+                    // the captured tree (no `this` access beyond this validity check) and stop.
+                    if (!GodotObject.IsInstanceValid(this))
+                    {
+                        raceDone = true;
+                        if (onPostDraw != null) { RenderingServer.FramePostDraw -= onPostDraw; onPostDraw = null; }
+                        if (onFrame != null) { tree.ProcessFrame -= onFrame; onFrame = null; }
+                        return;
+                    }
                     if (raceDone) return;
                     raceDone = true;
                     RenderingServer.FramePostDraw -= onPostDraw;
-                    GetTree().ProcessFrame -= onFrame;
+                    tree.ProcessFrame -= onFrame;
                     EmitSignal(RenderRaceSignal);
                 }
                 if (!HasUserSignal(RenderRaceSignal))
@@ -197,7 +227,7 @@ namespace Goose2Client
                 onPostDraw = FinishRace;
                 onFrame = FinishRace;
                 RenderingServer.FramePostDraw += onPostDraw;
-                GetTree().ProcessFrame += onFrame;
+                tree.ProcessFrame += onFrame;
                 await ToSignal(this, RenderRaceSignal);
 
                 // Explicit lifecycle ownership: free the previous world only after the new map
@@ -214,6 +244,7 @@ namespace Goose2Client
             }
             finally
             {
+                _changingMap = false;   // release on every exit path (early return, throw, normal)
                 if (loading != null && GodotObject.IsInstanceValid(loading))
                     loading.QueueFree();   // no leaked full-window Control
                 SetPaused(false);   // always drain queued gameplay packets, even if the transition throws
