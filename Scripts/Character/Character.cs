@@ -30,7 +30,7 @@ namespace Goose2Client.Character
         private static AnimationHeights _heights;
         private AppearanceData _appearance;
 
-        private Label _nameLabel;
+        private Overlays.BridgedNameLabel _nameLabel;
         private ColorRect _hpBar;
         private ColorRect _mpBar;
 
@@ -92,12 +92,13 @@ namespace Goose2Client.Character
 
         /// <summary>Distance from the head (resting-pose body height) to the top edge of the name
         /// label. Shared by name layout and chat-bubble placement so the two stay in sync.</summary>
-        private const float NameTopOffset = 26f;
+        internal const float NameTopOffset = 26f;
 
-        private void EnsureNameLabel()
+        private bool EnsureNameLabel()
         {
-            if (_nameLabel != null) return;
-            _nameLabel = new Label
+            if (_nameLabel != null) return true;
+            if (GameManager.Instance?.WorldTextBridge is not { } bridge) return false;   // defensive; can't happen pre-map
+            _nameLabel = new Overlays.BridgedNameLabel
             {
                 Text = FullName,
                 HorizontalAlignment = HorizontalAlignment.Center,
@@ -106,14 +107,11 @@ namespace Goose2Client.Character
                 ZAsRelative = false,
                 ClipText = false,
                 MouseFilter = Control.MouseFilterEnum.Ignore,
-                Position = new Vector2(-50, -74),   // name sits on top; HP bar (-56) below it, no overlap
-                Size = new Vector2(100, 16),
             };
-            _nameLabel.AddThemeFontSizeOverride("font_size", 12);
-            _nameLabel.AddThemeConstantOverride("outline_size", 4);
             _nameLabel.AddThemeColorOverride("font_outline_color", new Color(0, 0, 0, 0.9f));
-            AddChild(_nameLabel);
+            bridge.Register(_nameLabel, this);   // Register: Owner → ApplyScale (font metrics, valid off-tree) → AddChild
             RepositionOverlays();
+            return true;
         }
 
         /// <summary>Position name label and HP/MP bars from the resting-pose <see cref="Height"/>
@@ -123,19 +121,13 @@ namespace Goose2Client.Character
             int h = Height <= 0 ? 48 : Height;
             if (_hpBar != null) _hpBar.Position = new Vector2(-16, -(h + 8));
             if (_mpBar != null) _mpBar.Position = new Vector2(-16, -(h + 5));
-            LayoutNameLabel(h);
+            LayoutNameLabel();
         }
 
-        /// <summary>Size the name to its text and center it horizontally so long names
-        /// (e.g. "Smithing Supplies") are not clipped by a fixed 100px box.</summary>
-        private void LayoutNameLabel(int bodyHeight)
+        private void LayoutNameLabel()
         {
             if (_nameLabel == null) return;
-            var min = _nameLabel.GetMinimumSize();
-            float w = Mathf.Max(min.X, 8f);
-            float h = Mathf.Max(min.Y, 16f);
-            _nameLabel.Size = new Vector2(w, h);
-            _nameLabel.Position = new Vector2(-w / 2f, -(bodyHeight + NameTopOffset));
+            _nameLabel.Layout(this);
         }
 
         // The converter's height-prefix uses its AnimationType name, which differs from the
@@ -181,9 +173,7 @@ namespace Goose2Client.Character
             PlayState();
             RepositionOverlays();
 
-            EnsureNameLabel();
-            _nameLabel.Text = FullName;
-            LayoutNameLabel(Height <= 0 ? 48 : Height);
+            if (EnsureNameLabel()) { _nameLabel.Text = FullName; _nameLabel.Layout(this); }   // re-layout on rename: width changes
             SetVitals(p.HPPercent, 1f);
         }
 
