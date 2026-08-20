@@ -18,6 +18,9 @@ public partial class MapLayer : TileMapLayer
         _layer = layer;
         _catalog = catalog;
         TileSet = catalog.TileSet;
+        // Explicit Nearest (do not rely on the project default): matches every other sprite in
+        // the game (Character, Icon, ...), which sets it explicitly in code.
+        TextureFilter = CanvasItem.TextureFilterEnum.Nearest;
         ZIndex = layer * 10;     // 0,10,20,30,40. Matches Unity sorting layers: dropped items sit at
                                  // z=14 and characters at z=15 (both below Objects 1 @20); roofs @40.
 

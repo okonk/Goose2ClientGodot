@@ -48,6 +48,8 @@ public partial class ObjectLayer : Node2D
         {
             Texture = tex,
             Centered = false,
+            // Explicit Nearest (do not rely on the project default) — pixel art.
+            TextureFilter = CanvasItem.TextureFilterEnum.Nearest,
             Offset = new Vector2(-size.X / 2f, -size.Y),
             Position = MapCoords.TileBottomCenter(x, y),
         };

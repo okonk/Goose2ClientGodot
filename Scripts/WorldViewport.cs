@@ -31,6 +31,9 @@ namespace Goose2Client
         {
             WorldTexture.Name = "WorldTexture";
             WorldTexture.MouseFilter = Control.MouseFilterEnum.Ignore;
+            // Explicit Nearest (do not rely on the project default): the sub-viewport is
+            // upscaled here at layout.Scale, and bilinear would soften the whole world.
+            WorldTexture.TextureFilter = CanvasItem.TextureFilterEnum.Nearest;
             AddChild(WorldTexture);
             GetWindow().SizeChanged += OnWindowResized;
         }
