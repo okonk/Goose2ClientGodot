@@ -122,6 +122,9 @@ namespace Goose2Client.Character
             if (_hpBar != null) _hpBar.Position = new Vector2(-16, -(h + 8));
             if (_mpBar != null) _mpBar.Position = new Vector2(-16, -(h + 5));
             LayoutNameLabel();
+            if (_chatBubble != null && GodotObject.IsInstanceValid(_chatBubble))
+                _chatBubble.UpdateAnchor();   // appearance/mount changes moved the nameplate — a live
+                                              // bubble must re-derive its height-based anchor
         }
 
         private void LayoutNameLabel()
@@ -681,18 +684,18 @@ namespace Goose2Client.Character
             if (GodotObject.IsInstanceValid(_chatBubble))
                 _chatBubble.QueueFree();
 
-            _chatBubble = new Overlays.ChatBubble { Name = "ChatBubble" };
-            AddChild(_chatBubble);
-            _chatBubble.SetText(message);
+            if (GameManager.Instance?.WorldTextBridge is not { } bridge) return;
 
-            // The bubble draws on top of the name (its z is NamesZIndex + 2), so anchor it
-            // above the nameplate: its bottom edge VerticalGap px above the name's top edge
-            // (the node origin is the background's bottom-left, so no height math here). Shift
-            // left by half the width to center it on the character.
-            float nameTop = -(Height + NameTopOffset);
-            _chatBubble.Position = new Vector2(
-                -_chatBubble.BackgroundWidth / 2f,
-                nameTop - Overlays.ChatBubbleLayout.VerticalGap);
+            _chatBubble = new Overlays.ChatBubble { Name = "ChatBubble" };
+            // Register before SetText: Owner is set for the bubble's self-anchoring, and the
+            // bubble must be in the tree (under the bridge) before measurement — the wrap
+            // branch reads the label's own min size, which requires an in-tree label.
+            // ApplyScale no-ops (_message still null); SetText measures and sets LocalOffsetWorld
+            // (above the nameplate, centered — the bubble's z is NamesZIndex + 2, so it draws
+            // on top of the name; anchor: node origin is the background's bottom-left, bottom
+            // edge VerticalGap world-px above the name's top edge).
+            bridge.Register(_chatBubble, this);
+            _chatBubble.SetText(message, bridge.DisplayScale);
         }
 
         /// <summary>Show a spell impact animation at this character's origin. Spells stack (no replacement).</summary>
