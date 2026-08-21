@@ -83,8 +83,10 @@ public interface IScalableWindow { void Relayout(); }
   style static accessor, created in `GameManager._Ready` — persistent across map
   entries, same home as `WorldViewport`.
 - Windows **self-register at end of their own `_Ready`** (R3) via `ScaleRegister()`
-  (snapshot → `RegisterWindow` → `Relayout()` once — `ScaleRegister` is the SINGLE
-  Relayout owner; `RegisterWindow` is bookkeeping only); `tree_exited` deregisters.
+  (snapshot → `RegisterWindow` → `Relayout()` → `RepositionFromSaved()` — the window
+  is placed at its FINAL scaled size, never the 1× tscn size; `ScaleRegister` is the
+  SINGLE registration-time layout owner, `RegisterWindow` is bookkeeping only);
+  `tree_exited` deregisters.
   `UnregisterWindow` removes the window AND its descendant font entries (fonts are
   recorded flat, owned per-window by ancestry — runtime NPC windows free their labels
   with them); the apply pass additionally prunes entries that fail
@@ -125,11 +127,18 @@ public interface IScalableWindow { void Relayout(); }
   applier is the only writer) + `static NormalizeFactor(raw)` / `static AutoFactor(h)`;
   `ScaleSize*` read `CurrentFactor`. (A `Factor` property + `Factor(float)` method is
   a C# CS0102 error — verified — and the old naming was semantically ambiguous.)
-- R5: scale-commit placement — a saved position is a display coordinate at the SAVED
-  factor; the edge offset is derived with the pre-commit (old) display size and
-  re-anchored with the new size (`WindowPlacement.Resolve(savedPos, savedSize,
-  windowSize, …)`). Edge-stuck windows keep their edge margin (clamped when the
-  scaled window + margin doesn't fit); middle-band windows keep their top-left.
+- R5: **saved-quad placement model** (a captured old size alone cannot round-trip —
+  the persisted position goes stale after any commit): each window persists a QUAD
+  — (position, size, factor, canvas) — at drag-end, and EVERY placement (registration,
+  scale commit, canvas resize, auto-threshold crossing) derives from
+  `WindowPlacement.ResolveScaled(quad + live Size/factor/canvas)`. The quad is
+  invariant across commits, so 1×→2×→1× round-trips exactly by construction; canvas
+  and factor changes compose in one call (no old-canvas tracking, no live-rect
+  capture). **Margin policy: edge margins are LOGICAL UI PIXELS — they scale with the
+  factor** (× `factor/savedFactor`), matching anchored roots (chat's tscn margins
+  double at 2×); middle-band windows keep their saved coordinate (unscaled). Legacy
+  settings (no size/factor keys) fall back to (tscn size, 1) — the true pre-feature
+  pair, so old files place identically.
 - `UiScaleApplier` is a plain class with a `TooltipManager.Instance`-style static
   accessor, created in `GameManager._Ready` (not a Node).
 
@@ -168,19 +177,16 @@ public interface IScalableWindow { void Relayout(); }
 3. Hide live tooltips (R2).
 4. Set `GameTheme.default_font_size`; re-apply all registered explicit overrides
    (pruning invalid entries via `IsInstanceValid`).
-5. **Capture every window's pre-relayout display size** (the saved positions were
-   saved at this size's factor — R5).
-6. Call `Relayout()` on all registered windows (HUD, login/loading; geometry only).
-7. Re-solve every `BaseWindow`'s placement via the pure
-   `WindowPlacement.Resolve(savedPos, savedSize /* step 5 */, window.Size /* new */,
-   savedCanvas, currentCanvas, titleBarAllowance: ScaleSize(24))` and set the
-   position. All windows re-solve — no opt-out. R5's model: middle-parked windows
-   (e.g. the free-draggable hotbar) keep their top-left coordinate; edge-stuck
-   windows (chat, etc.) **keep their edge margin** — clamped to title-bar-reachable
-   when the scaled window + margin doesn't fit the canvas.
+5. Call `Relayout()` on all registered windows (HUD, login/loading; geometry only).
+6. Placement: every registered `BaseWindow` calls `RepositionFromSaved()` — it reads
+   its OWN persisted quad and resolves via the pure `ResolveScaled(quad + live
+   Size/factor/canvas, titleBarAllowance: ScaleSize(24))` (R5). All windows re-solve
+   — no opt-out. Registration uses the same call AFTER its `Relayout()` (a window is
+   placed at its FINAL scaled size, never at the 1× tscn size), and the
+   canvas-resize walk is the same call — one placement method, three callers.
 
 Order matters: fonts before `Relayout` (minimum-size queries see correct values),
-capture before relayout (R5), placement last (needs final sizes).
+placement last (needs final sizes).
 
 ## 4. Live change paths
 
