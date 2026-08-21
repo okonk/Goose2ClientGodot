@@ -82,13 +82,28 @@ public interface IScalableWindow { void Relayout(); }
 - `UiScaleApplier` is a plain class (not a Node) with a `TooltipManager.Instance`-
   style static accessor, created in `GameManager._Ready` — persistent across map
   entries, same home as `WorldViewport`.
-- Windows **self-register at end of their own `_Ready`** (R3); `tree_exited` deregisters.
-  `GameHud` is never freed/rebuilt (guarded `EnsureHud`), so there is no rebuild-clear;
-  a leaked entry is harmless (apply steps null-skip).
+- Windows **self-register at end of their own `_Ready`** (R3) via `ScaleRegister()`
+  (snapshot → `RegisterWindow` → `Relayout()` once — `ScaleRegister` is the SINGLE
+  Relayout owner; `RegisterWindow` is bookkeeping only); `tree_exited` deregisters.
+  `UnregisterWindow` removes the window AND its descendant font entries (fonts are
+  recorded flat, owned per-window by ancestry — runtime NPC windows free their labels
+  with them); the apply pass additionally prunes entries that fail
+  `GodotObject.IsInstanceValid` as a backstop. `GameHud` is never freed/rebuilt
+  (guarded `EnsureHud`), so there is no rebuild-clear.
 - Windows spawned mid-session (NPC windows on click) must build through the same
   Register → `Relayout()` path — **no window may build without registering.**
-- Tooltips do **not** register (R2): live tooltips are hidden on apply, re-shown on
-  next hover.
+- Tooltips do **not** register with the SNAPSHOT (R2): their geometry is per-frame
+  C# (skip meta). They are NOT exempt from scaling — each tooltip control computes
+  its layout every frame from factor-scaled constants (pure `TooltipMetrics`: item
+  40/9/46/48/+4, spell/text 8×4 pad, map-item 6/4/2/4 margins + 400px widths, item
+  icon 32px@4), so a re-shown tooltip at 2× has 2× fonts AND 2× box/padding/icon.
+  Live tooltips are hidden on apply (no per-frame reflow mid-commit) and re-shown on
+  next hover at the live factor.
+- **Dynamic post-snapshot geometry** (same class of bug as tooltips): `VitalsCharacterDisplay.SetLayer`
+  repaints the portrait from 1× constants (53px circle, 20px drop) on every character
+  update, after the window snapshot — it routes through pure
+  `VitalsPortraitMetrics.Layout(texSize, factor)`, and `VitalsWindow.Relayout()` re-runs
+  the portrait pass.
 - Login scene and loading overlay register in `_Ready`, deregister in `_ExitTree`.
 
 **Implementation refinements (ratified in the part-1 plan — `2026-08-21-ui-scale-part1-foundation.md`):**
@@ -98,11 +113,23 @@ public interface IScalableWindow { void Relayout(); }
   recovery — an early draft of the plan had that and it was wrong: it would have
   un-scaled the HUD on real 1080p startups while every headless test stayed green).
   The snapshot records anchor-relative **offsets** (anchored roots like ChatWindow's
-  bottom-left or Toolbar's right-edge would detach if `Position` were scaled).
-  Registration calls `Relayout()` once, so runtime-spawned windows scale in the same
-  frame.
-- R2: live tooltips are hidden on apply (re-shown on next hover).
+  bottom-left or Toolbar's right-edge would detach if `Position` were scaled), EXCEPT
+  for children whose parent is a `Container` (`ContainerManaged`: the container owns
+  their offsets — writing them back is async-flaky; their scaling rides on
+  min-sizes + separation constants, and the container re-derives the offsets itself).
+  `ScaleRegister()` calls `Relayout()` once, so runtime-spawned windows scale in the
+  same frame.
+- R2: live tooltips hidden on apply; factor-aware per-show layout (body above).
 - R3: windows self-register at end of `_Ready` (GameHud does not enumerate).
+- R4: `UiScale` separates state and pure functions — `CurrentFactor` (plain state,
+  applier is the only writer) + `static NormalizeFactor(raw)` / `static AutoFactor(h)`;
+  `ScaleSize*` read `CurrentFactor`. (A `Factor` property + `Factor(float)` method is
+  a C# CS0102 error — verified — and the old naming was semantically ambiguous.)
+- R5: scale-commit placement — a saved position is a display coordinate at the SAVED
+  factor; the edge offset is derived with the pre-commit (old) display size and
+  re-anchored with the new size (`WindowPlacement.Resolve(savedPos, savedSize,
+  windowSize, …)`). Edge-stuck windows keep their edge margin (clamped when the
+  scaled window + margin doesn't fit); middle-band windows keep their top-left.
 - `UiScaleApplier` is a plain class with a `TooltipManager.Instance`-style static
   accessor, created in `GameManager._Ready` (not a Node).
 
@@ -131,23 +158,29 @@ public interface IScalableWindow { void Relayout(); }
 
 `UiScaleApplier.Apply(factor, reason)`, in order:
 
-1. Normalize `factor` via `UiScale.Factor`; store on the applier's `UiScale` instance.
+1. `f = UiScale.NormalizeFactor(factor)` (pure); early-return if `f == CurrentFactor`
+   (not on the first apply); set `CurrentFactor = f` — the applier is the only writer.
 2. Cancel any in-progress **window move-drag** (the only mouse-follow drag with state —
-   `BaseWindow._dragging`; cancel = restore pre-drag position, persist nothing). Godot's
-   built-in item/spell DnD has no cancel API and cannot realistically co-occur with a
-   scale commit (both need the left button) — accepted limitation, see §7.
-3. Set `GameTheme.default_font_size`; re-apply all registered explicit overrides.
-4. Call `Relayout()` on all registered windows (HUD, login/loading; live tooltips
-   are hidden instead, R2).
-5. Re-solve every HUD window's placement via the existing pure
-   `WindowPlacement.Resolve(savedPos, window.Size, savedCanvas, currentCanvas)` and
-   set the position. All windows re-solve — no opt-out. Middle-parked windows (e.g.
-   the free-draggable hotbar) keep their coordinate; edge-stuck windows (chat, etc.)
-   keep their edge offset; the behavior falls out of the saved position through the
-   existing math.
+   `BaseWindow._dragging`; cancel = restore pre-drag position, persist nothing, flag
+   cleared on the next press). Godot's built-in item/spell DnD has no cancel API and
+   cannot realistically co-occur with a scale commit (both need the left button) —
+   accepted limitation, see §7.
+3. Hide live tooltips (R2).
+4. Set `GameTheme.default_font_size`; re-apply all registered explicit overrides
+   (pruning invalid entries via `IsInstanceValid`).
+5. **Capture every window's pre-relayout display size** (the saved positions were
+   saved at this size's factor — R5).
+6. Call `Relayout()` on all registered windows (HUD, login/loading; geometry only).
+7. Re-solve every `BaseWindow`'s placement via the pure
+   `WindowPlacement.Resolve(savedPos, savedSize /* step 5 */, window.Size /* new */,
+   savedCanvas, currentCanvas, titleBarAllowance: ScaleSize(24))` and set the
+   position. All windows re-solve — no opt-out. R5's model: middle-parked windows
+   (e.g. the free-draggable hotbar) keep their top-left coordinate; edge-stuck
+   windows (chat, etc.) **keep their edge margin** — clamped to title-bar-reachable
+   when the scaled window + margin doesn't fit the canvas.
 
 Order matters: fonts before `Relayout` (minimum-size queries see correct values),
-placement last (needs final sizes).
+capture before relayout (R5), placement last (needs final sizes).
 
 ## 4. Live change paths
 
@@ -193,7 +226,7 @@ flash.
 - **Persistence:** `UiScaleMode` (enum) + `UiScaleValue` (float) added to the
   existing options settings save path that `OptionsWindow` already uses (plan phase
   confirms the exact struct; no new file). Corrupt values pass through
-  `UiScale.Factor()` at load (`4.2 → 3`, `-1 → 1`).
+  `UiScale.NormalizeFactor` at load (`4.2 → 3`, `-1 → 1`).
 - **First-run default:** Auto (720p → 1×, no change; 1080p → 2×, the point of the
   feature).
 - The Options window scales like every other window, including live resize on its own

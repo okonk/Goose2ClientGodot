@@ -2,7 +2,7 @@
 
 **Goal:** The user-facing surface: Auto/Manual mode + slider in the Options window, settings persistence, auto-scale on window resize, commit-time drag cancellation, login/loading scaling, and the manual verification matrix. Builds directly on Part 1's `UiScale` / `UiScaleApplier` / `UiScaleLayout` machinery.
 
-**Architecture:** A pure `UiScale.Resolve(mode, savedValue, windowHeight)` decides the target factor from (mode, persisted slider value, window height); `GameManager`'s startup `Apply(1f, Startup)` (pinned in Part 1, `Scripts/GameManager.cs` HUD-build site) becomes settings-driven, and the existing `window.SizeChanged` handler (`Scripts/GameManager.cs:103,337`) gains the auto-recompute leg. The Options window gains a UI Scale group (two exclusive mode checks + a 0.5-step slider that commits on `drag_ended` or on non-drag `value_changed`), persisting through the existing `CharacterSettings.Options` dictionary. Login/loading scenes self-register (Part 1 pattern); fonts reach them through the PROJECT-WIDE theme (`project.godot:37` `theme/custom="res://Assets/UI/GameTheme.tres"` — no per-scene theme needed), so Task 5 is geometry-only registration plus a test pinning the effective font 10 → 20 → 10 round-trip.
+**Architecture:** A pure static `UiScale.Resolve(mode, savedValue, windowHeight)` decides the target factor from (mode, persisted slider value, window height) — **pure: it reads nothing but its arguments and never touches `CurrentFactor`** (an unknown mode falls back to Auto, tested). `GameManager`'s pre-login Auto `Apply(AutoFactor(canvas.Y), Startup)` (Part 1, `GameManager._Ready` — NOT a pinned 1×) becomes settings-driven at `LoadSettings` (post-login, pre-HUD), and the existing `window.SizeChanged` handler (`Scripts/GameManager.cs:103,337`) gains the auto-recompute leg. The Options window gains a UI Scale group (two exclusive mode checks + a 0.5-step slider that commits on the `DragEnded` event or on non-drag `value_changed`), persisting through the existing `CharacterSettings.Options` dictionary. Login/loading scenes self-register (Part 1 pattern); fonts reach them through the PROJECT-WIDE theme (`project.godot:37` `theme/custom="res://Assets/UI/GameTheme.tres"` — no per-scene theme needed), so Task 5 is geometry-only registration plus a test pinning the effective font 10 → 20 → 10 round-trip.
 
 **Tech Stack:** C# / Godot 4.7.1 (GodotSharp), xUnit, headless self-test (Part 1's `tools/tests/run_ui_scale.sh`), in-engine manual matrix.
 
@@ -33,18 +33,19 @@
 
 **Step 1: Failing tests.**
 
-Add to `UiScale` (pure, Godot-free): `public enum UiScaleMode { Auto = 0, Manual = 1 }` and
-`public float Resolve(UiScaleMode mode, float savedValue, int windowHeightPx)` —
-`Auto → AutoFactor(windowHeightPx)`; `Manual → Factor(savedValue)`.
+Add to `UiScale` (pure static, Godot-free): `public enum UiScaleMode { Auto = 0, Manual = 1 }` and
+`public static float Resolve(UiScaleMode mode, float savedValue, int windowHeightPx)` —
+`Auto → AutoFactor(windowHeightPx)`; `Manual → NormalizeFactor(savedValue)`; **unknown mode (corrupt persisted int, e.g. 99) → Auto**. Pure: never reads or writes `CurrentFactor`.
 
 - `Resolve_AutoIgnoresSavedValue`: `Resolve(Auto, 2.5f, 1080) == 2f`, `Resolve(Auto, 1f, 1440) == 3f`.
-- `Resolve_ManualIgnoresWindowHeight`: `Resolve(Manual, 1.5f, 720) == 1.5f`, `Resolve(Manual, 3.4f, 720) == 3f` (corrupt value normalizes through `Factor`).
+- `Resolve_ManualIgnoresWindowHeight`: `Resolve(Manual, 1.5f, 720) == 1.5f`, `Resolve(Manual, 3.4f, 720) == 3f` (corrupt value normalizes through `NormalizeFactor`).
 - `Resolve_ManualNaN`: `Resolve(Manual, float.NaN, 1080) == 1f`.
+- `Resolve_UnknownModeFallsBackToAuto`: `Resolve((UiScaleMode)99, 2.5f, 1080) == AutoFactor(1080) == 2f` (review finding: the persisted int is cast blindly — the GUARD lives in `Resolve`, not at the cast site).
 
 **Step 2 (red)** → **Step 3:** implement; add keys to `Constants.cs:136`:
 ```csharp
 public const string UiScaleMode = "UiScaleMode";   // int: 0 = Auto (default), 1 = Manual
-public const string UiScaleValue = "UiScaleValue"; // float, snapped by UiScale.Factor
+public const string UiScaleValue = "UiScaleValue"; // float, snapped by UiScale.NormalizeFactor
 ```
 **Step 4:** in `LoadSettings`, right after `CharacterSettings = new CharacterSettings(characterName);` (runs post-login, before the first map transition/HUD build — so the re-`Apply` precedes any HUD window: no unscaled flash; it also re-scales the still-visible login screen if settings pin a Manual factor that differs from the pre-login Auto guess):
 ```csharp
@@ -53,7 +54,7 @@ var mode = (UiScaleMode)CharacterSettings.GetOption<int>(Options.UiScaleMode, (i
 var saved = CharacterSettings.GetOption<float>(Options.UiScaleValue, 1f);
 var canvas = (Vector2I)GetTree().Root.GetVisibleRect().Size;
 applier.Mode = mode;   // Task 3's auto-recompute branches on this; set it HERE (not just in the Options window)
-applier.Apply(applier.Scale.Resolve(mode, saved, canvas.Y), ApplyReason.Startup);
+applier.Apply(UiScale.Resolve(mode, saved, canvas.Y), ApplyReason.Startup);   // static + pure — never mutates CurrentFactor itself
 ```
 (`Resolve` is an instance method reading nothing but its arguments; call it through the applier's `Scale` instance.) The headless self-test (Part 1 Task 8) never calls `LoadSettings` (no login in headless) — `CharacterSettings` stays null there, and Part 1's settings-independent `Apply` at the headless root size (NOT the project's 1280×720 — headless probes report ~64–100px; see Part 1 Task 8 step 0) gives `AutoFactor(small) == 1`, so the self-test's factor-1 baseline is untouched. The "launch with settings pinning Manual 2×" leg has NO automated form in either plan's self-test (headless cannot log in) — it is covered by manual check M3; state that there.
 
@@ -78,7 +79,7 @@ applier.Apply(applier.Scale.Resolve(mode, saved, canvas.Y), ApplyReason.Startup)
 - Source of truth: `BaseWindow._dragging` + the live `Position` during a move-drag (`Scripts/UI/BaseWindow.cs:122-140`).
 - Readers: the drag's own release handler (persists `Position` to `CharacterSettings` via `SetWindowSetting`); `RepositionForCurrentCanvas` (reads `Size`, not `Position` mid-drag).
 - Derived state: the persisted `WindowSettings.Position` — **must not record the mid-drag position**; cancel must prevent the release-persist from firing for a cancelled drag.
-- Propagation: (1) on press, store `_preDragPosition = Position`; (2) `CancelDrag()`: if `_dragging` → `_dragging = false; _dragCancelled = true; Position = _preDragPosition;` (3) apply pass: before hiding tooltips, call `CancelDrag()` on every registered `BaseWindow` (cast; non-BaseWindow `IScalableWindow`s skip); (4) **persistence suppression is mandatory, not incidental**: the title-bar release handler (`Scripts/UI/BaseWindow.cs:118-142`) calls `SetWindowSetting` **unconditionally** on left-button release — it never checks `_dragging` — so without a guard the user's eventual mouse release (after the scale commit has already restored `Position`) would still fire a persist. Guard BOTH release branches (the `GuiInput` release and the `MouseMotion` escape) with `if (!_dragCancelled)` and clear the flag when consumed. (In the pure case the value equals the re-resolved position so the observable outcome would coincidentally match — but the flag makes the invariant airtight and covers the `Visible`/canvas fields persisted in the same `SetWindowSetting` call.) The subsequent `Relayout()` + `RepositionForCurrentCanvas()` re-solves from the untouched saved position.
+- Propagation: (1) on press, store `_preDragPosition = Position`; (2) `CancelDrag()`: if `_dragging` → `_dragging = false; _dragCancelled = true; Position = _preDragPosition;` (3) apply pass: before hiding tooltips, call `CancelDrag()` on every registered `BaseWindow` (cast; non-BaseWindow `IScalableWindow`s skip); (4) **persistence suppression is mandatory, not incidental**: the title-bar release handler (`Scripts/UI/BaseWindow.cs:118-142`) calls `SetWindowSetting` **unconditionally** on left-button release — it never checks `_dragging` — so without a guard the user's eventual mouse release (after the scale commit has already restored `Position`) would still fire a persist. Guard BOTH release branches (the `GuiInput` release and the `MouseMotion` escape) with `if (!_dragCancelled)` and clear the flag when consumed. **The flag MUST also be cleared on the next left-press** (the press site, `BaseWindow.cs:118` — `if (_dragCancelled) _dragCancelled = false;` before `_dragging = true`): a cancelled release that never reaches a guarded branch (e.g. the window was freed mid-drag, so no release handler ran) would otherwise leak the flag and silently suppress the user's NEXT legitimate drag save (review finding). (In the pure case the value equals the re-resolved position so the observable outcome would coincidentally match — but the flag makes the invariant airtight and covers the `Visible`/canvas fields persisted in the same `SetWindowSetting` call.) The subsequent `Relayout()` + `RepositionForCurrentCanvas()` re-solves from the untouched saved position.
 - Invariants: a scale commit mid-move leaves the saved settings unchanged and the window at its pre-drag position; a *completed* drag (released before the commit) persists as today.
 - Observable proof: Task 5's in-engine check M6.
 
@@ -110,7 +111,7 @@ if (applier != null && applier.Mode == UiScaleMode.Auto)
 ```
 `applier.Mode` = the mode stored at settings load (Task 1, in `LoadSettings`) and updated by the Options window (Task 4) — the `Mode` property is added in Task 1 (set in BOTH places; default `Auto` covers the pre-login window). It is UI-state, not scale-math.
 
-**Why safe:** `OnWindowResized` fires on the root window's `size_changed` — user drag-resize emits many; the `f != applier.Factor` compare makes each a no-op except at the 720/1080/1440 boundaries (design Section 4, no debounce). The `Apply` early-return-on-unchanged-factor (Part 1 Task 3) is the second guard.
+**Why safe:** `OnWindowResized` fires on the root window's `size_changed` — user drag-resize emits many; the `f != applier.Factor` compare makes each a no-op except at the 720/1080/1440 boundaries (design Section 4, no debounce). The `Apply` early-return-on-unchanged-factor (Part 1 Task 3) is the second guard. The existing reposition walk in this path keeps the 4-arg `Resolve` form (Part 1 Task 2): its saved positions were saved at the CURRENT factor, so `savedSize == windowSize` is the identity case — only a scale COMMIT uses the saved-size overload.
 
 **Gate:** xUnit green; in-engine M4 (resize across 1080 → HUD rescales once, no flicker storm; back across → rescales back).
 **Commit:** `feat: auto UI scale follows window height`.
@@ -124,15 +125,15 @@ if (applier != null && applier.Mode == UiScaleMode.Auto)
 - Modify: `Scripts/UI/OptionsWindow.cs`
 
 **Behavior spec (pinned — the drag-release contract from the design):**
-- Mode is exclusive: checking one unchecks the other. `ScaleAutoCheck` → mode Auto; `ScaleManualCheck` → mode Manual (slider row becomes visible; in Auto the slider + value label are `Visible = false`). **Reentrancy:** the programmatic uncheck of the other box re-fires its `Toggled` handler and would flip the mode straight back — guard with a `bool _modeSwitching` set for the duration of the paired check/uncheck (same suppression idea as the `_initializing` guard below, but for mode switches at runtime).
-- On open — the Options window is built ONCE at HUD time (Part 1) and toggled visible, so the open-state refresh belongs in the `_Ready` body guarded by the existing `_initializing`-style first-run flag (or a one-shot `bool _optionsInitialized`), NOT re-read on every show: read `Options.UiScaleMode` (default Auto) + `Options.UiScaleValue` (default 1); set check states, slider value, effective-factor display (`"Auto (2×)"` style text on `ScaleValueLabel` — the user always sees the in-force factor). The new `_Process` override (drag-release poll) MUST call `base._Process(delta)` first — `BaseWindow._Process` drives the hover fade (`BaseWindow.cs`).
-- **Initial-open guard (adversarial):** programmatic `ScaleSlider.Value = x` in `_Ready` fires `ValueChanged`, and with `_dragging == false` that would `Commit` on EVERY window open — in first-open Manual mode the mode-switch rule would double-commit on top. Set `_initializing = true` before the programmatic sets and clear it on the next `ProcessFrame` (one `await`); `ValueChanged` and the mode handlers early-return while it is set.
+- Mode is exclusive: checking one unchecks the other. `ScaleAutoCheck` → mode Auto; `ScaleManualCheck` → mode Manual (slider row becomes visible; in Auto ONLY THE SLIDER is hidden — `ScaleValueLabel` stays visible showing the effective factor, e.g. `"Auto (2×)"`, so Auto users still see what is in force; review finding: hiding the value label contradicted the "user always sees the in-force factor" rule two bullets down). **Reentrancy:** the programmatic uncheck of the other box re-fires its `Toggled` handler and would flip the mode straight back — guard with a `bool _modeSwitching` set for the duration of the paired check/uncheck (same suppression idea as the `_initializing` guard below, but for mode switches at runtime).
+- On open — the Options window is built ONCE at HUD time (Part 1) and toggled visible, so the open-state refresh belongs in the `_Ready` body guarded by the existing `_initializing`-style first-run flag (or a one-shot `bool _optionsInitialized`), NOT re-read on every show: read `Options.UiScaleMode` (default Auto) + `Options.UiScaleValue` (default 1); set check states, slider value, effective-factor display (`"Auto (2×)"` style text on `ScaleValueLabel` — the user always sees the in-force factor). (No `_Process` override is needed for the commit mechanism — `DragStarted`/`DragEnded` events replace the poll; only if the M2 fallback is adopted does a `_Process` override come in, and it MUST then call `base._Process(delta)` first — `BaseWindow._Process` drives the hover fade.)
+- **Initial-open guard (adversarial):** programmatic `ScaleSlider.Value = x` in `_Ready` fires `ValueChanged`, and with `_dragging == false` that would `Commit` on EVERY window open — in first-open Manual mode the mode-switch rule would double-commit on top. Set `_initializing = true` at the top of the refresh and clear it **synchronously at the end of the same `_Ready` block** — NOT on a next-frame `await` (review finding: a next-frame clear races the deferred `ScaleRegister` and the ready-flush ordering; there is no user input interleaved INSIDE `_Ready`, so a synchronous set/clear is race-free by construction); `ValueChanged` and the mode handlers early-return while it is set.
 - **Commit rule** (events verified — see APIs verified):
   - `ScaleSlider.DragStarted` → `_dragging = true` (suppresses per-tick commits while the thumb is held).
   - `ScaleSlider.DragEnded` → `_dragging = false; Commit((float)ScaleSlider.Value);`
   - `ValueChanged(v)`: update `ScaleValueLabel` ALWAYS (live feedback). If `!_dragging` (keyboard arrow / programmatic set) → `Commit(v)`.
   - **Fallback (decide at M2):** if manual check M2 shows a release with the cursor OFF the slider fails to fire `DragEnded` (the engine emits it on control mouse-release; verify, don't assume), add the `BaseWindow`-style `_Process` poll of `Input.IsMouseButtonPressed(MouseButton.Left)` as the release detector (left-press via `GuiInput` sets `_dragging`, matching `Scripts/UI/BaseWindow.cs:120-140`).
-- `Commit(v)`: `snapped = UiScaleApplier.Instance.Scale.Factor(v)`; if `snapped != UiScaleApplier.Instance.Factor` → `Options[UiScaleValue] = snapped`, `Save()`, `UiScaleApplier.Instance.Apply(snapped, ApplyReason.UserCommit)`; always set `applier.Mode` + persist `Options[UiScaleMode]` on mode changes and `Save()` on window close/toggle (existing pattern, `OptionsWindow.cs:56-60`).
+- `Commit(v)`: `snapped = UiScale.NormalizeFactor(v)` (pure); **persist `Options[UiScaleValue] = snapped` + `Save()` on every commit** (review finding: persist the normalized slider value even when it equals the current live factor — a commit that changes nothing to the factor can still change what the slider should show next open); then `if (snapped != UiScaleApplier.Instance.Factor) UiScaleApplier.Instance.Apply(snapped, ApplyReason.UserCommit);` always set `applier.Mode` + persist `Options[UiScaleMode]` on mode changes and `Save()` on window close/toggle (existing pattern, `OptionsWindow.cs:56-60`).
 - Mode switch to Manual commits the current slider value immediately (`ApplyReason.UserCommit`); switch to Auto commits `AutoFactor(currentCanvasY)`.
 - The Options window itself live-resizes on its own commit (accepted per design Section 5); the release-only commit means it never resizes under the dragging cursor.
 
@@ -163,15 +164,15 @@ The `VBox` `separation = 10` constant and the `MarginContainer` ±150/±100 offs
 
 | # | Check | Pass condition |
 |---|-------|----------------|
-| M1 | 1080p first launch (default Auto) | Login + HUD render at 2× (fonts ~20px, windows 2× tscn sizes); no 1× flash at map entry |
+| M1 | 1080p first launch (default Auto) | Login + HUD render at 2× (fonts ~20px, windows 2× tscn sizes); vitals portrait fills the scaled circle after a character load (the headless-untestable Task 6 leg); no 1× flash at map entry |
 | M2 | Options → UI Scale → drag slider 2× → 1.5×, release | HUD (incl. options window) rescales ONCE, on release; label follows thumb live during drag; arrow-key nudge applies immediately |
 | M3 | Restart (incl. with settings pinning Manual 2× — the only automated-gap leg, headless can't log in) | Mode/value persist; factor applied before HUD build (no flash) |
 | M4 | Auto mode: drag-resize window across 1080px height boundary | Exactly one rescale crossing each way; no per-pixel churn (watch for layout thrash while dragging) |
-| M5 | 720p Manual 3× | HUD scales to 3×; oversized windows clamp on-screen (accepted-limitation behavior, design §7); 1.5× icons acceptably soft (the Q3 verdict) |
+| M5 | 720p Manual 3× | HUD scales to 3×; oversized windows keep their title bar reachable — bottom may be clipped when the scaled window + saved margin doesn't fit (the Task 2 clamp model, design §7); 1.5× icons acceptably soft (the Q3 verdict) |
 | M6 | Start moving a window (title-bar drag), then commit a scale change before releasing | Window snaps back to pre-drag position; saved settings unchanged (verify by restarting and comparing position) |
-| M7 | Non-16:9 window (e.g. 1600×900) | World gutters per Stage 1; HUD placement correct at the auto factor (900 → 1, threshold); tooltips clamp to viewport at 3× |
+| M7 | Non-16:9 window (e.g. 1600×900) | World gutters per Stage 1; HUD placement correct at the auto factor (900 → 1, threshold); at 3× an item tooltip's box/padding/icon scale with its font (the Part 1 Task 6 tooltip leg) and clamp to the viewport |
 | M8 | Login screen at 1080p Auto | Login box 2× (600×400), text 20px (project theme base 10 × 2); loading overlay scales during a map transition |
-| M9 | Chat: scroll mid-log, commit scale change | Chat content + scroll offset preserved; reposition keeps edge-stuck offset (M-edge check) |
+| M9 | Chat: scroll mid-log, commit scale change | Chat content + scroll offset preserved; reposition keeps its edge margin (R5 model — Task 2's clamp if the scaled window + margin overruns) |
 | M10 | `bash tools/tests/run_ui_scale.sh` (+ login leg) | Exit 0, no `ERR_` output — headless regression gate stays green |
 
 **Done criteria for the part (and feature):** M1–M10 all pass; `dotnet test tests/Goose2Client.Tests` green; the design doc's §7 accepted limitations hold (no new unbounded cases found); PR description carries the matrix results.
@@ -186,7 +187,7 @@ The `VBox` `separation = 10` constant and the `MarginContainer` ±150/±100 offs
 | No persisted-state corruption from cancelled drags | Task 2 propagation sequence + M6 (in-engine; headless can't synthesize the mouse interleave — stated limitation) |
 | Auto recompute is boundary-only (no resize churn) | Task 3 compare + M4 |
 | Drag-release commit (no resize under cursor) | Task 4 pinned commit rule + M2 |
-| Slider can't produce off-step values | `HSlider.Step = 0.5` + `Commit` snaps through `UiScale.Factor` again (belt and braces) + M2 |
+| Slider can't produce off-step values | `HSlider.Step = 0.5` + `Commit` snaps through `UiScale.NormalizeFactor` again (belt and braces) + M2 |
 | Login/loading scale WITHOUT a 1× visual change | Task 5 round-trip self-test leg (adversarial: any wrong font base — e.g. the old 16 assumption — fails the 10→20→10 round-trip) |
 | Whole feature regression gate | M10 (Part 1 self-test + new login leg) |
 
