@@ -174,7 +174,11 @@ public interface IScalableWindow { void Relayout(); }
    (not on the first apply); set `CurrentFactor = f` — the applier is the only writer.
 2. Cancel any in-progress **window move-drag** (the only mouse-follow drag with state —
    `BaseWindow._dragging`; cancel = restore pre-drag position, persist nothing, flag
-   cleared on the next press). Godot's built-in item/spell DnD has no cancel API and
+   cleared on the next press). The restore is an INTERMEDIATE step: step 7 then
+   re-derives every window from its UNCHANGED quad at the new factor, so the final
+   position is `ResolveScaled(quad, newFactor)` — equal to the pre-drag pixel only when
+   the factor didn't change; the in-flight drag position is never persisted. Godot's
+   built-in item/spell DnD has no cancel API and
    cannot realistically co-occur with a scale commit (both need the left button) —
    accepted limitation, see §7.
 3. Hide live tooltips (R2).
@@ -228,9 +232,16 @@ flash.
 
 ## 5. Options window UI
 
-- New **UI Scale** group in the Options window: mode `Auto` (default) / `Manual`.
+- New **UI Scale** group in the Options window: mode `Auto` (default) / `Manual`. The
+  mode pair is two `CheckBox`es in ONE `ButtonGroup` with `AllowUnpress = false`
+  (reflection-verified group-level property in the 4.7.1 binding) — widget-enforced
+  exactly-one-selected, so "user unchecks the currently selected mode" is impossible;
+  the handler acts only on the newly-pressed box (`IsPressed == true`), and the initial
+  `ButtonPressed` sync in `_Ready` happens BEFORE the `Toggled` handlers connect.
 - Slider visible only in Manual mode: 1.0–3.0, 0.5 steps, value shown as `1.5×`.
-  In Auto mode the group shows the effective factor (`Auto (2×)`).
+  In Auto mode the group shows the effective factor (`Auto (2×)`). The `DragEnded`
+  handler's signature is `void (bool valueChanged)` (the binding's delegate — verified);
+  the commit is unconditional.
 - Pending-while-dragging per Section 4.
 - **Persistence:** `UiScaleMode` (enum) + `UiScaleValue` (float) added to the
   existing options settings save path that `OptionsWindow` already uses (plan phase
@@ -291,7 +302,14 @@ flash.
   hold the left button). Window move-drag IS cancelled (it is the only stateful
   mouse-follow drag).
 - **Dev build stamp stays 1×:** `BuildStampOverlay` (root-viewport label) is not
-  registered — it is a dev-only stamp, intentionally unscaled.
+  registered — it is a dev-only stamp, intentionally unscaled. Mechanism: a FIXED local
+  `AddThemeFontSizeOverride("font_size", 10)` on its label — the applier mutates the
+  shared project theme's DEFAULT font size, so any control without a local override
+  scales with it. Self-test asserts 10 at 2× (Part 1 Task 9/10).
+- **PartyMember tiles are the one exception to the container-managed skip:** their
+  87×33 exists only as tscn offsets (no `CustomMinimumSize`), so a scalable
+  min-size + scaled internal offsets via pure `PartyMemberMetrics` (Part 1 Task 9);
+  self-test asserts (174, 66) at 2×.
 
 ## 8. Rejected alternatives
 
