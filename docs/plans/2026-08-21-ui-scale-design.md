@@ -38,6 +38,32 @@ theme font sizes and window size constants, applied live.
 `max(1, round(base × factor))`. No scaled value is computed outside the `UiScale`
 math class.
 
+## 1a. Requirements (stable IDs) — canonical traceability table
+
+The implementation plans (`part1a-math-persistence`, `part1b-core-scaler`,
+`part1c-dynamic-surfaces`, `part2-product`) tag tasks and matrix rows with these IDs;
+this table is the single requirement→component→phase→test mapping (review: the prior
+prose repetition made traceability informal).
+
+| ID | Requirement | Component (plan task) | Pinned by |
+|----|-------------|------------------------|-----------|
+| SC-01 | Scope: everything on the root viewport (HUD windows, tooltips, login, loading); world subviewport + bridge excluded | all parts; login/loading in Part 2 Task 5 | Part 2 Task 5 self-test leg + M1/M8 |
+| SC-02 | Factor model: Auto default; Manual 1.0–3.0 in 0.5 steps; auto = integer thresholds 720/1080/1440 | `UiScale` (Part 1A Task 1); `Resolve`/`NormalizeMode` (Part 2 Task 1) | `UiScaleTests`, Part 2 Task 1 xUnit |
+| SC-03 | Live commit: rescale in place on commit; slider commits on `DragEnded` / non-drag change only | applier (Part 1B Task 1); slider (Part 2 Task 4) | M2 + commit-rule pin |
+| SC-04 | Fonts: theme default + explicit `ApplyFontSize` registry; login/loading via the PROJECT-WIDE theme (no per-scene work) | Part 1B Task 1; Part 1C Task 3; Part 2 Task 5 | 1×/2× audits (Part 1C Task 5), grep invariant, M8 |
+| SC-05 | Window geometry: 1× tscn/base snapshot, `Relayout` scales; container-managed offsets skipped | `UiScaleLayout` (Part 1B Task 2); registration (1B Tasks 3–4) | 1× bit-identity + 2× sampled rects (Part 1C Task 5) |
+| SC-06 | Placement: saved QUAD + pure `ResolveScaled`; edge margins in logical px; middle-band kept; legacy files place identically (`LegacySize`) | Part 1A Task 2; `RepositionFromSaved` (Part 1B Task 3) | `ResolveScaled_*` pins + `CharacterSettingsJsonTests` |
+| SC-07 | Persistence: full quad ONLY at drag-end; visibility toggles write `Visible` only; Part 1A adds `Size`/`Factor`, Part 2 adds the two option keys | Part 1A Task 2; Part 1B Task 3; Part 2 Task 1 | `SetWindowVisible_PreservesFullQuad` etc. + M2 leg |
+| SC-08 | Drag-cancel on commit: in-flight move-drag cancelled; final position = `ResolveScaled(quad, newFactor)`; in-flight position never persisted | Part 1B Task 1 (pass step); Part 2 Task 2 | M6 + `CancelDrag` postcondition pin |
+| SC-09 | Tooltips + vitals portrait: factor-aware per-frame via pure metrics; NOT snapshot-registered | Part 1C Tasks 1–2 | metrics xUnit + Part 1C Task 5 leg + M7 |
+| SC-10 | Party roster tiles: the ONE container-skip exception — min-size + internal map via `PartyMemberMetrics` | Part 1C Task 3 | `PartyMemberMetrics` xUnit + Part 1C Task 5 leg (8 tiles) |
+| SC-11 | Runtime-created Quest/Info windows: native-scale at spawn + re-layout on commit, via `MultiWindowMetrics` (line pitch 11.18f) | Part 1C Task 4 | `MultiWindowMetrics` xUnit + Part 1C Task 5 step 2c |
+| SC-12 | Dev build stamp: fixed 10px local override, deliberately unscaled | Part 1C Task 3 | Part 1C Task 5 stamp leg (10 at 2×) |
+| SC-13 | Auto mode re-computes on window resize (720/1080/1440 boundaries only, no debounce) | Part 2 Task 3 | M4 |
+| SC-14 | Mode UI: `ButtonGroup` `AllowUnpress = false` (exactly-one-selected); Auto→Manual persists mode+value; dormant manual value survives Auto | Part 2 Task 4 | M11 (widget) + commit-split xUnit (value) |
+| SC-15 | Regression gates: xUnit suite + headless self-test exit 0 (M10) + manual matrix M1–M11 | Part 1C Task 5; Part 2 Task 6 | the gates themselves |
+| SC-16 | Login scaling automated; **loading scaling MANUAL-ONLY** (headless can never trigger a map transition — stated gap, M8 is the sole gate) | Part 2 Task 5 | self-test login leg; M8 |
+
 ## 2. `UiScale` pure math
 
 New file `Scripts/UiScale.cs`. Pure, no Godot types, fully xUnit-covered (same shape
@@ -108,7 +134,7 @@ public interface IScalableWindow { void Relayout(); }
   the portrait pass.
 - Login scene and loading overlay register in `_Ready`, deregister in `_ExitTree`.
 
-**Implementation refinements (ratified in the part-1 plan — `2026-08-21-ui-scale-part1-foundation.md`):**
+**Implementation refinements (ratified in the part-1 plans — `2026-08-21-ui-scale-part1a-math-persistence.md`, `part1b-core-scaler.md`, `part1c-dynamic-surfaces.md`):**
 - R1: instead of per-window hand-written constants in `Relayout()`, a generic
   `UiScaleLayout` snapshot at end-of-`_Ready` IS the 1× base (build code writes 1×
   constants — `.tscn` offsets load at 1× regardless of factor; **no** divide-by-factor
@@ -238,6 +264,9 @@ flash.
   exactly-one-selected, so "user unchecks the currently selected mode" is impossible;
   the handler acts only on the newly-pressed box (`IsPressed == true`), and the initial
   `ButtonPressed` sync in `_Ready` happens BEFORE the `Toggled` handlers connect.
+  The dormant manual value survives Auto: only manual commits write `UiScaleValue`,
+  so Auto→Manual restores the slider where it was (SC-14, matrix M11 — manual-only
+  for the widget behavior; the value-preservation invariant is xUnit-pinned).
 - Slider visible only in Manual mode: 1.0–3.0, 0.5 steps, value shown as `1.5×`.
   In Auto mode the group shows the effective factor (`Auto (2×)`). The `DragEnded`
   handler's signature is `void (bool valueChanged)` (the binding's delegate — verified);
@@ -305,11 +334,18 @@ flash.
   registered — it is a dev-only stamp, intentionally unscaled. Mechanism: a FIXED local
   `AddThemeFontSizeOverride("font_size", 10)` on its label — the applier mutates the
   shared project theme's DEFAULT font size, so any control without a local override
-  scales with it. Self-test asserts 10 at 2× (Part 1 Task 9/10).
+  scales with it. Self-test asserts 10 at 2× (Part 1C Task 3/5).
 - **PartyMember tiles are the one exception to the container-managed skip:** their
   87×33 exists only as tscn offsets (no `CustomMinimumSize`), so a scalable
-  min-size + scaled internal offsets via pure `PartyMemberMetrics` (Part 1 Task 9);
-  self-test asserts (174, 66) at 2×.
+  min-size + scaled internal offsets via pure `PartyMemberMetrics` (Part 1C Task 3);
+  self-test asserts (174, 66) at 2×. (SC-10)
+- **Runtime-created Quest/Info windows (SC-11):** `QuestWindow`/`InfoWindow`
+  (`BaseMultipleWindow`, spawned by their managers, not present at HUD build) lay out
+  their line labels at the 1× pitch `11.18f` — font migration alone would overlap them
+  at 2×. Pure `MultiWindowMetrics` (pitch/font, 1× row = the literals) drives both
+  creation (native-scale at the live factor) and `Relayout` on every commit; the line
+  labels carry the snapshot skip-meta. Self-test asserts a driven `InfoWindow`'s pitch
+  at 2×/1× (Part 1C Task 4/5).
 
 ## 8. Rejected alternatives
 

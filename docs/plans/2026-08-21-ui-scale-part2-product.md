@@ -6,7 +6,9 @@
 
 **Tech Stack:** C# / Godot 4.7.1 (GodotSharp), xUnit, headless self-test (Part 1's `tools/tests/run_ui_scale.sh`), in-engine manual matrix.
 
-**Execution:** same worktree/branch as Part 1 (sequential — Part 2 builds directly on Part 1's machinery; do not start it before Part 1 Task 10 is green). Tasks run sequentially as written — each compiles standalone and lands as its own commit. Recommended: @subagent-driven-development (fresh subagent per task, spec-compliance then code-quality review after each). Task 6's matrix M1–M9 need a display and a game server — run manually or in a headed session; M10 is Part 1 Task 10's headless gate.
+**Part order:** 1A → 1B → 1C → Part 2 (sequential, same worktree/branch; each part is a self-contained execution context). **Prereq: Part 1C is merged** (do not start before Part 1C Task 5 is green). **Requirements (stable IDs SC-01…SC-16):** see the `Requirements` table in `2026-08-21-ui-scale-design.md` — the canonical requirement→component→phase→test mapping; task headers below tag the IDs they implement.
+
+**Execution:** same worktree/branch as Parts 1A–1C (sequential — Part 2 builds directly on their machinery). Tasks run sequentially as written — each compiles standalone and lands as its own commit. Recommended: @subagent-driven-development (fresh subagent per task, spec-compliance then code-quality review after each). Task 6's matrix M1–M9 and M11 need a display and a game server — run manually or in a headed session; M10 is Part 1C Task 5's headless gate.
 
 ---
 
@@ -24,7 +26,7 @@
 
 ---
 
-### Task 1: pure factor resolution + settings keys + startup read
+### Task 1: pure factor resolution + settings keys + startup read — SC-02, SC-07
 
 **Files:**
 - Modify: `Scripts/UiScale.cs`
@@ -63,7 +65,7 @@ applier.Mode = mode;
 applier.Apply(UiScale.Resolve(mode, saved, canvas.Y), ApplyReason.Startup);
 ```
 `applier.Mode` is set to the NORMALIZED mode and must be set HERE too (not just in the Options window) — Task 3's auto-recompute branches on it.
-Both `Resolve` and `NormalizeMode` are STATIC — call through the `UiScale` type, never `applier.Scale.…` (CS0176). The headless self-test (Part 1 Task 10) does NOT go through login; it runs its own deterministic startup sequence: `LoadSettings("ui-scale-selftest")` (a real `CharacterSettings` — settings load works headless; an NRE on `CharacterSettings` in a window `_Ready` means this step is missing) → force `Apply(1f, Startup)` for the 1× baseline → `EnsureHud()`. The headless root is NOT the project's 1280×720 (headless probes report ~64–100px; Part 1 Task 10 step 0), so the pre-login `AutoFactor(small) == 1` anyway — the forced 1× is a deterministic pin, not a workaround. The "launch with settings pinning Manual 2×" leg has NO automated form (headless cannot log in) — covered by manual check M3; state that there.
+Both `Resolve` and `NormalizeMode` are STATIC — call through the `UiScale` type, never `applier.Scale.…` (CS0176). The headless self-test (Part 1C Task 5) does NOT go through login; it runs its own deterministic startup sequence: `LoadSettings("ui-scale-selftest")` (a real `CharacterSettings` — settings load works headless; an NRE on `CharacterSettings` in a window `_Ready` means this step is missing) → force `Apply(1f, Startup)` for the 1× baseline → `EnsureHud()`. The headless root is NOT the project's 1280×720 (headless probes report ~64–100px; Part 1C Task 5 step 0), so the pre-login `AutoFactor(small) == 1` anyway — the forced 1× is a deterministic pin, not a workaround. The "launch with settings pinning Manual 2×" leg has NO automated form (headless cannot log in) — covered by manual check M3; state that there.
 
 **Step 5 (green) + commit:** `feat: settings-driven UI scale factor at settings load`.
 
@@ -71,12 +73,12 @@ Both `Resolve` and `NormalizeMode` are STATIC — call through the `UiScale` typ
 |-----------|-----------|
 | Auto ignores stale slider values (and vice versa) | `Resolve_AutoIgnoresSavedValue` / `Resolve_ManualIgnoresWindowHeight` |
 | Corrupt persisted value can't escape [1,3] | `Resolve_ManualNaN`, `Resolve_Manual...3.4f` |
-| Headless/default path unchanged (Part 1 tests stay green) | Part 1 Task 10 command re-run |
+| Headless/default path unchanged (Part 1 tests stay green) | Part 1C Task 5 command re-run |
 | No NRE pre-login; login screen still scales (Auto) before settings exist | `LoadSettings` hook placement (settings-null-proof `_Ready` unchanged) + M8 (login at 1080p Auto) |
 
 ---
 
-### Task 2: commit-time drag cancellation (`BaseWindow.CancelDrag`)
+### Task 2: commit-time drag cancellation (`BaseWindow.CancelDrag`) — SC-08
 
 **Files:**
 - Modify: `Scripts/UI/BaseWindow.cs:110-140`
@@ -97,7 +99,7 @@ Both `Resolve` and `NormalizeMode` are STATIC — call through the `UiScale` typ
 
 ---
 
-### Task 3: auto-scale on window resize
+### Task 3: auto-scale on window resize — SC-13
 
 **Files:**
 - Modify: `Scripts/GameManager.cs:337` (`OnWindowResized`)
@@ -115,20 +117,20 @@ if (applier != null && applier.Mode == UiScaleMode.Auto)
     }
 }
 ```
-The `return` matters: `Apply`'s placement step already re-laid-out and repositioned every window — running the existing `CollectBaseWindows` walk afterwards would double-reposition (harmless but wasteful, and it obscures the single-owner model). In the else branch the existing walk (now `RepositionFromSaved` per Part 1 Task 5) runs unchanged.
+The `return` matters: `Apply`'s placement step already re-laid-out and repositioned every window — running the existing `CollectBaseWindows` walk afterwards would double-reposition (harmless but wasteful, and it obscures the single-owner model). In the else branch the existing walk (now `RepositionFromSaved` per Part 1B Task 3) runs unchanged.
 `applier.Mode` = the mode stored at settings load (Task 1, in `LoadSettings`) and updated by the Options window (Task 4) — the `Mode` property is added in Task 1 (set in BOTH places; default `Auto` covers the pre-login window). It is UI-state, not scale-math.
 
-**Why safe:** `OnWindowResized` fires on the root window's `size_changed` — user drag-resize emits many; the `f != applier.Factor` compare makes each a no-op except at the 720/1080/1440 boundaries (design Section 4, no debounce). The `Apply` early-return-on-unchanged-factor (Part 1 Task 3) is the second guard. **The canvas+factor composition is already correct in Part 1's model** (review finding — the old claim that "stored positions are necessarily at the current factor" was false after a commit): every placement (this walk, an auto-crossing `Apply`, a user commit) derives from the per-window saved QUAD (pos/size/factor/canvas, Part 1 Task 2) + the live (Size, factor, canvas), so a threshold crossing that changes BOTH canvas and factor re-anchors in one `ResolveScaled` call — no old-canvas tracking, no live-rect capture. The walk (manual resize, no factor change) is the same call with size/factor unchanged.
+**Why safe:** `OnWindowResized` fires on the root window's `size_changed` — user drag-resize emits many; the `f != applier.Factor` compare makes each a no-op except at the 720/1080/1440 boundaries (design Section 4, no debounce). The `Apply` early-return-on-unchanged-factor (Part 1B Task 1) is the second guard. **The canvas+factor composition is already correct in Part 1's model** (review finding — the old claim that "stored positions are necessarily at the current factor" was false after a commit): every placement (this walk, an auto-crossing `Apply`, a user commit) derives from the per-window saved QUAD (pos/size/factor/canvas, Part 1A Task 2) + the live (Size, factor, canvas), so a threshold crossing that changes BOTH canvas and factor re-anchors in one `ResolveScaled` call — no old-canvas tracking, no live-rect capture. The walk (manual resize, no factor change) is the same call with size/factor unchanged.
 
 **Gate:** xUnit green; in-engine M4 (resize across 1080 → HUD rescales once, no flicker storm; back across → rescales back).
 **Commit:** `feat: auto UI scale follows window height`.
 
 ---
 
-### Task 4: Options window UI Scale group
+### Task 4: Options window UI Scale group — SC-03, SC-14
 
 **Files:**
-- Modify: `Scenes/UI/OptionsWindow.tscn` — **(a) resize the root**: `offset_bottom = 112.0` → `240.0` (root offsets `0, 0, 240, 112` at `OptionsWindow.tscn:22-25`; `Background` and `Content` are full-rect anchored and follow; existing checkbox rows occupy y 28–108, so the new group gets y ≈ 120–232; the window's saved/default position re-resolves at the new size through `RepositionFromSaved` (at registration and every commit — the quad model, Part 1 Task 2) — no extra work. **Legacy files (review finding):** saved positions predate this resize — the `Size == default` fallback for this window MUST use `DefaultWindowLayout.LegacySize` → 240×112 (Part 1 Task 2), NOT the new tscn size, or legacy y-margins are misread by 128px). **(b) add under `Content`**: a `Label` ("UI Scale"), two `CheckBox`es (`ScaleAutoCheck` pressed by default, `ScaleManualCheck`) — NO `ButtonGroup` resource in the tscn; `_Ready` creates the single group (mode bullets below) — an `HSlider` (`ScaleSlider`: `min_value = 1.0`, `max_value = 3.0`, `step = 0.5`, `value = 1.0`), a `Label` (`ScaleValueLabel`, text `"1×"`). Layout with the existing checkbox rows' pixel style (the generic scaler handles sizing; tscn offsets are the base).
+- Modify: `Scenes/UI/OptionsWindow.tscn` — **(a) resize the root**: `offset_bottom = 112.0` → `240.0` (root offsets `0, 0, 240, 112` at `OptionsWindow.tscn:22-25`; `Background` and `Content` are full-rect anchored and follow; existing checkbox rows occupy y 28–108, so the new group gets y ≈ 120–232; the window's saved/default position re-resolves at the new size through `RepositionFromSaved` (at registration and every commit — the quad model, Part 1A Task 2) — no extra work. **Legacy files (review finding):** saved positions predate this resize — the `Size == default` fallback for this window MUST use `DefaultWindowLayout.LegacySize` → 240×112 (Part 1A Task 2), NOT the new tscn size, or legacy y-margins are misread by 128px). **(b) add under `Content`**: a `Label` ("UI Scale"), two `CheckBox`es (`ScaleAutoCheck` pressed by default, `ScaleManualCheck`) — NO `ButtonGroup` resource in the tscn; `_Ready` creates the single group (mode bullets below) — an `HSlider` (`ScaleSlider`: `min_value = 1.0`, `max_value = 3.0`, `step = 0.5`, `value = 1.0`), a `Label` (`ScaleValueLabel`, text `"1×"`). Layout with the existing checkbox rows' pixel style (the generic scaler handles sizing; tscn offsets are the base).
 - Modify: `Scripts/UI/OptionsWindow.cs`
 
 **Behavior spec (pinned — the drag-release contract from the design):**
@@ -152,14 +154,14 @@ The `return` matters: `Apply`'s placement step already re-laid-out and repositio
 
 ---
 
-### Task 5: login + loading registration
+### Task 5: login + loading registration — SC-01, SC-16
 
 **Files:**
 - Modify: `Scripts/LoginScene/LoginScene.cs` (`_Ready` end: Part 1 self-registration pattern — snapshot + `RegisterWindow`; `Relayout()` = `UiScaleLayout.Apply(_geom, factor)`; no reposition — the scene is full-rect anchored)
 - Modify: `Scripts/LoadingMapScene/LoadingMapScene.cs` (same)
 - **No explicit font entries (review finding F2):** `project.godot:37` sets `theme/custom` project-wide, so Login/Loading text already resolves `font_size == 10` through the same `GameTheme` instance the applier mutates — `SetDefaultFontSize` reaches these controls with zero per-scene work. Do NOT add `ApplyFontSize(c, 16f)` overrides: the effective base is 10 (probed), not 16, and a 16-based override would change 1× login text from 10px to 16px — a visible regression this task's own gate exists to prevent.
 
-The `VBox` `separation = 10` constant and the `MarginContainer` ±150/±100 offsets scale via the snapshot (Part 1 Task 4).
+The `VBox` `separation = 10` constant and the `MarginContainer` ±150/±100 offsets scale via the snapshot (Part 1B Task 2).
 
 **1× no-op proof (adversarial):** extend Part 1's self-test (same `+selftest=ui_scale` run — no separate mode). At startup the login scene IS the current scene (freed only on successful login), so the sequence gains a login phase around the existing HUD phases: (0) at startup factor 1, assert login baselines: `MarginContainer` size `300×200` (tscn ±150/±100), `NameInput.GetThemeFontSize("font_size") == 10` (pins the PROJECT-THEME base — if this ever reads 16, the project theme stopped applying and this task's premise is broken), VBox separation `== 10`; (1) `Apply(2f)`: login `MarginContainer == 600×400`, `NameInput` font `== 20`, separation `== 20`, plus all Part 1 HUD assertions; (2) `Apply(1f)`: login values round-trip to `300×200` / 10 / 10 (an explicit-override approach with a wrong base would not round-trip — the adversarial leg).
 
@@ -168,22 +170,23 @@ The `VBox` `separation = 10` constant and the `MarginContainer` ±150/±100 offs
 
 ---
 
-### Task 6: manual verification matrix (in-engine, headed)
+### Task 6: manual verification matrix (in-engine, headed) — SC-15, SC-16
 
 **Files:** none (checklist task). Run the dev server on at least 720p and 1080p; record results in the PR description. `run.sh` lives in the main workspace (gitignored — absent from this worktree); from the worktree either copy it over or inline its two commands (`godot-mono --headless --path . --build-solutions --quit`, then `godot-mono --path . --gpu-index 1 --display-driver wayland`).
 
 | # | Check | Pass condition |
 |---|-------|----------------|
-| M1 | 1080p first launch (default Auto) | Login + HUD render at 2× (fonts ~20px, windows 2× tscn sizes); vitals portrait fills the scaled circle after a character load (the headless-untestable Part 1 Task 8 leg); no 1× flash at map entry |
-| M2 | Options → UI Scale → drag slider 2× → 1.5×, release | HUD (incl. options window) rescales ONCE, on release; label follows thumb live during drag; arrow-key nudge applies immediately. Also: drag a HUD window at 2×, then close and reopen it (and again at 1×) — position/size persist exactly (the visibility-only toggle persistence, Part 1 Task 5: a close must not write a mixed-coordinate quad) |
+| M1 | 1080p first launch (default Auto) | EVERY scoped window renders at 2× — check each: Vitals (portrait fills the scaled circle after a character load — the headless-untestable Part 1C Task 2 leg), Inventory, Character, Spellbook, Hotbar, Toolbar, Chat, Options, Vendor, Bank, CombineBag, Debug (tscn-offset windows scale their children), Party (all 8 roster tiles scaled — SC-10), BuffEffects, a runtime-spawned Info or Quest window with content (native-scaled lines — SC-11), one item tooltip (hover a hotbar item), login text at 20px (SC-16). No 1× flash at map entry. ("HUD renders at 2×" alone is not reproducible — every row above must be observed) |
+| M2 | Options → UI Scale → drag slider 2× → 1.5×, release | HUD (incl. options window) rescales ONCE, on release; label follows thumb live during drag; arrow-key nudge applies immediately. Also: drag a HUD window at 2×, then close and reopen it (and again at 1×) — position/size persist exactly (the visibility-only toggle persistence, Part 1B Task 3: a close must not write a mixed-coordinate quad) |
 | M3 | Restart (incl. with settings pinning Manual 2× — the only automated-gap leg, headless can't log in) | Mode/value persist; factor applied before HUD build (no flash) |
 | M4 | Auto mode: drag-resize window across 1080px height boundary | Exactly one rescale crossing each way; no per-pixel churn (watch for layout thrash while dragging) |
 | M5 | 720p Manual 3× | HUD scales to 3×; oversized windows keep their title bar reachable — bottom may be clipped when the scaled window + saved margin doesn't fit (the Task 2 clamp model, design §7); 1.5× icons acceptably soft (the Q3 verdict) |
 | M6 | Start moving a window (title-bar drag), then commit a scale change before releasing | Window ends at the quad-derived position at the NEW factor (== pre-drag pixel only when the factor is unchanged); the in-flight drag position is never saved (verify by restarting: position matches the quad derivation, not the drag midpoint) |
-| M7 | Non-16:9 window (e.g. 1600×900) | World gutters per Stage 1; HUD placement correct at the auto factor (900 → 1, threshold); at 3× an item tooltip's box/padding/icon scale with its font (the Part 1 Task 7 leg) and clamp to the viewport |
-| M8 | Login screen at 1080p Auto | Login box 2× (600×400), text 20px (project theme base 10 × 2); loading overlay scales during a map transition |
+| M7 | Non-16:9 window (e.g. 1600×900) | World gutters per Stage 1; HUD placement correct at the auto factor (900 → 1, threshold); at 3× an item tooltip's box/padding/icon scale with its font (the Part 1C Task 1 leg) and clamp to the viewport |
+| M8 | Login screen at 1080p Auto | Login box 2× (600×400), text 20px (project theme base 10 × 2); loading overlay scales during a map transition — **loading is MANUAL-ONLY coverage** (SC-16 stated gap: headless can never trigger a map transition, so this M8 leg is the sole gate for the loading overlay) |
 | M9 | Chat: scroll mid-log, commit scale change | Chat content + scroll offset preserved; reposition keeps its edge margin (R5 model — Task 2's clamp if the scaled window + margin overruns) |
 | M10 | `bash tools/tests/run_ui_scale.sh` (+ login leg) | Exit 0, no `ERR_` output — headless regression gate stays green |
+| M11 | Mode switching (SC-14) | (1) Press Manual → Auto unpresses, Manual presses, slider row appears — exactly ONE selected at every step (widget-enforced by the `ButtonGroup` `AllowUnpress = false` — the user cannot unpress the active mode); (2) set 2.5×, release; (3) press Auto → Manual unpresses, slider hidden, label shows `Auto (n×)`; (4) press Manual again → slider restored AT 2.5× (the dormant manual value survived the Auto leg — Auto never writes `UiScaleValue`); (5) press Auto → file ends with mode Auto and `UiScaleValue` 2.5. **Automated coverage of this row: NONE — widget input cannot be synthesized headless; the value-preservation invariant itself is xUnit-pinned (Task 1's commit-split + Task 2's round-trip), M11 is the widget-behavior gate** |
 
 **Done criteria for the part (and feature):** M1–M10 all pass; `dotnet test tests/Goose2Client.Tests` green; the design doc's §7 accepted limitations hold (no new unbounded cases found); PR description carries the matrix results.
 
