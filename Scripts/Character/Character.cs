@@ -109,7 +109,7 @@ namespace Goose2Client.Character
                 MouseFilter = Control.MouseFilterEnum.Ignore,
             };
             _nameLabel.AddThemeColorOverride("font_outline_color", new Color(0, 0, 0, 0.9f));
-            bridge.Register(_nameLabel, this);   // Register: AnchorOwner → ApplyScale (font metrics, valid off-tree) → AddChild
+            bridge.Register(_nameLabel, this);
             RepositionOverlays();
             return true;
         }
@@ -176,7 +176,7 @@ namespace Goose2Client.Character
             PlayState();
             RepositionOverlays();
 
-            if (EnsureNameLabel()) { _nameLabel.Text = FullName; _nameLabel.Layout(this); }   // re-layout on rename: width changes
+            if (EnsureNameLabel()) { _nameLabel.Text = FullName; _nameLabel.Layout(this); }
             SetVitals(p.HPPercent, 1f);
         }
 
@@ -665,16 +665,14 @@ namespace Goose2Client.Character
             return null;
         }
 
-        /// <summary>Spawn a damage/heal/status line above this character on the native-resolution
-        /// text bridge. The container is registered once and re-added if it was freed (e.g. by the
-        /// bridge sweep); LocalOffsetWorld carries the old (0,−40) creation-time Position.</summary>
+        /// <summary>Spawn a battle line above this character; re-registers if the bridge sweep freed the container.</summary>
         public void AddBattleText(BattleTextType type, string text)
         {
             if (GameManager.Instance?.WorldTextBridge is not { } bridge) return;
             if (_battleText == null || !GodotObject.IsInstanceValid(_battleText) || _battleText.GetParent() == null)
             {
                 _battleText = new Overlays.BattleText { Name = "BattleText", ZIndex = 20 };
-                _battleText.LocalOffsetWorld = new Vector2(0, -40);   // above the character
+                _battleText.LocalOffsetWorld = new Vector2(0, -40);
                 bridge.Register(_battleText, this);
             }
             _battleText.AddText(type, text, Height, bridge.DisplayScale);
@@ -690,13 +688,8 @@ namespace Goose2Client.Character
             if (GameManager.Instance?.WorldTextBridge is not { } bridge) return;
 
             _chatBubble = new Overlays.ChatBubble { Name = "ChatBubble" };
-            // Register before SetText: AnchorOwner is set for the bubble's self-anchoring, and the
-            // bubble must be in the tree (under the bridge) before measurement — the wrap
-            // branch reads the label's own min size, which requires an in-tree label.
-            // ApplyScale no-ops (_message still null); SetText measures and sets LocalOffsetWorld
-            // (above the nameplate, centered — the bubble's z is NamesZIndex + 2, so it draws
-            // on top of the name; anchor: node origin is the background's bottom-left, bottom
-            // edge VerticalGap world-px above the name's top edge).
+            // Register before SetText: AnchorOwner must be set for the bubble's self-anchoring, and the
+            // bubble must be in the tree before measurement — the wrap branch reads an in-tree label's min size.
             bridge.Register(_chatBubble, this);
             _chatBubble.SetText(message, bridge.DisplayScale);
         }

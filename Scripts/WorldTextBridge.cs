@@ -2,53 +2,29 @@ using Godot;
 
 namespace Goose2Client
 {
-    /// <summary>CanvasLayer hosting world-anchored text at native resolution (names, chat bubbles,
-    /// battle text). Placed in the tree between WorldViewport and UiLayer (GameManager._Ready), so
-    /// on the default CanvasLayer Layer=1: above WorldTexture (root-canvas Control) and, by tree
-    /// order, below UiLayer (HUD). Owns element Position/Visible per frame and their lifetime.
-    /// Projection runs in the bridge's own _Process at ProcessPriority 100 — NOT from
-    /// SceneTree.process_frame (probed: emitted BEFORE node _process → would lag a frame).
-    /// At equal priority the tree order alone would suffice (the world nodes live under the
-    /// earlier-sibling WorldViewport, so they process first); priority 100 additionally covers
-    /// future world nodes that raise their own priority. It runs after every world node in the
-    /// same stage, before rendering (T2; contract pinned by tools/tests/text_bridge_order.gd).</summary>
+    /// <summary>CanvasLayer for world-anchored text (names, chat bubbles, battle text) at native resolution; projection
+    /// runs in the bridge's own _Process at priority 100 (not process_frame — probed: emitted before node _process), so after every world node.</summary>
     public partial class WorldTextBridge : CanvasLayer
     {
-        /// <summary>Must exceed every world node's process priority (all use the default 0 today —
-        /// Character, MapManager, WorldOverlay). Lower priority runs first; see text_bridge_order.gd.</summary>
+        /// Must exceed every world node's process priority (all default 0 today); lower priority runs first (text_bridge_order.gd).
         private const int ProjectionProcessPriority = 100;
 
-        /// <summary>Current display scale (T7: the only place elements learn S). 1 before first map.
-        /// Named DisplayScale (not Scale — would shadow the inherited Node.Scale with a CS0108
-        /// warning, the same trap the overlay elements' DisplayScale fields avoid).</summary>
+        /// Current display scale — the single scale source for elements (T7: never read Layout.Scale here).
+        /// Named DisplayScale: `Scale` would shadow Node.Scale (CS0108).
         public float DisplayScale { get; private set; } = 1f;
 
         private WorldViewport _worldViewport;
 
         public override void _EnterTree() => ProcessPriority = ProjectionProcessPriority;   // before the first _Process
 
-        /// <summary>Wire to the owning WorldViewport. Precondition: worldViewport in tree.
-        /// Postcondition: scale changes propagate to all registered elements.</summary>
         public void Attach(WorldViewport worldViewport)
         {
             _worldViewport = worldViewport;
             _worldViewport.ScaleChanged += OnScaleChanged;
         }
 
-        /// <summary>Publish an element for projection. Precondition: element not in any tree, owner valid.
-        /// Postcondition: element is a child, scaled at the current Scale, projected from the next frame.
-        /// Teardown needs no unregistration: the per-frame pass frees children with dead owners.
-        /// Constraint is CanvasItem (the common base of Node2D and Control) — name labels are
-        /// Labels/Controls, bubbles/battle text are Node2Ds. (Position must be set through the
-        /// Node2D/Control branch in the pass — CanvasItem has no Position.)
-        /// ORDER: ApplyScale BEFORE AddChild — name labels measure via font metrics, which are
-        /// correct off-tree, whereas GetMinimumSize() is stale same-frame after a font-size
-        /// change (probed). Bubble ApplyScale is a no-op pre-SetText (no message yet); its real
-        /// measurement runs in-tree from ShowChatBubble, which needs an in-tree label anyway.
-        /// Visible starts FALSE: Register lands in a mid-frame deferred flush (packet handling),
-        /// which is AFTER this frame's _process but BEFORE its render — the element would
-        /// otherwise draw one frame at (0,0) (window top-left). The next frame's pass sets
-        /// Visible from the projection, so first appearance is already at the correct spot.</summary>
+        /// ApplyScale runs before AddChild: font metrics are correct off-tree, but GetMinimumSize()
+        /// is stale same-frame after a font-size change (probed).
         public void Register<T>(T element, Character.Character owner) where T : CanvasItem, IBridgedText
         {
             element.AnchorOwner = owner;
@@ -61,7 +37,7 @@ namespace Goose2Client
 
         public override void _ExitTree()
         {
-            if (_worldViewport != null) _worldViewport.ScaleChanged -= OnScaleChanged;   // same delegate instance Attach connected
+            if (_worldViewport != null) _worldViewport.ScaleChanged -= OnScaleChanged;
         }
 
         private void OnScaleChanged(float s)
@@ -73,12 +49,10 @@ namespace Goose2Client
 
         private void UpdateProjection()
         {
-            // Current is null only pre-first-map, when the bridge is empty (Attach never clears it),
-            // so a plain return is correct here — there is no state to reset.
+            // Current is null only pre-first-map, when the bridge is empty (Attach never clears it) — no state to reset.
             if (_worldViewport == null || _worldViewport.Current == null) return;
-            // T7: DisplayScale is the bridge's single scale source (kept in lockstep with
-            // Layout.Scale by the same ScaleChanged event that feeds it) — never read
-            // Layout.Scale here. Only the display rect geometry comes from Layout.
+            // T7: DisplayScale is the single scale source (ScaleChanged keeps it in lockstep with
+            // Layout.Scale) — never read Layout.Scale here; only the display rect geometry comes from Layout.
             float scale = DisplayScale;
             var o = _worldViewport.Layout.DisplayOrigin;
             var s = _worldViewport.Layout.DisplaySize;
@@ -87,15 +61,14 @@ namespace Goose2Client
             for (int i = GetChildCount() - 1; i >= 0; i--)   // backwards: pass may QueueFree
             {
                 var child = GetChild(i);
-                if (child is not CanvasItem item || child is not IBridgedText element) continue;   // CanvasItem: uniform for Control + Node2D elements
+                if (child is not CanvasItem item || child is not IBridgedText element) continue;
                 if (element.AnchorOwner == null || !GodotObject.IsInstanceValid(element.AnchorOwner))
                 {
-                    item.QueueFree();   // T4: owner gone (char removed / map change) → element dies
+                    item.QueueFree();
                     continue;
                 }
-                // ChangeMap overlap guard: for ~2 frames after a transition the NEW map is Current
-                // while OLD-map characters are still alive (queued free pending) — don't project
-                // them through the new map's canvas transform.
+                // Post-transition overlap: for ~2 frames the NEW map is Current while OLD-map characters
+                // are still alive (queued free) — don't project them through the new map's canvas transform.
                 if (element.AnchorOwner.GetViewport() != _worldViewport.Current) { item.Visible = false; continue; }
                 var pos = _worldViewport.WorldToWindow(element.AnchorOwner.GlobalPosition)   // calls the shared forward transform (lockstep with WindowToWorld)
                     + element.LocalOffsetWorld * scale;
@@ -103,7 +76,7 @@ namespace Goose2Client
                 if (item is Node2D n) n.Position = pos;
                 else if (item is Control c) c.Position = pos;
                 item.Visible = !WorldTextProjection.IsCulled(
-                    new Rect2(pos + element.ScreenBounds.Position, element.ScreenBounds.Size), display);   // T3
+                    new Rect2(pos + element.ScreenBounds.Position, element.ScreenBounds.Size), display);
             }
         }
     }
