@@ -48,7 +48,7 @@ applier (no hidden global state).
 const Min = 1f, Max = 3f, Step = 0.5f
 
 Factor(float raw)            // snap to 0.5 steps, clamp to [1, 3]
-AutoFactor(int windowHpx)    // Factor(round(windowHpx / 720f))
+AutoFactor(int windowHpx)    // thresholds: h < 1080 → 1, h < 1440 → 2, else 3 (clamped)
 ScaleSize(float basePx)      // max(1, round(basePx * factor))   (round = half-away-from-zero, pinned by test)
 ScaleSizeI(Vector2I v)       // per-axis ScaleSize
 ```
@@ -81,8 +81,9 @@ public interface IScalableWindow { void Relayout(); }
 
 - `UiScaleApplier` is a node under the `GameManager` autoload (persistent across map
   entries, same home as `WorldViewport`).
-- `GameHud` registers each window it builds; the applier **clears its registry at HUD
-  rebuild** (no explicit unregister; a leaked entry is harmless).
+- Windows **self-register at end of their own `_Ready`** (R3); `tree_exited` deregisters.
+  `GameHud` is never freed/rebuilt (guarded `EnsureHud`), so there is no rebuild-clear;
+  a leaked entry is harmless (apply steps null-skip).
 - Windows spawned mid-session (NPC windows on click) must build through the same
   Register → `Relayout()` path — **no window may build without registering.**
 - Tooltips register on spawn, deregister via `tree_exited`.
@@ -126,8 +127,10 @@ public interface IScalableWindow { void Relayout(); }
 `UiScaleApplier.Apply(factor, reason)`, in order:
 
 1. Normalize `factor` via `UiScale.Factor`; store on the applier's `UiScale` instance.
-2. Cancel any in-progress UI drag (window move-drag, hotbar/spell item drag,
-   spell-target drag) — drop the drag, hide the drag image, commit no drop.
+2. Cancel any in-progress **window move-drag** (the only mouse-follow drag with state —
+   `BaseWindow._dragging`; cancel = restore pre-drag position, persist nothing). Godot's
+   built-in item/spell DnD has no cancel API and cannot realistically co-occur with a
+   scale commit (both need the left button) — accepted limitation, see §7.
 3. Set `GameTheme.default_font_size`; re-apply all registered explicit overrides.
 4. Call `Relayout()` on all registered windows (HUD, login/loading, live tooltips
    repositioned).
@@ -234,6 +237,12 @@ flash.
   factor. Accepted by design decision (Q3: start with 1–3 in 0.5 steps, revisit).
 - **Tooltip clamping at large scale:** tooltips clamp to the viewport, consistent
   with existing tooltip behavior.
+- **Item/spell DnD not cancelable on commit:** Godot's built-in drag-and-drop has no
+  cancel API; a scale commit cannot realistically co-occur with an in-flight DnD (both
+  hold the left button). Window move-drag IS cancelled (it is the only stateful
+  mouse-follow drag).
+- **Dev build stamp stays 1×:** `BuildStampOverlay` (root-viewport label) is not
+  registered — it is a dev-only stamp, intentionally unscaled.
 
 ## 8. Rejected alternatives
 

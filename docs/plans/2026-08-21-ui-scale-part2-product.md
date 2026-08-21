@@ -27,7 +27,7 @@
 **Files:**
 - Modify: `Scripts/UiScale.cs`
 - Modify: `Scripts/Constants.cs:136`
-- Modify: `Scripts/GameManager.cs` (Part 1's startup `Apply(1f, Startup)` line)
+- Modify: `Scripts/GameManager.cs` — the settings read goes in **`LoadSettings`** (`Scripts/GameManager.cs:275`), NOT `GameManager._Ready`: `CharacterSettings` is null in `_Ready` (it is created only in `LoadSettings`, called from `LoginScene.cs:103` on successful login — a settings read in `_Ready` NREs on every launch). Part 1's settings-independent `Apply(AutoFactor(canvas.Y), Startup)` in `_Ready` stays as-is (it scales the login screen for Auto users pre-login).
 - Test: `tests/Goose2Client.Tests/UiScaleTests.cs` (extend)
 
 **Step 1: Failing tests.**
@@ -45,23 +45,25 @@ Add to `UiScale` (pure, Godot-free): `public enum UiScaleMode { Auto = 0, Manual
 public const string UiScaleMode = "UiScaleMode";   // int: 0 = Auto (default), 1 = Manual
 public const string UiScaleValue = "UiScaleValue"; // float, snapped by UiScale.Factor
 ```
-**Step 4:** GameManager startup site (Part 1 line):
+**Step 4:** in `LoadSettings`, right after `CharacterSettings = new CharacterSettings(characterName);` (runs post-login, before the first map transition/HUD build — so the re-`Apply` precedes any HUD window: no unscaled flash; it also re-scales the still-visible login screen if settings pin a Manual factor that differs from the pre-login Auto guess):
 ```csharp
-var cs = CharacterSettings;
-var mode = (UiScaleMode)cs.GetOption<int>(Options.UiScaleMode, (int)UiScaleMode.Auto);
-var saved = cs.GetOption<float>(Options.UiScaleValue, 1f);
+var applier = UiScaleApplier.Instance;
+var mode = (UiScaleMode)CharacterSettings.GetOption<int>(Options.UiScaleMode, (int)UiScaleMode.Auto);
+var saved = CharacterSettings.GetOption<float>(Options.UiScaleValue, 1f);
 var canvas = (Vector2I)GetTree().Root.GetVisibleRect().Size;
-UiScaleApplier.Instance.Apply(UiScale.Instance.Resolve(mode, saved, canvas.Y), ApplyReason.Startup);
+applier.Mode = mode;   // Task 3's auto-recompute branches on this; set it HERE (not just in the Options window)
+applier.Apply(applier.Scale.Resolve(mode, saved, canvas.Y), ApplyReason.Startup);
 ```
-(`UiScale.Instance` = the applier's `Scale` property — use `UiScaleApplier.Instance.Scale.Resolve(...)`; `Resolve` is an instance method reading nothing but arguments, so either exposure is fine — prefer calling it statically-style through the applier's `Scale` instance as shown.) Note the headless self-test (Part 1 Task 8) still passes: default settings → Auto → headless canvas is tiny (not 720 — headless windows are minimal) → `AutoFactor → 1` → identical to Part 1's pinned `Apply(1f, Startup)`.
+(`Resolve` is an instance method reading nothing but its arguments; call it through the applier's `Scale` instance.) The headless self-test (Part 1 Task 8) never calls `LoadSettings` (no login in headless) — `CharacterSettings` stays null there, and Part 1's settings-independent `Apply` at the 1280×720 project viewport (`project.godot`) gives `AutoFactor(720) == 1`, so the self-test's factor-1 baseline is untouched. The "launch with settings pinning Manual 2×" leg has NO automated form in either plan's self-test (headless cannot log in) — it is covered by manual check M3; state that there.
 
-**Step 5 (green) + commit:** `feat: settings-driven UI scale factor at startup`.
+**Step 5 (green) + commit:** `feat: settings-driven UI scale factor at settings load`.
 
 | Invariant | Proved by |
 |-----------|-----------|
 | Auto ignores stale slider values (and vice versa) | `Resolve_AutoIgnoresSavedValue` / `Resolve_ManualIgnoresWindowHeight` |
 | Corrupt persisted value can't escape [1,3] | `Resolve_ManualNaN`, `Resolve_Manual...3.4f` |
 | Headless/default path unchanged (Part 1 tests stay green) | Part 1 Task 8 command re-run |
+| No NRE pre-login; login screen still scales (Auto) before settings exist | `LoadSettings` hook placement (settings-null-proof `_Ready` unchanged) + M8 (login at 1080p Auto) |
 
 ---
 
@@ -105,7 +107,7 @@ if (applier != null && applier.Mode == UiScaleMode.Auto)
 }
 // existing CollectBaseWindows walk (unchanged)
 ```
-`applier.Mode` = the mode stored at startup (Part 1 Task 1) and updated by the Options window (Task 4) — add `public UiScaleMode Mode { get; set; }` to the applier (set in both places; it is UI-state, not scale-math).
+`applier.Mode` = the mode stored at settings load (Task 1, in `LoadSettings`) and updated by the Options window (Task 4) — add `public UiScaleMode Mode { get; set; }` to the applier (set in BOTH places; default `Auto` covers the pre-login window). It is UI-state, not scale-math.
 
 **Why safe:** `OnWindowResized` fires on the root window's `size_changed` — user drag-resize emits many; the `f != applier.Factor` compare makes each a no-op except at the 720/1080/1440 boundaries (design Section 4, no debounce). The `Apply` early-return-on-unchanged-factor (Part 1 Task 3) is the second guard.
 
@@ -122,7 +124,7 @@ if (applier != null && applier.Mode == UiScaleMode.Auto)
 
 **Behavior spec (pinned — the drag-release contract from the design):**
 - Mode is exclusive: checking one unchecks the other. `ScaleAutoCheck` → mode Auto; `ScaleManualCheck` → mode Manual (slider row becomes visible; in Auto the slider + value label are `Visible = false`).
-- On open (`_Ready`, after the existing checkbox reads): read `Options.UiScaleMode` (default Auto) + `Options.UiScaleValue` (default 1); set check states, slider value, effective-factor display (`"Auto (2×)"` style text on `ScaleValueLabel` — the user always sees the in-force factor).
+- On open — the Options window is built ONCE at HUD time (Part 1) and toggled visible, so the open-state refresh belongs in the `_Ready` body guarded by the existing `_initializing`-style first-run flag (or a one-shot `bool _optionsInitialized`), NOT re-read on every show: read `Options.UiScaleMode` (default Auto) + `Options.UiScaleValue` (default 1); set check states, slider value, effective-factor display (`"Auto (2×)"` style text on `ScaleValueLabel` — the user always sees the in-force factor). The new `_Process` override (drag-release poll) MUST call `base._Process(delta)` first — `BaseWindow._Process` drives the hover fade (`BaseWindow.cs`).
 - **Initial-open guard (adversarial):** programmatic `ScaleSlider.Value = x` in `_Ready` fires `ValueChanged`, and with `_dragging == false` that would `Commit` on EVERY window open — in first-open Manual mode the mode-switch rule would double-commit on top. Set `_initializing = true` before the programmatic sets and clear it on the next `ProcessFrame` (one `await`); `ValueChanged` and the mode handlers early-return while it is set.
 - **Commit rule** (no `drag_ended` in this engine — see APIs verified): track a local `_dragging` on the slider with the `BaseWindow` move-drag pattern (`Scripts/UI/BaseWindow.cs:120-140`):
   - `ScaleSlider.GuiInput`: left mouse button **press** → `_dragging = true`.
@@ -161,11 +163,11 @@ if (applier != null && applier.Mode == UiScaleMode.Auto)
 |---|-------|----------------|
 | M1 | 1080p first launch (default Auto) | Login + HUD render at 2× (fonts ~20px, windows 2× tscn sizes); no 1× flash at map entry |
 | M2 | Options → UI Scale → drag slider 2× → 1.5×, release | HUD (incl. options window) rescales ONCE, on release; label follows thumb live during drag; arrow-key nudge applies immediately |
-| M3 | Restart | Mode/value persist; factor applied before HUD build (no flash) |
+| M3 | Restart (incl. with settings pinning Manual 2× — the only automated-gap leg, headless can't log in) | Mode/value persist; factor applied before HUD build (no flash) |
 | M4 | Auto mode: drag-resize window across 1080px height boundary | Exactly one rescale crossing each way; no per-pixel churn (watch for layout thrash while dragging) |
 | M5 | 720p Manual 3× | HUD scales to 3×; oversized windows clamp on-screen (accepted-limitation behavior, design §7); 1.5× icons acceptably soft (the Q3 verdict) |
 | M6 | Start moving a window (title-bar drag), then commit a scale change before releasing | Window snaps back to pre-drag position; saved settings unchanged (verify by restarting and comparing position) |
-| M7 | Non-16:9 window (e.g. 1600×900) | World gutters per Stage 1; HUD placement correct at the auto factor (round(900/720)=1); tooltips clamp to viewport at 3× |
+| M7 | Non-16:9 window (e.g. 1600×900) | World gutters per Stage 1; HUD placement correct at the auto factor (900 → 1, threshold); tooltips clamp to viewport at 3× |
 | M8 | Login screen at 1080p Auto | Login box 2× (600×400), text 32px; loading overlay scales during a map transition |
 | M9 | Chat: scroll mid-log, commit scale change | Chat content + scroll offset preserved; reposition keeps edge-stuck offset (M-edge check) |
 | M10 | `bash tools/tests/run_ui_scale.sh` (+ login leg) | Exit 0, no `ERR_` output — headless regression gate stays green |
@@ -186,4 +188,4 @@ if (applier != null && applier.Mode == UiScaleMode.Auto)
 | Login/loading scale WITHOUT a 1× visual change | Task 5 round-trip self-test leg (adversarial: wrong base 16 fails the round-trip) |
 | Whole feature regression gate | M10 (Part 1 self-test + new login leg) |
 
-**Explicitly NOT in this part (design §7, accepted):** 3×-overflow fit guarantee, OS-DPI auto-mode accuracy, sub-0.5 steps, world-viewport text scaling (out of scope by design).
+**Explicitly NOT in this part (design §7, accepted):** 3×-overflow fit guarantee, OS-DPI auto-mode accuracy, sub-0.5 steps, world-viewport text scaling (out of scope by design), item/spell DnD cancel on commit (no Godot API; window move-drag IS cancelled).

@@ -24,7 +24,8 @@
   - `Control.SetMeta(StringName, Variant)` / `GetMeta(...)` — the skip-meta mechanism.
   - `Node.TreeExited` event — deregistration hook.
   - `OS.GetCmdlineUserArgs()` (`string[]`) — project args after `--`; **`GD.GetCommandLineArgs` does not exist**. Task 8's flag comes from here.
-  - Anchored roots in the wild: `Scenes/UI/ChatWindow.tscn:11-14` (bottom-left, `offset_top = -213`), `Scenes/UI/Toolbar.tscn` root `anchor_left = 1.0` (right-edge). Offsets scale correctly under either; `Position` would not.
+  - Anchored roots in the wild: `Scenes/UI/ChatWindow.tscn:11-14` (bottom-left, `offset_top = -213`), `Scenes/UI/Toolbar.tscn` root bottom-right (all four anchors `1.0`). Offsets scale correctly under either; `Position` would not.
+- Test project (`tests/Goose2Client.Tests`) pins **GodotSharp 4.6.2** from NuGet (not the 4.7.1 in the engine dir) — the xUnit surface (`UiScale`, `WindowPlacement` param) must stay 4.6.2-compatible; `Vector2I`/`MathF` are fine (existing `WindowPlacementTests` already use GodotSharp).
 - `theme_override_font_sizes` occurrences to migrate: `Scenes/UI/BankWindow.tscn:43` (9), `Scenes/UI/ChatWindow.tscn:47` (`normal_font_size` 12, RichTextLabel), `Scenes/UI/ChatWindow.tscn:55` (12), `Scenes/UI/DebugWindow.tscn:23,32` (12), `Scenes/UI/VendorWindow.tscn:43` (10). Raw C# overrides: `Scripts/UI/BaseMultipleWindow.cs:60` (12) and `:68` (10). (Bridge files `ChatBubble`/`BattleTextLine`/`BridgedNameLabel` are world-space — **do not touch**.)
 - Window geometry is `.tscn` pixel-offset layout (e.g. `Scenes/UI/VitalsWindow.tscn` all `layout_mode = 0` offsets; `Scenes/UI/BaseWindow.tscn` anchor-based children). Slots: `Scenes/UI/ItemSlot.tscn` `custom_minimum_size = Vector2(32, 32)`.
 - Headless runner: `/usr/local/bin/godot --headless` (4.7.1 mono). Existing probes `tools/tests/*.gd` intentionally do NOT execute C#; Part 1's C#-executing proof is a project-argument self-test (Task 8), run as `godot --headless -- +selftest=ui_scale`.
@@ -50,14 +51,14 @@
 Tests (all red against "does not exist"):
 - `Factor_SnapsToHalfStepsAndClamps`: `0.4f → 1`, `0.9f → 1`, `1.25f → 1.5f`, `1.7f → 1.5f`, `2.3f → 2.5f`, `3.4f → 3`, `4.2f → 3`, `-1f → 1`.
 - `Factor_RejectsNaN`: `Factor(float.NaN)` returns `1` (normalize must be total — corrupt settings pass through here).
-- `AutoFactor_Boundaries`: `719 → 1`, `720 → 1`, `1079 → 2`, `1080 → 2`, `1439 → 2`, `1440 → 3`, `2880 → 3` (clamp case).
+- `AutoFactor_Boundaries` (explicit thresholds — NOT `round(h/720)`, which would make 1440 → 2): `719 → 1`, `720 → 1`, `1079 → 1`, `1080 → 2`, `1439 → 2`, `1440 → 3`, `2880 → 3` (clamp case).
 - `ScaleSize_RoundsHalfAwayFromZero`: with factor `1.5f`, `ScaleSize(10f) == 15` and — the pin — a `.5` product rounds away: set factor `2.5f`, `ScaleSize(3f) == 8` (7.5 → 8, not 7).
 - `ScaleSize_MinOneGuard`: factor `1f`, `ScaleSize(0f) == 1`; smallest real base `ScaleSize(1f) == 1` at factor `1f`.
 - `ScaleSizeI_PerAxis`: factor `2f`, `new Vector2I(32, 55) → new Vector2I(64, 110)`.
 
 **Step 2 (red):** `dotnet test tests/Goose2Client.Tests` → compile fail (no `UiScale`).
 
-**Step 3:** Implement `Scripts/UiScale.cs`. Use explicit half-away-from-zero rounding (Godot's `Mathf.Round` is not allowed — this file is Godot-free): `int MathF.Round(x, MidpointRounding.AwayFromZero)`. `Factor`: `if (float.IsNaN(raw)) raw = Min; snapped = MathF.Round(raw / Step, MidpointRounding.AwayFromZero) * Step; return clamp to [Min, Max]`.
+**Step 3:** Implement `Scripts/UiScale.cs`. Use explicit half-away-from-zero rounding (Godot's `Mathf.Round` is not allowed — this file is Godot-free): `int MathF.Round(x, MidpointRounding.AwayFromZero)`. `Factor`: `if (float.IsNaN(raw)) raw = Min; snapped = MathF.Round(raw / Step, MidpointRounding.AwayFromZero) * Step; return clamp to [Min, Max]`. `AutoFactor(h)`: `h < 1080 ? 1 : h < 1440 ? 2 : 3` (clamped by construction).
 
 **Step 4 (green):** all pass. **Step 5:** commit `feat: add UiScale pure scale math`.
 
@@ -88,7 +89,7 @@ Tests (all red against "does not exist"):
 - `Resolve_MiddleParkedWindowKeepsCoordinateWhenSizeDoubles`: saved `(640, 360)` on `LegacyCanvas`, window size `(100, 50) → (200, 100)`, current canvas `1280×720` → result stays `(640, 360)` (middle band, both halves).
 - `Resolve_EdgeStuckWindowKeepsEdgeOffsetAtLargerSize`: saved `(0, 640)` left-edge on `LegacyCanvas`, size `(160, 60) → (320, 120)`, current `1280×720` → x stays `0`, y keeps its left-edge-irrelevant value per existing rule (assert exactly what the axis rule yields; x must be 0).
 - `Resolve_WindowLargerThanCanvas_ClampsToOrigin`: saved `(0, 0)` on `LegacyCanvas`, size `(2000, 1500)`, current `1280×720` → `(0, 0)` (both axes edge-stuck to origin; x clamps to `max(0, 1280−2000)=0`).
-- `Resolve_TitleBarAllowance_Scaled`: saved `(100, 700)` on `LegacyCanvas`, window height `700`, current `1280×720`. Trace: y-axis `right = 720 − (700+700) = −680 < left`, so `y = 720 − 700 − (−680) = 700`; default allowance clamps to `720−24` → assert y `== 696`; with `titleBarAllowance: 48` assert y `== 672`. (Saved y must be ≥ 696 or the clamp never engages — e.g. saved `(100, 600)` yields 600, not 696; do not use it.)
+- `Resolve_TitleBarAllowance_Scaled`: saved `(100, 700)` on `LegacyCanvas`, window size `(100, 700)`, current `1280×720`. Trace: y-axis `right = 720 − (700+700) = −680 < left`, so `y = 720 − 700 − (−680) = 700`; default allowance clamps to `720−24` → assert y `== 696`; with `titleBarAllowance: 48` assert y `== 672`. (Saved y must be ≥ 696 or the clamp never engages — e.g. saved `(100, 600)` yields 600, not 696; do not use it.)
 
 **Step 2 (red):** new tests fail (parameter doesn't exist → compile error for the 4-arg+1 calls; size cases may already pass — the compile failure is the red).
 **Step 3:** add the optional parameter; use it in the y clamp (`Mathf.Max(0, currentCanvas.Y - titleBarAllowance)`).
@@ -101,8 +102,7 @@ Tests (all red against "does not exist"):
 
 **Files:**
 - Create: `Scripts/UiScaleApplier.cs`
-- Modify: `Scripts/GameManager.cs` (create/`Instance` in `_Ready`, after `CharacterSettings` exists; initial `Apply` there too — no HUD-ordering constraint: windows first build later, at `EnsureHud()` from `MapManager`)
-- Modify: `Scripts/UI/GameHud.cs:39` (`_Ready` start: `UiScaleApplier.Instance.ClearRegistry()`)
+- Modify: `Scripts/GameManager.cs` (create/`Instance` + initial settings-independent `Apply` in `_Ready` — `CharacterSettings` does NOT exist yet there: it is created only in `LoadSettings`, called from `LoginScene.cs:103` on successful login; the settings-driven re-`Apply` is Part 2's `LoadSettings` hook. Windows first build later, at `EnsureHud()` from `MapManager` (post-login, settings exist).)
 
 **Shape** (no `Node` base — plain class; Godot types only for theme/control args):
 
@@ -123,6 +123,7 @@ public class UiScaleApplier
     public void ClearRegistry();                             // windows + fonts
     public float Factor => Scale.Factor;
     public int ScaleSize(float basePx) => Scale.ScaleSize(basePx);   // code-side pixel helper
+    public bool HasFontEntry(Control c, StringName prop);            // Task 8 audit: registry membership query
 }
 public enum ApplyReason { Startup, UserCommit, AutoResize }
 ```
@@ -133,23 +134,24 @@ public enum ApplyReason { Startup, UserCommit, AutoResize }
 1. `Scale.Factor(factor)` (normalizes; NaN-safe per Task 1). If unchanged from previous factor → still run steps 3–5 once at startup, but on non-`Startup` reasons **early-return when factor is unchanged** (window-resize spam costs one compare).
 2. HIDE live tooltips: `if (TooltipManager.Instance != null) TooltipManager.Instance.HideAll();` — add `HideAll()` to `TooltipManager` (sets `Visible = false` on the four tooltip controls; mirrors existing `Hide*Tooltip`, `Scripts/UI/TooltipManager.cs:37-60`). (R2)
 3. Theme: `Preload("res://Assets/UI/GameTheme.tres")` cached field, `theme.SetDefaultFontSize(ScaleSize(10))` (base 10 = `GameTheme.tres` `default_font_size`).
-4. Fonts: for every `(c, prop, base)` — `if (c.IsInsideTree()) c.AddThemeFontSizeOverride(prop, ScaleSize(base))`. (Skip-free: a control leaving the tree is simply unqueried next pass; registry entries are cleared at HUD rebuild.)
+4. Fonts: for every `(c, prop, base)` — `if (c.IsInsideTree()) c.AddThemeFontSizeOverride(prop, ScaleSize(base))`. (Skip-free: a control leaving the tree is simply unqueried next pass; entries are dropped by `tree_exited` deregistration.)
 5. Geometry: `foreach (var w in _windows) w.Relayout();` — `BaseWindow.Relayout()` (Task 5) ends with `RepositionForCurrentCanvas()`, so repositioning happens per window right after its own geometry — the `Size` it reads is already scaled (`BaseWindow.cs:106`).
 
 **Publication boundary (registry):**
 - Creation order: window builds nodes (at 1× base constants) → snapshots geometry (Task 5) → `RegisterWindow(this)` → **calls `Relayout()` once immediately**: build-time geometry is the 1× base, so a window spawned at runtime under a 2× factor lands at 2× in the same frame (zero 1× frames); at 1× the call is a no-op re-apply.
-- Teardown: `UnregisterWindow` on `tree_exited` (connected at registration); `ClearRegistry()` at `GameHud._Ready` start (`GameHud.cs:39`) for map-entry rebuilds. A leaked entry is harmless (step 4/5 null-skip).
+- Teardown: `UnregisterWindow` on `tree_exited` (connected at registration). `GameHud` is never freed/rebuilt (guarded `EnsureHud`, no free path) — there is no rebuild-clear; a leaked entry is harmless (step 4/5 `IsInsideTree`/null-skip).
 - Readers (the apply pass) can only ever see a fully-built, already-laid-out window: registration happens at END of `_Ready` (R1 snapshot also taken there), and `Apply` never runs during a `_Ready` (startup Apply precedes HUD build; user commits happen on input events between frames).
 - Failure behavior: `RegisterWindow` with a null/duplicate is a no-op; no partial state.
 
 **`ApplyFontSize` contract:** sets the override immediately (build-time correctness) AND records the entry. It is the ONLY place window code may set a font-size theme override (raw `AddThemeFontSizeOverride` calls in window code are prohibited — Task 7 enforces the migration; the self-test in Task 8 is the tripwire).
 
-**GameManager wiring:** in `_Ready`, after `CharacterSettings` exists (the HUD builds later, from `MapManager`, so there is no HUD-ordering constraint):
+**GameManager wiring:** in `_Ready` — **before `CharacterSettings` exists** (it is created only on successful login, `LoginScene.cs:103` → `LoadSettings`), so the startup `Apply` must be settings-independent. Use the settings-free best guess (Auto): the login screen (Part 2 registers it) is already at the right factor for Auto users, and at 720 — the only headless size — `AutoFactor(720) == 1` keeps Part 1's self-test deterministic:
 ```csharp
 UiScaleApplier.Instance = new UiScaleApplier();
-UiScaleApplier.Instance.Apply(1f, ApplyReason.Startup);
+var canvas = (Vector2I)GetTree().Root.GetVisibleRect().Size;
+UiScaleApplier.Instance.Apply(UiScaleApplier.Instance.Scale.AutoFactor(canvas.Y), ApplyReason.Startup);
 ```
-Part 1 pins 1× (no settings read — the options keys are Part 2). A `// Part 2: read Options.UiScaleMode/UiScaleValue here` is NOT added (comment policy: no forward-looking comments); Part 2 edits this line.
+Part 1 reads no settings (the options keys are Part 2); Part 2 adds the settings-driven re-`Apply` in `LoadSettings` (runs post-login, pre-HUD — still before any map entry, so no unscaled flash) and sets `applier.Mode`.
 
 **Step ordering / tests:** this task has no pure-xUnit surface (Godot types). Proof comes from Task 8's self-test (audit + smoke) and Task 5/7's 1× no-op run. Compile + existing test suite green is the gate here.
 **Commit:** `feat: add UiScaleApplier apply pass and font registry`.
@@ -195,17 +197,21 @@ public static class UiScaleLayout
 - Modify: `Scripts/UI/BaseMultipleWindow.cs:46-77` (font + line positions)
 - Modify: `Scripts/IScalableWindow.cs` (if not created in Task 3 — created there)
 
-**Changes to `BaseWindow` (implements `IScalableWindow`):**
-- Field: `private readonly List<GeomRecord> _geom = null!;`
-- `_Ready()`: at the VERY END (after drag-handle wiring, `MoveChild` etc. — after `BaseWindow.cs:76`'s `MoveChild` call):
+**WHY THE SNAPSHOT MUST RUN AT END OF THE SUBCLASS `_Ready` (plan-review finding — the original "end of `BaseWindow._Ready`" timing was broken):** every window subclass calls `base._Ready()` FIRST and builds its runtime content AFTER it — the `ItemSlot` grids (`InventoryWindow.cs:25-40`: slots instantiated in `_Ready` after `base._Ready()`, none are in the `.tscn`), the 20 NPC line labels (`BaseMultipleWindow.cs:43,63-71`), hotbar pages, equipment grids. A snapshot at the end of `BaseWindow._Ready` would miss all of it → at live 2× the window frame scales but its content stays 1×. **Fix — `ScaleRegister()` pattern (no reordering of `base._Ready()`, which would flip `Visible`-restore ordering for toggle windows):**
+- `BaseWindow` gains `protected void ScaleRegister()`:
   ```csharp
-  var applier = UiScaleApplier.Instance;
+  if (_scaleRegistered) return;                       // idempotent (deferred fallback)
+  _scaleRegistered = true;
   _geom = UiScaleLayout.Snapshot(this);
+  var applier = UiScaleApplier.Instance;
   applier.RegisterWindow(this);
-  Relayout();
+  Relayout();                                          // same-frame scale; no-op re-apply at 1×
+  TreeExited += () => applier.UnregisterWindow(this);
   ```
-  Connect `TreeExited += () => applier.UnregisterWindow(this);` in the same place.
-  **Invariant:** no code after these lines may set geometry on `this` or descendants directly — the snapshot is the base and the next `Apply` clobbers any direct write. (Build code BEFORE the snapshot uses 1× base constants; that geometry becomes part of the base.)
+- `BaseWindow._Ready()`: UNCHANGED in order/behavior (keeps `Visible`-restore semantics bit-identical). At its very end (after `MoveChild`, `BaseWindow.cs:76`) it schedules the fallback `CallDeferred(ScaleRegister);` — covers `BaseWindow` subclasses that do NOT override `_Ready` (InfoWindow, QuestWindow: registration lands one frame later; both are server-driven dialogs, no perceptible flash).
+- **Each of the 9 window subclasses that override `_Ready` gets ONE line at the end of it: `ScaleRegister();`** — `BankWindow`, `BaseMultipleWindow`, `CharacterWindow`, `CombineBagContainerWindow`, `HotbarWindow`, `InventoryWindow`, `OptionsWindow`, `SpellbookWindow`, `VendorWindow`. (Verified audit: no subclass build code reads the `Content`/`TitleLabel`/`Background` properties — all use their own `GetNode` calls — so no reordering was needed; `BaseMultipleWindowManager` does not call `base._Ready()` and is not an on-screen window — leave it.)
+- **Invariant:** no code after the `ScaleRegister()` call may set geometry on `this` or descendants directly — the snapshot is the base and the next `Apply` clobbers any direct write. (Build code BEFORE the call uses 1× base constants; that geometry becomes part of the base.)
+- `BaseWindow` field: `private readonly List<GeomRecord> _geom = null!; private bool _scaleRegistered;
 - `public void Relayout()`:
   ```csharp
   UiScaleLayout.Apply(_geom, UiScaleApplier.Instance.Factor);
@@ -214,12 +220,12 @@ public static class UiScaleLayout
   and `RepositionForCurrentCanvas()`'s `Resolve` call (line 106) passes `titleBarAllowance: UiScaleApplier.Instance != null ? UiScaleApplier.Instance.ScaleSize(24) : WindowPlacement.TitleBarHeight` (Task 2 parameter). At factor 1 this is bit-identical to today.
 
 **`BaseMultipleWindow` (fonts only — no relayout helper needed):**
-- All 20 line labels are created in `_Ready` (fixed `LineCount = 20`, lines 63-71) — BEFORE the end-of-`_Ready` snapshot — so the generic snapshot captures their 1× positions (`LinesOrigin` (6,22) + `i × LineRowHeight` (11.18) stay as base constants, exactly as written today) and `Relayout` scales them from the records. There is NO `RelayoutLines()` helper in this design.
+- All 20 line labels are created in `_Ready` (fixed `LineCount = 20`, lines 63-71) — BEFORE the end-of-`_Ready` `ScaleRegister()` — so the generic snapshot captures their 1× positions (`LinesOrigin` (6,22) + `i × LineRowHeight` (11.18) stay as base constants, exactly as written today) and `Relayout` scales them from the records. There is NO `RelayoutLines()` helper in this design.
 - Fonts: line 60 `b.AddThemeFontSizeOverride("font_size", ButtonFontSize)` → `applier.ApplyFontSize(b, ButtonFontSize)`; line 68 `label.AddThemeFontSizeOverride("font_size", LineFontSize)` → `applier.ApplyFontSize(label, LineFontSize)`.
 
-**Other `BaseWindow` subclasses:** no changes expected — their geometry is `.tscn`/generic. If any subclass sets geometry in `_Ready` AFTER the snapshot point, the next `Apply` clobbers it — the 2× audit (Task 8) catches this; treat such failures as "move this window's build code before the snapshot", not as scaler bugs.
+**Other `BaseWindow` subclasses:** covered by the 9-file one-liner list above. If any subclass sets geometry in `_Ready` AFTER the `ScaleRegister()` line (or packet-driven geometry after registration), the next `Apply` clobbers it — the 2× audit (Task 8) catches this; treat such failures as "register after build", not as scaler bugs.
 
-**Gate:** full xUnit suite green; compile clean.
+**Gate:** full xUnit suite green; compile clean; Task 8's 2× audit proves the runtime-built slot grids actually scaled (the leg that fails if the end-of-`_Ready` timing regresses).
 **Commit:** `feat: BaseWindow self-registration and factor-aware relayout`.
 
 ---
@@ -228,7 +234,7 @@ public static class UiScaleLayout
 
 **Files:**
 - Modify: `Scripts/UI/VitalsWindow.cs:33` (`_Ready`)
-- Create: `Scripts/UI/Toolbar.cs` + attach to `Scenes/UI/Toolbar.tscn` root — the `HBoxContainer` root is **scriptless** (scripts live only on `DestroyButton`/`ToolbarItem` children); a new root script implements the registration pattern. The root is right-edge anchored (`anchor_left = 1.0`), so offset scaling is what keeps it stuck.
+- Create: `Scripts/UI/Toolbar.cs` + attach to `Scenes/UI/Toolbar.tscn` root — the `HBoxContainer` root is **scriptless** (scripts live only on `DestroyButton`/`ToolbarItem` children); a new root script implements the registration pattern. The root is bottom-right anchored (all four anchors `1.0`), so offset scaling is what keeps it stuck.
 - Modify: `Scripts/UI/ChatWindow.cs`, `Scripts/UI/PartyWindow.cs`, `Scripts/UI/DebugWindow.cs`, `Scripts/UI/BuffEffectsWindow.cs` (`_Ready` each — **all five are plain `Control` roots, verified**, and Chat/Party/Debug/BuffEffects would otherwise never scale)
 - Modify: `Scripts/UI/TooltipManager.cs:17` (root + `HideAll()` added in Task 3)
 - Modify: `Scenes/UI/Tooltips.tscn` (set `meta/ui_scale_skip = true` on the four tooltip control nodes `ItemTooltip`/`SpellTooltip`/`TextTooltip`/`MapItemTooltip` — their geometry is set dynamically per-show in C#, e.g. `ItemTooltipControl.SetItem`)
@@ -248,7 +254,7 @@ TreeExited += () => applier.UnregisterWindow(this);
 - `PartyWindow`, `DebugWindow`, `BuffEffectsWindow`: register (top-left-anchored tscn offsets scale).
 - `Toolbar`: registers (offsets scale; its Options button wiring is untouched).
 - `TooltipManager`: registers ONLY its root + static children; the four dynamic tooltip nodes carry the skip meta so per-show C# geometry is untouched; live tooltips hide on commit (Task 3 step 2, R2) and reappear correctly on next hover because `SetItem`/`ShowTextTooltip` recompute position from the live factor.
-- `WorldDropTarget` (`Scripts/UI/WorldDropTarget.cs`, full-rect `Ignore` filter): **do not register** — full-rect anchors, nothing to scale.
+- `WorldDropTarget` (`Scripts/UI/WorldDropTarget.cs`, full-rect, `MouseFilter.Pass`): **do not register** — full-rect anchors, nothing to scale.
 
 **Gate:** xUnit green; 1× headless run (Task 8 command) shows no layout drift (visual/rect check via the audit's 1× no-op leg).
 **Commit:** `feat: register vitals, toolbar, and tooltip roots with the scale applier`.
@@ -264,7 +270,7 @@ TreeExited += () => applier.UnregisterWindow(this);
 **Rules:**
 - The base constant in C# must equal the removed tscn value (9/12/12/12/10). At factor 1 the rendered size is unchanged — verified by Task 8's 1× audit.
 - Bridge files (`ChatBubble.cs:95`, `BattleTextLine.cs:33`, `BridgedNameLabel.cs:17`) stay on raw overrides — world-space, out of scope.
-- After this task, `grep -rn "AddThemeFontSizeOverride\|theme_override_font_sizes" Scenes/UI Scripts/UI | grep -v Bridge` returns only `UiScaleApplier.cs` (the helper) and the three bridge files. State this grep in the commit message body as the invariant.
+- After this task, `grep -rn "AddThemeFontSizeOverride\|theme_override_font_sizes" Scenes Scripts | grep -v Overlays` returns only `UiScaleApplier.cs` (the helper). (The three bridge files live in `Scripts/Overlays/` — a different path from the window code — so exclude that directory rather than filename-filtering.) State this grep in the commit message body as the invariant.
 
 **Gate:** grep invariant above; xUnit green.
 **Commit:** `refactor: route all root-viewport font overrides through UiScaleApplier.ApplyFontSize`.
@@ -274,11 +280,11 @@ TreeExited += () => applier.UnregisterWindow(this);
 ### Task 8: headless self-test (audit + 1× no-op + 2× smoke)
 
 **Files:**
-- Modify: `Scripts/GameManager.cs` (`_Ready`, after settings load): read `OS.GetCmdlineUserArgs()`; if it contains `"+selftest=ui_scale"`, run the sequence below on the NEXT frame (one `ProcessFrame` await) and `GetTree().Quit(failed ? 1 : 0)`. **The sequence's first step is `GameManager.Instance.EnsureHud()`** (plus another `ProcessFrame` await) — the HUD does not exist at startup: `EnsureHud`'s only call site is the server-driven map transition (`Scripts/MapManager.cs:93`), which headless never reaches. Without this the test fails for the wrong reason (no registered windows at all).
+- Modify: `Scripts/GameManager.cs` (`_Ready`): read `OS.GetCmdlineUserArgs()`; if it contains `"+selftest=ui_scale"`, run the sequence below on the NEXT frame (one `ProcessFrame` await) and `GetTree().Quit(failed ? 1 : 0)`. **The sequence's first step is `GameManager.Instance.EnsureHud()`** (plus another `ProcessFrame` await) — the HUD does not exist at startup: `EnsureHud`'s only call site is the server-driven map transition (`Scripts/MapManager.cs:93`), which headless never reaches. Without this the test fails for the wrong reason (no registered windows at all).
 - Create: `tools/tests/run_ui_scale.sh` — wrapper: `godot --headless -- +selftest=ui_scale; exit $?` (docs the invocation; args after `--` are what `OS.GetCmdlineUserArgs()` returns; the existing probes use `--script`, this one needs the project + C#).
 
 **Sequence (all inside C#, `Print`-labeled steps):**
-1. **1× no-op:** for each registered `BaseWindow`: snapshot its descendants' `(OffsetLeft, OffsetTop, OffsetRight, OffsetBottom)` into a dict, call `w.Relayout()`, re-read; assert bit-identical (factor is 1 from startup Apply). Catches snapshot bugs and any `_Ready` code that sets geometry after the snapshot point.
+1. **1× no-op:** for each registered `BaseWindow`: snapshot its descendants' `(OffsetLeft, OffsetTop, OffsetRight, OffsetBottom)` into a dict, call `w.Relayout()`, re-read; assert bit-identical (factor is 1 from startup Apply). Catches snapshot bugs and any `_Ready` code that sets geometry after the `ScaleRegister()` line.
 2. **2× apply:** `UiScaleApplier.Instance.Apply(2f, ApplyReason.UserCommit)`. Then assert:
    - `GameTheme` (the applier's cached instance) `GetThemeFontSize("font_size") == 20`.
    - **Font audit (adversarial):** walk every `Control` under `UiLayer`; for any with `HasThemeFontSizeOverride("font_size")` or `HasThemeFontSizeOverride("normal_font_size")` (excluding nothing — bridge text lives in the world viewport, not `UiLayer`): the control MUST be in the applier's font registry, and its effective `GetThemeFontSize(prop)` must equal `base × 2`. A raw `AddThemeFontSizeOverride` added outside the registry (e.g. a future PR skipping `ApplyFontSize`) fails here.
@@ -308,6 +314,6 @@ TreeExited += () => applier.UnregisterWindow(this);
 | Fonts scale through the registry; raw overrides trip the wire | Task 8 step 2 (audit) + Task 7 grep invariant |
 | Geometry scales per window incl. min-sizes | Task 8 step 2 (sampled rects) |
 | Tooltips hidden on commit (R2) | Task 8 step 2 |
-| Registry leaks are harmless / cleared at HUD rebuild | Task 3 `ClearRegistry` wiring (`GameHud.cs:39`) + null-skip in steps 4–5 (covered by Task 8 clean run across HUD build) |
+| Registry leaks are harmless | `tree_exited` deregistration + `IsInsideTree`/null-skip in apply steps 4–5 (covered by Task 8 clean run across `EnsureHud`) |
 
 **Explicitly deferred to Part 2:** options UI (slider/mode), `Options.UiScaleMode`/`UiScaleValue` persistence + startup read (Task 3's pinned `Apply(1f, Startup)` becomes the settings-driven value), auto-mode window-resize path (`GameManager.cs:103` `size_changed` handler), login/loading registration (their scenes attach no `GameTheme` — they need explicit `ApplyFontSize` with base 16, the engine default), drag-cancel on commit, manual verification matrix, and the design's accepted-limitations list.
