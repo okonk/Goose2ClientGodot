@@ -97,8 +97,6 @@ namespace Goose2Client
             this.Options = deserialized.Options;
             this.MountName = deserialized.MountName;
 
-            GD.Print($"Settings loaded: {filePath} {fileContents}");
-
             return true;
         }
 
@@ -147,8 +145,6 @@ namespace Goose2Client
         {
             var filePath = GetFilePath();
             var fileContents = JsonSerializer.Serialize(this, JsonOptions);
-
-            GD.Print($"Settings saved: {filePath} {fileContents}");
 
             File.WriteAllText(filePath, fileContents);
         }
