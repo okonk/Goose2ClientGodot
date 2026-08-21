@@ -2,7 +2,7 @@
 
 **Goal:** The user-facing surface: Auto/Manual mode + slider in the Options window, settings persistence, auto-scale on window resize, commit-time drag cancellation, login/loading scaling, and the manual verification matrix. Builds directly on Part 1's `UiScale` / `UiScaleApplier` / `UiScaleLayout` machinery.
 
-**Architecture:** A pure `UiScale.Resolve(mode, savedValue, windowHeight)` decides the target factor from (mode, persisted slider value, window height); `GameManager`'s startup `Apply(1f, Startup)` (pinned in Part 1, `Scripts/GameManager.cs` HUD-build site) becomes settings-driven, and the existing `window.SizeChanged` handler (`Scripts/GameManager.cs:103,337`) gains the auto-recompute leg. The Options window gains a UI Scale group (two exclusive mode checks + a 0.5-step slider that commits on `drag_ended` or on non-drag `value_changed`), persisting through the existing `CharacterSettings.Options` dictionary. Login/loading scenes self-register (Part 1 pattern) and get explicit `ApplyFontSize` bases of 16 (engine default — they attach no `GameTheme`).
+**Architecture:** A pure `UiScale.Resolve(mode, savedValue, windowHeight)` decides the target factor from (mode, persisted slider value, window height); `GameManager`'s startup `Apply(1f, Startup)` (pinned in Part 1, `Scripts/GameManager.cs` HUD-build site) becomes settings-driven, and the existing `window.SizeChanged` handler (`Scripts/GameManager.cs:103,337`) gains the auto-recompute leg. The Options window gains a UI Scale group (two exclusive mode checks + a 0.5-step slider that commits on `drag_ended` or on non-drag `value_changed`), persisting through the existing `CharacterSettings.Options` dictionary. Login/loading scenes self-register (Part 1 pattern); fonts reach them through the PROJECT-WIDE theme (`project.godot:37` `theme/custom="res://Assets/UI/GameTheme.tres"` — no per-scene theme needed), so Task 5 is geometry-only registration plus a test pinning the effective font 10 → 20 → 10 round-trip.
 
 **Tech Stack:** C# / Godot 4.7.1 (GodotSharp), xUnit, headless self-test (Part 1's `tools/tests/run_ui_scale.sh`), in-engine manual matrix.
 
@@ -11,13 +11,13 @@
 ## APIs verified (citations)
 
 - Part 1's verified surface applies unchanged (`AddThemeFontSizeOverride`, `Theme.SetDefaultFontSize`, `HasThemeFontSizeOverride`, `OS.GetCmdlineUserArgs`, `SetMeta`/`GetMeta`, `Node.TreeExited`).
-- `HSlider` (GodotSharp 4.7.1, same DLL): properties `MinValue`, `MaxValue`, `Step`, `Value`; C# events `ValueChanged` (verified) and `GuiInput`. **`Range.DragEnded` DOES NOT EXIST in this binding or engine** — verified two ways: reflection on the DLL (Range events: `ValueChanged, Changed, Resized, GuiInput, ...` — no drag signal) and a headless runtime probe (`get_signal_list()` on a live `Range`: ends `...,value_changed,changed,` — no `drag_ended`). Drag state must therefore be tracked with the exact pattern `BaseWindow` already uses for window moves (`Scripts/UI/BaseWindow.cs:120-140`): left-press via `GuiInput` sets `_dragging = true`; a `_Process` poll of `Input.IsMouseButtonPressed(MouseButton.Left)` detects the release (works even if the cursor leaves the slider). This is Task 4's commit mechanism.
+- `HSlider` (GodotSharp 4.7.1, same DLL): properties `MinValue`, `MaxValue`, `Step`, `Value`; C# events `ValueChanged`, `GuiInput`, **`DragStarted`, `DragEnded`** — reflection-verified on `Godot.HSlider` (the drag events are generated on `HSlider`/`VSlider`, NOT on `Range` — an earlier reflection check of `Range` missed them and wrongly concluded the signal didn't exist; a runtime probe confirms `HSlider.get_signal_list()` includes `drag_started,drag_ended`). Task 4's commit mechanism is the `DragEnded` event; `_Process`/`Input.IsMouseButtonPressed` polling (the `BaseWindow` pattern, `Scripts/UI/BaseWindow.cs:120-140`) is the fallback ONLY if M2 shows release-outside-control doesn't fire `DragEnded`.
 - `CharacterSettings.Options` — `Dictionary<string, object>`, `GetOption<T>(key, default)`, indexer-set + `Save()` — `Scripts/CharacterSettings.cs:42-67,144`. Existing usage pattern: `Scripts/UI/OptionsWindow.cs:23-49` (checkbox read in `_Ready`, write in toggled handler, `Save()` on close/toggle — `OptionsWindow.cs:56-60`).
 - `Constants.cs:136` — `public static class Options` (string keys: `TargetFiltering`, `ShowSpiritBar`, `SpiritBarShown`, `RenderMode`).
 - `OptionsWindow.tscn` — checkboxes are `Content/*Check` nodes; window root is a `BaseWindow` (self-registered by Part 1, so the new group scales automatically).
 - Window resize: `GameManager.cs:103` (`window.SizeChanged += OnWindowResized`), handler `Scripts/GameManager.cs:337-345` (guards: `UiLayer == null`, canvas < 2; walks `CollectBaseWindows`).
 - Only drag state in the codebase: `BaseWindow._dragging` (`Scripts/UI/BaseWindow.cs:122-140`) — press sets true, release persists + clears, motion accumulates `Position += motion.Relative`. No other mouse-follow drags exist (hotbar swap is click-based, `Scripts/UI/HotbarSwap.cs`).
-- Login: `Scenes/Login.tscn` — `MarginContainer` (anchor 0.5, offsets ±150/±100) → `VBox` (`theme_override_constants/separation = 10`) → `NameInput`, `PasswordInput`, `LoginButton`, `StatusLabel`; script `Scripts/LoginScene/LoginScene.cs`; **no `GameTheme` attached** (engine default font, size 16).
+- Login: `Scenes/Login.tscn` — `MarginContainer` (anchor 0.5, offsets ±150/±100) → `VBox` (`theme_override_constants/separation = 10`) → `NameInput`, `PasswordInput`, `LoginButton`, `StatusLabel`; script `Scripts/LoginScene/LoginScene.cs`. Theme: the scene attaches no theme of its own, but `project.godot:37` sets `theme/custom="res://Assets/UI/GameTheme.tres"` **project-wide**, so its text controls resolve `font_size == 10` (headless-probed: themeless in-tree `Label`/`LineEdit` in this project → 10; the engine default of 16 never applies). Mutating the theme's `default_font_size` therefore reaches these controls — no explicit font entries needed (Task 5).
 - Loading: `Scenes/LoadingMap.tscn` — single `StatusLabel` (anchor 0.5, offsets ±150/±10), script `Scripts/LoadingMapScene/LoadingMapScene.cs`; **no theme**.
 
 ---
@@ -27,6 +27,7 @@
 **Files:**
 - Modify: `Scripts/UiScale.cs`
 - Modify: `Scripts/Constants.cs:136`
+- Modify: `Scripts/UiScaleApplier.cs` — add `public UiScaleMode Mode { get; set; }` (default `Auto`; used by this task's `LoadSettings` hook and Task 3's recompute — added HERE so Part 2 compiles task-by-task).
 - Modify: `Scripts/GameManager.cs` — the settings read goes in **`LoadSettings`** (`Scripts/GameManager.cs:275`), NOT `GameManager._Ready`: `CharacterSettings` is null in `_Ready` (it is created only in `LoadSettings`, called from `LoginScene.cs:103` on successful login — a settings read in `_Ready` NREs on every launch). Part 1's settings-independent `Apply(AutoFactor(canvas.Y), Startup)` in `_Ready` stays as-is (it scales the login screen for Auto users pre-login).
 - Test: `tests/Goose2Client.Tests/UiScaleTests.cs` (extend)
 
@@ -54,7 +55,7 @@ var canvas = (Vector2I)GetTree().Root.GetVisibleRect().Size;
 applier.Mode = mode;   // Task 3's auto-recompute branches on this; set it HERE (not just in the Options window)
 applier.Apply(applier.Scale.Resolve(mode, saved, canvas.Y), ApplyReason.Startup);
 ```
-(`Resolve` is an instance method reading nothing but its arguments; call it through the applier's `Scale` instance.) The headless self-test (Part 1 Task 8) never calls `LoadSettings` (no login in headless) — `CharacterSettings` stays null there, and Part 1's settings-independent `Apply` at the 1280×720 project viewport (`project.godot`) gives `AutoFactor(720) == 1`, so the self-test's factor-1 baseline is untouched. The "launch with settings pinning Manual 2×" leg has NO automated form in either plan's self-test (headless cannot log in) — it is covered by manual check M3; state that there.
+(`Resolve` is an instance method reading nothing but its arguments; call it through the applier's `Scale` instance.) The headless self-test (Part 1 Task 8) never calls `LoadSettings` (no login in headless) — `CharacterSettings` stays null there, and Part 1's settings-independent `Apply` at the headless root size (NOT the project's 1280×720 — headless probes report ~64–100px; see Part 1 Task 8 step 0) gives `AutoFactor(small) == 1`, so the self-test's factor-1 baseline is untouched. The "launch with settings pinning Manual 2×" leg has NO automated form in either plan's self-test (headless cannot log in) — it is covered by manual check M3; state that there.
 
 **Step 5 (green) + commit:** `feat: settings-driven UI scale factor at settings load`.
 
@@ -107,7 +108,7 @@ if (applier != null && applier.Mode == UiScaleMode.Auto)
 }
 // existing CollectBaseWindows walk (unchanged)
 ```
-`applier.Mode` = the mode stored at settings load (Task 1, in `LoadSettings`) and updated by the Options window (Task 4) — add `public UiScaleMode Mode { get; set; }` to the applier (set in BOTH places; default `Auto` covers the pre-login window). It is UI-state, not scale-math.
+`applier.Mode` = the mode stored at settings load (Task 1, in `LoadSettings`) and updated by the Options window (Task 4) — the `Mode` property is added in Task 1 (set in BOTH places; default `Auto` covers the pre-login window). It is UI-state, not scale-math.
 
 **Why safe:** `OnWindowResized` fires on the root window's `size_changed` — user drag-resize emits many; the `f != applier.Factor` compare makes each a no-op except at the 720/1080/1440 boundaries (design Section 4, no debounce). The `Apply` early-return-on-unchanged-factor (Part 1 Task 3) is the second guard.
 
@@ -123,13 +124,14 @@ if (applier != null && applier.Mode == UiScaleMode.Auto)
 - Modify: `Scripts/UI/OptionsWindow.cs`
 
 **Behavior spec (pinned — the drag-release contract from the design):**
-- Mode is exclusive: checking one unchecks the other. `ScaleAutoCheck` → mode Auto; `ScaleManualCheck` → mode Manual (slider row becomes visible; in Auto the slider + value label are `Visible = false`).
+- Mode is exclusive: checking one unchecks the other. `ScaleAutoCheck` → mode Auto; `ScaleManualCheck` → mode Manual (slider row becomes visible; in Auto the slider + value label are `Visible = false`). **Reentrancy:** the programmatic uncheck of the other box re-fires its `Toggled` handler and would flip the mode straight back — guard with a `bool _modeSwitching` set for the duration of the paired check/uncheck (same suppression idea as the `_initializing` guard below, but for mode switches at runtime).
 - On open — the Options window is built ONCE at HUD time (Part 1) and toggled visible, so the open-state refresh belongs in the `_Ready` body guarded by the existing `_initializing`-style first-run flag (or a one-shot `bool _optionsInitialized`), NOT re-read on every show: read `Options.UiScaleMode` (default Auto) + `Options.UiScaleValue` (default 1); set check states, slider value, effective-factor display (`"Auto (2×)"` style text on `ScaleValueLabel` — the user always sees the in-force factor). The new `_Process` override (drag-release poll) MUST call `base._Process(delta)` first — `BaseWindow._Process` drives the hover fade (`BaseWindow.cs`).
 - **Initial-open guard (adversarial):** programmatic `ScaleSlider.Value = x` in `_Ready` fires `ValueChanged`, and with `_dragging == false` that would `Commit` on EVERY window open — in first-open Manual mode the mode-switch rule would double-commit on top. Set `_initializing = true` before the programmatic sets and clear it on the next `ProcessFrame` (one `await`); `ValueChanged` and the mode handlers early-return while it is set.
-- **Commit rule** (no `drag_ended` in this engine — see APIs verified): track a local `_dragging` on the slider with the `BaseWindow` move-drag pattern (`Scripts/UI/BaseWindow.cs:120-140`):
-  - `ScaleSlider.GuiInput`: left mouse button **press** → `_dragging = true`.
-  - `_Process` (options window): `if (_dragging)` → live-update `ScaleValueLabel`; `if (!Input.IsMouseButtonPressed(MouseButton.Left))` → `_dragging = false; Commit((float)ScaleSlider.Value);` (release detected globally, even off-slider — same as window-move release).
-  - `ValueChanged(v)`: update `ScaleValueLabel` ALWAYS (live feedback). If `!_dragging` (keyboard arrow / programmatic set) → `Commit(v)` — mirrors how `BaseWindow` treats non-drag state, and matches the design's "commit on `value_changed` iff not dragging" rule.
+- **Commit rule** (events verified — see APIs verified):
+  - `ScaleSlider.DragStarted` → `_dragging = true` (suppresses per-tick commits while the thumb is held).
+  - `ScaleSlider.DragEnded` → `_dragging = false; Commit((float)ScaleSlider.Value);`
+  - `ValueChanged(v)`: update `ScaleValueLabel` ALWAYS (live feedback). If `!_dragging` (keyboard arrow / programmatic set) → `Commit(v)`.
+  - **Fallback (decide at M2):** if manual check M2 shows a release with the cursor OFF the slider fails to fire `DragEnded` (the engine emits it on control mouse-release; verify, don't assume), add the `BaseWindow`-style `_Process` poll of `Input.IsMouseButtonPressed(MouseButton.Left)` as the release detector (left-press via `GuiInput` sets `_dragging`, matching `Scripts/UI/BaseWindow.cs:120-140`).
 - `Commit(v)`: `snapped = UiScaleApplier.Instance.Scale.Factor(v)`; if `snapped != UiScaleApplier.Instance.Factor` → `Options[UiScaleValue] = snapped`, `Save()`, `UiScaleApplier.Instance.Apply(snapped, ApplyReason.UserCommit)`; always set `applier.Mode` + persist `Options[UiScaleMode]` on mode changes and `Save()` on window close/toggle (existing pattern, `OptionsWindow.cs:56-60`).
 - Mode switch to Manual commits the current slider value immediately (`ApplyReason.UserCommit`); switch to Auto commits `AutoFactor(currentCanvasY)`.
 - The Options window itself live-resizes on its own commit (accepted per design Section 5); the release-only commit means it never resizes under the dragging cursor.
@@ -144,11 +146,11 @@ if (applier != null && applier.Mode == UiScaleMode.Auto)
 **Files:**
 - Modify: `Scripts/LoginScene/LoginScene.cs` (`_Ready` end: Part 1 self-registration pattern — snapshot + `RegisterWindow`; `Relayout()` = `UiScaleLayout.Apply(_geom, factor)`; no reposition — the scene is full-rect anchored)
 - Modify: `Scripts/LoadingMapScene/LoadingMapScene.cs` (same)
-- Same files: explicit fonts — every text control gets `applier.ApplyFontSize(c, 16f)`: Login's `NameInput`, `PasswordInput`, `LoginButton`, `StatusLabel`; Loading's `StatusLabel`. Base 16 = engine default (`GetDefaultFontSize` without a theme — verify at implementation with a one-line headless probe if in doubt; the 1× no-op check below pins it).
+- **No explicit font entries (review finding F2):** `project.godot:37` sets `theme/custom` project-wide, so Login/Loading text already resolves `font_size == 10` through the same `GameTheme` instance the applier mutates — `SetDefaultFontSize` reaches these controls with zero per-scene work. Do NOT add `ApplyFontSize(c, 16f)` overrides: the effective base is 10 (probed), not 16, and a 16-based override would change 1× login text from 10px to 16px — a visible regression this task's own gate exists to prevent.
 
-**Why explicit (not theme):** neither scene attaches `GameTheme`, so `SetDefaultFontSize` never reaches them; attaching the theme would be a 16→10px regression for 1× users (design Gap 1). The `VBox` `separation = 10` constant scales via the snapshot's constants path (Part 1 Task 4).
+The `VBox` `separation = 10` constant and the `MarginContainer` ±150/±100 offsets scale via the snapshot (Part 1 Task 4).
 
-**1× no-op proof (adversarial):** extend Part 1's self-test (same `+selftest=ui_scale` run — no separate mode). At startup the login scene IS the current scene (freed only on successful login), so the sequence gains a login phase around the existing HUD phases: (0) at startup factor 1, assert login baselines: `MarginContainer` size `300×200` (tscn ±150/±100), `NameInput.GetThemeFontSize("font_size") == 16` (pins the engine-default base), VBox separation `== 10`; (1) `Apply(2f)`: login `MarginContainer == 600×400`, `NameInput` font `== 32`, separation `== 20`, plus all Part 1 HUD assertions; (2) `Apply(1f)`: login values round-trip to `300×200` / 16 / 10 (a wrong base would not round-trip — the adversarial leg).
+**1× no-op proof (adversarial):** extend Part 1's self-test (same `+selftest=ui_scale` run — no separate mode). At startup the login scene IS the current scene (freed only on successful login), so the sequence gains a login phase around the existing HUD phases: (0) at startup factor 1, assert login baselines: `MarginContainer` size `300×200` (tscn ±150/±100), `NameInput.GetThemeFontSize("font_size") == 10` (pins the PROJECT-THEME base — if this ever reads 16, the project theme stopped applying and this task's premise is broken), VBox separation `== 10`; (1) `Apply(2f)`: login `MarginContainer == 600×400`, `NameInput` font `== 20`, separation `== 20`, plus all Part 1 HUD assertions; (2) `Apply(1f)`: login values round-trip to `300×200` / 10 / 10 (an explicit-override approach with a wrong base would not round-trip — the adversarial leg).
 
 **Gate:** self-test exits 0 including the login legs.
 **Commit:** `feat: scale login and loading screens`.
@@ -168,7 +170,7 @@ if (applier != null && applier.Mode == UiScaleMode.Auto)
 | M5 | 720p Manual 3× | HUD scales to 3×; oversized windows clamp on-screen (accepted-limitation behavior, design §7); 1.5× icons acceptably soft (the Q3 verdict) |
 | M6 | Start moving a window (title-bar drag), then commit a scale change before releasing | Window snaps back to pre-drag position; saved settings unchanged (verify by restarting and comparing position) |
 | M7 | Non-16:9 window (e.g. 1600×900) | World gutters per Stage 1; HUD placement correct at the auto factor (900 → 1, threshold); tooltips clamp to viewport at 3× |
-| M8 | Login screen at 1080p Auto | Login box 2× (600×400), text 32px; loading overlay scales during a map transition |
+| M8 | Login screen at 1080p Auto | Login box 2× (600×400), text 20px (project theme base 10 × 2); loading overlay scales during a map transition |
 | M9 | Chat: scroll mid-log, commit scale change | Chat content + scroll offset preserved; reposition keeps edge-stuck offset (M-edge check) |
 | M10 | `bash tools/tests/run_ui_scale.sh` (+ login leg) | Exit 0, no `ERR_` output — headless regression gate stays green |
 
@@ -185,7 +187,7 @@ if (applier != null && applier.Mode == UiScaleMode.Auto)
 | Auto recompute is boundary-only (no resize churn) | Task 3 compare + M4 |
 | Drag-release commit (no resize under cursor) | Task 4 pinned commit rule + M2 |
 | Slider can't produce off-step values | `HSlider.Step = 0.5` + `Commit` snaps through `UiScale.Factor` again (belt and braces) + M2 |
-| Login/loading scale WITHOUT a 1× visual change | Task 5 round-trip self-test leg (adversarial: wrong base 16 fails the round-trip) |
+| Login/loading scale WITHOUT a 1× visual change | Task 5 round-trip self-test leg (adversarial: any wrong font base — e.g. the old 16 assumption — fails the 10→20→10 round-trip) |
 | Whole feature regression gate | M10 (Part 1 self-test + new login leg) |
 
 **Explicitly NOT in this part (design §7, accepted):** 3×-overflow fit guarantee, OS-DPI auto-mode accuracy, sub-0.5 steps, world-viewport text scaling (out of scope by design), item/spell DnD cancel on commit (no Godot API; window move-drag IS cancelled).

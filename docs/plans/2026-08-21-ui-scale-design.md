@@ -79,14 +79,16 @@ public interface IScalableWindow { void Relayout(); }
 
 ### Registration
 
-- `UiScaleApplier` is a node under the `GameManager` autoload (persistent across map
-  entries, same home as `WorldViewport`).
+- `UiScaleApplier` is a plain class (not a Node) with a `TooltipManager.Instance`-
+  style static accessor, created in `GameManager._Ready` — persistent across map
+  entries, same home as `WorldViewport`.
 - Windows **self-register at end of their own `_Ready`** (R3); `tree_exited` deregisters.
   `GameHud` is never freed/rebuilt (guarded `EnsureHud`), so there is no rebuild-clear;
   a leaked entry is harmless (apply steps null-skip).
 - Windows spawned mid-session (NPC windows on click) must build through the same
   Register → `Relayout()` path — **no window may build without registering.**
-- Tooltips register on spawn, deregister via `tree_exited`.
+- Tooltips do **not** register (R2): live tooltips are hidden on apply, re-shown on
+  next hover.
 - Login scene and loading overlay register in `_Ready`, deregister in `_ExitTree`.
 
 **Implementation refinements (ratified in the part-1 plan — `2026-08-21-ui-scale-part1-foundation.md`):**
@@ -116,11 +118,14 @@ public interface IScalableWindow { void Relayout(); }
    window code sets a font size.
    - Bridge text (`BridgedNameLabel`, `ChatBubble`, `BattleTextLine`) does **not**
      use it — world-space, out of scope.
-   - `Login.tscn` and `LoadingMap.tscn` do **not** attach `GameTheme` (their labels
-     currently render at the engine default font/size, 16px). They get explicit
-     `ApplyFontSize` calls with base values matching today's rendered size.
-     Attaching `GameTheme` instead would be a 16px→10px visual regression for all
-     1× users — rejected.
+   - `Login.tscn` and `LoadingMap.tscn` attach no theme of their own, but
+     `project.godot:37` sets `theme/custom` **project-wide**, so their text already
+     resolves through `GameTheme` at effective `font_size == 10` (headless-probed).
+     Tier 1 therefore reaches them with **no per-scene work** — no `ApplyFontSize`
+     entries, no theme attaching (an earlier draft assumed the 16px engine default
+     here; the probe disproved it — the part-2 plan's Task 5 pins 10→20→10).
+     Their geometry (the `MarginContainer` offsets, VBox `separation`) scales via
+     the standard snapshot registration.
 
 ### Apply pass — the single mutation point
 
@@ -132,8 +137,8 @@ public interface IScalableWindow { void Relayout(); }
    built-in item/spell DnD has no cancel API and cannot realistically co-occur with a
    scale commit (both need the left button) — accepted limitation, see §7.
 3. Set `GameTheme.default_font_size`; re-apply all registered explicit overrides.
-4. Call `Relayout()` on all registered windows (HUD, login/loading, live tooltips
-   repositioned).
+4. Call `Relayout()` on all registered windows (HUD, login/loading; live tooltips
+   are hidden instead, R2).
 5. Re-solve every HUD window's placement via the existing pure
    `WindowPlacement.Resolve(savedPos, window.Size, savedCanvas, currentCanvas)` and
    set the position. All windows re-solve — no opt-out. Middle-parked windows (e.g.
@@ -154,10 +159,12 @@ Both triggers funnel through `Apply(factor, reason)`.
 - On mouse release: if value ≠ committed factor → save → `Apply`.
 - Keyboard/programmatic change: `value_changed` with no pointer drag in progress →
   commit immediately. Rule: commit on `value_changed` iff not dragging, else on
-  release. (Mechanism note: Godot 4.7.1's `Range` has no `drag_ended` signal —
-  verified by reflection + headless probe — so drag state is tracked with the
-  `BaseWindow` pattern: `GuiInput` left-press sets it, an `Input.IsMouseButtonPressed`
-  poll in `_Process` detects release. See the part-2 plan, APIs verified.)
+  release. (Mechanism note: `HSlider`/`VSlider` expose C# `DragStarted`/`DragEnded`
+  events in 4.7.1 — reflection + runtime `get_signal_list()` verified; they are
+  generated on the slider types, not on `Range`, which is where an earlier check
+  wrongly looked. The commit uses `DragEnded`, with the `BaseWindow`
+  `GuiInput`+`Input.IsMouseButtonPressed` poll as fallback only if M2 shows
+  release-outside-control doesn't fire it. See the part-2 plan, APIs verified.)
 
 **2. Auto mode + window resize.**
 
@@ -253,7 +260,8 @@ flash.
   rasterize-then-scale (blur at 1.5×), `WindowPlacement` canvas-coordinate math
   breaks, tooltip anchoring needs inverse transforms, and it fights the native-
   pixels philosophy Stages 1–2 established.
-- **Attaching `GameTheme` to login/loading:** would change their text from the engine
-  default (16px) to LiberationSans-10 at 1× — a regression disguised as scaling.
+- **Explicit `ApplyFontSize` bases for login/loading (e.g. base 16):** their text
+  already resolves through the project-wide theme at 10px, so explicit overrides
+  would change 1× appearance — the part-2 Task 5 round-trip test is the guard.
 - **Integer-only factors (1–4):** crisper icons but no in-between sizes; the chosen
   1–3 in 0.5 steps is the compromise, with the clamp keeping Auto integer.
