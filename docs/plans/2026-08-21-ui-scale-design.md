@@ -132,7 +132,10 @@ public interface IScalableWindow { void Relayout(); }
   — (position, size, factor, canvas) — at drag-end, and EVERY placement (registration,
   scale commit, canvas resize, auto-threshold crossing) derives from
   `WindowPlacement.ResolveScaled(quad + live Size/factor/canvas)`. The quad is
-  invariant across commits, so 1×→2×→1× round-trips exactly by construction; canvas
+  invariant across commits — it changes ONLY at drag-end (visibility toggles/close
+  persist `Visible` only; a toggle path that also saved live position + canvas would
+  yield mixed-coordinate quads after a scale commit) — so 1×→2×→1× round-trips
+  exactly by construction; canvas
   and factor changes compose in one call (no old-canvas tracking, no live-rect
   capture). **Margin policy: edge margins are LOGICAL UI PIXELS — they scale with the
   factor** (× `factor/savedFactor`), matching anchored roots (chat's tscn margins
