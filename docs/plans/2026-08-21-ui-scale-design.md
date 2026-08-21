@@ -27,15 +27,19 @@ theme font sizes and window size constants, applied live.
 
 - The world subviewport and everything in it, including `WorldTextBridge`
   (names, chat bubbles, battle text) — world-anchored; scales with the world.
-- Window positions — Stage 1's edge-stick/clamp placement already adapts to canvas
-  size; Stage 3 only feeds it the new sizes.
+- The window-placement ALGORITHM — Stage 1's edge-stick/clamp/middle-band logic is
+  unchanged; Stage 3 only feeds it new sizes. (What Stage 3 DOES add to placement:
+  per-window persistence of the (Size, Factor, Placed) quad so a saved position
+  survives scale commits, and pure `ResolveScaled` — SC-06/SC-07.)
 - New art assets or font files — existing LiberationSans is reused; existing
   icons/sprites are stretched.
 - Reticle/cursor (none exists on the root viewport).
 
 **Behavioral contract:** the visible factor is either the user's slider value or
-`AutoFactor(window_h)`, clamped to 1–3. Every scaled pixel value is
-`max(1, round(base × factor))`. No scaled value is computed outside the `UiScale`
+`AutoFactor(window_h)`, clamped to 1–3. Every scaled SIZE and FONT value is
+`max(1, round(base × factor))`; OFFSETS scale without the min-1 clamp (they may be
+zero or negative — bottom-anchored roots, tooltips), and PLACEMENT stays float with
+no per-axis rounding (SC-06). No scaled value is computed outside the `UiScale`
 math class.
 
 ## 1a. Requirements (stable IDs) — canonical traceability table
@@ -53,7 +57,7 @@ prose repetition made traceability informal).
 | SC-04 | Fonts: theme default + explicit `ApplyFontSize` registry; login/loading via the PROJECT-WIDE theme (no per-scene work) | Part 1B Task 1; Part 1C Task 3; Part 2 Task 5 | 1×/2× audits (Part 1C Task 5), grep invariant, M8 |
 | SC-05 | Window geometry: 1× tscn/base snapshot, `Relayout` scales; container-managed offsets skipped | `UiScaleLayout` (Part 1B Task 2); registration (1B Tasks 3–4) | 1× bit-identity + 2× sampled rects (Part 1C Task 5) |
 | SC-06 | Placement: saved QUAD + pure `ResolveScaled`; edge margins in logical px; middle-band kept; legacy files place identically (`LegacySize`) | Part 1A Task 2; `RepositionFromSaved` (Part 1B Task 3) | `ResolveScaled_*` pins + `CharacterSettingsJsonTests` |
-| SC-07 | Persistence: full quad ONLY at drag-end; visibility toggles write `Visible` only; Part 1A adds `Size`/`Factor`, Part 2 adds the two option keys | Part 1A Task 2; Part 1B Task 3; Part 2 Task 1 | `SetWindowVisible_PreservesFullQuad` etc. + M2 leg |
+| SC-07 | Persistence: full quad + `Placed` marker ONLY at drag-end; visibility toggles write `Visible` only; a saved (0,0) round-trips; Part 1A adds `Size`/`Factor`/`Placed`, Part 2 adds the two option keys | Part 1A Task 2; Part 1B Task 3; Part 2 Task 1 | `WindowSettings_SavedOriginRoundTrips` + `SetWindowVisible_PreservesFullQuad` etc. + Part 1C Task 5 step 2d + M2 leg |
 | SC-08 | Drag-cancel on commit: in-flight move-drag cancelled; final position = `ResolveScaled(quad, newFactor)`; in-flight position never persisted | Part 1B Task 1 (pass step); Part 2 Task 2 | M6 + `CancelDrag` postcondition pin |
 | SC-09 | Tooltips + vitals portrait: factor-aware per-frame via pure metrics; NOT snapshot-registered | Part 1C Tasks 1–2 | metrics xUnit + Part 1C Task 5 leg + M7 |
 | SC-10 | Party roster tiles: the ONE container-skip exception — min-size + internal map via `PartyMemberMetrics` | Part 1C Task 3 | `PartyMemberMetrics` xUnit + Part 1C Task 5 leg (8 tiles) |
@@ -62,7 +66,7 @@ prose repetition made traceability informal).
 | SC-13 | Auto mode re-computes on window resize (720/1080/1440 boundaries only, no debounce) | Part 2 Task 3 | M4 |
 | SC-14 | Mode UI: `ButtonGroup` `AllowUnpress = false` (exactly-one-selected); Auto→Manual persists mode+value; dormant manual value survives Auto | Part 2 Task 4 | M11 (widget) + commit-split xUnit (value) |
 | SC-15 | Regression gates: xUnit suite + headless self-test exit 0 (M10) + manual matrix M1–M11 | Part 1C Task 5; Part 2 Task 6 | the gates themselves |
-| SC-16 | Login scaling automated; **loading scaling MANUAL-ONLY** (headless can never trigger a map transition — stated gap, M8 is the sole gate) | Part 2 Task 5 | self-test login leg; M8 |
+| SC-16 | Login AND loading scaling AUTOMATED — the self-test instantiates both scenes directly (no server transition needed; M3's real-transition check is sanity-only) | Part 2 Task 5 | self-test login leg + loading leg; M8 |
 
 ## 2. `UiScale` pure math
 
@@ -73,17 +77,21 @@ applier (no hidden global state).
 ```
 const Min = 1f, Max = 3f, Step = 0.5f
 
-Factor(float raw)            // snap to 0.5 steps, clamp to [1, 3]
-AutoFactor(int windowHpx)    // thresholds: h < 1080 → 1, h < 1440 → 2, else 3 (clamped)
-ScaleSize(float basePx)      // max(1, round(basePx * factor))   (round = half-away-from-zero, pinned by test)
-ScaleSizeI(Vector2I v)       // per-axis ScaleSize
+static NormalizeFactor(float raw)  // snap to 0.5 steps, clamp to [1, 3]
+static AutoFactor(int windowHpx)   // thresholds: h < 1080 → 1, h < 1440 → 2, else 3 (clamped)
+ScaleSize(float basePx)            // max(1, (int)MathF.Round(basePx * factor, AwayFromZero))  (pinned by test; the (int) cast is required)
+ScaleSizeI(Vector2I v)             // per-axis ScaleSize
+CurrentFactor (float)              // plain state — the applier is the ONLY writer
 ```
 
-- `Factor` is the single normalization entry point; auto and slider values both pass
-  through it (corrupt saved values included).
+- `NormalizeFactor` is the single normalization entry point; auto and slider values
+  both pass through it (corrupt saved values included). `Resolve` (mode, value, h)
+  and `NormalizeMode` (Part 2) are the same shape — pure statics.
 - `AutoFactor` boundaries: 720–1079 → 1, 1080–1439 → 2, 1440+ → 3 (2880 → 3, clamped).
 - Font sizes use the same `ScaleSize` — no separate font rounding rule.
-- No division anywhere: placement math takes actual sizes, never the factor.
+- No division anywhere EXCEPT the documented `factor / savedFactor` margin re-scale
+  inside `WindowPlacement.ResolveScaled` (SC-06) — every other call site takes
+  actual sizes, never the factor.
 
 ## 3. Registration and re-layout contract
 
@@ -155,7 +163,9 @@ public interface IScalableWindow { void Relayout(); }
   a C# CS0102 error — verified — and the old naming was semantically ambiguous.)
 - R5: **saved-quad placement model** (a captured old size alone cannot round-trip —
   the persisted position goes stale after any commit): each window persists a QUAD
-  — (position, size, factor, canvas) — at drag-end, and EVERY placement (registration,
+  — (position, size, factor, canvas) — plus a `Placed` marker (a saved (0,0) is a
+  position, not an absence; unplaced/legacy records fall back to default/legacy
+  resolution — SC-07) at drag-end, and EVERY placement (registration,
   scale commit, canvas resize, auto-threshold crossing) derives from
   `WindowPlacement.ResolveScaled(quad + live Size/factor/canvas)`. The quad is
   invariant across commits — it changes ONLY at drag-end (visibility toggles/close
@@ -248,13 +258,19 @@ Both triggers funnel through `Apply(factor, reason)`.
 **Commit-time safety:**
 
 - A window move-drag in progress at commit time is cancelled (Section 3 step 2); the
-  move never "finished", so `savedPos` is unchanged and the re-solve is a no-op.
+  move never "finished", so the saved QUAD is unchanged. The pre-drag restore is an
+  INTERMEDIATE step — the placement pass then re-derives every window as
+  `ResolveScaled(quad, newFactor)`, equal to the pre-drag pixel ONLY when the factor
+  didn't change (Section 3 step 2).
 - `ScrollContainer` children are not recreated by `Relayout` — chat does not jump to
   the top.
 
-**Startup order:** settings load → initial `Apply` → scene/HUD build. The factor is
-set before any window registers, so the first build is already scaled; no unscaled
-flash.
+**Startup order (two applies, review — the one-apply sketch was wrong):** applier
+created in `GameManager._Ready` + settings-INDEPENDENT Auto `Apply(AutoFactor(canvas.Y),
+Startup)` (CharacterSettings doesn't exist yet — this scales the login screen for
+Auto users) → successful login → `LoadSettings` (settings-DRIVEN re-`Apply`: persisted
+Manual factor, or Auto — Part 2 Task 1) → scene/HUD build. The factor is set before
+any window registers, so the first build is already scaled; no unscaled flash.
 
 ## 5. Options window UI
 
