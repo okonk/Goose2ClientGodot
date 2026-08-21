@@ -133,10 +133,13 @@ Both triggers funnel through `Apply(factor, reason)`.
 **1. Slider commit (options window).**
 
 - While dragging: only the slider's value label updates; nothing else happens.
-- On `drag_ended` (mouse release): if value ≠ committed factor → save → `Apply`.
+- On mouse release: if value ≠ committed factor → save → `Apply`.
 - Keyboard/programmatic change: `value_changed` with no pointer drag in progress →
   commit immediately. Rule: commit on `value_changed` iff not dragging, else on
-  `drag_ended`.
+  release. (Mechanism note: Godot 4.7.1's `Range` has no `drag_ended` signal —
+  verified by reflection + headless probe — so drag state is tracked with the
+  `BaseWindow` pattern: `GuiInput` left-press sets it, an `Input.IsMouseButtonPressed`
+  poll in `_Process` detects release. See the part-2 plan, APIs verified.)
 
 **2. Auto mode + window resize.**
 
