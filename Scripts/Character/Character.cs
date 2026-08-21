@@ -109,7 +109,7 @@ namespace Goose2Client.Character
                 MouseFilter = Control.MouseFilterEnum.Ignore,
             };
             _nameLabel.AddThemeColorOverride("font_outline_color", new Color(0, 0, 0, 0.9f));
-            bridge.Register(_nameLabel, this);   // Register: Owner → ApplyScale (font metrics, valid off-tree) → AddChild
+            bridge.Register(_nameLabel, this);   // Register: AnchorOwner → ApplyScale (font metrics, valid off-tree) → AddChild
             RepositionOverlays();
             return true;
         }
@@ -690,7 +690,7 @@ namespace Goose2Client.Character
             if (GameManager.Instance?.WorldTextBridge is not { } bridge) return;
 
             _chatBubble = new Overlays.ChatBubble { Name = "ChatBubble" };
-            // Register before SetText: Owner is set for the bubble's self-anchoring, and the
+            // Register before SetText: AnchorOwner is set for the bubble's self-anchoring, and the
             // bubble must be in the tree (under the bridge) before measurement — the wrap
             // branch reads the label's own min size, which requires an in-tree label.
             // ApplyScale no-ops (_message still null); SetText measures and sets LocalOffsetWorld

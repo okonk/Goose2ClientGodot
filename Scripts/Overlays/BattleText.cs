@@ -10,7 +10,7 @@ namespace Goose2Client.Overlays
         private int _position;
         private float _scale = 1f;
 
-        public Character.Character Owner { get; set; }
+        public Character.Character AnchorOwner { get; set; }
         public Vector2 LocalOffsetWorld { get; set; }
 
         /// <summary>Local extent of the lines (the (0,−40) anchor is LocalOffsetWorld, NOT in here):

@@ -14,7 +14,7 @@ namespace Goose2Client.Overlays
         private string _message;
 
         /// <summary>The speaking character (set by the bridge at Register; used by self-anchoring).</summary>
-        public Character.Character Owner { get; set; }
+        public Character.Character AnchorOwner { get; set; }
 
         /// <summary>Anchor offset from the owner's feet origin in WORLD units; re-derived in <see cref="UpdateAnchor"/>.</summary>
         public Vector2 LocalOffsetWorld { get; set; }
@@ -51,11 +51,11 @@ namespace Goose2Client.Overlays
         /// mount changes move the nameplate).</summary>
         public void UpdateAnchor()
         {
-            if (Owner == null || !GodotObject.IsInstanceValid(Owner) || _message == null) return;
+            if (AnchorOwner == null || !GodotObject.IsInstanceValid(AnchorOwner) || _message == null) return;
             // 48 fallback mirrors the name label's `Height <= 0 ? 48 : Height` (BridgedNameLabel) —
             // a character missing body-height metadata must anchor the bubble above the SAME fallback
             // body height the nameplate uses, or the bubble detaches from the nameplate.
-            int bodyHeight = Owner.Height <= 0 ? 48 : Owner.Height;
+            int bodyHeight = AnchorOwner.Height <= 0 ? 48 : AnchorOwner.Height;
             LocalOffsetWorld = new Vector2(
                 -BackgroundWidth / 2f,
                 -(bodyHeight + Character.Character.NameTopOffset)

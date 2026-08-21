@@ -9,7 +9,7 @@ namespace Goose2Client.Overlays
     {
         private float _scale = 1f;
 
-        public Character.Character Owner { get; set; }
+        public Character.Character AnchorOwner { get; set; }
         public Vector2 LocalOffsetWorld { get; set; }
         public Rect2 ScreenBounds => new Rect2(Vector2.Zero, Size);   // node origin = label top-left
 
@@ -18,7 +18,7 @@ namespace Goose2Client.Overlays
             _scale = scale;
             AddThemeFontSizeOverride("font_size", Mathf.Max(1, Mathf.RoundToInt(12f * scale)));
             AddThemeConstantOverride("outline_size", Mathf.RoundToInt(4f * scale));
-            Layout(Owner);
+            Layout(AnchorOwner);
         }
 
         /// <summary>Re-measure at the current scale, size the label (screen px), and publish the

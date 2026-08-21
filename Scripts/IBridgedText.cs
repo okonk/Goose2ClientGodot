@@ -10,7 +10,7 @@ namespace Goose2Client
     /// viewport would swallow world clicks) and anchor-free — the bridge writes an absolute Position.</summary>
     public interface IBridgedText
     {
-        Character.Character Owner { get; set; }
+        Character.Character AnchorOwner { get; set; }
 
         /// <summary>Anchor offset from the owner's origin (feet) in WORLD units (scaled once at projection).</summary>
         Vector2 LocalOffsetWorld { get; set; }

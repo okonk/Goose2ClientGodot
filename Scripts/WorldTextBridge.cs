@@ -51,7 +51,7 @@ namespace Goose2Client
         /// Visible from the projection, so first appearance is already at the correct spot.</summary>
         public void Register<T>(T element, Character.Character owner) where T : CanvasItem, IBridgedText
         {
-            element.Owner = owner;
+            element.AnchorOwner = owner;
             element.ApplyScale(DisplayScale);
             element.Visible = false;   // no (0,0) flash before the first projection
             AddChild(element);
@@ -88,7 +88,7 @@ namespace Goose2Client
             {
                 var child = GetChild(i);
                 if (child is not CanvasItem item || child is not IBridgedText element) continue;   // CanvasItem: uniform for Control + Node2D elements
-                if (element.Owner == null || !GodotObject.IsInstanceValid(element.Owner))
+                if (element.AnchorOwner == null || !GodotObject.IsInstanceValid(element.AnchorOwner))
                 {
                     item.QueueFree();   // T4: owner gone (char removed / map change) → element dies
                     continue;
@@ -96,8 +96,8 @@ namespace Goose2Client
                 // ChangeMap overlap guard: for ~2 frames after a transition the NEW map is Current
                 // while OLD-map characters are still alive (queued free pending) — don't project
                 // them through the new map's canvas transform.
-                if (element.Owner.GetViewport() != _worldViewport.Current) { item.Visible = false; continue; }
-                var pos = _worldViewport.WorldToWindow(element.Owner.GlobalPosition)   // calls the shared forward transform (lockstep with WindowToWorld)
+                if (element.AnchorOwner.GetViewport() != _worldViewport.Current) { item.Visible = false; continue; }
+                var pos = _worldViewport.WorldToWindow(element.AnchorOwner.GlobalPosition)   // calls the shared forward transform (lockstep with WindowToWorld)
                     + element.LocalOffsetWorld * scale;
                 // No Position on CanvasItem — branch on the concrete base (elements are always one or the other):
                 if (item is Node2D n) n.Position = pos;
