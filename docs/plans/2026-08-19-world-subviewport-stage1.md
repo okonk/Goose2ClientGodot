@@ -410,6 +410,6 @@ Run `./run.sh`. Checklist:
 
 `WorldTextBridge`: move in-world text (`Character._nameLabel`, `ChatBubble`, `BattleText`; HP bars/reticle optional) to a native-resolution `CanvasLayer` between the world texture and `UiLayer`. Per frame, per element: `screenPos = WorldToWindow(worldPos)` — the **forward** transform, the exact inverse of Task 4's `WindowToWorld`: `vp = Current.GetCanvasTransform() * worldPos; screenPos = vp * Scale + DisplayOrigin` (add the method next to `WindowToWorld`). Font sizes in native px; cull outside the display rect; text always above world (fine for top-down; matches Unity's visual result).
 
-## Stage 3 (stub — plan later, possibly skip)
+## Stage 3 (designed — see 2026-08-21-ui-scale-design.md)
 
-UI scale knob (poor-man's Canvas Scaler): single factor (user option, or `round(window_h/720)` auto) multiplying theme font sizes + window size constants, applied at HUD (re)build. Positions are already handled in Stage 1 (edge-stick + clamp + canvas tracking); Stage 3 is font/window-size scaling only — and may be skippable, since edge-stuck windows already sit correctly on large displays.
+UI scale knob (poor-man's Canvas Scaler): single factor (auto `round(window_h/720)` clamped 1–3, or user slider 1–3 in 0.5 steps) multiplying theme font sizes + window size constants, applied live through a central applier + pure `UiScale` math. Positions are handled by Stage 1 (edge-stick + clamp); the applier re-solves placements via `WindowPlacement` after each layout pass.

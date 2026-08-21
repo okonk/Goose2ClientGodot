@@ -1,0 +1,232 @@
+# UI Scale (World Subviewport — Stage 3) Design
+
+**Date:** 2026-08-21
+**Branch:** `feature/ui-scale`
+**Supersedes:** the "Stage 3 (stub — plan later, possibly skip)" section of
+`docs/plans/2026-08-19-world-subviewport-stage1.md`.
+
+**Background:** Stage 1 moved the world into a `SubViewport` and made the root
+viewport render at native pixels; Stage 2 moved in-world text to the native-resolution
+`WorldTextBridge`. Everything left on the root viewport (HUD windows, tooltips, login,
+loading) still uses the 720p-era pixel constants — text and windows are tiny on
+1080p+/4K displays. Stage 3 adds a UI scale factor: a single knob that multiplies
+theme font sizes and window size constants, applied live.
+
+## 1. Scope
+
+**In scope** — everything rendered on the root (native-pixel) viewport:
+
+- All HUD window scenes (vitals, inventory, chat, spellbook, character, party, quest,
+  vendor, bank, hotbar, options, debug, buff effects, NPC/combine windows)
+- Tooltips (item/spell/map-item/text), spawned by `TooltipManager`
+- Login scene and loading overlay
+- Theme typography: `GameTheme.default_font_size` (base 10px) and all registered
+  explicit font-size overrides
+
+**Out of scope:**
+
+- The world subviewport and everything in it, including `WorldTextBridge`
+  (names, chat bubbles, battle text) — world-anchored; scales with the world.
+- Window positions — Stage 1's edge-stick/clamp placement already adapts to canvas
+  size; Stage 3 only feeds it the new sizes.
+- New art assets or font files — existing LiberationSans is reused; existing
+  icons/sprites are stretched.
+- Reticle/cursor (none exists on the root viewport).
+
+**Behavioral contract:** the visible factor is either the user's slider value or
+`AutoFactor(window_h)`, clamped to 1–3. Every scaled pixel value is
+`max(1, round(base × factor))`. No scaled value is computed outside the `UiScale`
+math class.
+
+## 2. `UiScale` pure math
+
+New file `Scripts/UiScale.cs`. Pure, no Godot types, fully xUnit-covered (same shape
+as `WorldViewportScale` / `WindowPlacement`). Small non-static class owned by the
+applier (no hidden global state).
+
+```
+const Min = 1f, Max = 3f, Step = 0.5f
+
+Factor(float raw)            // snap to 0.5 steps, clamp to [1, 3]
+AutoFactor(int windowHpx)    // Factor(round(windowHpx / 720f))
+ScaleSize(float basePx)      // max(1, round(basePx * factor))   (round = half-away-from-zero, pinned by test)
+ScaleSizeI(Vector2I v)       // per-axis ScaleSize
+```
+
+- `Factor` is the single normalization entry point; auto and slider values both pass
+  through it (corrupt saved values included).
+- `AutoFactor` boundaries: 720–1079 → 1, 1080–1439 → 2, 1440+ → 3 (2880 → 3, clamped).
+- Font sizes use the same `ScaleSize` — no separate font rounding rule.
+- No division anywhere: placement math takes actual sizes, never the factor.
+
+## 3. Registration and re-layout contract
+
+### `IScalableWindow`
+
+```csharp
+public interface IScalableWindow { void Relayout(); }
+```
+
+- Each window's build code is refactored so all size/position/anchor-pixel/font-override
+  assignments live in `Relayout()`. `Build()`/`_Ready` creates nodes once, then calls
+  `Relayout()`.
+- `Relayout()` reads the factor through the applier — a pure function of (base
+  constants, current factor). Windows never store the factor except a cached
+  "last factor I laid out at" used to skip re-creating expensive child content
+  (slot grids, spell pages) when only placement re-solved.
+- Node children are never recreated by a scale change: state (chat contents, selected
+  pages, scroll offsets) survives; only geometry changes.
+
+### Registration
+
+- `UiScaleApplier` is a node under the `GameManager` autoload (persistent across map
+  entries, same home as `WorldViewport`).
+- `GameHud` registers each window it builds; the applier **clears its registry at HUD
+  rebuild** (no explicit unregister; a leaked entry is harmless).
+- Windows spawned mid-session (NPC windows on click) must build through the same
+  Register → `Relayout()` path — **no window may build without registering.**
+- Tooltips register on spawn, deregister via `tree_exited`.
+- Login scene and loading overlay register in `_Ready`, deregister in `_ExitTree`.
+
+### Fonts — two tiers
+
+1. **Default-size text** (the majority): the applier sets
+   `GameTheme.default_font_size = ScaleSize(10)` on every apply pass; the shared Theme
+   resource propagates live to every themed control. Nothing to register.
+2. **Explicit overrides**: all raw `AddThemeFontSizeOverride` calls in window code
+   (e.g. `BaseMultipleWindow` button/line sizes) convert to
+   `UiScaleApplier.ApplyFontSize(Control c, float basePx)`, which sets the override to
+   `ScaleSize(basePx)` *and* records `(c, basePx)`. `ApplyFontSize` is the only way
+   window code sets a font size.
+   - Bridge text (`BridgedNameLabel`, `ChatBubble`, `BattleTextLine`) does **not**
+     use it — world-space, out of scope.
+   - `Login.tscn` and `LoadingMap.tscn` do **not** attach `GameTheme` (their labels
+     currently render at the engine default font/size, 16px). They get explicit
+     `ApplyFontSize` calls with base values matching today's rendered size.
+     Attaching `GameTheme` instead would be a 16px→10px visual regression for all
+     1× users — rejected.
+
+### Apply pass — the single mutation point
+
+`UiScaleApplier.Apply(factor, reason)`, in order:
+
+1. Normalize `factor` via `UiScale.Factor`; store on the applier's `UiScale` instance.
+2. Cancel any in-progress UI drag (window move-drag, hotbar/spell item drag,
+   spell-target drag) — drop the drag, hide the drag image, commit no drop.
+3. Set `GameTheme.default_font_size`; re-apply all registered explicit overrides.
+4. Call `Relayout()` on all registered windows (HUD, login/loading, live tooltips
+   repositioned).
+5. Re-solve every HUD window's placement via the existing pure
+   `WindowPlacement.Resolve(savedPos, window.Size, savedCanvas, currentCanvas)` and
+   set the position. All windows re-solve — no opt-out. Middle-parked windows (e.g.
+   the free-draggable hotbar) keep their coordinate; edge-stuck windows (chat, etc.)
+   keep their edge offset; the behavior falls out of the saved position through the
+   existing math.
+
+Order matters: fonts before `Relayout` (minimum-size queries see correct values),
+placement last (needs final sizes).
+
+## 4. Live change paths
+
+Both triggers funnel through `Apply(factor, reason)`.
+
+**1. Slider commit (options window).**
+
+- While dragging: only the slider's value label updates; nothing else happens.
+- On `drag_ended` (mouse release): if value ≠ committed factor → save → `Apply`.
+- Keyboard/programmatic change: `value_changed` with no pointer drag in progress →
+  commit immediately. Rule: commit on `value_changed` iff not dragging, else on
+  `drag_ended`.
+
+**2. Auto mode + window resize.**
+
+- On Auto, the window `size_changed` signal drives: `AutoFactor(newHeight)`; if it
+  differs from the committed factor → `Apply(newFactor, AutoResize)`.
+- Auto factors only change at the 720/1080/1440 height boundaries; the compare-and-
+  skip makes a drag-resize cost one int compare per frame. No debounce.
+
+**Commit-time safety:**
+
+- A window move-drag in progress at commit time is cancelled (Section 3 step 2); the
+  move never "finished", so `savedPos` is unchanged and the re-solve is a no-op.
+- `ScrollContainer` children are not recreated by `Relayout` — chat does not jump to
+  the top.
+
+**Startup order:** settings load → initial `Apply` → scene/HUD build. The factor is
+set before any window registers, so the first build is already scaled; no unscaled
+flash.
+
+## 5. Options window UI
+
+- New **UI Scale** group in the Options window: mode `Auto` (default) / `Manual`.
+- Slider visible only in Manual mode: 1.0–3.0, 0.5 steps, value shown as `1.5×`.
+  In Auto mode the group shows the effective factor (`Auto (2×)`).
+- Pending-while-dragging per Section 4.
+- **Persistence:** `UiScaleMode` (enum) + `UiScaleValue` (float) added to the
+  existing options settings save path that `OptionsWindow` already uses (plan phase
+  confirms the exact struct; no new file). Corrupt values pass through
+  `UiScale.Factor()` at load (`4.2 → 3`, `-1 → 1`).
+- **First-run default:** Auto (720p → 1×, no change; 1080p → 2×, the point of the
+  feature).
+- The Options window scales like every other window, including live resize on its own
+  commit (accepted).
+- Window positions keep using the existing saved-canvas placement file unchanged.
+
+## 6. Testing
+
+**xUnit (`tests/Goose2Client.Tests`), pure:**
+
+1. `UiScale`: `Factor` snap/clamp table; `AutoFactor` boundaries incl. 2880→3 clamp;
+   `ScaleSize` half-away-from-zero rounding pin and min-1 guard.
+2. `WindowPlacement` new cases for changed sizes: middle-parked window keeps its
+   coordinate when its size doubles; edge-stuck window keeps its edge offset at 2×/3×;
+   a window larger than the canvas at 3× clamps to (0,0).
+3. Normalization of corrupt saved values (incl. NaN-safe).
+
+**Headless/runtime (`tools/tests/` pattern, like `scene_lifecycle.gd`):**
+
+4. Font-registry audit: build HUD at factor 2, walk all `Control`s, assert any control
+   with a `font_size` override is in the applier's registry. Fails if a future PR adds
+   a raw `AddThemeFontSizeOverride`.
+5. No-unscaled-flash: start with settings pinning Manual 2×; before the first HUD
+   frame, theme `default_font_size == 20` and sampled window sizes equal
+   `round(base × 2)`.
+6. Live-change smoke: commit 1→2 on a built HUD; window sizes updated, placements
+   re-solved (edge-stuck edge offset unchanged), no script errors, chat scroll offset
+   preserved. The interrupted-drag sub-case is tested by directly invoking the cancel
+   path on a fake in-flight drag (synthetic mouse interleaving left to manual).
+
+**Manual / in-engine:**
+
+- 720p / 1080p / 1440p + non-16:9 windows: login, HUD, every window type, tooltips at
+  3×, slider drag-release, keyboard nudge, auto boundary crossing by window resize,
+  window move-drag interrupted by a scale commit, save/reload persistence.
+- Icon crispness at 1.5× specifically (user-accepted risk; this is where the 0.5-step
+  choice gets its verdict).
+
+## 7. Accepted limitations / deferred
+
+- **3× on a small window:** HUD can exceed the canvas (e.g. 3× Manual at 720p);
+  `WindowPlacement` clamps and overflow is unreachable. Accepted — 3× is an explicit
+  user choice and Auto never produces it below 1440p. Fit-guarantee deferred.
+- **OS-level DPI scaling vs Auto:** Godot's reported window height may be in scaled
+  pixels on some Windows DPI setups, so Auto may land one step off. Accepted;
+  one-line fix later (e.g. `DisplayServer` content scale) if it actually bites.
+- **Icon softness at 1.5×:** inherent to stretching sprite textures at a fractional
+  factor. Accepted by design decision (Q3: start with 1–3 in 0.5 steps, revisit).
+- **Tooltip clamping at large scale:** tooltips clamp to the viewport, consistent
+  with existing tooltip behavior.
+
+## 8. Rejected alternatives
+
+- **Per-window multiplication** (each of ~16 windows multiplies its own constants):
+  rounding/clamping policy copy-pasted across 20+ call sites; 16 separate live-update
+  hooks. Rots.
+- **Scaling the HUD root `Control` node:** free uniform scale, but fonts
+  rasterize-then-scale (blur at 1.5×), `WindowPlacement` canvas-coordinate math
+  breaks, tooltip anchoring needs inverse transforms, and it fights the native-
+  pixels philosophy Stages 1–2 established.
+- **Attaching `GameTheme` to login/loading:** would change their text from the engine
+  default (16px) to LiberationSans-10 at 1× — a regression disguised as scaling.
+- **Integer-only factors (1–4):** crisper icons but no in-between sizes; the chosen
+  1–3 in 0.5 steps is the compromise, with the clamp keeping Auto integer.
