@@ -53,7 +53,7 @@ var saved = cs.GetOption<float>(Options.UiScaleValue, 1f);
 var canvas = (Vector2I)GetTree().Root.GetVisibleRect().Size;
 UiScaleApplier.Instance.Apply(UiScale.Instance.Resolve(mode, saved, canvas.Y), ApplyReason.Startup);
 ```
-(`UiScale.Instance` = the applier's `Scale` property — use `UiScaleApplier.Instance.Scale.Resolve(...)`; `Resolve` is an instance method reading nothing but arguments, so either exposure is fine — prefer calling it statically-style through the applier's `Scale` instance as shown.) Note the headless self-test (Part 1 Task 8) still passes: default settings → Auto → `AutoFactor(720) == 1` → identical to the pinned `Apply(1f, Startup)`.
+(`UiScale.Instance` = the applier's `Scale` property — use `UiScaleApplier.Instance.Scale.Resolve(...)`; `Resolve` is an instance method reading nothing but arguments, so either exposure is fine — prefer calling it statically-style through the applier's `Scale` instance as shown.) Note the headless self-test (Part 1 Task 8) still passes: default settings → Auto → headless canvas is tiny (not 720 — headless windows are minimal) → `AutoFactor → 1` → identical to Part 1's pinned `Apply(1f, Startup)`.
 
 **Step 5 (green) + commit:** `feat: settings-driven UI scale factor at startup`.
 
@@ -75,7 +75,7 @@ UiScaleApplier.Instance.Apply(UiScale.Instance.Resolve(mode, saved, canvas.Y), A
 - Source of truth: `BaseWindow._dragging` + the live `Position` during a move-drag (`Scripts/UI/BaseWindow.cs:122-140`).
 - Readers: the drag's own release handler (persists `Position` to `CharacterSettings` via `SetWindowSetting`); `RepositionForCurrentCanvas` (reads `Size`, not `Position` mid-drag).
 - Derived state: the persisted `WindowSettings.Position` — **must not record the mid-drag position**; cancel must prevent the release-persist from firing for a cancelled drag.
-- Propagation: (1) on press, store `_preDragPosition = Position`; (2) `CancelDrag()`: if `_dragging` → `_dragging = false; Position = _preDragPosition;` (3) apply pass: before hiding tooltips, call `CancelDrag()` on every registered `BaseWindow` (cast; non-BaseWindow `IScalableWindow`s skip); (4) because `_dragging` is false and no release event will be processed as a drag, nothing persists; the subsequent `Relayout()` + `RepositionForCurrentCanvas()` re-solves from the untouched saved position.
+- Propagation: (1) on press, store `_preDragPosition = Position`; (2) `CancelDrag()`: if `_dragging` → `_dragging = false; _dragCancelled = true; Position = _preDragPosition;` (3) apply pass: before hiding tooltips, call `CancelDrag()` on every registered `BaseWindow` (cast; non-BaseWindow `IScalableWindow`s skip); (4) **persistence suppression is mandatory, not incidental**: the title-bar release handler (`Scripts/UI/BaseWindow.cs:118-142`) calls `SetWindowSetting` **unconditionally** on left-button release — it never checks `_dragging` — so without a guard the user's eventual mouse release (after the scale commit has already restored `Position`) would still fire a persist. Guard BOTH release branches (the `GuiInput` release and the `MouseMotion` escape) with `if (!_dragCancelled)` and clear the flag when consumed. (In the pure case the value equals the re-resolved position so the observable outcome would coincidentally match — but the flag makes the invariant airtight and covers the `Visible`/canvas fields persisted in the same `SetWindowSetting` call.) The subsequent `Relayout()` + `RepositionForCurrentCanvas()` re-solves from the untouched saved position.
 - Invariants: a scale commit mid-move leaves the saved settings unchanged and the window at its pre-drag position; a *completed* drag (released before the commit) persists as today.
 - Observable proof: Task 5's in-engine check M6.
 
@@ -117,19 +117,20 @@ if (applier != null && applier.Mode == UiScaleMode.Auto)
 ### Task 4: Options window UI Scale group
 
 **Files:**
-- Modify: `Scenes/UI/OptionsWindow.tscn` — add under `Content`: a `Label` ("UI Scale"), two `CheckBox`es (`ScaleAutoCheck` checked by default, `ScaleManualCheck`), an `HSlider` (`ScaleSlider`: `min_value = 1.0`, `max_value = 3.0`, `step = 0.5`, `value = 1.0`), a `Label` (`ScaleValueLabel`, text `"1×"`). Layout with the existing checkbox rows' pixel style (the generic scaler handles sizing; tscn offsets are the base).
+- Modify: `Scenes/UI/OptionsWindow.tscn` — **(a) resize the root**: `offset_bottom = 112.0` → `240.0` (root offsets `0, 0, 240, 112` at `OptionsWindow.tscn:22-25`; `Background` and `Content` are full-rect anchored and follow; existing checkbox rows occupy y 28–108, so the new group gets y ≈ 120–232; the window's saved/default position re-resolves at the new size through the existing `RepositionForCurrentCanvas` — no extra work). **(b) add under `Content`**: a `Label` ("UI Scale"), two `CheckBox`es (`ScaleAutoCheck` checked by default, `ScaleManualCheck`), an `HSlider` (`ScaleSlider`: `min_value = 1.0`, `max_value = 3.0`, `step = 0.5`, `value = 1.0`), a `Label` (`ScaleValueLabel`, text `"1×"`). Layout with the existing checkbox rows' pixel style (the generic scaler handles sizing; tscn offsets are the base).
 - Modify: `Scripts/UI/OptionsWindow.cs`
 
 **Behavior spec (pinned — the drag-release contract from the design):**
 - Mode is exclusive: checking one unchecks the other. `ScaleAutoCheck` → mode Auto; `ScaleManualCheck` → mode Manual (slider row becomes visible; in Auto the slider + value label are `Visible = false`).
 - On open (`_Ready`, after the existing checkbox reads): read `Options.UiScaleMode` (default Auto) + `Options.UiScaleValue` (default 1); set check states, slider value, effective-factor display (`"Auto (2×)"` style text on `ScaleValueLabel` — the user always sees the in-force factor).
+- **Initial-open guard (adversarial):** programmatic `ScaleSlider.Value = x` in `_Ready` fires `ValueChanged`, and with `_dragging == false` that would `Commit` on EVERY window open — in first-open Manual mode the mode-switch rule would double-commit on top. Set `_initializing = true` before the programmatic sets and clear it on the next `ProcessFrame` (one `await`); `ValueChanged` and the mode handlers early-return while it is set.
 - **Commit rule** (no `drag_ended` in this engine — see APIs verified): track a local `_dragging` on the slider with the `BaseWindow` move-drag pattern (`Scripts/UI/BaseWindow.cs:120-140`):
   - `ScaleSlider.GuiInput`: left mouse button **press** → `_dragging = true`.
   - `_Process` (options window): `if (_dragging)` → live-update `ScaleValueLabel`; `if (!Input.IsMouseButtonPressed(MouseButton.Left))` → `_dragging = false; Commit((float)ScaleSlider.Value);` (release detected globally, even off-slider — same as window-move release).
   - `ValueChanged(v)`: update `ScaleValueLabel` ALWAYS (live feedback). If `!_dragging` (keyboard arrow / programmatic set) → `Commit(v)` — mirrors how `BaseWindow` treats non-drag state, and matches the design's "commit on `value_changed` iff not dragging" rule.
 - `Commit(v)`: `snapped = UiScaleApplier.Instance.Scale.Factor(v)`; if `snapped != UiScaleApplier.Instance.Factor` → `Options[UiScaleValue] = snapped`, `Save()`, `UiScaleApplier.Instance.Apply(snapped, ApplyReason.UserCommit)`; always set `applier.Mode` + persist `Options[UiScaleMode]` on mode changes and `Save()` on window close/toggle (existing pattern, `OptionsWindow.cs:56-60`).
 - Mode switch to Manual commits the current slider value immediately (`ApplyReason.UserCommit`); switch to Auto commits `AutoFactor(currentCanvasY)`.
-- The Options window itself live-resizes on its own commit (accepted per design Section 5); the slider's `drag_ended`-only commit means it never resizes under the dragging cursor.
+- The Options window itself live-resizes on its own commit (accepted per design Section 5); the release-only commit means it never resizes under the dragging cursor.
 
 **Gate:** xUnit green; in-engine M1–M3, M7.
 **Commit:** `feat: UI scale options (auto/manual slider, drag-release commit)`.
@@ -154,7 +155,7 @@ if (applier != null && applier.Mode == UiScaleMode.Auto)
 
 ### Task 6: manual verification matrix (in-engine, headed)
 
-**Files:** none (checklist task). Run `run.sh` (repo root, dev run) on at least 720p and 1080p; record results in the PR description.
+**Files:** none (checklist task). Run the dev server on at least 720p and 1080p; record results in the PR description. `run.sh` lives in the main workspace (gitignored — absent from this worktree); from the worktree either copy it over or inline its two commands (`godot-mono --headless --path . --build-solutions --quit`, then `godot-mono --path . --gpu-index 1 --display-driver wayland`).
 
 | # | Check | Pass condition |
 |---|-------|----------------|

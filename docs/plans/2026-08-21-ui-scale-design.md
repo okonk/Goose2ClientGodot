@@ -88,6 +88,21 @@ public interface IScalableWindow { void Relayout(); }
 - Tooltips register on spawn, deregister via `tree_exited`.
 - Login scene and loading overlay register in `_Ready`, deregister in `_ExitTree`.
 
+**Implementation refinements (ratified in the part-1 plan — `2026-08-21-ui-scale-part1-foundation.md`):**
+- R1: instead of per-window hand-written constants in `Relayout()`, a generic
+  `UiScaleLayout` snapshot at end-of-`_Ready` IS the 1× base (build code writes 1×
+  constants — `.tscn` offsets load at 1× regardless of factor; **no** divide-by-factor
+  recovery — an early draft of the plan had that and it was wrong: it would have
+  un-scaled the HUD on real 1080p startups while every headless test stayed green).
+  The snapshot records anchor-relative **offsets** (anchored roots like ChatWindow's
+  bottom-left or Toolbar's right-edge would detach if `Position` were scaled).
+  Registration calls `Relayout()` once, so runtime-spawned windows scale in the same
+  frame.
+- R2: live tooltips are hidden on apply (re-shown on next hover).
+- R3: windows self-register at end of `_Ready` (GameHud does not enumerate).
+- `UiScaleApplier` is a plain class with a `TooltipManager.Instance`-style static
+  accessor, created in `GameManager._Ready` (not a Node).
+
 ### Fonts — two tiers
 
 1. **Default-size text** (the majority): the applier sets
