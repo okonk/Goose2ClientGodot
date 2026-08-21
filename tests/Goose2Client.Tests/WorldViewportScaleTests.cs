@@ -88,6 +88,27 @@ public class WorldViewportScaleTests
         Assert.True(WorldViewportScale.IsInsideDisplay(layout, new Vector2I(400, 1)));
     }
 
+    // ── CameraParityOffset ──
+
+    [Theory]
+    [InlineData(1280, 720, 0.0f, 0.0f)]
+    [InlineData(639, 701, 0.5f, 0.5f)]
+    [InlineData(639, 720, 0.5f, 0.0f)]
+    [InlineData(1280, 701, 0.0f, 0.5f)]
+    [InlineData(1281, 721, 0.5f, 0.5f)]
+    public void CameraParityOffset_isHalfPixelOnOddAxesOnly(int x, int y, float offX, float offY)
+    {
+        Assert.Equal(new Vector2(offX, offY), WorldViewportScale.CameraParityOffset(new Vector2I(x, y)));
+    }
+
+    [Fact]
+    public void CameraParityOffset_reportedMaximizedWindow_639x701_getsHalfPixelBothAxes()
+    {
+        var layout = WorldViewportScale.Compute(WorldRenderMode.Integer2x, new Vector2I(1278, 1402));
+        Assert.Equal(new Vector2I(639, 701), layout.SubViewportSize);
+        Assert.Equal(new Vector2(0.5f, 0.5f), WorldViewportScale.CameraParityOffset(layout.SubViewportSize));
+    }
+
     // ── Property tests over a range of window sizes ──
 
     [Theory]

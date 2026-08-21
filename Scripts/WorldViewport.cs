@@ -140,6 +140,10 @@ namespace Goose2Client
             Current.Size = Layout.SubViewportSize;
             WorldTexture.Position = Layout.DisplayOrigin;
             WorldTexture.Size = Layout.DisplaySize;
+            // The camera anchors to the viewport center, a half pixel on odd sub-viewport
+            // sizes; the 0.5 offset cancels that center parity (moving camera is fractional anyway).
+            if (Current.GetCamera2D() is Camera2D cam)
+                cam.Offset = WorldViewportScale.CameraParityOffset(Layout.SubViewportSize);
 
             if (Layout.Scale != _lastAppliedScale)
             {

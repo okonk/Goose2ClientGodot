@@ -93,4 +93,12 @@ public static class WorldViewportScale
             && windowPos.Y >= layout.DisplayOrigin.Y
             && windowPos.Y < end.Y;
     }
+
+    /// <summary>
+    /// Camera2D.Offset that cancels the viewport-center parity: the camera anchors to the
+    /// viewport center, a half pixel on odd axes, so +0.5 there makes the canvas translation
+    /// integral for an integral camera position (a moving camera is fractional regardless).
+    /// </summary>
+    public static Vector2 CameraParityOffset(Vector2I subViewportSize)
+        => new((subViewportSize.X % 2) * 0.5f, (subViewportSize.Y % 2) * 0.5f);
 }
