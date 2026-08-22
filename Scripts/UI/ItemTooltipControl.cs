@@ -48,7 +48,6 @@ namespace Goose2Client.UI
                 var label = new Label();
                 label.Text = text;
                 label.AddThemeColorOverride("font_color", MapColor(color));
-                label.Visible = text.Trim().Length > 0; // hide blank separator lines
                 _statsVBox.AddChild(label);
             }
         }
@@ -74,15 +73,18 @@ namespace Goose2Client.UI
             _typeLabel.OffsetTop = m.TypeTop;
             _flagsLabel.OffsetLeft = m.TextColumn;
             _flagsLabel.OffsetTop = m.FlagsTop;
-            _statsVBox.OffsetLeft = m.TextColumn;
+            _statsVBox.OffsetLeft = m.IconOffset;
             _statsVBox.OffsetTop = m.StatsTop;
 
             // Size to content (both axes) so the full-rect Background panel hugs the text.
-            // Width = widest of the name/type/flags lines and the stat rows.
-            float textWidth = Mathf.Max(
+            // Header rows start at the text column; stat rows start at the left margin.
+            float headerWidth = Mathf.Max(
                 Mathf.Max(_nameLabel.GetCombinedMinimumSize().X, _typeLabel.GetCombinedMinimumSize().X),
-                Mathf.Max(_flagsLabel.GetCombinedMinimumSize().X, _statsVBox.GetCombinedMinimumSize().X));
-            float width = Mathf.Max(m.MinWidth, m.TextColumn + textWidth + m.RightPad);
+                _flagsLabel.GetCombinedMinimumSize().X);
+            float statsWidth = _statsVBox.GetCombinedMinimumSize().X;
+            float width = Mathf.Max(m.MinWidth, Mathf.Max(
+                m.TextColumn + headerWidth,
+                m.IconOffset + statsWidth) + m.RightPad);
 
             // Header block runs to HeaderTop (Flags label bottom); StatsVBox starts at StatsTop
             // and its combined minimum size reflects only the visible stat lines.

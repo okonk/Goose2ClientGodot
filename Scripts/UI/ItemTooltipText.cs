@@ -35,7 +35,7 @@ namespace Goose2Client.UI
         {
             var lines = new List<(string Text, ItemTooltipColor Color)>();
 
-            if (s.Description != null)
+            if (!string.IsNullOrWhiteSpace(s.Description))
                 lines.Add((s.Description, ItemTooltipColor.Description));
 
             if (s.MaxDamage != 0)

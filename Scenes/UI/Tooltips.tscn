@@ -8,11 +8,20 @@
 [ext_resource type="Texture2D" path="res://Assets/UI/hotbar-slot-background.png" id="6_slotbg"]
 
 [sub_resource type="StyleBoxFlat" id="sb_tooltip_bg"]
-bg_color = Color(0, 0, 0, 0.9)
-corner_radius_top_left = 3
-corner_radius_top_right = 3
-corner_radius_bottom_right = 3
-corner_radius_bottom_left = 3
+content_margin_left = 2.0
+content_margin_top = 2.0
+content_margin_right = 2.0
+content_margin_bottom = 2.0
+bg_color = Color(0, 0, 0, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+border_color = Color(1, 1, 1, 1)
 
 [node name="TooltipManager" type="Control"]
 script = ExtResource("1_manager")
@@ -59,7 +68,7 @@ offset_bottom = 36.0
 layout_mode = 0
 anchor_right = 1.0
 offset_left = 40.0
-offset_top = 2.0
+offset_top = 4.0
 offset_right = -4.0
 offset_bottom = 18.0
 
@@ -67,25 +76,25 @@ offset_bottom = 18.0
 layout_mode = 0
 anchor_right = 1.0
 offset_left = 40.0
-offset_top = 18.0
+offset_top = 17.0
 offset_right = -4.0
-offset_bottom = 32.0
-theme_override_colors/font_color = Color(0.6, 0.6, 0.6, 1)
+offset_bottom = 31.0
+theme_override_colors/font_color = Color(0.627, 0.659, 0.627, 1)
 
 [node name="Flags" type="Label" parent="ItemTooltip"]
 layout_mode = 0
 anchor_right = 1.0
 offset_left = 40.0
-offset_top = 32.0
+offset_top = 30.0
 offset_right = -4.0
-offset_bottom = 46.0
-theme_override_colors/font_color = Color(0.7, 0.5, 0.3, 1)
+offset_bottom = 44.0
+theme_override_colors/font_color = Color(0.439, 0.486, 0.784, 1)
 
 [node name="StatsVBox" type="VBoxContainer" parent="ItemTooltip"]
 layout_mode = 0
 anchor_right = 1.0
-offset_left = 40.0
-offset_top = 48.0
+offset_left = 4.0
+offset_top = 51.0
 offset_right = -4.0
 offset_bottom = 120.0
 
@@ -167,6 +176,6 @@ offset_left = 4.0
 offset_top = 24.0
 offset_right = 400.0
 offset_bottom = 40.0
-text = "Bound"
-theme_override_colors/font_color = Color(0.7, 0.5, 0.3, 1)
+text = "This item will bind on pickup"
+theme_override_colors/font_color = Color(0.91, 0.471, 0.439, 1)
 visible = false

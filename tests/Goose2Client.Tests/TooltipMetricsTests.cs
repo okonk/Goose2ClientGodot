@@ -7,15 +7,15 @@ public class TooltipMetricsTests
 {
     [Fact]
     public void ItemMetrics_At1x_EqualsCurrentLiterals()
-        => Assert.Equal((40, 9, 46, 48, 4, 32, 4, 60, 2, 18, 32), TooltipMetrics.ItemMetrics(1f));
+        => Assert.Equal((52, 10, 49, 51, 10, 32, 10, 60, 10, 23, 36), TooltipMetrics.ItemMetrics(1f));
 
     [Fact]
     public void ItemMetrics_At15x()
-        => Assert.Equal((60, 14, 69, 72, 6, 48, 6, 90, 3, 27, 48), TooltipMetrics.ItemMetrics(1.5f));
+        => Assert.Equal((78, 15, 74, 77, 15, 48, 15, 90, 15, 35, 54), TooltipMetrics.ItemMetrics(1.5f));
 
     [Fact]
     public void ItemMetrics_At2x()
-        => Assert.Equal((80, 18, 92, 96, 8, 64, 8, 120, 4, 36, 64), TooltipMetrics.ItemMetrics(2f));
+        => Assert.Equal((104, 20, 98, 102, 20, 64, 20, 120, 20, 46, 72), TooltipMetrics.ItemMetrics(2f));
 
     [Fact]
     public void ItemMetrics_RoundTrips1To2To1()
