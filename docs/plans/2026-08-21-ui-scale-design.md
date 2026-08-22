@@ -160,9 +160,11 @@ public interface IScalableWindow { void Relayout(); }
   for children whose parent is a `Container` (`ContainerManaged`: the container owns
   their offsets — writing them back is async-flaky; their scaling rides on
   min-sizes + separation constants, and the container re-derives the offsets itself).
-  The snapshot also records nine-patch rects' patch margins, so the window
-  backgrounds' border art scales with the factor (field bug: at 2× the 20px title
-  strip and 36px bottom strip stayed 1×-thick while buttons/text doubled).
+  Window frame backgrounds (info, quest, hotbar) are stretched `TextureRect`s, like
+  every other window: the frame art is 1px hairlines on flat grey, and nine-patch
+  corners draw 1:1, so a `NinePatchRect` can never thicken those lines — at 2× the
+  frame looked 1×-scaled while the text doubled. `UiScaleLayout` still records
+  nine-patch margins for genuine nine-patch art (scaled corner regions).
   `ScaleRegister()` calls `Relayout()` once, so runtime-spawned windows scale in the
   same frame.
 - R2: live tooltips hidden on apply; factor-aware per-show layout (body above).

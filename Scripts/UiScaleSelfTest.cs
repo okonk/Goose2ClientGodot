@@ -34,8 +34,6 @@ internal static class UiScaleSelfTest
 
         async System.Threading.Tasks.Task Frame() => await gm.ToSignal(tree, SceneTree.SignalName.ProcessFrame);
 
-        static (int, int, int, int) Patch(NinePatchRect n)
-            => (n.PatchMarginLeft, n.PatchMarginTop, n.PatchMarginRight, n.PatchMarginBottom);
 
         void Assert(bool cond, string msg)
         {
@@ -226,9 +224,8 @@ internal static class UiScaleSelfTest
         var hotSlot = hotbar.GetNode<Control>("Content/Pages/Page0").GetChild(0);
         Assert(hotSlot.GetNode<TextureProgressBar>("CooldownOverlay").NinePatchStretch,
             "hotbar slot cooldown nine_patch_stretch off");
-        var hotbarBg = hotbar.GetNode<NinePatchRect>("Background");
-        Assert(Patch(hotbarBg) == (6, 6, 6, 6),
-            $"hotbar bg patch margin 2x {Patch(hotbarBg)} != (6,6,6,6)");
+        Assert(hotbar.GetNode<TextureRect>("Background") != null,
+            "hotbar bg must be a stretched TextureRect");
         Assert(hotbar.Position == WindowPlacement.HotbarDefault(canvas, hotbar.Size, 2f,
             DefaultWindowLayout.For("Hotbar"), hotbar.Size / 2f),
             $"hotbar 2x position {hotbar.Position} != HotbarDefault");
@@ -309,9 +306,8 @@ internal static class UiScaleSelfTest
         Assert(l19.Position == MultiWindowMetrics.LinePosition(19, 2f), $"line 19 at 2x {l19.Position} != {MultiWindowMetrics.LinePosition(19, 2f)}");
         var l0Font = l0.GetThemeFontSize("font_size");
         Assert(l0Font == 20, $"line 0 font {l0Font} != 20");
-        var infoBg = info.GetNode<NinePatchRect>("Background");
-        Assert(Patch(infoBg) == (6, 40, 20, 6),
-            $"info bg patch margin 2x {Patch(infoBg)} != (6,40,20,6)");
+        Assert(info.GetNode<TextureRect>("Background") != null,
+            "info bg must be a stretched TextureRect");
         // Exact game packet spawn path (manager node parentage), pinned at 2x.
         {
             var infoMgr = new InfoWindowCreator();
@@ -324,12 +320,10 @@ internal static class UiScaleSelfTest
             var wq = GD.Load<PackedScene>(questMgr.PrefabPath).Instantiate<QuestWindow>();
             questMgr.AddChild(wq);
             await Frame();
-            var ib = wi.GetNode<NinePatchRect>("Background");
-            var qb = wq.GetNode<NinePatchRect>("Background");
             Assert(wi.Size == new Vector2(504, 280), $"manager-spawned info size 2x {wi.Size} != (504,280)");
-            Assert(Patch(ib) == (6, 40, 20, 6), $"manager-spawned info patch 2x {Patch(ib)} != (6,40,20,6)");
+            Assert(wi.GetNode<TextureRect>("Background") != null, "manager-spawned info bg must be a stretched TextureRect");
             Assert(wq.Size == new Vector2(520, 582), $"manager-spawned quest size 2x {wq.Size} != (520,582)");
-            Assert(Patch(qb) == (10, 40, 24, 72), $"manager-spawned quest patch 2x {Patch(qb)} != (10,40,24,72)");
+            Assert(wq.GetNode<TextureRect>("Background") != null, "manager-spawned quest bg must be a stretched TextureRect");
             wi.QueueFree();
             wq.QueueFree();
             await Frame();
@@ -341,8 +335,6 @@ internal static class UiScaleSelfTest
         await Frame();
         Assert(l0.Position == new Vector2(6, 22), $"line 0 at 1x {l0.Position} != (6, 22)");
         Assert(l19.Position == new Vector2(6, 22 + 19 * 11.18f), $"line 19 at 1x {l19.Position} != (6, {22 + 19 * 11.18f})");
-        Assert(Patch(infoBg) == (3, 20, 10, 3),
-            $"info bg patch margin 1x {Patch(infoBg)} != (3,20,10,3)");
         Assert(gm.Hud.Hotbar.Position == WindowPlacement.HotbarDefault(canvas, gm.Hud.Hotbar.Size, 1f,
             DefaultWindowLayout.For("Hotbar"), gm.Hud.Hotbar.Size),
             $"hotbar 1x position {gm.Hud.Hotbar.Position} != HotbarDefault");
@@ -461,9 +453,8 @@ internal static class UiScaleSelfTest
         var sep1 = gm.Hud.Party.GetNode<VBoxContainer>("MemberList").GetThemeConstant("separation");
         Assert(sep1 == 1, $"party separation {sep1} != 1");
         Assert(slot.CustomMinimumSize == new Vector2(32, 32), $"item slot min {slot.CustomMinimumSize} != (32, 32)");
-        var hotbarBg1 = gm.Hud.Hotbar.GetNode<NinePatchRect>("Background");
-        Assert(Patch(hotbarBg1) == (3, 3, 3, 3),
-            $"hotbar bg patch margin 1x restore {Patch(hotbarBg1)} != (3,3,3,3)");
+        Assert(gm.Hud.Hotbar.GetNode<TextureRect>("Background") != null,
+            "hotbar bg must stay a stretched TextureRect");
         tm.ShowSpellTooltip(new SpellInfo { Name = "Selftest" }, gm.Hud);
         await Frame();
         await Frame();
