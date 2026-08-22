@@ -39,29 +39,26 @@ namespace Goose2Client.UI
 
             // Size to content so the full-rect Background wraps the name (+ bind line when shown).
             // Labels are sized to their actual text height so there is no leftover row padding.
-            const float LeftMargin = 6f;
-            const float TopMargin = 4f;
-            const float RowGap = 2f;
-            const float BottomMargin = 4f;
+            var m = TooltipMetrics.MapItemMetrics(UiScaleApplier.Instance.Factor);
 
             Vector2 nameMin = _nameLabel.GetCombinedMinimumSize();
-            _nameLabel.Position = new Vector2(LeftMargin, TopMargin);
-            _nameLabel.Size = new Vector2(400f, nameMin.Y);
+            _nameLabel.Position = new Vector2(m.LeftMargin, m.TopMargin);
+            _nameLabel.Size = new Vector2(m.LabelWidth, nameMin.Y);
 
             float width = nameMin.X;
-            float height = TopMargin + nameMin.Y + BottomMargin;
+            float height = m.TopMargin + nameMin.Y + m.BottomMargin;
 
             if (_bindLabel.Visible)
             {
                 Vector2 bindMin = _bindLabel.GetCombinedMinimumSize();
-                _bindLabel.Position = new Vector2(LeftMargin, TopMargin + nameMin.Y + RowGap);
-                _bindLabel.Size = new Vector2(400f, bindMin.Y);
+                _bindLabel.Position = new Vector2(m.LeftMargin, m.TopMargin + nameMin.Y + m.RowGap);
+                _bindLabel.Size = new Vector2(m.LabelWidth, bindMin.Y);
                 width = Mathf.Max(width, bindMin.X);
-                height += RowGap + bindMin.Y;
+                height += m.RowGap + bindMin.Y;
             }
 
             // LeftMargin on the left, same on the right.
-            Size = new Vector2(width + LeftMargin * 2f, height);
+            Size = new Vector2(width + m.LeftMargin * 2f, height);
 
             PositionTooltip();
         }
