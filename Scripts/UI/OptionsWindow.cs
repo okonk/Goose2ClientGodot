@@ -31,6 +31,8 @@ public partial class OptionsWindow : BaseWindow
         _nativeRender = GetNode<CheckBox>("Content/NativeRenderCheck");
         _nativeRender.ButtonPressed = GameManager.Instance.CharacterSettings.GetOption<bool>(Options.RenderMode, false);
         _nativeRender.Toggled += OnNativeRenderChanged;
+
+        ScaleRegister();
     }
 
     private void OnTargetFilteringChanged(bool pressed)

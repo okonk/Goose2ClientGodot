@@ -56,8 +56,9 @@ public abstract partial class BaseMultipleWindow : BaseWindow, IWindow
         _backButton.Pressed += BackClicked;
         _nextButton.Pressed += NextClicked;
         _closeButton.Pressed += CloseWindow;
+        var applier = UiScaleApplier.Instance;
         foreach (var b in new[] { _backButton, _nextButton, _closeButton })
-            b.AddThemeFontSizeOverride("font_size", ButtonFontSize);
+            applier.ApplyFontSize(b, ButtonFontSize);
 
         // Create line labels at runtime, stacked at Unity's 11.18 px row pitch (see LineRowHeight).
         _lines = new Label[LineCount];
@@ -65,11 +66,16 @@ public abstract partial class BaseMultipleWindow : BaseWindow, IWindow
         for (int i = 0; i < LineCount; i++)
         {
             var label = new Label { Text = " " };
-            label.AddThemeFontSizeOverride("font_size", LineFontSize);
+            applier.ApplyFontSize(label, LineFontSize);
+            // Line geometry is owned by the metrics + Relayout override; the generic snapshot
+            // must not capture it (a snapshot record would double-scale already-scaled offsets).
+            label.SetMeta(UiScaleLayout.SkipMeta, true);
             label.Position = LinesOrigin + new Vector2(0, i * LineRowHeight);
             content.AddChild(label);
             _lines[i] = label;
         }
+
+        ScaleRegister();
     }
 
     /// <summary>Called by the manager when a MakeWindowPacket arrives for this window.</summary>

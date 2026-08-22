@@ -112,6 +112,8 @@ public partial class HotbarWindow : BaseWindow, IWindow
         _listenersRegistered = true;
 
         UpdatePageButtons();
+
+        ScaleRegister();
     }
 
     public override void _ExitTree()

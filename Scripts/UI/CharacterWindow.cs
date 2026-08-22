@@ -93,6 +93,8 @@ public partial class CharacterWindow : BaseWindow, IWindow
             else
                 Visible = savedVisible;
         }
+
+        ScaleRegister();
     }
 
     public override void _ExitTree()

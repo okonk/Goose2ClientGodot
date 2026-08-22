@@ -53,6 +53,8 @@ public partial class InventoryWindow : BaseWindow, IWindow
             else
                 Visible = savedVisible;
         }
+
+        ScaleRegister();
     }
 
     public override void _ExitTree()

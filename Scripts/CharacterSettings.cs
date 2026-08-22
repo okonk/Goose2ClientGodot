@@ -183,16 +183,6 @@ namespace Goose2Client
             Save();
         }
 
-        public void SetWindowSetting(string windowName, Vector2? position, bool visible, Vector2I canvas)
-        {
-            var settings = GetOrCreateWindowSettings(windowName);
-            if (position.HasValue)
-                settings.Position = position.Value;
-            settings.Visible = visible;
-            settings.CanvasSize = canvas;
-            Save();
-        }
-
         // Visibility-only: the toggle/close path must not touch the saved quad (Size/Factor are
         // not live at close time — writing Position/CanvasSize without them would corrupt it).
         public void SetWindowVisible(string windowName, bool visible)

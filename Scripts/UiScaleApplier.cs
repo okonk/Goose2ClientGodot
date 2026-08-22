@@ -124,7 +124,7 @@ public class UiScaleApplier
         foreach (var r in _windows)
         {
             if (r.Window is BaseWindow bw)
-                bw.RepositionForCurrentCanvas();
+                bw.RepositionFromSaved();
         }
     }
 }

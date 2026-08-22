@@ -51,6 +51,8 @@ public partial class CombineBagContainerWindow : BaseWindow, IWindow
         GameManager.Instance.PacketManager.Listen<CombineBagSlotPacket>(OnCombineBagSlot);
         GameManager.Instance.PacketManager.Listen<ClearCombineBagSlotPacket>(OnClearCombineBagSlot);
         _listenersRegistered = true;
+
+        ScaleRegister();
     }
 
     public override void _ExitTree()

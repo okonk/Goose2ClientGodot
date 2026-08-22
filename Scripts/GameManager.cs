@@ -349,7 +349,7 @@ namespace Goose2Client
             if (canvas.X < 2 || canvas.Y < 2)
                 return;
             foreach (var w in CollectBaseWindows(UiLayer))
-                w.RepositionForCurrentCanvas();
+                w.RepositionFromSaved();
         }
 
         /// <summary>Recursive depth-first walk of <paramref name="root"/>'s children collecting every

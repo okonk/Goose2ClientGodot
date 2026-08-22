@@ -53,6 +53,8 @@ public partial class VendorWindow : BaseWindow, IWindow, INpcWindow
         GameManager.Instance.PacketManager.Listen<VendorSlotPacket>(OnVendorSlot);
         GameManager.Instance.PacketManager.Listen<ClearVendorPacket>(OnClearVendor);
         _listenersRegistered = true;
+
+        ScaleRegister();
     }
 
     public override void _ExitTree()
