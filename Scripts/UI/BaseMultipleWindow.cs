@@ -15,16 +15,6 @@ public abstract partial class BaseMultipleWindow : BaseWindow, IWindow
     public const int LineCount = 20;
 
     private const int LineFontSize = 10;
-    // Row pitch copied from Unity's line prefabs (m_SizeDelta.y = 11.18). Unity's TMP renders
-    // size-10 LiberationSans with ~11.2 px line height (ascent+descent), but Godot's Label
-    // derives line height from hhea metrics: 13 px per line at size 10 — 1.8 px extra per line,
-    // which accumulates to ~1 line of overflow in these fixed-height windows. So the labels are
-    // positioned manually at this pitch (like Unity's fixed 11.18 px rows) instead of being
-    // stacked in a VBoxContainer. Each label keeps its natural 13 px height, so a row's ink
-    // overlaps the next by 1.8 px — the same overlap Unity's 11.18 px rows have.
-    private const float LineRowHeight = 11.18f;
-    // Top-left of the line area in both InfoWindow and QuestWindow (matches the old Lines rect).
-    private static readonly Vector2 LinesOrigin = new(6, 22);
     private const int ButtonFontSize = 12;
 
     private Label[] _lines;
@@ -60,22 +50,29 @@ public abstract partial class BaseMultipleWindow : BaseWindow, IWindow
         foreach (var b in new[] { _backButton, _nextButton, _closeButton })
             applier.ApplyFontSize(b, ButtonFontSize);
 
-        // Create line labels at runtime, stacked at Unity's 11.18 px row pitch (see LineRowHeight).
         _lines = new Label[LineCount];
         var content = GetNode<Control>("Content");
         for (int i = 0; i < LineCount; i++)
         {
-            var label = new Label { Text = " " };
+            var label = new Label { Text = " ", Name = "Line" + i };
             applier.ApplyFontSize(label, LineFontSize);
             // Line geometry is owned by the metrics + Relayout override; the generic snapshot
             // must not capture it (a snapshot record would double-scale already-scaled offsets).
             label.SetMeta(UiScaleLayout.SkipMeta, true);
-            label.Position = LinesOrigin + new Vector2(0, i * LineRowHeight);
+            label.Position = MultiWindowMetrics.LinePosition(i, applier.Factor);
             content.AddChild(label);
             _lines[i] = label;
         }
 
         ScaleRegister();
+    }
+
+    public override void Relayout()
+    {
+        base.Relayout();
+        var factor = UiScaleApplier.Instance.Factor;
+        for (int i = 0; i < _lines.Length; i++)
+            _lines[i].Position = MultiWindowMetrics.LinePosition(i, factor);
     }
 
     /// <summary>Called by the manager when a MakeWindowPacket arrives for this window.</summary>
