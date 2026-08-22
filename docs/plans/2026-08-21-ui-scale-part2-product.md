@@ -160,6 +160,7 @@ The `return` matters: `Apply`'s placement step already re-laid-out and repositio
 **Files:**
 - Modify: `Scripts/LoginScene/LoginScene.cs` (`_Ready` end: Part 1 self-registration pattern — snapshot + `RegisterWindow`; `Relayout()` = `UiScaleLayout.Apply(_geom, factor)`; no reposition — the scene is full-rect anchored)
 - Modify: `Scripts/LoadingMapScene/LoadingMapScene.cs` (same)
+- Modify: `Scripts/GameManager.cs` — the self-test sequence (Part 1C Task 5) gains the login leg (0/1/2) and the loading leg (3); the settings-driven `Apply` hook also lands in `LoadSettings` here (Part 2 Task 1's `LoadSettings` edit and this task's self-test extension both touch `GameManager` — same file, different methods)
 - **No explicit font entries (review finding F2):** `project.godot:37` sets `theme/custom` project-wide, so Login/Loading text already resolves `font_size == 10` through the same `GameTheme` instance the applier mutates — `SetDefaultFontSize` reaches these controls with zero per-scene work. Do NOT add `ApplyFontSize(c, 16f)` overrides: the effective base is 10 (probed), not 16, and a 16-based override would change 1× login text from 10px to 16px — a visible regression this task's own gate exists to prevent.
 
 The `VBox` `separation = 10` constant and the `MarginContainer` ±150/±100 offsets scale via the snapshot (Part 1B Task 2).

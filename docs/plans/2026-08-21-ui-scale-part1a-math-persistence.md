@@ -34,7 +34,7 @@
 - Test project (`tests/Goose2Client.Tests`) pins **GodotSharp 4.6.2** from NuGet (not the 4.7.1 in the engine dir) — the xUnit surface (`UiScale`, `WindowPlacement` param) must stay 4.6.2-compatible; `Vector2I`/`MathF` are fine (existing `WindowPlacementTests` already use GodotSharp).
 - `theme_override_font_sizes` occurrences to migrate: `Scenes/UI/BankWindow.tscn:43` (9), `Scenes/UI/ChatWindow.tscn:47` (`normal_font_size` 12, RichTextLabel), `Scenes/UI/ChatWindow.tscn:55` (12), `Scenes/UI/DebugWindow.tscn:23,32` (12), `Scenes/UI/VendorWindow.tscn:43` (10). Raw C# overrides: `Scripts/UI/BaseMultipleWindow.cs:60` (12) and `:68` (10). (Bridge files `ChatBubble`/`BattleTextLine`/`BridgedNameLabel` are world-space — **do not touch**.)
 - Window geometry is `.tscn` pixel-offset layout (e.g. `Scenes/UI/VitalsWindow.tscn` all `layout_mode = 0` offsets; `Scenes/UI/BaseWindow.tscn` anchor-based children). Slots: `Scenes/UI/ItemSlot.tscn` `custom_minimum_size = Vector2(32, 32)`.
-- Headless runner: `/usr/local/bin/godot --headless` (4.7.1 mono). Existing probes `tools/tests/*.gd` intentionally do NOT execute C#; Part 1's C#-executing proof is a project-argument self-test (Part 1C Task 5), run as `godot --headless -- +selftest=ui_scale`.
+- Headless runner: `godot-mono`/`godot` — whichever C#-capable build the machine has (the binary name varies across environments; `tools/tests/run_ui_scale.sh`, Part 1C Task 5, resolves it and fails clearly if neither exists), run as `--headless`. Existing probes `tools/tests/*.gd` intentionally do NOT execute C#; Part 1's C#-executing proof is a project-argument self-test (Part 1C Task 5), run as `<godot> --headless -- +selftest=ui_scale`.
 
 ## Design refinements vs `2026-08-21-ui-scale-design.md` (ratified in design chat)
 
@@ -51,13 +51,13 @@
 
 **Step 1: Write the failing tests.**
 
-`UiScale` is a small non-static class (no Godot usings), with **explicitly separated state and pure functions** (review finding: a `Factor` property + `Factor(float)` method is a C# CS0102 compile error — verified against the compiler — and it was ambiguous whether `Factor(raw)` normalized or mutated):
+`UiScale` is a small non-static class with **explicitly separated state and pure functions** (review finding: a `Factor` property + `Factor(float)` method is a C# CS0102 compile error — verified against the compiler — and it was ambiguous whether `Factor(raw)` normalized or mutated). **"Pure" = no scene-tree / global-state APIs; Godot VALUE types are permitted (review: `Vector2I` in the signature with "no Godot usings" and no global `using Godot` in the project cannot compile)** — the file carries `using Godot;` for `Vector2I`, exactly like the existing `WorldViewportScale` (which is the pattern this class copies):
 - `public float CurrentFactor { get; set; }` — plain state; **`UiScaleApplier.Apply` is the only writer** (tests set it via object initializer).
 - `public static float NormalizeFactor(float raw)` — pure: clamp + snap, NaN → `MinFactor`. Never touches `CurrentFactor`.
 - `public static int AutoFactor(int windowHeightPx)` — pure.
 - `public int ScaleSize(float basePx)` / `public Vector2I ScaleSizeI(Vector2I v)` — read `CurrentFactor`.
 - **Pinned constants** `public const float MinFactor = 1f, MaxFactor = 3f, Step = 0.5f` (the slider range; `NormalizeFactor` clamps/snaps to these).
-`Vector2I` is fine in the test project (GodotSharp is already referenced there, see `WindowPlacementTests`).
+Both projects reference GodotSharp (the test project already does, see `WindowPlacementTests`) — `Vector2`/`Vector2I` in signatures are the norm for the pure math classes (`WorldViewportScale`, `WindowPlacement`).
 
 Tests (all red against "does not exist"):
 - `NormalizeFactor_SnapsToHalfStepsAndClamps`: `0.4f → 1`, `0.9f → 1`, `1.25f → 1.5f`, `1.7f → 1.5f`, `2.3f → 2.5f`, `3.4f → 3`, `4.2f → 3`, `-1f → 1`.

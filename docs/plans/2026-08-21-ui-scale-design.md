@@ -296,7 +296,7 @@ any window registers, so the first build is already scaled; no unscaled flash.
   feature).
 - The Options window scales like every other window, including live resize on its own
   commit (accepted).
-- Window positions keep using the existing saved-canvas placement file unchanged.
+- The window-placement ALGORITHM is unchanged (Stage 1's edge-stick/clamp/middle-band). The settings file GAINS per-window `Size`/`Factor`/`Placed` fields (the saved-quad schema, SC-06/SC-07 — see §1a and Part 1A Task 2); placement still resolves against the saved canvas.
 
 ## 6. Testing
 
@@ -314,19 +314,28 @@ any window registers, so the first build is already scaled; no unscaled flash.
 4. Font-registry audit: build HUD at factor 2, walk all `Control`s, assert any control
    with a `font_size` override is in the applier's registry. Fails if a future PR adds
    a raw `AddThemeFontSizeOverride`.
-5. No-unscaled-flash: start with settings pinning Manual 2×; before the first HUD
-   frame, theme `default_font_size == 20` and sampled window sizes equal
-   `round(base × 2)`.
-6. Live-change smoke: commit 1→2 on a built HUD; window sizes updated, placements
-   re-solved (edge-stuck edge offset unchanged), no script errors, chat scroll offset
-   preserved. The interrupted-drag sub-case is tested by directly invoking the cancel
-   path on a fake in-flight drag (synthetic mouse interleaving left to manual).
+5. No-unscaled-flash (AUTOMATED where possible, split per review — the old text
+   promised an automated Manual-2× startup test that headless cannot run — it
+   requires a real login): the ORDERING (factor applied before any window registers:
+   `GameManager._Ready`'s settings-independent Auto `Apply`, then `LoadSettings`'s
+   settings-driven re-`Apply`, then HUD build) is code-order + xUnit `Resolve`;
+   the end-to-end "settings pin Manual 2× → login → first HUD frame already 2×"
+   is MANUAL M3 (Part 2).
+6. Live-change smoke (AUTOMATED — Part 1C Task 5 self-test): commit 1→2 on a built
+   HUD; window sizes updated, placements re-solved (edge-stuck edge offset
+   unchanged), no script errors; chat scroll offset is the MANUAL M9 leg (scrolling
+   is not synthesizable headless). The interrupted-drag sub-case is MANUAL M6
+   (synthetic mouse interleaving is not automatable headless); the underlying
+   invariant — a mid-drag commit re-derives `ResolveScaled(quad, newFactor)` with
+   the quad untouched — is xUnit-pinned (Part 1A Task 2).
 
 **Manual / in-engine:**
 
 - 720p / 1080p / 1440p + non-16:9 windows: login, HUD, every window type, tooltips at
   3×, slider drag-release, keyboard nudge, auto boundary crossing by window resize,
-  window move-drag interrupted by a scale commit, save/reload persistence.
+  window move-drag interrupted by a scale commit (M6), save/reload persistence incl.
+  Manual 2× at startup (M3). These are the MANUAL legs that headless cannot reach —
+  see the M1–M11 matrix in Part 2 Task 6 for pass conditions.
 - Icon crispness at 1.5× specifically (user-accepted risk; this is where the 0.5-step
   choice gets its verdict).
 
