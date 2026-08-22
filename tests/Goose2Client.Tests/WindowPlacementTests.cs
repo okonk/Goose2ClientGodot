@@ -242,7 +242,7 @@ public class WindowPlacementTests
     }
 
     // Hotbar design quad: (520, 679) 351x36 on the 1280x720 design canvas (bottom margin 5,
-    // center offset from canvas center +55.5).
+    // center offset from canvas center +55.5; chat clearance 520 = chat right edge 508 + 12).
     private static Vector2 HotbarDef(Vector2I canvas, Vector2 liveSize, float factor)
         => WindowPlacement.HotbarDefault(canvas, liveSize, factor, new Vector2(520, 679), new Vector2(351, 36));
 
@@ -253,16 +253,19 @@ public class WindowPlacementTests
     }
 
     [Fact]
-    public void HotbarDefault_ScaledTracksCenter()
+    public void HotbarDefault_NarrowCanvas2xRightClamped()
     {
-        // 2x: x = 520 − (702−351)/2 = 344.5 (center stays at 695.5); y = 720 − 72 − 10 = 638.
-        Assert.Equal(new Vector2(344.5f, 638f), HotbarDef(C720, new Vector2(702, 72), 2f));
+        // 2x on 1280px: centered 344.5 → chat clearance 1040 → right-clamped to 1280−702 = 578
+        // (chat + a 702px hotbar physically do not both fit at 1280px wide).
+        Assert.Equal(new Vector2(578f, 638f), HotbarDef(C720, new Vector2(702, 72), 2f));
     }
 
     [Fact]
-    public void HotbarDefault_WideCanvas2x()
+    public void HotbarDefault_WideCanvas2xClearsChat()
     {
-        Assert.Equal(new Vector2(984.5f, 1358f), HotbarDef(new Vector2I(2560, 1440), new Vector2(702, 72), 2f));
+        // 2x on 2560px: centered 984.5 would overlap the chat window (right edge 1016 at 2x);
+        // chat clearance clamps x to 1040, leaving the 24px design gap.
+        Assert.Equal(new Vector2(1040f, 1358f), HotbarDef(new Vector2I(2560, 1440), new Vector2(702, 72), 2f));
     }
 
     [Fact]

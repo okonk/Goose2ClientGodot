@@ -19,6 +19,10 @@ public static class WindowPlacement
     // Windows closer than ¼ of the canvas to either edge are edge-parked; the band is the middle 50%.
     private const float MiddleBandEdgeFraction = 0.25f;
 
+    // ChatWindow (plain root, bottom-left) spans x 8..508 at 1× and scales with the factor;
+    // 520 = 508 + the 12px design gap, i.e. the hotbar's authored 1× x.
+    private const float ChatClearanceX = 520f;
+
     /// <summary>
     /// Middle-band + edge-stick + clamp at the 1× baseline (legacy pre-quad path: saved size is
     /// the live size, factors 1). Delegates to <see cref="ResolveScaled"/>; mathematically identical
@@ -64,9 +68,10 @@ public static class WindowPlacement
 
     /// <summary>
     /// Unplaced hotbar default: bottom-stuck (the design canvas's 5px bottom margin, scaled by
-    /// factor) and centered with the design canvas's center offset preserved (+55.5). Reduces
-    /// exactly to (520, 679) at 1x on the 1280x720 design canvas, so it replaces the authored
-    /// default there and tracks the screen center at other canvases/factors.
+    /// factor) and centered with the design canvas's center offset preserved (+55.5), with the
+    /// left edge clamped to chat clearance (520 × factor) so a centered hotbar never lands on
+    /// the bottom-left chat window. Reduces exactly to (520, 679) at 1x on the 1280x720 design
+    /// canvas, so it replaces the authored default there.
     /// </summary>
     public static Vector2 HotbarDefault(Vector2I canvas, Vector2 liveSize, float factor,
         Vector2 designPos, Vector2 designSize)
@@ -74,6 +79,7 @@ public static class WindowPlacement
         float bottomMargin = LegacyCanvas.Y - (designPos.Y + designSize.Y);
         float centerOffset = designPos.X + designSize.X / 2f - LegacyCanvas.X / 2f;
         float x = (canvas.X - liveSize.X) / 2f + centerOffset;
+        x = Mathf.Max(x, ChatClearanceX * factor);
         float y = canvas.Y - liveSize.Y - bottomMargin * factor;
         return new Vector2(
             Mathf.Clamp(x, 0f, Mathf.Max(0f, canvas.X - liveSize.X)),

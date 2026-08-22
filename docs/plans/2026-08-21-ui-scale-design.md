@@ -194,8 +194,13 @@ public interface IScalableWindow { void Relayout(); }
   An UNPLACED hotbar now resolves through `WindowPlacement.HotbarDefault`: bottom-stuck
   with the design canvas's 5px margin (scaled) and its center at the same offset from
   the canvas center as on the design canvas (+55.5px) — so 1× on 1280×720 is exactly
-  the authored (520, 679), and at 2×/1440p it moves with the scale. A hotbar the user
-  dragged (Placed) or a legacy position keeps the normal `ResolveScaled` path.
+  the authored (520, 679), and at 2×/1440p it moves with the scale. The left edge is
+  additionally clamped to chat clearance (520 × factor — the chat window's right edge
+  508 plus the 12px design gap, both scaling with the factor) so a centered hotbar
+  never overlaps the bottom-left chat window; on canvases where chat + hotbar cannot
+  both fit, the right-edge containment clamp wins and the hotbar stays on screen.
+  A hotbar the user dragged (Placed) or a legacy position keeps the normal
+  `ResolveScaled` path.
 - `UiScaleApplier` is a plain class with a `TooltipManager.Instance`-style static
   accessor, created in `GameManager._Ready` (not a Node).
 
