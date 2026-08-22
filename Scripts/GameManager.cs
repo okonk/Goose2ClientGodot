@@ -537,6 +537,9 @@ namespace Goose2Client
             var expectedSpell = labelMin + new Vector2(applier.ScaleSize(8f), applier.ScaleSize(4f));
             Assert(spellTt.Visible, "spell tooltip not visible after show");
             Assert(spellTt.Size == expectedSpell, $"spell tooltip size {spellTt.Size} != {expectedSpell}");
+            Assert(spellLabel.OffsetLeft == 8 && spellLabel.OffsetTop == 4
+                && spellLabel.OffsetRight == -8 && spellLabel.OffsetBottom == -4,
+                $"spell label 2x offsets {spellLabel.OffsetLeft},{spellLabel.OffsetTop},{spellLabel.OffsetRight},{spellLabel.OffsetBottom} != (8,4,-8,-4)");
             Assert(spellTt.Position.Y + spellTt.Size.Y <= canvas.Y, $"spell tooltip y-clamp {spellTt.Position.Y}+{spellTt.Size.Y} > {canvas.Y}");
             tm.HideSpellTooltip();
             await Frame();
@@ -727,6 +730,15 @@ namespace Goose2Client
             Assert(tile1.CustomMinimumSize == new Vector2(87, 33), $"party tile min {tile1.CustomMinimumSize} != (87, 33)");
             var sep1 = Hud.Party.GetNode<VBoxContainer>("MemberList").GetThemeConstant("separation");
             Assert(sep1 == 1, $"party separation {sep1} != 1");
+            tm.ShowSpellTooltip(new SpellInfo { Name = "Selftest" }, Hud);
+            await Frame();
+            await Frame();
+            var labelMin1 = spellLabel.GetCombinedMinimumSize();
+            Assert(spellLabel.OffsetLeft == 4 && spellLabel.OffsetTop == 2
+                && spellLabel.OffsetRight == -4 && spellLabel.OffsetBottom == -2,
+                $"spell label 1x offsets {spellLabel.OffsetLeft},{spellLabel.OffsetTop},{spellLabel.OffsetRight},{spellLabel.OffsetBottom} != (4,2,-4,-2)");
+            Assert(spellTt.Size == labelMin1 + new Vector2(8, 4), $"spell tooltip 1x size {spellTt.Size} != {labelMin1} + (8,4)");
+            tm.HideSpellTooltip();
             GD.Print("[ui_scale_selftest] OK 1x restore (idempotence: geometry + positions)");
         }
 

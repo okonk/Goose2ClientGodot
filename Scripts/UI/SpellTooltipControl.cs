@@ -57,6 +57,10 @@ namespace Goose2Client.UI
             // Size to the label's content (+padding) so the full-rect Background wraps the text.
             var pad = TooltipMetrics.TextPad(UiScaleApplier.Instance.Factor);
             Size = _label.GetCombinedMinimumSize() + new Vector2(pad.W, pad.H);
+            _label.OffsetLeft = pad.W / 2;
+            _label.OffsetTop = pad.H / 2;
+            _label.OffsetRight = -pad.W / 2;
+            _label.OffsetBottom = -pad.H / 2;
 
             PositionTooltip();
         }
