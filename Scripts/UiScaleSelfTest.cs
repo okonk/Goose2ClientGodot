@@ -126,6 +126,19 @@ internal static class UiScaleSelfTest
                 $"1x no-op: {kv.Key.GetPath()} {kv.Value} -> {v}");
         GD.Print($"[ui_scale_selftest] OK 1x no-op: {applier.RegisteredWindows.Count} roots, {geo1.Count} controls");
 
+        // Leg 0: login 1x baseline — the current scene stays Login the whole run.
+        var login = (LoginScene)tree.CurrentScene;
+        var loginMargin = login.GetNode<MarginContainer>("MarginContainer");
+        var loginVBox = login.GetNode<VBoxContainer>("MarginContainer/VBox");
+        var nameInput = login.GetNode<LineEdit>("MarginContainer/VBox/NameInput");
+        Assert(loginMargin.Size == new Vector2(300, 200), $"login margin size {loginMargin.Size} != (300, 200)");
+        // Project-theme base is 10; a different value means the project theme stopped applying.
+        var loginFont1 = nameInput.GetThemeFontSize("font_size");
+        var loginSep1 = loginVBox.GetThemeConstant("separation");
+        Assert(loginFont1 == 10, $"login font base {loginFont1} != 10");
+        Assert(loginSep1 == 10, $"login separation {loginSep1} != 10");
+        GD.Print("[ui_scale_selftest] OK login 1x baseline: 300x200, font 10, separation 10");
+
         applier.Apply(2f, ApplyReason.UserCommit);
         await Frame();
 
@@ -195,6 +208,14 @@ internal static class UiScaleSelfTest
         tm.HideSpellTooltip();
         await Frame();
         GD.Print($"[ui_scale_selftest] OK 2x audit: theme=20, {fontChecked} font overrides, spell tooltip {expectedSpell}");
+
+        // Leg 1: login at 2x.
+        Assert(loginMargin.Size == new Vector2(600, 400), $"login margin size 2x {loginMargin.Size} != (600, 400)");
+        var loginFont2 = nameInput.GetThemeFontSize("font_size");
+        var loginSep2 = loginVBox.GetThemeConstant("separation");
+        Assert(loginFont2 == 20, $"login font 2x {loginFont2} != 20");
+        Assert(loginSep2 == 20, $"login separation 2x {loginSep2} != 20");
+        GD.Print("[ui_scale_selftest] OK login 2x: 600x400, font 20, separation 20");
 
         // Step 2b: runtime spawn at 2x. WindowSettings is a class mutated in place — the
         // record is deep-copied into locals, and restore runs in finally before anything that can throw.
@@ -392,5 +413,33 @@ internal static class UiScaleSelfTest
         Assert(spellTt.Size == labelMin1 + new Vector2(8, 4), $"spell tooltip 1x size {spellTt.Size} != {labelMin1} + (8,4)");
         tm.HideSpellTooltip();
         GD.Print("[ui_scale_selftest] OK 1x restore (idempotence: geometry + positions)");
+
+        // Leg 2: login round trip — an explicit-override approach with a wrong base would not round-trip.
+        Assert(loginMargin.Size == new Vector2(300, 200), $"login margin size 1x {loginMargin.Size} != (300, 200)");
+        var loginFont3 = nameInput.GetThemeFontSize("font_size");
+        var loginSep3 = loginVBox.GetThemeConstant("separation");
+        Assert(loginFont3 == 10, $"login font 1x {loginFont3} != 10");
+        Assert(loginSep3 == 10, $"login separation 1x {loginSep3} != 10");
+        GD.Print("[ui_scale_selftest] OK login 1x round trip: 300x200, font 10, separation 10");
+
+        // Leg 3: loading scene (SC-16) — instantiated directly; _Ready self-registers.
+        var loading = GD.Load<PackedScene>("res://Scenes/LoadingMap.tscn").Instantiate<LoadingMapScene>();
+        tree.Root.AddChild(loading);
+        await Frame();
+        var status = loading.GetNode<Label>("StatusLabel");
+        var r1 = new Vector4(status.OffsetLeft, status.OffsetTop, status.OffsetRight, status.OffsetBottom);
+        Assert(r1 != default, $"loading label rect degenerate {r1}");
+        applier.Apply(2f, ApplyReason.UserCommit);
+        await Frame();
+        var r2 = new Vector4(status.OffsetLeft, status.OffsetTop, status.OffsetRight, status.OffsetBottom);
+        Assert(r2 == new Vector4(r1.X * 2, r1.Y * 2, r1.Z * 2, r1.W * 2), $"loading label rect 2x {r2} != {r1} * 2");
+        applier.Apply(1f, ApplyReason.UserCommit);
+        await Frame();
+        var r3 = new Vector4(status.OffsetLeft, status.OffsetTop, status.OffsetRight, status.OffsetBottom);
+        Assert(r3 == r1, $"loading label rect 1x {r3} != {r1}");
+        loading.QueueFree();
+        await Frame();
+        Assert(!ContainsRoot(loading), "loading registration not pruned after free");
+        GD.Print("[ui_scale_selftest] OK loading leg: 2x double + 1x round trip + prune");
     }
 }

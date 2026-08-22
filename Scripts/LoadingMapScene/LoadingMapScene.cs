@@ -1,9 +1,11 @@
+using System.Collections.Generic;
 using Godot;
 
 namespace Goose2Client;
 
-public partial class LoadingMapScene : Control
+public partial class LoadingMapScene : Control, IScalableWindow
 {
+    private List<UiScaleLayout.GeomRecord> _geom = null!;
     private Label _statusLabel;
     private string _mapName = "";
 
@@ -11,6 +13,18 @@ public partial class LoadingMapScene : Control
     {
         _statusLabel = GetNode<Label>("StatusLabel");
         UpdateLabel();
+
+        var applier = UiScaleApplier.Instance;
+        _geom = UiScaleLayout.Snapshot(this);
+        applier.RegisterWindow(this);
+        Relayout();
+        TreeExited += () => applier.UnregisterWindow(this);
+    }
+
+    public void Relayout()
+    {
+        UiScaleLayout.Apply(_geom, UiScaleApplier.Instance.Factor);
+        _statusLabel.UpdateMinimumSize(); // Label min goes stale on theme default font change; see LoginScene.Relayout
     }
 
     /// <summary>

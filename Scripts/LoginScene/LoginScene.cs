@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Godot;
 using Goose2Client.Network.Packets;
 
@@ -8,8 +9,10 @@ namespace Goose2Client;
 /// Faithful Godot port of Unity's LoginScene/LoginButton.cs.
 /// Provides the interactive login form: username/password input, connect + login flow.
 /// </summary>
-public partial class LoginScene : Control
+public partial class LoginScene : Control, IScalableWindow
 {
+    private List<UiScaleLayout.GeomRecord> _geom = null!;
+
     // Cached UI nodes
     private LineEdit _nameInput = default!;
     private LineEdit _passwordInput = default!;
@@ -49,6 +52,20 @@ public partial class LoginScene : Control
 
         // Clear status label initially
         _statusLabel.Text = "";
+
+        var applier = UiScaleApplier.Instance;
+        _geom = UiScaleLayout.Snapshot(this);
+        applier.RegisterWindow(this);
+        Relayout();
+        TreeExited += () => applier.UnregisterWindow(this);
+    }
+
+    public void Relayout()
+    {
+        UiScaleLayout.Apply(_geom, UiScaleApplier.Instance.Factor);
+        // Godot quirk: a Label's min size is not refreshed when the theme default font
+        // size changes, so the stale min over-allocates the VBox after a scale-down.
+        _statusLabel.UpdateMinimumSize();
     }
 
     public override void _ExitTree()
