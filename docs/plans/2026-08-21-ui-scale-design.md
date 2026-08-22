@@ -66,22 +66,24 @@ prose repetition made traceability informal).
 | SC-13 | Auto mode re-computes on window resize (720/1080/1440 boundaries only, no debounce) | Part 2 Task 3 | M4 |
 | SC-14 | Mode UI: `ButtonGroup` `AllowUnpress = false` (exactly-one-selected); Auto→Manual persists mode+value; dormant manual value survives Auto | Part 2 Task 4 | M11 (widget) + commit-split xUnit (value) |
 | SC-15 | Regression gates: xUnit suite + headless self-test exit 0 (M10) + manual matrix M1–M11 | Part 1C Task 5; Part 2 Task 6 | the gates themselves |
-| SC-16 | Login AND loading scaling AUTOMATED — the self-test instantiates both scenes directly (no server transition needed; M3's real-transition check is sanity-only) | Part 2 Task 5 | self-test login leg + loading leg; M8 |
+| SC-16 | Login AND loading scaling AUTOMATED — the self-test instantiates both scenes directly (no server transition needed; M8's real-transition check is sanity-only) | Part 2 Task 5 | self-test login leg + loading leg; M8 |
 
 ## 2. `UiScale` pure math
 
-New file `Scripts/UiScale.cs`. Pure, no Godot types, fully xUnit-covered (same shape
-as `WorldViewportScale` / `WindowPlacement`). Small non-static class owned by the
-applier (no hidden global state).
+New file `Scripts/UiScale.cs`. Pure — no scene-tree / global-state APIs (Godot VALUE
+types permitted; the file carries `using Godot;`, same shape as
+`WorldViewportScale` / `WindowPlacement`), fully xUnit-covered. Small non-static class
+owned by the applier (no hidden global state).
 
 ```
 const Min = 1f, Max = 3f, Step = 0.5f
 
-static NormalizeFactor(float raw)  // snap to 0.5 steps, clamp to [1, 3]
-static AutoFactor(int windowHpx)   // thresholds: h < 1080 → 1, h < 1440 → 2, else 3 (clamped)
-ScaleSize(float basePx)            // max(1, (int)MathF.Round(basePx * factor, AwayFromZero))  (pinned by test; the (int) cast is required)
-ScaleSizeI(Vector2I v)             // per-axis ScaleSize
-CurrentFactor (float)              // plain state — the applier is the ONLY writer
+static NormalizeFactor(float raw)    // snap to 0.5 steps, clamp to [1, 3]
+static AutoFactor(int windowHpx)     // thresholds: h < 1080 → 1, h < 1440 → 2, else 3 (clamped)
+static ScaleSize(float basePx, float factor)  // max(1, (int)MathF.Round(basePx * factor, AwayFromZero)) — the SINGLE scaling primitive; ALL metrics classes call this (pinned by test; the (int) cast is required)
+ScaleSize(float basePx)              // thin instance form → ScaleSize(basePx, CurrentFactor) (applier-internal only)
+ScaleSizeI(Vector2I v)               // per-axis instance form
+CurrentFactor (float)                // plain state — the applier is the ONLY writer
 ```
 
 - `NormalizeFactor` is the single normalization entry point; auto and slider values
@@ -367,10 +369,11 @@ any window registers, so the first build is already scaled; no unscaled flash.
 - **Runtime-created Quest/Info windows (SC-11):** `QuestWindow`/`InfoWindow`
   (`BaseMultipleWindow`, spawned by their managers, not present at HUD build) lay out
   their line labels at the 1× pitch `11.18f` — font migration alone would overlap them
-  at 2×. Pure `MultiWindowMetrics` (pitch/font, 1× row = the literals) drives both
-  creation (native-scale at the live factor) and `Relayout` on every commit; the line
-  labels carry the snapshot skip-meta. Self-test asserts a driven `InfoWindow`'s pitch
-  at 2×/1× (Part 1C Task 4/5).
+  at 2×. Pure `MultiWindowMetrics.LinePosition(index, factor)` — POSITION-ONLY
+  (1× column = the exact literals; font sizes go through the `ApplyFontSize` registry,
+  not the metrics class) — drives both creation (native-scale at the live factor) and
+  `Relayout` on every commit; the line labels carry the snapshot skip-meta.
+  Self-test asserts a driven `InfoWindow`'s line positions at 2×/1× (Part 1C Task 4/5).
 
 ## 8. Rejected alternatives
 

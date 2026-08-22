@@ -55,7 +55,8 @@
 - `public float CurrentFactor { get; set; }` — plain state; **`UiScaleApplier.Apply` is the only writer** (tests set it via object initializer).
 - `public static float NormalizeFactor(float raw)` — pure: clamp + snap, NaN → `MinFactor`. Never touches `CurrentFactor`.
 - `public static int AutoFactor(int windowHeightPx)` — pure.
-- `public int ScaleSize(float basePx)` / `public Vector2I ScaleSizeI(Vector2I v)` — read `CurrentFactor`.
+- **`public static int ScaleSize(float basePx, float factor)` — the SINGLE scaling primitive (review: the draft's "shared static instance" is global state and `UiScaleApplier.Instance.Scale` ignores an explicit factor — neither fits the pure `Metrics(factor)` contract)**: pure, `Math.Max(1, (int)MathF.Round(basePx × factor, MidpointRounding.AwayFromZero))`. ALL Part 1C metrics classes call this static two-arg form with their explicit `factor` argument — no rounding logic duplicated in metrics files.
+- `public int ScaleSize(float basePx) => ScaleSize(basePx, CurrentFactor);` / `public Vector2I ScaleSizeI(Vector2I v)` — thin instance forms reading `CurrentFactor` (applier-internal only; metrics never use them).
 - **Pinned constants** `public const float MinFactor = 1f, MaxFactor = 3f, Step = 0.5f` (the slider range; `NormalizeFactor` clamps/snaps to these).
 Both projects reference GodotSharp (the test project already does, see `WindowPlacementTests`) — `Vector2`/`Vector2I` in signatures are the norm for the pure math classes (`WorldViewportScale`, `WindowPlacement`).
 
@@ -65,6 +66,7 @@ Tests (all red against "does not exist"):
 - `CurrentFactor_IsPlainState`: `new UiScale { CurrentFactor = 2.5f }` → `ScaleSize(10f) == 25` (25.0), and `NormalizeFactor`/`AutoFactor` do not read or write it.
 - `AutoFactor_Boundaries` (explicit thresholds — NOT `round(h/720)`, which would make 1440 → 2): `719 → 1`, `720 → 1`, `1079 → 1`, `1080 → 2`, `1439 → 2`, `1440 → 3`, `2880 → 3` (clamp case).
 - `ScaleSize_RoundsHalfAwayFromZero`: with `CurrentFactor = 1.5f`, `ScaleSize(10f) == 15` and — the pin — a `.5` product rounds away: `CurrentFactor = 2.5f`, `ScaleSize(3f) == 8` (7.5 → 8, not 7).
+- `ScaleSize_StaticTwoArg`: the static primitive is factor-explicit and matches the instance form: `ScaleSize(10f, 1.5f) == 15`, `ScaleSize(3f, 2.5f) == 8` (same half-away pin, no state involved), `ScaleSize(1f, 1f) == 1`, `ScaleSize(0f, 3f) == 1` (min-1 via the static path).
 - `ScaleSize_MinOneGuard`: factor `1f`, `ScaleSize(0f) == 1`; smallest real base `ScaleSize(1f) == 1` at factor `1f`.
 - `ScaleSizeI_PerAxis`: factor `2f`, `new Vector2I(32, 55) → new Vector2I(64, 110)`.
 
@@ -78,7 +80,7 @@ Tests (all red against "does not exist"):
 |-----------|-----------|
 | Corrupt/NaN values normalize into range | `NormalizeFactor_SnapsToHalfStepsAndClamps`, `NormalizeFactor_RejectsNaN` |
 | 1.5-step slider value 3.4 can't leak through | `NormalizeFactor_SnapsToHalfStepsAndClamps` |
-| Rounding is deterministic, not engine-dependent | `ScaleSize_RoundsHalfAwayFromZero` |
+| Rounding is deterministic, not engine-dependent | `ScaleSize_RoundsHalfAwayFromZero` + `ScaleSize_StaticTwoArg` |
 | Build-time geometry is the 1× base; a runtime-spawned window under 2× scales correctly (the adversarial leg the headless factor-1 bias can't fake) | Part 1C Task 5 step 2b (in-engine) |
 
 ---
