@@ -27,6 +27,7 @@ script = ExtResource("2_item")
 layout_mode = 0
 mouse_filter = 2
 visible = false
+metadata/ui_scale_skip = true
 
 [node name="Background" type="Panel" parent="ItemTooltip"]
 layout_mode = 0
@@ -93,6 +94,7 @@ script = ExtResource("3_spell")
 layout_mode = 0
 mouse_filter = 2
 visible = false
+metadata/ui_scale_skip = true
 
 [node name="Background" type="Panel" parent="SpellTooltip"]
 layout_mode = 0
@@ -117,6 +119,7 @@ script = ExtResource("4_text")
 layout_mode = 0
 mouse_filter = 2
 visible = false
+metadata/ui_scale_skip = true
 
 [node name="Background" type="Panel" parent="TextTooltip"]
 layout_mode = 0
@@ -141,6 +144,7 @@ script = ExtResource("5_mapitem")
 layout_mode = 0
 mouse_filter = 2
 visible = false
+metadata/ui_scale_skip = true
 
 [node name="Background" type="Panel" parent="MapItemTooltip"]
 layout_mode = 0

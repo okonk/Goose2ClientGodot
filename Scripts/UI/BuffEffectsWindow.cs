@@ -1,5 +1,7 @@
 using Godot;
+using Goose2Client;
 using Goose2Client.Network.Packets;
+using System.Collections.Generic;
 
 namespace Goose2Client.UI
 {
@@ -7,7 +9,7 @@ namespace Goose2Client.UI
     /// Buff effects window — 20-slot horizontal row of buff icons.
     /// Double-clicking a buff kills it.
     /// </summary>
-    public partial class BuffEffectsWindow : Control
+    public partial class BuffEffectsWindow : Control, IScalableWindow
     {
         public const int SlotCount = 20;
 
@@ -15,6 +17,7 @@ namespace Goose2Client.UI
 
         private BuffEffect[] _slots;
         private bool _listenersRegistered;
+        private List<UiScaleLayout.GeomRecord> _geom = null!;
 
         public override void _Ready()
         {
@@ -32,6 +35,17 @@ namespace Goose2Client.UI
 
             GameManager.Instance.PacketManager.Listen<BuffBarPacket>(OnBuffBar);
             _listenersRegistered = true;
+
+            var applier = UiScaleApplier.Instance;
+            _geom = UiScaleLayout.Snapshot(this);
+            applier.RegisterWindow(this);
+            Relayout();
+            TreeExited += () => applier.UnregisterWindow(this);
+        }
+
+        public void Relayout()
+        {
+            UiScaleLayout.Apply(_geom, UiScaleApplier.Instance.Factor);
         }
 
         public override void _ExitTree()
