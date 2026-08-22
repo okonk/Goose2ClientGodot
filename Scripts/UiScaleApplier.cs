@@ -98,7 +98,7 @@ public class UiScaleApplier
         _appliedOnce = true;
         Scale.CurrentFactor = f;
 
-        // Part 2: cancel in-progress BaseWindow drags before hiding tooltips
+        // Part 2 seam: the scale-commit BaseWindow CancelDrag() pass inserts here, before the tooltip hide.
         if (TooltipManager.Instance != null)
             TooltipManager.Instance.HideAll();
 

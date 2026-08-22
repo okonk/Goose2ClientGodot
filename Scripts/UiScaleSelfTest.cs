@@ -126,7 +126,6 @@ internal static class UiScaleSelfTest
                 $"1x no-op: {kv.Key.GetPath()} {kv.Value} -> {v}");
         GD.Print($"[ui_scale_selftest] OK 1x no-op: {applier.RegisteredWindows.Count} roots, {geo1.Count} controls");
 
-        // Step 2: apply 2x and audit.
         applier.Apply(2f, ApplyReason.UserCommit);
         await Frame();
 
