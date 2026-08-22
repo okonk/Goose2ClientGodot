@@ -33,6 +33,7 @@ namespace Goose2Client.UI
         private long _lastMaxSp;
 
         private List<UiScaleLayout.GeomRecord> _geom = null!;
+        private VitalsCharacterDisplay _portrait;
 
         public override void _Ready()
         {
@@ -44,6 +45,7 @@ namespace Goose2Client.UI
             _spText = GetNode<Label>("SpText");
             _spOutline = GetNode<Control>("SpOutline");
             _levelText = GetNode<Label>("LevelText");
+            _portrait = GetNode<VitalsCharacterDisplay>("Portrait");
 
             _hpBar.MaxValue = 1;
             _mpBar.MaxValue = 1;
@@ -92,6 +94,7 @@ namespace Goose2Client.UI
         public void Relayout()
         {
             UiScaleLayout.Apply(_geom, UiScaleApplier.Instance.Factor);
+            _portrait.Relayout();
         }
 
         public override void _Process(double delta)
