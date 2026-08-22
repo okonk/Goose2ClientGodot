@@ -131,4 +131,113 @@ public class WindowPlacementTests
         Assert.InRange(p.X, 0f, 640f - 300f);
         Assert.InRange(p.Y, 0f, 360f - WindowPlacement.TitleBarHeight); // y ≤ 336
     }
+
+    [Fact]
+    public void Resolve_DelegatesToResolveScaled()
+    {
+        // savedSize == windowSize, factors 1, marginScale 1 → identical arithmetic per float input.
+        var samples = new (Vector2 Pos, Vector2 Size, Vector2I Saved, Vector2I Current)[]
+        {
+            (new Vector2(520, 679), new Vector2(351, 36), C720, C720),
+            (new Vector2(144.5f, 10), new Vector2(351, 36), new Vector2I(640, 360), new Vector2I(640, 360)),
+            (new Vector2(980.25f, 695.75f), new Vector2(300, 200), C720, C1080),
+            (new Vector2(0, 0), new Vector2(300, 200), C1080, C720),
+            (new Vector2(480.5f, 160.25f), new Vector2(320, 400), C720, C1080),
+            (new Vector2(-5, -5), new Vector2(638, 360), C720, C720),
+        };
+        foreach (var s in samples)
+            Assert.Equal(
+                WindowPlacement.Resolve(s.Pos, s.Size, s.Saved, s.Current),
+                WindowPlacement.ResolveScaled(s.Pos, s.Size, 1f, s.Saved, s.Size, 1f, s.Current));
+    }
+
+    [Fact]
+    public void ResolveScaled_HotbarCommitAt2x()
+    {
+        // Real hotbar quad: (520, 679) 351x36 @ f1 on C720; window now (702, 72) @ f2, C720.
+        // x: left 520 ≥ 320 AND right 1280 − (520+351) == 409 ≥ 320 → band → kept 520 (fits: ≤ 578).
+        // y: top 679 ≥ 180, bottom 720 − (679+36) == 5 < 180 → trailing → 720 − 72 − (5×2) == 638.
+        var p = WindowPlacement.ResolveScaled(new Vector2(520, 679), new Vector2(351, 36), 1f, C720,
+            new Vector2(702, 72), 2f, C720);
+        Assert.Equal(new Vector2(520, 638), p);
+    }
+
+    [Fact]
+    public void ResolveScaled_ScaleCommitRoundTrips()
+    {
+        // Invariant quad (520, 679) 351x36 @ f1 C720: deriving back at the saved factor
+        // returns the saved position EXACTLY at every factor in between.
+        Vector2 At(float sizeW, float sizeH, float factor)
+            => WindowPlacement.ResolveScaled(new Vector2(520, 679), new Vector2(351, 36), 1f, C720,
+                new Vector2(sizeW, sizeH), factor, C720);
+
+        // @1× (351, 36): x band-kept 520; y 720 − 36 − 5 == 679.
+        Assert.Equal(new Vector2(520, 679), At(351, 36, 1f));
+        // @1.5× (527, 54): x band-kept 520; y 720 − 54 − (5×1.5 == 7.5) == 658.5.
+        Assert.Equal(new Vector2(520, 658.5f), At(527, 54, 1.5f));
+        // @2× (702, 72): y 720 − 72 − (5×2) == 638.
+        Assert.Equal(new Vector2(520, 638), At(702, 72, 2f));
+    }
+
+    [Fact]
+    public void ResolveScaled_DragAtScale_CommitAndRoundTrips()
+    {
+        // 400-wide window dragged at 2×: quad ((800, 600), (400, 72), 2, C720).
+        Vector2 At(float sizeW, float sizeH, float factor)
+            => WindowPlacement.ResolveScaled(new Vector2(800, 600), new Vector2(400, 72), 2f, C720,
+                new Vector2(sizeW, sizeH), factor, C720);
+
+        // Commit to 1× (200, 36), ms 0.5:
+        // x: left 800 ≥ 320, right 1280 − 1200 == 80 < 320 → trailing → 1280 − 200 − (80×0.5) == 1040;
+        // y: top 600 ≥ 180, bottom 720 − 672 == 48 < 180 → trailing → 720 − 36 − (48×0.5) == 660.
+        Assert.Equal(new Vector2(1040, 660), At(200, 36, 1f));
+        // Back at 2× (400, 72), ms 1 → exactly the saved position.
+        Assert.Equal(new Vector2(800, 600), At(400, 72, 2f));
+    }
+
+    [Fact]
+    public void ResolveScaled_LeadingMarginScales()
+    {
+        // Quad ((100, 679), (351, 36), 1, C720) at (702, 72) @ 2, C720.
+        // x: left 100 < 320 → not band; left < right (829) → leading → 100×2 == 200 (fits: ≤ 578).
+        // y: bottom 5 < 180 → trailing → 638.
+        var p = WindowPlacement.ResolveScaled(new Vector2(100, 679), new Vector2(351, 36), 1f, C720,
+            new Vector2(702, 72), 2f, C720);
+        Assert.Equal(new Vector2(200, 638), p);
+    }
+
+    [Fact]
+    public void ResolveScaled_ClampWhenScaledWindowExceedsCanvas()
+    {
+        // Same quad on a 1280×60 canvas: y trailing → 60 − 72 − 10 == −22 → clamped to 0;
+        // x leading 200.
+        var p = WindowPlacement.ResolveScaled(new Vector2(100, 679), new Vector2(351, 36), 1f, C720,
+            new Vector2(702, 72), 2f, new Vector2I(1280, 60));
+        Assert.Equal(new Vector2(200, 0), p);
+    }
+
+    [Fact]
+    public void ResolveScaled_TitleBarAllowance_Scaled()
+    {
+        // Quad ((100, 700), (100, 100), 1, C720), (100, 100) @ 1.
+        // x: left 100 < 320 → leading → 100. y: bottom 720 − 800 == −80 → trailing →
+        // 720 − 100 − (−80×1) == 700 → clamped by the allowance: 696 (24) / 672 (48).
+        Vector2 At(int allowance)
+            => WindowPlacement.ResolveScaled(new Vector2(100, 700), new Vector2(100, 100), 1f, C720,
+                new Vector2(100, 100), 1f, C720, allowance);
+
+        Assert.Equal(new Vector2(100, 696), At(24));
+        Assert.Equal(new Vector2(100, 672), At(48));
+    }
+
+    [Fact]
+    public void ResolveScaled_CorruptSavedFactorFallsBackTo1()
+    {
+        Vector2 At(float savedFactor)
+            => WindowPlacement.ResolveScaled(new Vector2(100, 679), new Vector2(351, 36), savedFactor, C720,
+                new Vector2(702, 72), 2f, C720);
+
+        Assert.Equal(At(1f), At(0f));
+        Assert.Equal(At(1f), At(-1f));
+    }
 }

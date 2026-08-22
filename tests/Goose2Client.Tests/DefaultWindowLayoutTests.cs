@@ -26,4 +26,10 @@ public class DefaultWindowLayoutTests
     [InlineData("Options", false)]
     public void IsDialog_OnlyTransientDialogFamily(string name, bool expected)
         => Assert.Equal(expected, DefaultWindowLayout.IsDialog(name));
+
+    [Fact] public void LegacySize_Options_Is240x112()
+        => Assert.Equal(new Vector2(240, 112), DefaultWindowLayout.LegacySize("Options"));
+
+    [Fact] public void LegacySize_UnlistedWindow_IsNull()
+        => Assert.Null(DefaultWindowLayout.LegacySize("Hotbar"));
 }

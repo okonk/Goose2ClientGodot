@@ -33,6 +33,11 @@ namespace Goose2Client
         /// <summary>Canvas the window was saved on (native root window size). Legacy files lack
         /// the field → (0,0), which BaseWindow maps to <c>WindowPlacement.LegacyCanvas</c>.</summary>
         public Vector2I CanvasSize;
+        // Saved-quad fields (pre-feature files lack all three → zero/false); the quad is written
+        // only by the drag-end SetWindowSetting call, Placed is the placement-valid marker.
+        public Vector2 Size;
+        public float Factor;
+        public bool Placed;
     }
 
     public class CharacterSettings
@@ -64,7 +69,9 @@ namespace Goose2Client
             ApplyDefaults();
         }
 
-        private string GetFilePath()
+        // Virtual: ProjectSettings.GlobalizePath aborts the process outside the engine, so the
+        // xUnit suite redirects the path via a subclass.
+        protected virtual string GetFilePath()
         {
             return Path.Combine(ProjectSettings.GlobalizePath("user://"), $"{characterName}-settings.json");
         }
@@ -183,6 +190,30 @@ namespace Goose2Client
                 settings.Position = position.Value;
             settings.Visible = visible;
             settings.CanvasSize = canvas;
+            Save();
+        }
+
+        // Visibility-only: the toggle/close path must not touch the saved quad (Size/Factor are
+        // not live at close time — writing Position/CanvasSize without them would corrupt it).
+        public void SetWindowVisible(string windowName, bool visible)
+        {
+            var settings = GetOrCreateWindowSettings(windowName);
+            settings.Visible = visible;
+            Save();
+        }
+
+        // Drag-end save: the ONLY writer of the full quad (all four fields atomically; Placed
+        // must never be set with an incomplete quad — Part 1B trusts a Placed quad wholesale).
+        public void SetWindowSetting(string windowName, Vector2 position, Vector2 size, float factor, bool? visible, Vector2I canvas)
+        {
+            var settings = GetOrCreateWindowSettings(windowName);
+            settings.Position = position;
+            settings.Size = size;
+            settings.Factor = factor;
+            if (visible.HasValue)
+                settings.Visible = visible.Value;
+            settings.CanvasSize = canvas;
+            settings.Placed = true;
             Save();
         }
 

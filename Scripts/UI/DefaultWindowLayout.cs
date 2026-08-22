@@ -33,4 +33,11 @@ public static class DefaultWindowLayout
 
     public static Vector2 For(string windowName)
         => windowName != null && Defaults.TryGetValue(windowName, out var p) ? p : new Vector2(100, 100);
+
+    /// <summary>
+    /// Pre-feature tscn size: legacy saves predate the Size key, and the live tscn size would
+    /// misinterpret their margins. Null → caller uses the live tscn size.
+    /// </summary>
+    public static Vector2? LegacySize(string windowName)
+        => windowName == "Options" ? new Vector2(240, 112) : null;
 }

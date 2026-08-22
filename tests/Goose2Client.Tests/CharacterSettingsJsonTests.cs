@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.IO;
 using System.Text.Json;
 using Godot;
 using Goose2Client.UI;
@@ -134,6 +135,184 @@ namespace Goose2Client.Tests
             Assert.Equal(679, ws.Position.Y);
             Assert.True(ws.Visible);
             Assert.Equal(new Vector2I(1280, 720), WindowPlacement.LegacyCanvas);
+        }
+
+        [Fact]
+        public void WindowSettings_SizeFactorPlaced_RoundTrip()
+        {
+            var cs = new CharacterSettings
+            {
+                WindowSettings = new Dictionary<string, WindowSettings>
+                {
+                    { "Hotbar", new WindowSettings
+                        {
+                            Position = new Vector2(520, 638),
+                            Visible = true,
+                            CanvasSize = new Vector2I(1280, 720),
+                            Size = new Vector2(702, 72),
+                            Factor = 2f,
+                            Placed = true,
+                        } },
+                },
+            };
+
+            var json = JsonSerializer.Serialize(cs, CharacterSettings.JsonOptions);
+            var back = CharacterSettings.FromJson(json);
+            var ws = back.WindowSettings["Hotbar"];
+
+            Assert.Equal(new Vector2(702, 72), ws.Size);
+            Assert.Equal(2f, ws.Factor);
+            Assert.True(ws.Placed);
+            Assert.Equal(new Vector2(520, 638), ws.Position);
+            Assert.True(ws.Visible);
+            Assert.Equal(new Vector2I(1280, 720), ws.CanvasSize);
+        }
+
+        [Fact]
+        public void WindowSettings_LegacyJsonWithoutSizeFactor()
+        {
+            // Pre-feature window section: no Size/Factor/Placed keys.
+            const string legacyJson = """
+                {
+                    "Hotkeys": null,
+                    "WindowSettings": {
+                        "Hotbar": { "Position": { "X": 520.0, "Y": 679.0 }, "Visible": true, "CanvasSize": { "X": 1280, "Y": 720 } }
+                    },
+                    "Options": null,
+                    "MountName": null
+                }
+                """;
+
+            var back = CharacterSettings.FromJson(legacyJson);
+            var ws = back.WindowSettings["Hotbar"];
+
+            Assert.Equal(default(Vector2), ws.Size);
+            Assert.Equal(0f, ws.Factor);
+            Assert.False(ws.Placed);
+            Assert.Equal(new Vector2(520, 679), ws.Position);
+            Assert.True(ws.Visible);
+            Assert.Equal(new Vector2I(1280, 720), ws.CanvasSize);
+        }
+
+        [Fact]
+        public void WindowSettings_SavedOriginRoundTrips()
+        {
+            // (0, 0) with Placed = true is a VALID saved position, not an absence.
+            var cs = new CharacterSettings
+            {
+                WindowSettings = new Dictionary<string, WindowSettings>
+                {
+                    { "Hotbar", new WindowSettings
+                        {
+                            Position = new Vector2(0, 0),
+                            Visible = true,
+                            CanvasSize = new Vector2I(1280, 720),
+                            Size = new Vector2(351, 36),
+                            Factor = 1f,
+                            Placed = true,
+                        } },
+                },
+            };
+
+            var json = JsonSerializer.Serialize(cs, CharacterSettings.JsonOptions);
+            var back = CharacterSettings.FromJson(json);
+            var ws = back.WindowSettings["Hotbar"];
+
+            Assert.True(ws.Placed);
+            Assert.Equal(new Vector2(0, 0), ws.Position);
+            Assert.Equal(new Vector2(351, 36), ws.Size);
+            Assert.Equal(1f, ws.Factor);
+        }
+
+        [Fact]
+        public void SetWindowVisible_PreservesFullQuad()
+        {
+            var dir = Path.Combine(Path.GetTempPath(), "gs2-" + Path.GetRandomFileName());
+            Directory.CreateDirectory(dir);
+            try
+            {
+                var cs = new TempCharacterSettings(dir);
+                cs.SetWindowVisible("Hotbar", true);
+                cs.SetWindowSetting("Hotbar", new Vector2(520, 638), new Vector2(702, 72), 2f, true, new Vector2I(1280, 720));
+
+                var before = JsonSerializer.Serialize(cs, CharacterSettings.JsonOptions);
+                cs.SetWindowVisible("Hotbar", false);
+                var after = JsonSerializer.Serialize(cs, CharacterSettings.JsonOptions);
+
+                // Byte-identical except the single Visible flip — the quad is untouched.
+                Assert.Equal(before.Replace("\"Visible\":true", "\"Visible\":false"), after);
+
+                var reloaded = new TempCharacterSettings(dir);
+                Assert.True(reloaded.Load());
+                var ws = reloaded.GetWindowSettings("Hotbar");
+                Assert.NotNull(ws);
+                Assert.False(ws.Visible);
+                Assert.True(ws.Placed);
+                Assert.Equal(new Vector2(520, 638), ws.Position);
+                Assert.Equal(new Vector2(702, 72), ws.Size);
+                Assert.Equal(2f, ws.Factor);
+                Assert.Equal(new Vector2I(1280, 720), ws.CanvasSize);
+
+                // First-time visibility write on an unplaced record leaves Placed == false.
+                cs.SetWindowVisible("Bank", true);
+                var again = new TempCharacterSettings(dir);
+                Assert.True(again.Load());
+                var bank = again.GetWindowSettings("Bank");
+                Assert.NotNull(bank);
+                Assert.True(bank.Visible);
+                Assert.False(bank.Placed);
+                Assert.Equal(default(Vector2), bank.Position);
+                Assert.Equal(default(Vector2), bank.Size);
+                Assert.Equal(0f, bank.Factor);
+                Assert.Equal(default(Vector2I), bank.CanvasSize);
+            }
+            finally
+            {
+                Directory.Delete(dir, true);
+            }
+        }
+
+        [Fact]
+        public void SetWindowSetting_DragSave_UpdatesAllFiveAtomically()
+        {
+            var dir = Path.Combine(Path.GetTempPath(), "gs2-" + Path.GetRandomFileName());
+            Directory.CreateDirectory(dir);
+            try
+            {
+                var cs = new TempCharacterSettings(dir);
+                cs.SetWindowVisible("Hotbar", false);
+
+                // visible: null → the drag-end save must NOT touch the existing Visible.
+                cs.SetWindowSetting("Hotbar", new Vector2(800, 600), new Vector2(400, 72), 2f, null, new Vector2I(1920, 1080));
+
+                var reloaded = new TempCharacterSettings(dir);
+                Assert.True(reloaded.Load());
+                var ws = reloaded.GetWindowSettings("Hotbar");
+                Assert.NotNull(ws);
+                Assert.Equal(new Vector2(800, 600), ws.Position);
+                Assert.Equal(new Vector2(400, 72), ws.Size);
+                Assert.Equal(2f, ws.Factor);
+                Assert.Equal(new Vector2I(1920, 1080), ws.CanvasSize);
+                Assert.True(ws.Placed);
+                Assert.False(ws.Visible);
+            }
+            finally
+            {
+                Directory.Delete(dir, true);
+            }
+        }
+
+        private sealed class TempCharacterSettings : CharacterSettings
+        {
+            private readonly string _path;
+
+            public TempCharacterSettings(string dir)
+            {
+                _path = Path.Combine(dir, "settings.json");
+                ApplyDefaults();
+            }
+
+            protected override string GetFilePath() => _path;
         }
     }
 }
