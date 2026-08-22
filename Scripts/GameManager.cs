@@ -495,6 +495,20 @@ namespace Goose2Client
             Assert(applier.Theme.GetDefaultFontSize() == 20, $"theme default font {applier.Theme.GetDefaultFontSize()} != 20");
             AuditFonts(UiLayer);
 
+            // The migrated set is pinned explicitly so the walk can't pass vacuously.
+            void CheckFont(Control c, StringName prop, float basePx)
+            {
+                Assert(applier.TryGetFontBase(c, prop, out float actual), $"font base not registered: {c.GetPath()} ({prop})");
+                Assert(actual == basePx, $"font base {c.GetPath()} {actual} != {basePx}");
+                Assert(c.GetThemeFontSize(prop) == applier.ScaleSize(basePx), $"font {c.GetPath()} {c.GetThemeFontSize(prop)} != {applier.ScaleSize(basePx)}");
+            }
+            CheckFont(Hud.Chat.GetNode<RichTextLabel>("ChatLog"), new StringName("normal_font_size"), 12f);
+            CheckFont(Hud.Chat.GetNode<LineEdit>("Input"), new StringName("font_size"), 12f);
+            CheckFont(Hud.Debug.GetNode<Label>("FpsText"), new StringName("font_size"), 12f);
+            CheckFont(Hud.Debug.GetNode<Label>("VersionText"), new StringName("font_size"), 12f);
+            CheckFont(Hud.Bank.GetNode<Label>("TitleBar/TitleLabel"), new StringName("font_size"), 9f);
+            CheckFont(Hud.Vendor.GetNode<Label>("TitleBar/TitleLabel"), new StringName("font_size"), 10f);
+
             Assert(Hud.Vitals.Size == new Vector2(366, 110), $"vitals size {Hud.Vitals.Size} != (366, 110)");
             Assert(Hud.Vitals.Position == new Vector2(16, 16), $"vitals pos {Hud.Vitals.Position} != (16, 16)");
             var slot = (ItemSlot)Hud.Inventory.GetNode<GridContainer>("Content/SlotGrid").GetChild(0);
@@ -730,6 +744,7 @@ namespace Goose2Client
             Assert(tile1.CustomMinimumSize == new Vector2(87, 33), $"party tile min {tile1.CustomMinimumSize} != (87, 33)");
             var sep1 = Hud.Party.GetNode<VBoxContainer>("MemberList").GetThemeConstant("separation");
             Assert(sep1 == 1, $"party separation {sep1} != 1");
+            Assert(slot.CustomMinimumSize == new Vector2(32, 32), $"item slot min {slot.CustomMinimumSize} != (32, 32)");
             tm.ShowSpellTooltip(new SpellInfo { Name = "Selftest" }, Hud);
             await Frame();
             await Frame();
