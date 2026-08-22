@@ -17,6 +17,7 @@ namespace Goose2Client.Character
         public int MoveSpeed { get; private set; } = 250;
         public bool IsMounted { get; private set; }
         public bool IsLocalPlayer { get; set; }
+        public bool IsGM { get; private set; }
         public float HPPercent { get; private set; } = 1f;
         public float MPPercent { get; private set; } = 1f;
         public CharacterType CharacterType { get; private set; }
@@ -176,8 +177,24 @@ namespace Goose2Client.Character
             PlayState();
             RepositionOverlays();
 
+            IsGM = p.IsGM;
             if (EnsureNameLabel()) { _nameLabel.Text = FullName; _nameLabel.Layout(this); }
+            UpdateNameColor();
             SetVitals(p.HPPercent, 1f);
+        }
+
+        /// <summary>Set GM state from an AMA (AdminModeActivate) packet and recolor the name.</summary>
+        public void SetGm(bool gm)
+        {
+            IsGM = gm;
+            UpdateNameColor();
+        }
+
+        private void UpdateNameColor()
+        {
+            if (_nameLabel == null) return;
+            if (IsGM) _nameLabel.AddThemeColorOverride("font_color", GameColors.Blue);
+            else _nameLabel.RemoveThemeColorOverride("font_color");
         }
 
         /// <summary>Appearance-only rebuild from a CHP packet. Keeps current position/facing/name;

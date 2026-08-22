@@ -73,6 +73,7 @@ public partial class MapManager : Node2D
         pm.Listen<EraseObjectPacket>(OnEraseObject);
         pm.Listen<SetYourPositionPacket>(OnSetYourPosition);
         pm.Listen<MakeCharacterPacket>(OnMakeCharacter);
+        pm.Listen<AdminModeActivatePacket>(OnAdminModeActivate);
         pm.Listen<SetYourCharacterPacket>(OnSetYourCharacter);
         pm.Listen<MoveCharacterPacket>(OnMoveCharacter);
         pm.Listen<ChangeHeadingPacket>(OnChangeHeading);
@@ -106,6 +107,7 @@ public partial class MapManager : Node2D
         pm.Remove<EraseObjectPacket>(OnEraseObject);
         pm.Remove<SetYourPositionPacket>(OnSetYourPosition);
         pm.Remove<MakeCharacterPacket>(OnMakeCharacter);
+        pm.Remove<AdminModeActivatePacket>(OnAdminModeActivate);
         pm.Remove<SetYourCharacterPacket>(OnSetYourCharacter);
         pm.Remove<MoveCharacterPacket>(OnMoveCharacter);
         pm.Remove<ChangeHeadingPacket>(OnChangeHeading);
@@ -126,7 +128,8 @@ public partial class MapManager : Node2D
     public bool IsValidMove(int x, int y)
     {
         if (_map == null || x < 0 || y < 0 || x >= _map.Width || y >= _map.Height) return false;
-        if (_map[x, y].IsBlocked) return false;
+        // GMs (MKC IsGM / AMA enabled) walk through blocked tiles; bounds and occupancy still apply.
+        if (_map[x, y].IsBlocked && LocalPlayer?.IsGM != true) return false;
         foreach (var c in _characters.Values)
             if (c.X == x && c.Y == y) return false;
         return true;
@@ -145,6 +148,12 @@ public partial class MapManager : Node2D
 
         if (p.LoginId == _myLoginId) AttachLocalPlayer(c);
         if (c == _localPlayer) GameManager.Instance.OnCharacterUpdated(c);
+    }
+
+    private void OnAdminModeActivate(object packetObj)
+    {
+        var p = (AdminModeActivatePacket)packetObj;
+        GetCharacter(p.LoginId)?.SetGm(p.Enabled != 0);
     }
 
     private void OnSetYourCharacter(object packetObj)
