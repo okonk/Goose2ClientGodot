@@ -3,7 +3,7 @@
 [ext_resource type="Script" path="res://Scripts/MapManager.cs" id="1_mm"]
 
 [node name="Map" type="SubViewport"]
-handle_input_locally = false
+handle_input_locally = true
 physics_object_picking = true
 transparent_bg = false
 

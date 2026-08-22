@@ -185,8 +185,8 @@ namespace Goose2Client
         private bool _forwardingHover;
 
         /// <summary>
-        /// Window mouse motion → sub-viewport hover. Like clicks, sub-viewport nodes never
-        /// receive window input (handle_input_locally=false), so the map items' Area2D
+        /// Window mouse motion → sub-viewport hover. Sub-viewport nodes never receive
+        /// window input (nothing routes events into the map), so the map items' Area2D
         /// mouse_entered/mouse_exited (hover tooltips) need the motion driven in here:
         /// push_input(local) updates the sub-viewport mouse position, but picking only runs
         /// once notify_mouse_entered() has marked the mouse as inside the viewport — a plain
@@ -194,6 +194,9 @@ namespace Goose2Client
         /// exited when leaving the display rect: it drops the hovered area synchronously
         /// (tools/tests/subviewport_hover_pick.gd pins all of this). _Input (not
         /// _UnhandledInput) so motion over HUD windows still clears the hover.
+        /// The map must keep handle_input_locally=true: with false, the pushed event's
+        /// picking set_input_as_handled() propagates to the root window, skipping its GUI
+        /// phase and breaking Control drag & drop.
         /// </summary>
         public override void _Input(InputEvent e)
         {
@@ -225,8 +228,9 @@ namespace Goose2Client
         }
 
         /// <summary>
-        /// Window mouse clicks → world clicks. Sub-viewport nodes never receive window input
-        /// (handle_input_locally=false), so the map's own _UnhandledInput is dead; convert
+        /// Window mouse clicks → world clicks. Sub-viewport nodes never receive window
+        /// input (nothing routes events into the map), so the map's own _UnhandledInput is
+        /// dead; convert
         /// explicitly at the root and dispatch to the MapManager. mb.Position is root-window
         /// coordinates (root viewport is 1:1 with the window). The display-rect gate is
         /// mandatory, not cosmetic: with the camera centered inside a large map, a click 1px
