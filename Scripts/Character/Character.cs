@@ -32,6 +32,7 @@ namespace Goose2Client.Character
         private AppearanceData _appearance;
 
         private Overlays.BridgedNameLabel _nameLabel;
+        private ColorRect _hpBarBackground;
         private ColorRect _hpBar;
         private ColorRect _mpBar;
 
@@ -46,6 +47,15 @@ namespace Goose2Client.Character
         private void EnsureBars()
         {
             if (_hpBar != null) return;
+            // Black full-width backing under the HP bar (Unity CharacterHealthBars "HP Background").
+            _hpBarBackground = new ColorRect
+            {
+                Position = new Vector2(-16, -56),
+                Size = new Vector2(BarWidth, 3),
+                Color = new Color(0, 0, 0),
+                ZIndex = 20,
+            };
+            AddChild(_hpBarBackground);
             // HP bar: 3px tall, centered 32px-wide bar, just below the name label.
             _hpBar = new ColorRect
             {
@@ -87,6 +97,7 @@ namespace Goose2Client.Character
             double now = Time.GetTicksMsec() / 1000.0;
             _healthBarAutoHide.Tick(now);
             bool visible = _healthBarAutoHide.Visible;
+            if (_hpBarBackground != null) _hpBarBackground.Visible = visible;
             if (_hpBar != null) _hpBar.Visible = visible;
             if (_mpBar != null) _mpBar.Visible = visible;
         }
@@ -120,6 +131,7 @@ namespace Goose2Client.Character
         private void RepositionOverlays()
         {
             int h = Height <= 0 ? 48 : Height;
+            if (_hpBarBackground != null) _hpBarBackground.Position = new Vector2(-16, -(h + 8));
             if (_hpBar != null) _hpBar.Position = new Vector2(-16, -(h + 8));
             if (_mpBar != null) _mpBar.Position = new Vector2(-16, -(h + 5));
             LayoutNameLabel();
