@@ -112,6 +112,13 @@ public partial class BaseWindow : Control, IScalableWindow
         var ws = GameManager.Instance?.CharacterSettings?.GetWindowSettings(WindowName);
         var placed = ws != null && ws.Placed;                       // (b) valid quad — Position may legitimately be (0,0)
         var legacy = !placed && ws != null && ws.Position != default; // (a) pre-feature position, honored with legacy size/factor
+        if (!placed && !legacy && WindowName == "Hotbar")
+        {
+            var ap = UiScaleApplier.Instance;
+            Position = WindowPlacement.HotbarDefault(canvas, Size,
+                ap != null ? ap.Factor : 1f, DefaultWindowLayout.For(WindowName), _tscnSize);
+            return;
+        }
         if (!placed && !legacy && DefaultWindowLayout.IsDialog(WindowName))
         {
             Position = WindowPlacement.Center(canvas, Size);

@@ -55,7 +55,7 @@ prose repetition made traceability informal).
 | SC-02 | Factor model: Auto default; Manual 1.0–3.0 in 0.5 steps; auto = integer thresholds 720/1080/2160 (1440p → 2×, field-verified) | `UiScale` (Part 1A Task 1); `Resolve`/`NormalizeMode` (Part 2 Task 1) | `UiScaleTests`, Part 2 Task 1 xUnit |
 | SC-03 | Live commit: rescale in place on commit; slider commits on `DragEnded` / non-drag change only | applier (Part 1B Task 1); slider (Part 2 Task 4) | M2 + commit-rule pin |
 | SC-04 | Fonts: theme default + explicit `ApplyFontSize` registry; login/loading via the PROJECT-WIDE theme (no per-scene work) | Part 1B Task 1; Part 1C Task 3; Part 2 Task 5 | 1×/2× audits (Part 1C Task 5), grep invariant, M8 |
-| SC-05 | Window geometry: 1× tscn/base snapshot, `Relayout` scales; container-managed offsets skipped | `UiScaleLayout` (Part 1B Task 2); registration (1B Tasks 3–4) | 1× bit-identity + 2× sampled rects (Part 1C Task 5) |
+| SC-05 | Window geometry: 1× tscn/base snapshot, `Relayout` scales (incl. nine-patch margins); container-managed offsets skipped | `UiScaleLayout` (Part 1B Task 2); registration (1B Tasks 3–4) | 1× bit-identity + 2× sampled rects (Part 1C Task 5) |
 | SC-06 | Placement: saved QUAD + pure `ResolveScaled`; edge margins in logical px; middle-band kept; legacy files place identically (`LegacySize`) | Part 1A Task 2; `RepositionFromSaved` (Part 1B Task 3) | `ResolveScaled_*` pins + `CharacterSettingsJsonTests` |
 | SC-07 | Persistence: full quad + `Placed` marker ONLY at drag-end; visibility toggles write `Visible` only; a saved (0,0) round-trips; Part 1A adds `Size`/`Factor`/`Placed`, Part 2 adds the two option keys | Part 1A Task 2; Part 1B Task 3; Part 2 Task 1 | `WindowSettings_SavedOriginRoundTrips` + `SetWindowVisible_PreservesFullQuad` etc. + Part 1C Task 5 step 2d + M2 leg |
 | SC-08 | Drag-cancel on commit: in-flight move-drag cancelled; final position = `ResolveScaled(quad, newFactor)`; in-flight position never persisted | Part 1B Task 1 (pass step); Part 2 Task 2 | M6 + `CancelDrag` postcondition pin |
@@ -67,6 +67,7 @@ prose repetition made traceability informal).
 | SC-14 | Mode UI: `ButtonGroup` `AllowUnpress = false` (exactly-one-selected); Auto→Manual persists mode+value; dormant manual value survives Auto | Part 2 Task 4 | M11 (widget) + commit-split xUnit (value) |
 | SC-15 | Regression gates: xUnit suite + headless self-test exit 0 (M10) + manual matrix M1–M11 | Part 1C Task 5; Part 2 Task 6 | the gates themselves |
 | SC-16 | Login AND loading scaling AUTOMATED — the self-test instantiates both scenes directly (no server transition needed; M8's real-transition check is sanity-only) | Part 2 Task 5 | self-test login leg + loading leg; M8 |
+| SC-17 | Unplaced hotbar is SCREEN-ANCHORED: bottom-stuck (design 5px margin, scaled) + center offset from canvas center preserved — it moves horizontally with factor/canvas instead of staying at x=520; placed/legacy hotbars keep the normal quad path | `WindowPlacement.HotbarDefault`; `RepositionFromSaved` | `HotbarDefault_*` pins + self-test wiring asserts |
 
 ## 2. `UiScale` pure math
 
@@ -159,6 +160,9 @@ public interface IScalableWindow { void Relayout(); }
   for children whose parent is a `Container` (`ContainerManaged`: the container owns
   their offsets — writing them back is async-flaky; their scaling rides on
   min-sizes + separation constants, and the container re-derives the offsets itself).
+  The snapshot also records nine-patch rects' patch margins, so the window
+  backgrounds' border art scales with the factor (field bug: at 2× the 20px title
+  strip and 36px bottom strip stayed 1×-thick while buttons/text doubled).
   `ScaleRegister()` calls `Relayout()` once, so runtime-spawned windows scale in the
   same frame.
 - R2: live tooltips hidden on apply; factor-aware per-show layout (body above).
@@ -184,6 +188,14 @@ public interface IScalableWindow { void Relayout(); }
   double at 2×); middle-band windows keep their saved coordinate (unscaled). Legacy
   settings (no size/factor keys) fall back to (tscn size, 1) — the true pre-feature
   pair, so old files place identically.
+- **Screen-anchored unplaced hotbar (SC-17):** the hotbar's authored (520, 679) default
+  was designed for the 1280×720 canvas, and the middle-band rule kept x=520 at every
+  other canvas/factor — at 1440p the hotbar sat visibly left of center (field bug).
+  An UNPLACED hotbar now resolves through `WindowPlacement.HotbarDefault`: bottom-stuck
+  with the design canvas's 5px margin (scaled) and its center at the same offset from
+  the canvas center as on the design canvas (+55.5px) — so 1× on 1280×720 is exactly
+  the authored (520, 679), and at 2×/1440p it moves with the scale. A hotbar the user
+  dragged (Placed) or a legacy position keeps the normal `ResolveScaled` path.
 - `UiScaleApplier` is a plain class with a `TooltipManager.Instance`-style static
   accessor, created in `GameManager._Ready` (not a Node).
 

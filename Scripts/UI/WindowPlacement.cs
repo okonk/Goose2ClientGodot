@@ -63,6 +63,24 @@ public static class WindowPlacement
     }
 
     /// <summary>
+    /// Unplaced hotbar default: bottom-stuck (the design canvas's 5px bottom margin, scaled by
+    /// factor) and centered with the design canvas's center offset preserved (+55.5). Reduces
+    /// exactly to (520, 679) at 1x on the 1280x720 design canvas, so it replaces the authored
+    /// default there and tracks the screen center at other canvases/factors.
+    /// </summary>
+    public static Vector2 HotbarDefault(Vector2I canvas, Vector2 liveSize, float factor,
+        Vector2 designPos, Vector2 designSize)
+    {
+        float bottomMargin = LegacyCanvas.Y - (designPos.Y + designSize.Y);
+        float centerOffset = designPos.X + designSize.X / 2f - LegacyCanvas.X / 2f;
+        float x = (canvas.X - liveSize.X) / 2f + centerOffset;
+        float y = canvas.Y - liveSize.Y - bottomMargin * factor;
+        return new Vector2(
+            Mathf.Clamp(x, 0f, Mathf.Max(0f, canvas.X - liveSize.X)),
+            Mathf.Clamp(y, 0f, Mathf.Max(0f, canvas.Y - TitleBarHeight)));
+    }
+
+    /// <summary>
     /// First-run position for transient dialog windows: centered in <c>canvas</c>.
     /// Result = (canvas − windowSize) / 2 truncated per axis, clamped to ≥ 0
     /// (a window larger than the canvas lands at (0,0)).

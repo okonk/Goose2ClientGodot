@@ -22,7 +22,8 @@ public static class UiScaleLayout
         float OLeft, float OTop, float ORight, float OBottom,
         bool ContainerManaged,
         Vector2 MinSize, bool HasMinSize,
-        (StringName Name, int Value)[] Constants);
+        (StringName Name, int Value)[] Constants,
+        int PatchL, int PatchT, int PatchR, int PatchB, bool HasPatch);
 
     // Call exactly once at end of _Ready, after build-time geometry: the snapshot IS the
     // 1x base, so build code must never scale at build time.
@@ -76,6 +77,15 @@ public static class UiScaleLayout
                     c.AddThemeConstantOverride(name, factor == 1f ? value
                         : (int)MathF.Round(value * factor, MidpointRounding.AwayFromZero));
             }
+
+            if (rec.HasPatch)
+            {
+                var npr = (NinePatchRect)c;
+                npr.PatchMarginLeft = factor == 1f ? rec.PatchL : (int)MathF.Round(rec.PatchL * factor, MidpointRounding.AwayFromZero);
+                npr.PatchMarginTop = factor == 1f ? rec.PatchT : (int)MathF.Round(rec.PatchT * factor, MidpointRounding.AwayFromZero);
+                npr.PatchMarginRight = factor == 1f ? rec.PatchR : (int)MathF.Round(rec.PatchR * factor, MidpointRounding.AwayFromZero);
+                npr.PatchMarginBottom = factor == 1f ? rec.PatchB : (int)MathF.Round(rec.PatchB * factor, MidpointRounding.AwayFromZero);
+            }
         }
     }
 
@@ -111,11 +121,21 @@ public static class UiScaleLayout
 
         // Container children: the container owns their offsets (its layout pass can run
         // after the snapshot), and scaling rides on min-size/separation/font minimums.
+        // Nine-patch edge art is source pixels, not stretch: the margins must scale with the
+        // factor or the border stays 1x-thick on a scaled window.
+        var npr = c as NinePatchRect;
+        bool hasPatch = npr != null
+            && (npr.PatchMarginLeft != 0 || npr.PatchMarginTop != 0 || npr.PatchMarginRight != 0 || npr.PatchMarginBottom != 0);
         return new GeomRecord(
             c,
             c.OffsetLeft, c.OffsetTop, c.OffsetRight, c.OffsetBottom,
             c.GetParent() is Container,
             min, min != Vector2.Zero,
-            constants.ToArray());
+            constants.ToArray(),
+            hasPatch ? npr.PatchMarginLeft : 0,
+            hasPatch ? npr.PatchMarginTop : 0,
+            hasPatch ? npr.PatchMarginRight : 0,
+            hasPatch ? npr.PatchMarginBottom : 0,
+            hasPatch);
     }
 }

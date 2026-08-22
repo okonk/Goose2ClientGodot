@@ -240,4 +240,34 @@ public class WindowPlacementTests
         Assert.Equal(At(1f), At(0f));
         Assert.Equal(At(1f), At(-1f));
     }
+
+    // Hotbar design quad: (520, 679) 351x36 on the 1280x720 design canvas (bottom margin 5,
+    // center offset from canvas center +55.5).
+    private static Vector2 HotbarDef(Vector2I canvas, Vector2 liveSize, float factor)
+        => WindowPlacement.HotbarDefault(canvas, liveSize, factor, new Vector2(520, 679), new Vector2(351, 36));
+
+    [Fact]
+    public void HotbarDefault_DesignCanvasIdentity()
+    {
+        Assert.Equal(new Vector2(520, 679), HotbarDef(C720, new Vector2(351, 36), 1f));
+    }
+
+    [Fact]
+    public void HotbarDefault_ScaledTracksCenter()
+    {
+        // 2x: x = 520 − (702−351)/2 = 344.5 (center stays at 695.5); y = 720 − 72 − 10 = 638.
+        Assert.Equal(new Vector2(344.5f, 638f), HotbarDef(C720, new Vector2(702, 72), 2f));
+    }
+
+    [Fact]
+    public void HotbarDefault_WideCanvas2x()
+    {
+        Assert.Equal(new Vector2(984.5f, 1358f), HotbarDef(new Vector2I(2560, 1440), new Vector2(702, 72), 2f));
+    }
+
+    [Fact]
+    public void HotbarDefault_ClampsTinyCanvas()
+    {
+        Assert.Equal(Vector2.Zero, HotbarDef(new Vector2I(64, 64), new Vector2(702, 72), 2f));
+    }
 }
