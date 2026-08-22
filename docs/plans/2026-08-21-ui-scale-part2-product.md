@@ -37,7 +37,7 @@
 
 **Step 1: Failing tests.**
 
-Add to `UiScale` (pure static, Godot-free): `public enum UiScaleMode { Auto = 0, Manual = 1 }`,
+Add to `UiScale` (pure static — no scene-tree / global-state APIs; Godot value types permitted): `public enum UiScaleMode { Auto = 0, Manual = 1 }`,
 `public static UiScaleMode NormalizeMode(int raw)` — `0 → Auto, 1 → Manual, anything else → Auto` (pure; the ONLY place a persisted mode int is interpreted — both `LoadSettings` and the Options window go through it), and
 `public static float Resolve(UiScaleMode mode, float savedValue, int windowHeightPx)` —
 `Auto → AutoFactor(windowHeightPx)`; `Manual → NormalizeFactor(savedValue)`; **unknown mode enum value → Auto** (defensive second layer — callers already normalize, but `Resolve` must be safe if called raw). Pure: never reads or writes `CurrentFactor`.

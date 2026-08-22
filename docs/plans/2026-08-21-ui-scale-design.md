@@ -80,7 +80,9 @@ const Min = 1f, Max = 3f, Step = 0.5f
 
 static NormalizeFactor(float raw)    // snap to 0.5 steps, clamp to [1, 3]
 static AutoFactor(int windowHpx)     // thresholds: h < 1080 → 1, h < 1440 → 2, else 3 (clamped)
-static ScaleSize(float basePx, float factor)  // max(1, (int)MathF.Round(basePx * factor, AwayFromZero)) — the SINGLE scaling primitive; ALL metrics classes call this (pinned by test; the (int) cast is required)
+static ScaleCoordinate(float v, float factor)  // (int)MathF.Round(v * factor, AwayFromZero) — NO floor; 0 stays 0, negatives stay negative. Positions, offsets, rect edges.
+static ScaleSize(float basePx, float factor)   // max(1, ScaleCoordinate(basePx, factor)) — the min-1 floor is SIZE semantics. Dimensions, minimum sizes.
+                                                  // ALL metrics classes call these two (pinned by test; the (int) cast is required)
 ScaleSize(float basePx)              // thin instance form → ScaleSize(basePx, CurrentFactor) (applier-internal only)
 ScaleSizeI(Vector2I v)               // per-axis instance form
 CurrentFactor (float)                // plain state — the applier is the ONLY writer
@@ -311,7 +313,7 @@ any window registers, so the first build is already scaled; no unscaled flash.
    a window larger than the canvas at 3× clamps to (0,0).
 3. Normalization of corrupt saved values (incl. NaN-safe).
 
-**Headless/runtime (`tools/tests/` pattern, like `scene_lifecycle.gd`):**
+**Headless/runtime (C# project-argument self-test — `godot --headless --path . -- +selftest=ui_scale`, the argument read via `OS.GetCmdlineUserArgs()`, driven by `tools/tests/run_ui_scale.sh`; NOT a `.gd` script like `scene_lifecycle.gd`):**
 
 4. Font-registry audit: build HUD at factor 2, walk all `Control`s, assert any control
    with a `font_size` override is in the applier's registry. Fails if a future PR adds
