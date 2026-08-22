@@ -312,6 +312,31 @@ internal static class UiScaleSelfTest
         var infoBg = info.GetNode<NinePatchRect>("Background");
         Assert(Patch(infoBg) == (6, 40, 20, 6),
             $"info bg patch margin 2x {Patch(infoBg)} != (6,40,20,6)");
+        // Exact game packet spawn path (manager node parentage), pinned at 2x.
+        {
+            var infoMgr = new InfoWindowCreator();
+            var questMgr = new QuestWindowManager();
+            gm.Hud.AddChild(infoMgr);
+            gm.Hud.AddChild(questMgr);
+            await Frame();
+            var wi = GD.Load<PackedScene>(infoMgr.PrefabPath).Instantiate<InfoWindow>();
+            infoMgr.AddChild(wi);
+            var wq = GD.Load<PackedScene>(questMgr.PrefabPath).Instantiate<QuestWindow>();
+            questMgr.AddChild(wq);
+            await Frame();
+            var ib = wi.GetNode<NinePatchRect>("Background");
+            var qb = wq.GetNode<NinePatchRect>("Background");
+            Assert(wi.Size == new Vector2(504, 280), $"manager-spawned info size 2x {wi.Size} != (504,280)");
+            Assert(Patch(ib) == (6, 40, 20, 6), $"manager-spawned info patch 2x {Patch(ib)} != (6,40,20,6)");
+            Assert(wq.Size == new Vector2(520, 582), $"manager-spawned quest size 2x {wq.Size} != (520,582)");
+            Assert(Patch(qb) == (10, 40, 24, 72), $"manager-spawned quest patch 2x {Patch(qb)} != (10,40,24,72)");
+            wi.QueueFree();
+            wq.QueueFree();
+            await Frame();
+            infoMgr.QueueFree();
+            questMgr.QueueFree();
+            await Frame();
+        }
         applier.Apply(1f, ApplyReason.UserCommit);
         await Frame();
         Assert(l0.Position == new Vector2(6, 22), $"line 0 at 1x {l0.Position} != (6, 22)");
