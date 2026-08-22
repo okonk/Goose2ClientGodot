@@ -42,6 +42,7 @@ visible = false
 max_value = 1.0
 value = 0.0
 fill_mode = 4
+nine_patch_stretch = true
 tint_progress = Color(0, 0, 0, 0.5)
 texture_progress = ExtResource("cooldown_fill")
 offset_left = 0.0

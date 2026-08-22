@@ -207,7 +207,23 @@ internal static class UiScaleSelfTest
         Assert(spellTt.Position.Y + spellTt.Size.Y <= canvas.Y, $"spell tooltip y-clamp {spellTt.Position.Y}+{spellTt.Size.Y} > {canvas.Y}");
         tm.HideSpellTooltip();
         await Frame();
-        GD.Print($"[ui_scale_selftest] OK 2x audit: theme=20, {fontChecked} font overrides, spell tooltip {expectedSpell}");
+        var vitals = gm.Hud.Vitals;
+        foreach (var barName in new[] { "HpBar", "MpBar", "SpBar" })
+            Assert(vitals.GetNode<TextureProgressBar>(barName).NinePatchStretch,
+                $"vitals {barName} nine_patch_stretch off");
+        var hotbar = gm.Hud.Hotbar;
+        Assert(hotbar.GetNode<TextureProgressBar>("Content/XpBar").NinePatchStretch,
+            "hotbar XpBar nine_patch_stretch off");
+        var partyMember = GD.Load<PackedScene>("res://Scenes/UI/PartyMember.tscn").Instantiate<Control>();
+        gm.Hud.AddChild(partyMember);
+        foreach (var barName in new[] { "HpBar", "MpBar" })
+            Assert(partyMember.GetNode<TextureProgressBar>($"Content/{barName}").NinePatchStretch,
+                $"party {barName} nine_patch_stretch off");
+        partyMember.QueueFree();
+        var hotSlot = hotbar.GetNode<Control>("Content/Pages/Page0").GetChild(0);
+        Assert(hotSlot.GetNode<TextureProgressBar>("CooldownOverlay").NinePatchStretch,
+            "hotbar slot cooldown nine_patch_stretch off");
+        GD.Print($"[ui_scale_selftest] OK 2x audit: theme=20, {fontChecked} font overrides, spell tooltip {expectedSpell}, 8 nine-patch bars");
 
         // Leg 1: login at 2x.
         Assert(loginMargin.Size == new Vector2(600, 400), $"login margin size 2x {loginMargin.Size} != (600, 400)");
