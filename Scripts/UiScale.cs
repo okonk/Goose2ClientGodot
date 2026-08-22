@@ -29,7 +29,7 @@ public class UiScale
     }
 
     public static int AutoFactor(int windowHeightPx)
-        => windowHeightPx < 1080 ? 1 : windowHeightPx < 1440 ? 2 : 3;
+        => windowHeightPx < 1080 ? 1 : windowHeightPx < 2160 ? 2 : 3;
 
     public static UiScaleMode NormalizeMode(int raw)
         => raw == 1 ? UiScaleMode.Manual : UiScaleMode.Auto;

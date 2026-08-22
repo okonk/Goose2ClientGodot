@@ -52,7 +52,7 @@ prose repetition made traceability informal).
 | ID | Requirement | Component (plan task) | Pinned by |
 |----|-------------|------------------------|-----------|
 | SC-01 | Scope: everything on the root viewport (HUD windows, tooltips, login, loading); world subviewport + bridge excluded | all parts; login/loading in Part 2 Task 5 | Part 2 Task 5 self-test leg + M1/M8 |
-| SC-02 | Factor model: Auto default; Manual 1.0–3.0 in 0.5 steps; auto = integer thresholds 720/1080/1440 | `UiScale` (Part 1A Task 1); `Resolve`/`NormalizeMode` (Part 2 Task 1) | `UiScaleTests`, Part 2 Task 1 xUnit |
+| SC-02 | Factor model: Auto default; Manual 1.0–3.0 in 0.5 steps; auto = integer thresholds 720/1080/2160 (1440p → 2×, field-verified) | `UiScale` (Part 1A Task 1); `Resolve`/`NormalizeMode` (Part 2 Task 1) | `UiScaleTests`, Part 2 Task 1 xUnit |
 | SC-03 | Live commit: rescale in place on commit; slider commits on `DragEnded` / non-drag change only | applier (Part 1B Task 1); slider (Part 2 Task 4) | M2 + commit-rule pin |
 | SC-04 | Fonts: theme default + explicit `ApplyFontSize` registry; login/loading via the PROJECT-WIDE theme (no per-scene work) | Part 1B Task 1; Part 1C Task 3; Part 2 Task 5 | 1×/2× audits (Part 1C Task 5), grep invariant, M8 |
 | SC-05 | Window geometry: 1× tscn/base snapshot, `Relayout` scales; container-managed offsets skipped | `UiScaleLayout` (Part 1B Task 2); registration (1B Tasks 3–4) | 1× bit-identity + 2× sampled rects (Part 1C Task 5) |
@@ -63,7 +63,7 @@ prose repetition made traceability informal).
 | SC-10 | Party roster tiles: the ONE container-skip exception — tile min-size via `PartyMemberMetrics` (internal map stays with the generic snapshot, round 12) | Part 1C Task 3 | `PartyMemberMetrics` xUnit + Part 1C Task 5 leg (8 tiles) |
 | SC-11 | Runtime-created Quest/Info windows: native-scale at spawn + re-layout on commit, via `MultiWindowMetrics` (line pitch 11.18f) | Part 1C Task 4 | `MultiWindowMetrics` xUnit + Part 1C Task 5 step 2c |
 | SC-12 | Dev build stamp: fixed 10px local override, deliberately unscaled | Part 1C Task 3 | Part 1C Task 5 stamp leg (10 at 2×) |
-| SC-13 | Auto mode re-computes on window resize (720/1080/1440 boundaries only, no debounce) | Part 2 Task 3 | M4 |
+| SC-13 | Auto mode re-computes on window resize (720/1080/2160 boundaries only, no debounce) | Part 2 Task 3 | M4 |
 | SC-14 | Mode UI: `ButtonGroup` `AllowUnpress = false` (exactly-one-selected); Auto→Manual persists mode+value; dormant manual value survives Auto | Part 2 Task 4 | M11 (widget) + commit-split xUnit (value) |
 | SC-15 | Regression gates: xUnit suite + headless self-test exit 0 (M10) + manual matrix M1–M11 | Part 1C Task 5; Part 2 Task 6 | the gates themselves |
 | SC-16 | Login AND loading scaling AUTOMATED — the self-test instantiates both scenes directly (no server transition needed; M8's real-transition check is sanity-only) | Part 2 Task 5 | self-test login leg + loading leg; M8 |
@@ -79,7 +79,7 @@ owned by the applier (no hidden global state).
 const Min = 1f, Max = 3f, Step = 0.5f
 
 static NormalizeFactor(float raw)    // snap to 0.5 steps, clamp to [1, 3]
-static AutoFactor(int windowHpx)     // thresholds: h < 1080 → 1, h < 1440 → 2, else 3 (clamped)
+static AutoFactor(int windowHpx)     // thresholds: h < 1080 → 1, h < 2160 → 2, else 3 (clamped)
 static ScaleCoordinate(float v, float factor)  // (int)MathF.Round(v * factor, AwayFromZero) — NO floor; 0 stays 0, negatives stay negative. Positions, offsets, rect edges.
 static ScaleSize(float basePx, float factor)   // max(1, ScaleCoordinate(basePx, factor)) — the min-1 floor is SIZE semantics. Dimensions, minimum sizes.
                                                   // ALL metrics classes call these two (pinned by test; the (int) cast is required)
@@ -91,7 +91,9 @@ CurrentFactor (float)                // plain state — the applier is the ONLY 
 - `NormalizeFactor` is the single normalization entry point; auto and slider values
   both pass through it (corrupt saved values included). `Resolve` (mode, value, h)
   and `NormalizeMode` (Part 2) are the same shape — pure statics.
-- `AutoFactor` boundaries: 720–1079 → 1, 1080–1439 → 2, 1440+ → 3 (2880 → 3, clamped).
+- `AutoFactor` boundaries: 720–1079 → 1, 1080–2159 → 2, 2160+ → 3 (2880 → 3, clamped).
+  1440p sits in the 2× tier — the original 1440→3 boundary was revised after field testing
+  (3× at 1440p is too coarse); 3× is reserved for 2160p-class vertical resolutions.
 - Font sizes use the same `ScaleSize` — no separate font rounding rule.
 - No division anywhere EXCEPT the documented `factor / savedFactor` margin re-scale
   inside `WindowPlacement.ResolveScaled` (SC-06) — every other call site takes
@@ -256,7 +258,7 @@ Both triggers funnel through `Apply(factor, reason)`.
 
 - On Auto, the window `size_changed` signal drives: `AutoFactor(newHeight)`; if it
   differs from the committed factor → `Apply(newFactor, AutoResize)`.
-- Auto factors only change at the 720/1080/1440 height boundaries; the compare-and-
+- Auto factors only change at the 720/1080/2160 height boundaries; the compare-and-
   skip makes a drag-resize cost one int compare per frame. No debounce.
 
 **Commit-time safety:**
@@ -335,7 +337,7 @@ any window registers, so the first build is already scaled; no unscaled flash.
 
 **Manual / in-engine:**
 
-- 720p / 1080p / 1440p + non-16:9 windows: login, HUD, every window type, tooltips at
+- 720p / 1080p / 1440p (2×) / 2160p (3×) + non-16:9 windows: login, HUD, every window type, tooltips at
   3×, slider drag-release, keyboard nudge, auto boundary crossing by window resize,
   window move-drag interrupted by a scale commit (M6), save/reload persistence incl.
   Manual 2× at startup (M3). These are the MANUAL legs that headless cannot reach —
@@ -347,7 +349,7 @@ any window registers, so the first build is already scaled; no unscaled flash.
 
 - **3× on a small window:** HUD can exceed the canvas (e.g. 3× Manual at 720p);
   `WindowPlacement` clamps and overflow is unreachable. Accepted — 3× is an explicit
-  user choice and Auto never produces it below 1440p. Fit-guarantee deferred.
+  user choice and Auto never produces it below 2160p. Fit-guarantee deferred.
 - **OS-level DPI scaling vs Auto:** Godot's reported window height may be in scaled
   pixels on some Windows DPI setups, so Auto may land one step off. Accepted;
   one-line fix later (e.g. `DisplayServer` content scale) if it actually bites.

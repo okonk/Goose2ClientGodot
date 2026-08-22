@@ -42,7 +42,9 @@ public class UiScaleTests
     [InlineData(1079, 1)]
     [InlineData(1080, 2)]
     [InlineData(1439, 2)]
-    [InlineData(1440, 3)]
+    [InlineData(1440, 2)]
+    [InlineData(2159, 2)]
+    [InlineData(2160, 3)]
     [InlineData(2880, 3)]
     public void AutoFactor_Boundaries(int windowHeightPx, int expected)
     {
@@ -120,7 +122,8 @@ public class UiScaleTests
     public void Resolve_AutoIgnoresSavedValue()
     {
         Assert.Equal(2f, UiScale.Resolve(UiScaleMode.Auto, 2.5f, 1080));
-        Assert.Equal(3f, UiScale.Resolve(UiScaleMode.Auto, 1f, 1440));
+        Assert.Equal(2f, UiScale.Resolve(UiScaleMode.Auto, 1f, 1440));
+        Assert.Equal(3f, UiScale.Resolve(UiScaleMode.Auto, 1f, 2160));
     }
 
     [Fact]
