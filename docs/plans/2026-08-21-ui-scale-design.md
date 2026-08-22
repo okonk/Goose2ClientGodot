@@ -60,7 +60,7 @@ prose repetition made traceability informal).
 | SC-07 | Persistence: full quad + `Placed` marker ONLY at drag-end; visibility toggles write `Visible` only; a saved (0,0) round-trips; Part 1A adds `Size`/`Factor`/`Placed`, Part 2 adds the two option keys | Part 1A Task 2; Part 1B Task 3; Part 2 Task 1 | `WindowSettings_SavedOriginRoundTrips` + `SetWindowVisible_PreservesFullQuad` etc. + Part 1C Task 5 step 2d + M2 leg |
 | SC-08 | Drag-cancel on commit: in-flight move-drag cancelled; final position = `ResolveScaled(quad, newFactor)`; in-flight position never persisted | Part 1B Task 1 (pass step); Part 2 Task 2 | M6 + `CancelDrag` postcondition pin |
 | SC-09 | Tooltips + vitals portrait: factor-aware per-frame via pure metrics; NOT snapshot-registered | Part 1C Tasks 1–2 | metrics xUnit + Part 1C Task 5 leg + M7 |
-| SC-10 | Party roster tiles: the ONE container-skip exception — min-size + internal map via `PartyMemberMetrics` | Part 1C Task 3 | `PartyMemberMetrics` xUnit + Part 1C Task 5 leg (8 tiles) |
+| SC-10 | Party roster tiles: the ONE container-skip exception — tile min-size via `PartyMemberMetrics` (internal map stays with the generic snapshot, round 12) | Part 1C Task 3 | `PartyMemberMetrics` xUnit + Part 1C Task 5 leg (8 tiles) |
 | SC-11 | Runtime-created Quest/Info windows: native-scale at spawn + re-layout on commit, via `MultiWindowMetrics` (line pitch 11.18f) | Part 1C Task 4 | `MultiWindowMetrics` xUnit + Part 1C Task 5 step 2c |
 | SC-12 | Dev build stamp: fixed 10px local override, deliberately unscaled | Part 1C Task 3 | Part 1C Task 5 stamp leg (10 at 2×) |
 | SC-13 | Auto mode re-computes on window resize (720/1080/1440 boundaries only, no debounce) | Part 2 Task 3 | M4 |
@@ -366,7 +366,8 @@ any window registers, so the first build is already scaled; no unscaled flash.
   scales with it. Self-test asserts 10 at 2× (Part 1C Task 3/5).
 - **PartyMember tiles are the one exception to the container-managed skip:** their
   87×33 exists only as tscn offsets (no `CustomMinimumSize`), so a scalable
-  min-size + scaled internal offsets via pure `PartyMemberMetrics` (Part 1C Task 3);
+  tile min-size via pure `PartyMemberMetrics` (Part 1C Task 3; internal offsets are the
+  generic snapshot's — round 12);
   self-test asserts (174, 66) at 2×. (SC-10)
 - **Runtime-created Quest/Info windows (SC-11):** `QuestWindow`/`InfoWindow`
   (`BaseMultipleWindow`, spawned by their managers, not present at HUD build) lay out
