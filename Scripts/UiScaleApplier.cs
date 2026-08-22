@@ -100,7 +100,10 @@ public class UiScaleApplier
         _appliedOnce = true;
         Scale.CurrentFactor = f;
 
-        // Part 2 seam: the scale-commit BaseWindow CancelDrag() pass inserts here, before the tooltip hide.
+        foreach (var r in _windows)
+            if (r.Window is BaseWindow bw && GodotObject.IsInstanceValid(r.ControlRef))
+                bw.CancelDrag();
+
         if (TooltipManager.Instance != null)
             TooltipManager.Instance.HideAll();
 

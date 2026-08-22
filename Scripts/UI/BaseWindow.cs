@@ -15,6 +15,8 @@ public partial class BaseWindow : Control, IScalableWindow
     private Control _titleBar;
     private Button _closeButton;
     private bool _dragging;
+    private Vector2 _preDragPosition;
+    private bool _dragCancelled;
     private bool _hovered;
 
     private List<UiScaleLayout.GeomRecord> _geom = null!;
@@ -138,12 +140,18 @@ public partial class BaseWindow : Control, IScalableWindow
         {
             if (mb.Pressed)
             {
+                // Also cleared here: a cancelled release with the cursor off the title bar never
+                // reaches a guarded release, and the flag would otherwise swallow the next save.
+                if (_dragCancelled) _dragCancelled = false;
+                _preDragPosition = Position;
                 _dragging = true;
             }
             else
             {
                 _dragging = false;
-                if (WindowName != null)
+                if (_dragCancelled)
+                    _dragCancelled = false;
+                else if (WindowName != null)
                     GameManager.Instance.CharacterSettings.SetWindowSetting(WindowName, Position, Size, UiScaleApplier.Instance != null ? UiScaleApplier.Instance.Factor : 1f, null, (Vector2I)GetTree().Root.GetVisibleRect().Size);
             }
         }
@@ -152,12 +160,22 @@ public partial class BaseWindow : Control, IScalableWindow
             if (!Input.IsMouseButtonPressed(MouseButton.Left))
             {
                 _dragging = false;
-                if (WindowName != null)
+                if (_dragCancelled)
+                    _dragCancelled = false;
+                else if (WindowName != null)
                     GameManager.Instance.CharacterSettings.SetWindowSetting(WindowName, Position, Size, UiScaleApplier.Instance != null ? UiScaleApplier.Instance.Factor : 1f, null, (Vector2I)GetTree().Root.GetVisibleRect().Size);
                 return;
             }
             Position += motion.Relative;
         }
+    }
+
+    public void CancelDrag()
+    {
+        if (!_dragging) return;
+        _dragging = false;
+        _dragCancelled = true;
+        Position = _preDragPosition;
     }
 
     public override void _Process(double delta)
