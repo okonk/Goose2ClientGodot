@@ -67,5 +67,13 @@ namespace Goose2Client.UI
         }
 
         public void HideTextTooltip() => _textTooltip.Visible = false;
+
+        public void HideAll()
+        {
+            _itemTooltip.Visible = false;
+            _spellTooltip.Visible = false;
+            _textTooltip.Visible = false;
+            _mapItemTooltip.Visible = false;
+        }
     }
 }

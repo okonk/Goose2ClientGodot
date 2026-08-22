@@ -77,6 +77,10 @@ namespace Goose2Client
 
         public override void _Ready()
         {
+            UiScaleApplier.Instance = new UiScaleApplier();
+            var startupCanvas = (Vector2I)GetTree().Root.GetVisibleRect().Size;
+            UiScaleApplier.Instance.Apply(UiScale.AutoFactor(startupCanvas.Y), ApplyReason.Startup);
+
             // World sub-viewport display — must be added before UiLayer so the root Controls of
             // Login/LoadingMap scenes draw above the world texture (tree order).
             WorldViewport = new WorldViewport();
