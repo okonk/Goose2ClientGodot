@@ -2,7 +2,7 @@
 
 [ext_resource type="Script" path="res://Scripts/UI/HotbarSlot.cs" id="1_hotbar"]
 [ext_resource type="Texture2D" path="res://Assets/UI/hotbar-slot-background.png" id="bg_tex"]
-[ext_resource type="Texture2D" path="res://Assets/UI/cooldown-fill.tres" id="cooldown_fill"]
+[ext_resource type="Script" path="res://Scripts/UI/CooldownOverlay.cs" id="cooldown_overlay"]
 
 [node name="HotbarSlot" type="Panel"]
 script = ExtResource("1_hotbar")
@@ -35,16 +35,11 @@ offset_top = 0.0
 offset_right = 32.0
 offset_bottom = 32.0
 
-[node name="CooldownOverlay" type="TextureProgressBar" parent="."]
+[node name="CooldownOverlay" type="Control" parent="."]
 layout_mode = 0
 mouse_filter = 2
 visible = false
-max_value = 1.0
-value = 0.0
-fill_mode = 4
-nine_patch_stretch = true
-tint_progress = Color(0, 0, 0, 0.5)
-texture_progress = ExtResource("cooldown_fill")
+script = ExtResource("cooldown_overlay")
 offset_left = 0.0
 offset_top = 0.0
 offset_right = 32.0

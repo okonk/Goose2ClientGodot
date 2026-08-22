@@ -1,7 +1,7 @@
 [gd_scene load_steps=3 format=3]
 
 [ext_resource type="Script" path="res://Scripts/UI/SpellSlot.cs" id="1_spells"]
-[ext_resource type="Texture2D" path="res://Assets/UI/cooldown-fill.tres" id="cooldown_fill"]
+[ext_resource type="Script" path="res://Scripts/UI/CooldownOverlay.cs" id="cooldown_overlay"]
 
 [node name="SpellSlot" type="Panel"]
 script = ExtResource("1_spells")
@@ -23,15 +23,11 @@ offset_top = 0.0
 offset_right = 24.0
 offset_bottom = 24.0
 
-[node name="CooldownOverlay" type="TextureProgressBar" parent="."]
+[node name="CooldownOverlay" type="Control" parent="."]
+visible = false
 layout_mode = 0
 mouse_filter = 2
-max_value = 1.0
-value = 0.0
-fill_mode = 4
-nine_patch_stretch = true
-tint_progress = Color(0, 0, 0, 0.5)
-texture_progress = ExtResource("cooldown_fill")
+script = ExtResource("cooldown_overlay")
 offset_left = 0.0
 offset_top = 0.0
 offset_right = 24.0

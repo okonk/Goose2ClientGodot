@@ -13,7 +13,7 @@ namespace Goose2Client.UI
         private TextureRect _icon;
         private Label _count;
         private Label _slotNumberLabel;
-        private TextureProgressBar _cooldownOverlay;
+        private CooldownOverlay _cooldownOverlay;
 
         public Action<int> OnUseSlot { get; set; }
         public Action OnSaveSlots { get; set; }
@@ -56,7 +56,7 @@ namespace Goose2Client.UI
             _count = GetNode<Label>("Count");
             _slotNumberLabel = GetNode<Label>("SlotNumber");
             _slotNumberLabel.Text = SlotLabel(_slotNumber);
-            _cooldownOverlay = GetNode<TextureProgressBar>("CooldownOverlay");
+            _cooldownOverlay = GetNode<CooldownOverlay>("CooldownOverlay");
 
             MouseEntered += OnMouseEntered;
             MouseExited += OnMouseExited;
@@ -67,10 +67,8 @@ namespace Goose2Client.UI
             if (SpellInfo == null)
                 return;
 
-            if (SpellInfo.Cooldown == TimeSpan.Zero)
-                return;
-
-            _cooldownOverlay.Value = GetCooldownRemainingPercent();
+            var remaining = GameManager.Instance.SpellCooldownManager.GetCooldownRemaining(SpellInfo);
+            _cooldownOverlay.Update(remaining.TotalSeconds, SpellInfo.Cooldown.TotalSeconds);
         }
 
         public void SetItem(ItemStats stats)
@@ -95,8 +93,6 @@ namespace Goose2Client.UI
             SpellInfo = spell;
             SpellSlotIndex = spell.SlotNumber;
             Icon.Apply(_icon, spell.GraphicFile, spell.GraphicId, 0, 0, 0, 0);
-            _cooldownOverlay.Value = GetCooldownRemainingPercent();
-            _cooldownOverlay.Visible = true;
         }
 
         public void Clear(int keepItemSlot = -1, int keepSpellSlot = -1)
@@ -131,14 +127,6 @@ namespace Goose2Client.UI
         {
             if (SpellSlotIndex == spell.SlotNumber)
                 SetSpell(spell);
-        }
-
-        private float GetCooldownRemainingPercent()
-        {
-            var remaining = GameManager.Instance.SpellCooldownManager.GetCooldownRemaining(SpellInfo);
-            if (remaining == TimeSpan.Zero)
-                return 0;
-            return (float)(remaining.TotalMilliseconds / SpellInfo.Cooldown.TotalMilliseconds);
         }
 
         private void OnMouseEntered()

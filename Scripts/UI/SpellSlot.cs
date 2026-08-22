@@ -10,7 +10,7 @@ namespace Goose2Client.UI
     public partial class SpellSlot : Panel
     {
         private TextureRect _icon;
-        private TextureProgressBar _cooldownOverlay;
+        private CooldownOverlay _cooldownOverlay;
 
         public SpellInfo Info { get; private set; }
         public bool HasSpell => Info != null;
@@ -24,7 +24,7 @@ namespace Goose2Client.UI
         public override void _Ready()
         {
             _icon = GetNode<TextureRect>("Icon");
-            _cooldownOverlay = GetNode<TextureProgressBar>("CooldownOverlay");
+            _cooldownOverlay = GetNode<CooldownOverlay>("CooldownOverlay");
 
             MouseEntered += OnMouseEntered;
             MouseExited += OnMouseExited;
@@ -46,7 +46,7 @@ namespace Goose2Client.UI
         {
             Info = null;
             Goose2Client.UI.Icon.Clear(_icon);
-            _cooldownOverlay.Value = 0;
+            _cooldownOverlay.Visible = false;
         }
 
         private void OnMouseEntered()
@@ -79,16 +79,8 @@ namespace Goose2Client.UI
             if (!HasSpell)
                 return;
 
-            if (Info.Cooldown == TimeSpan.Zero)
-            {
-                _cooldownOverlay.Value = 0;
-                return;
-            }
-
             var remaining = GameManager.Instance.SpellCooldownManager.GetCooldownRemaining(Info);
-            _cooldownOverlay.Value = remaining == TimeSpan.Zero
-                ? 0
-                : remaining.TotalMilliseconds / Info.Cooldown.TotalMilliseconds;
+            _cooldownOverlay.Update(remaining.TotalSeconds, Info.Cooldown.TotalSeconds);
         }
 
         public override Variant _GetDragData(Vector2 atPosition)

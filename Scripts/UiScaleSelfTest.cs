@@ -222,14 +222,14 @@ internal static class UiScaleSelfTest
                 $"party {barName} nine_patch_stretch off");
         partyMember.QueueFree();
         var hotSlot = hotbar.GetNode<Control>("Content/Pages/Page0").GetChild(0);
-        Assert(hotSlot.GetNode<TextureProgressBar>("CooldownOverlay").NinePatchStretch,
-            "hotbar slot cooldown nine_patch_stretch off");
+        Assert(hotSlot.GetNode<CooldownOverlay>("CooldownOverlay") != null,
+            "hotbar slot cooldown overlay missing");
         Assert(hotbar.GetNode<TextureRect>("Background") != null,
             "hotbar bg must be a stretched TextureRect");
         Assert(hotbar.Position == WindowPlacement.HotbarDefault(canvas, hotbar.Size, 2f,
             DefaultWindowLayout.For("Hotbar"), hotbar.Size / 2f),
             $"hotbar 2x position {hotbar.Position} != HotbarDefault");
-        GD.Print($"[ui_scale_selftest] OK 2x audit: theme=20, {fontChecked} font overrides, spell tooltip {expectedSpell}, 8 nine-patch bars");
+        GD.Print($"[ui_scale_selftest] OK 2x audit: theme=20, {fontChecked} font overrides, spell tooltip {expectedSpell}, 7 nine-patch bars");
 
         // Leg 1: login at 2x.
         Assert(loginMargin.Size == new Vector2(600, 400), $"login margin size 2x {loginMargin.Size} != (600, 400)");
