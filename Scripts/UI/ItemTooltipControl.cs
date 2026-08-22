@@ -8,6 +8,7 @@ namespace Goose2Client.UI
     public partial class ItemTooltipControl : Control
     {
         private TextureRect _iconRect;
+        private TextureRect _iconBackground;
         private Label _nameLabel;
         private Label _typeLabel;
         private Label _flagsLabel;
@@ -18,6 +19,7 @@ namespace Goose2Client.UI
         public override void _Ready()
         {
             _iconRect = GetNode<TextureRect>("Icon");
+            _iconBackground = GetNode<TextureRect>("IconBackground");
             _nameLabel = GetNode<Label>("Name");
             _typeLabel = GetNode<Label>("Type");
             _flagsLabel = GetNode<Label>("Flags");
@@ -63,6 +65,17 @@ namespace Goose2Client.UI
 
             _iconRect.Position = new Vector2(m.IconOffset, m.IconOffset);
             _iconRect.Size = new Vector2(m.IconSize, m.IconSize);
+            _iconBackground.Position = new Vector2(m.IconOffset, m.IconOffset);
+            _iconBackground.Size = new Vector2(m.IconSize, m.IconSize);
+
+            _nameLabel.OffsetLeft = m.TextColumn;
+            _nameLabel.OffsetTop = m.NameTop;
+            _typeLabel.OffsetLeft = m.TextColumn;
+            _typeLabel.OffsetTop = m.TypeTop;
+            _flagsLabel.OffsetLeft = m.TextColumn;
+            _flagsLabel.OffsetTop = m.FlagsTop;
+            _statsVBox.OffsetLeft = m.TextColumn;
+            _statsVBox.OffsetTop = m.StatsTop;
 
             // Size to content (both axes) so the full-rect Background panel hugs the text.
             // Width = widest of the name/type/flags lines and the stat rows.
