@@ -357,6 +357,16 @@ namespace Goose2Client
             var canvas = (Vector2I)tree.Root.GetVisibleRect().Size;
             if (canvas.X < 2 || canvas.Y < 2)
                 return;
+            var applier = UiScaleApplier.Instance;
+            if (applier != null && applier.Mode == UiScaleMode.Auto)
+            {
+                var f = UiScale.AutoFactor(canvas.Y);
+                if (f != applier.Factor)
+                {
+                    applier.Apply(f, ApplyReason.AutoResize);
+                    return;
+                }
+            }
             foreach (var w in CollectBaseWindows(UiLayer))
                 w.RepositionFromSaved();
         }
