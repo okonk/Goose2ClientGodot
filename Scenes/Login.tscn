@@ -1,6 +1,30 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene load_steps=4 format=3]
 
 [ext_resource type="Script" path="res://Scripts/LoginScene/LoginScene.cs" id="1_login"]
+
+[sub_resource type="StyleBoxFlat" id="sb_login_btn"]
+bg_color = Color(0.470588, 0.47451, 0.478431, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.231373, 0.231373, 0.231373, 1)
+content_margin_left = 8.0
+content_margin_top = 4.0
+content_margin_right = 8.0
+content_margin_bottom = 4.0
+
+[sub_resource type="StyleBoxFlat" id="sb_login_btn_p"]
+bg_color = Color(0.470588, 0.47451, 0.478431, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.65098, 0.65098, 0.65098, 1)
+content_margin_left = 8.0
+content_margin_top = 4.0
+content_margin_right = 8.0
+content_margin_bottom = 4.0
 
 [node name="Login" type="Control"]
 script = ExtResource("1_login")
@@ -38,6 +62,9 @@ secret = true
 [node name="LoginButton" type="Button" parent="MarginContainer/VBox"]
 layout_mode = 1
 text = "Login"
+theme_override_styles/normal = SubResource("sb_login_btn")
+theme_override_styles/hover = SubResource("sb_login_btn")
+theme_override_styles/pressed = SubResource("sb_login_btn_p")
 
 [node name="StatusLabel" type="Label" parent="MarginContainer/VBox"]
 layout_mode = 1
