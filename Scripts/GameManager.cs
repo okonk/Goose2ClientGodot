@@ -75,6 +75,20 @@ namespace Goose2Client
             _packetQueue = new PausablePacketQueue(() => NetworkClient.Pause, PacketManager.Handle);
         }
 
+        public override void _Input(InputEvent @event)
+        {
+            if (@event.IsActionPressed("ToggleFullscreen"))
+                ToggleFullscreen();
+        }
+
+        public void ToggleFullscreen()
+        {
+            var window = GetWindow();
+            window.SetMode(window.Mode == Window.ModeEnum.Fullscreen
+                ? Window.ModeEnum.Windowed
+                : Window.ModeEnum.Fullscreen);
+        }
+
         public override void _Ready()
         {
             UiScaleApplier.Instance = new UiScaleApplier();

@@ -91,6 +91,11 @@ public partial class GameHud : Control
         if (GetViewport().GuiGetFocusOwner() is LineEdit)
             return;
 
+        // Godot also fires unmodified actions (Enter → StartChat) when a modified
+        // variant (Alt+Enter → ToggleFullscreen) is pressed; Alt combos are reserved.
+        if (@event is InputEventKey { AltPressed: true })
+            return;
+
         if (@event.IsActionPressed("ToggleInventory"))
             Inventory.Toggle();
         else if (@event.IsActionPressed("ToggleSpellbook"))
