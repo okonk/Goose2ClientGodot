@@ -100,4 +100,45 @@ public class UiScaleTests
         var ui = new UiScale { CurrentFactor = 2f };
         Assert.Equal(new Vector2I(64, 110), ui.ScaleSizeI(new Vector2I(32, 55)));
     }
+
+    [Fact]
+    public void NormalizeMode_Known()
+    {
+        Assert.Equal(UiScaleMode.Auto, UiScale.NormalizeMode(0));
+        Assert.Equal(UiScaleMode.Manual, UiScale.NormalizeMode(1));
+    }
+
+    [Fact]
+    public void NormalizeMode_UnknownFallsBackToAuto()
+    {
+        Assert.Equal(UiScaleMode.Auto, UiScale.NormalizeMode(99));
+        Assert.Equal(UiScaleMode.Auto, UiScale.NormalizeMode(-1));
+        Assert.Equal(UiScaleMode.Auto, UiScale.NormalizeMode(int.MaxValue));
+    }
+
+    [Fact]
+    public void Resolve_AutoIgnoresSavedValue()
+    {
+        Assert.Equal(2f, UiScale.Resolve(UiScaleMode.Auto, 2.5f, 1080));
+        Assert.Equal(3f, UiScale.Resolve(UiScaleMode.Auto, 1f, 1440));
+    }
+
+    [Fact]
+    public void Resolve_ManualIgnoresWindowHeight()
+    {
+        Assert.Equal(1.5f, UiScale.Resolve(UiScaleMode.Manual, 1.5f, 720));
+        Assert.Equal(3f, UiScale.Resolve(UiScaleMode.Manual, 3.4f, 720));
+    }
+
+    [Fact]
+    public void Resolve_ManualNaN()
+    {
+        Assert.Equal(1f, UiScale.Resolve(UiScaleMode.Manual, float.NaN, 1080));
+    }
+
+    [Fact]
+    public void Resolve_UnknownModeFallsBackToAuto()
+    {
+        Assert.Equal(UiScale.AutoFactor(1080), UiScale.Resolve((UiScaleMode)99, 2.5f, 1080));
+    }
 }

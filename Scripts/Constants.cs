@@ -140,5 +140,7 @@ namespace Goose2Client
         public const string SpiritBarShown = "SpiritBarShown";
         /// <summary>World render mode: <c>true</c> = Native1x, <c>false</c> (default) = Integer2x.</summary>
         public const string RenderMode = "RenderMode";
+        public const string UiScaleMode = "UiScaleMode";
+        public const string UiScaleValue = "UiScaleValue";
     }
 }

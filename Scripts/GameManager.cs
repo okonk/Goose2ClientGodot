@@ -282,6 +282,12 @@ namespace Goose2Client
         public void LoadSettings(string characterName)
         {
             CharacterSettings = new CharacterSettings(characterName);
+            var applier = UiScaleApplier.Instance;
+            var mode = UiScale.NormalizeMode(CharacterSettings.GetOption<int>(Options.UiScaleMode, (int)UiScaleMode.Auto));
+            var saved = CharacterSettings.GetOption<float>(Options.UiScaleValue, 1f);
+            var canvas = (Vector2I)GetTree().Root.GetVisibleRect().Size;
+            applier.Mode = mode;
+            applier.Apply(UiScale.Resolve(mode, saved, canvas.Y), ApplyReason.Startup);
         }
 
         private void OnPing(object packetObj) => NetworkClient.Pong();

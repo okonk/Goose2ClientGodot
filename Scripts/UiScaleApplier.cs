@@ -39,6 +39,8 @@ public class UiScaleApplier
     private readonly List<(Control C, StringName Prop, float Base)> _fonts = new();
     private bool _appliedOnce;
 
+    public UiScaleMode Mode { get; set; } = UiScaleMode.Auto;
+
     public float Factor => Scale.CurrentFactor;
 
     public int ScaleSize(float basePx) => Scale.ScaleSize(basePx);

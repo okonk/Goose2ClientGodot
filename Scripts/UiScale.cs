@@ -3,6 +3,12 @@ using Godot;
 
 namespace Goose2Client;
 
+public enum UiScaleMode
+{
+    Auto = 0,
+    Manual = 1
+}
+
 public class UiScale
 {
     public const float MinFactor = 1f;
@@ -24,6 +30,16 @@ public class UiScale
 
     public static int AutoFactor(int windowHeightPx)
         => windowHeightPx < 1080 ? 1 : windowHeightPx < 1440 ? 2 : 3;
+
+    public static UiScaleMode NormalizeMode(int raw)
+        => raw == 1 ? UiScaleMode.Manual : UiScaleMode.Auto;
+
+    public static float Resolve(UiScaleMode mode, float savedValue, int windowHeightPx)
+    {
+        if (mode != UiScaleMode.Manual)
+            return AutoFactor(windowHeightPx);
+        return NormalizeFactor(savedValue);
+    }
 
     public static int ScaleCoordinate(float value, float factor)
         => (int)MathF.Round(value * factor, MidpointRounding.AwayFromZero);
