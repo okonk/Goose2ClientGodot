@@ -9,6 +9,9 @@ public sealed class HealthBarAutoHide
 {
     public const double HideDelaySeconds = 2.0;
     private double _hideAt = double.PositiveInfinity;
+    private bool _hasLast;
+    private float _lastHp;
+    private float _lastMp;
 
     /// <summary>Whether the overhead bars should be visible.</summary>
     public bool Visible { get; private set; } = true;
@@ -20,6 +23,11 @@ public sealed class HealthBarAutoHide
     /// </summary>
     public void OnVitalsChanged(float hpPercent, float mpPercent, double nowSeconds)
     {
+        if (_hasLast && hpPercent == _lastHp && mpPercent == _lastMp) return;
+        _hasLast = true;
+        _lastHp = hpPercent;
+        _lastMp = mpPercent;
+
         Visible = true;
 
         if (hpPercent >= 1f && mpPercent >= 1f)
