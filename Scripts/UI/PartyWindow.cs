@@ -1,10 +1,12 @@
 using Godot;
+using Goose2Client;
 using Goose2Client.Network.Packets;
+using System.Collections.Generic;
 
 namespace Goose2Client.UI;
 
 /// <summary>Party/group roster — 8 member slots with vitals bars.</summary>
-public partial class PartyWindow : Control
+public partial class PartyWindow : Control, IScalableWindow
 {
     public const int MaxMembers = 8;
 
@@ -12,6 +14,7 @@ public partial class PartyWindow : Control
 
     private PartyMember[] _members;
     private bool _listenersRegistered;
+    private List<UiScaleLayout.GeomRecord> _geom = null!;
 
     public override void _Ready()
     {
@@ -30,6 +33,20 @@ public partial class PartyWindow : Control
         GameManager.Instance.PacketManager.Listen<EraseCharacterPacket>(OnEraseCharacter);
         GameManager.Instance.PacketManager.Listen<MakeCharacterPacket>(OnMakeCharacter);
         _listenersRegistered = true;
+
+        var applier = UiScaleApplier.Instance;
+        _geom = UiScaleLayout.Snapshot(this);
+        applier.RegisterWindow(this);
+        Relayout();
+        TreeExited += () => applier.UnregisterWindow(this);
+    }
+
+    public void Relayout()
+    {
+        var applier = UiScaleApplier.Instance;
+        UiScaleLayout.Apply(_geom, applier.Factor);
+        foreach (var tile in _members)
+            tile.CustomMinimumSize = PartyMemberMetrics.MinSize(applier.Factor);
     }
 
     public override void _ExitTree()

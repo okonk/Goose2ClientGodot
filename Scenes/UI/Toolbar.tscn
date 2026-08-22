@@ -1,4 +1,4 @@
-[gd_scene load_steps=7 format=3]
+[gd_scene load_steps=8 format=3]
 
 [ext_resource type="Script" path="res://Scripts/UI/DestroyButton.cs" id="1_db"]
 [ext_resource type="Script" path="res://Scripts/UI/ToolbarItem.cs" id="2_ti"]
@@ -6,8 +6,10 @@
 [ext_resource type="Texture2D" path="res://Assets/UI/combinebagbutton.png" id="4_combine"]
 [ext_resource type="Texture2D" path="res://Assets/UI/optionsbutton.png" id="5_options"]
 [ext_resource type="Texture2D" path="res://Assets/UI/exitbutton.png" id="6_exit"]
+[ext_resource type="Script" path="res://Scripts/UI/Toolbar.cs" id="7_tb"]
 
 [node name="Toolbar" type="HBoxContainer"]
+script = ExtResource("7_tb")
 layout_mode = 3
 anchor_left = 1.0
 anchor_top = 1.0

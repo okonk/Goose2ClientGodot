@@ -77,6 +77,10 @@ namespace Goose2Client
 
         public override void _Ready()
         {
+            UiScaleApplier.Instance = new UiScaleApplier();
+            var startupCanvas = (Vector2I)GetTree().Root.GetVisibleRect().Size;
+            UiScaleApplier.Instance.Apply(UiScale.AutoFactor(startupCanvas.Y), ApplyReason.Startup);
+
             // World sub-viewport display — must be added before UiLayer so the root Controls of
             // Login/LoadingMap scenes draw above the world texture (tree order).
             WorldViewport = new WorldViewport();
@@ -119,6 +123,9 @@ namespace Goose2Client
             Sprites = new SpriteCache();
             SpellTargetManager = new SpellTargetManager();
             AddChild(SpellTargetManager);
+
+            if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "+selftest=ui_scale") >= 0)
+                _ = UiScaleSelfTest.Run(this);
         }
 
         /// <summary>
@@ -275,6 +282,12 @@ namespace Goose2Client
         public void LoadSettings(string characterName)
         {
             CharacterSettings = new CharacterSettings(characterName);
+            var applier = UiScaleApplier.Instance;
+            var mode = UiScale.NormalizeMode(CharacterSettings.GetOption<int>(Options.UiScaleMode, (int)UiScaleMode.Auto));
+            var saved = CharacterSettings.GetOption<float>(Options.UiScaleValue, 1f);
+            var canvas = (Vector2I)GetTree().Root.GetVisibleRect().Size;
+            applier.Mode = mode;
+            applier.Apply(UiScale.Resolve(mode, saved, canvas.Y), ApplyReason.Startup);
         }
 
         private void OnPing(object packetObj) => NetworkClient.Pong();
@@ -344,8 +357,18 @@ namespace Goose2Client
             var canvas = (Vector2I)tree.Root.GetVisibleRect().Size;
             if (canvas.X < 2 || canvas.Y < 2)
                 return;
+            var applier = UiScaleApplier.Instance;
+            if (applier != null && applier.Mode == UiScaleMode.Auto)
+            {
+                var f = UiScale.AutoFactor(canvas.Y);
+                if (f != applier.Factor)
+                {
+                    applier.Apply(f, ApplyReason.AutoResize);
+                    return;
+                }
+            }
             foreach (var w in CollectBaseWindows(UiLayer))
-                w.RepositionForCurrentCanvas();
+                w.RepositionFromSaved();
         }
 
         /// <summary>Recursive depth-first walk of <paramref name="root"/>'s children collecting every

@@ -11,9 +11,10 @@ public static class DefaultWindowLayout
         ["Inventory"] = new Vector2(900, 360),
         ["Character"] = new Vector2(380, 120),
         ["Spellbook"] = new Vector2(700, 120),
-        // x=520 clears the chat window (bottom-left, ends at x=508); y=679 puts the hotbar's
-        // bottom (679+36=715) on the same line as the chat window's bottom (5px above a 720p
-        // viewport).
+        // 1x design-canvas reference for WindowPlacement.HotbarDefault (unplaced hotbars are
+        // screen-anchored from this): x=520 clears the chat window (bottom-left, ends at x=508);
+        // y=679 puts the hotbar's bottom (679+36=715) on the same line as the chat window's
+        // bottom (5px above a 720p viewport).
         ["Hotbar"]    = new Vector2(520, 679),
         ["Vendor"]    = new Vector2(300, 200),
         ["Bank"]      = new Vector2(300, 200),
@@ -33,4 +34,11 @@ public static class DefaultWindowLayout
 
     public static Vector2 For(string windowName)
         => windowName != null && Defaults.TryGetValue(windowName, out var p) ? p : new Vector2(100, 100);
+
+    /// <summary>
+    /// Pre-feature tscn size: legacy saves predate the Size key, and the live tscn size would
+    /// misinterpret their margins. Null → caller uses the live tscn size.
+    /// </summary>
+    public static Vector2? LegacySize(string windowName)
+        => windowName == "Options" ? new Vector2(240, 112) : null;
 }

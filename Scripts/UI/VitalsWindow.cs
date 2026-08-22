@@ -1,5 +1,7 @@
 using Godot;
+using Goose2Client;
 using Goose2Client.Network.Packets;
+using System.Collections.Generic;
 
 namespace Goose2Client.UI
 {
@@ -10,7 +12,7 @@ namespace Goose2Client.UI
     /// on), and a per-character latch that persists once SP has ever been
     /// non-zero (SpiritBarVisibility).
     /// </summary>
-    public partial class VitalsWindow : Control
+    public partial class VitalsWindow : Control, IScalableWindow
     {
         private TextureProgressBar _hpBar;
         private TextureProgressBar _mpBar;
@@ -30,6 +32,9 @@ namespace Goose2Client.UI
         private bool _snfReceived;
         private long _lastMaxSp;
 
+        private List<UiScaleLayout.GeomRecord> _geom = null!;
+        private VitalsCharacterDisplay _portrait;
+
         public override void _Ready()
         {
             _hpBar = GetNode<TextureProgressBar>("HpBar");
@@ -40,6 +45,7 @@ namespace Goose2Client.UI
             _spText = GetNode<Label>("SpText");
             _spOutline = GetNode<Control>("SpOutline");
             _levelText = GetNode<Label>("LevelText");
+            _portrait = GetNode<VitalsCharacterDisplay>("Portrait");
 
             _hpBar.MaxValue = 1;
             _mpBar.MaxValue = 1;
@@ -77,6 +83,18 @@ namespace Goose2Client.UI
             _levelText.MouseExited += () => TooltipManager.Instance.HideTextTooltip();
 
             GameManager.Instance.PacketManager.Listen<StatusInfoPacket>(OnStatusInfo);
+
+            var applier = UiScaleApplier.Instance;
+            _geom = UiScaleLayout.Snapshot(this);
+            applier.RegisterWindow(this);
+            Relayout();
+            TreeExited += () => applier.UnregisterWindow(this);
+        }
+
+        public void Relayout()
+        {
+            UiScaleLayout.Apply(_geom, UiScaleApplier.Instance.Factor);
+            _portrait.Relayout();
         }
 
         public override void _Process(double delta)

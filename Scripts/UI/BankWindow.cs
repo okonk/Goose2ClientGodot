@@ -57,6 +57,9 @@ public partial class BankWindow : BaseWindow, IWindow
         GameManager.Instance.PacketManager.Listen<BankSlotPacket>(OnBankSlot);
         GameManager.Instance.PacketManager.Listen<ClearBankSlotPacket>(OnClearBankSlot);
         _listenersRegistered = true;
+
+        UiScaleApplier.Instance.ApplyFontSize(GetNode<Label>("TitleBar/TitleLabel"), 9);
+        ScaleRegister();
     }
 
     public override void _ExitTree()

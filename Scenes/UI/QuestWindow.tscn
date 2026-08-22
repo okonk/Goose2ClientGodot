@@ -14,17 +14,13 @@ offset_right = 260.0
 offset_bottom = 291.0
 WindowName = "Quest"
 
-[node name="Background" type="NinePatchRect" parent="."]
+[node name="Background" type="TextureRect" parent="."]
 layout_mode = 2
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 texture = ExtResource("bg_tex")
 mouse_filter = 2
-patch_margin_left = 5
-patch_margin_top = 20
-patch_margin_right = 12
-patch_margin_bottom = 36
 
 [node name="TitleBar" type="Control" parent="."]
 layout_mode = 2
@@ -66,25 +62,25 @@ mouse_filter = 1
 layout_mode = 2
 anchors_preset = 0
 offset_left = 6.0
-offset_top = 258.0
+offset_top = 260.0
 offset_right = 80.0
-offset_bottom = 284.0
+offset_bottom = 286.0
 text = "Back"
 
 [node name="CloseButton" type="Button" parent="Content"]
 layout_mode = 2
 anchors_preset = 0
 offset_left = 90.0
-offset_top = 258.0
+offset_top = 260.0
 offset_right = 164.0
-offset_bottom = 284.0
+offset_bottom = 286.0
 text = "Close"
 
 [node name="NextButton" type="Button" parent="Content"]
 layout_mode = 2
 anchors_preset = 0
 offset_left = 174.0
-offset_top = 258.0
+offset_top = 260.0
 offset_right = 248.0
-offset_bottom = 284.0
+offset_bottom = 286.0
 text = "Next"

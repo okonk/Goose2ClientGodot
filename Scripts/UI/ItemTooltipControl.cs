@@ -8,6 +8,7 @@ namespace Goose2Client.UI
     public partial class ItemTooltipControl : Control
     {
         private TextureRect _iconRect;
+        private TextureRect _iconBackground;
         private Label _nameLabel;
         private Label _typeLabel;
         private Label _flagsLabel;
@@ -18,6 +19,7 @@ namespace Goose2Client.UI
         public override void _Ready()
         {
             _iconRect = GetNode<TextureRect>("Icon");
+            _iconBackground = GetNode<TextureRect>("IconBackground");
             _nameLabel = GetNode<Label>("Name");
             _typeLabel = GetNode<Label>("Type");
             _flagsLabel = GetNode<Label>("Flags");
@@ -59,18 +61,33 @@ namespace Goose2Client.UI
                 return;
             }
 
+            var m = TooltipMetrics.ItemMetrics(UiScaleApplier.Instance.Factor);
+
+            _iconRect.Position = new Vector2(m.IconOffset, m.IconOffset);
+            _iconRect.Size = new Vector2(m.IconSize, m.IconSize);
+            _iconBackground.Position = new Vector2(m.IconOffset, m.IconOffset);
+            _iconBackground.Size = new Vector2(m.IconSize, m.IconSize);
+
+            _nameLabel.OffsetLeft = m.TextColumn;
+            _nameLabel.OffsetTop = m.NameTop;
+            _typeLabel.OffsetLeft = m.TextColumn;
+            _typeLabel.OffsetTop = m.TypeTop;
+            _flagsLabel.OffsetLeft = m.TextColumn;
+            _flagsLabel.OffsetTop = m.FlagsTop;
+            _statsVBox.OffsetLeft = m.TextColumn;
+            _statsVBox.OffsetTop = m.StatsTop;
+
             // Size to content (both axes) so the full-rect Background panel hugs the text.
-            // Text columns start at x=40 (right of the 32px icon); add 9px right padding.
             // Width = widest of the name/type/flags lines and the stat rows.
             float textWidth = Mathf.Max(
                 Mathf.Max(_nameLabel.GetCombinedMinimumSize().X, _typeLabel.GetCombinedMinimumSize().X),
                 Mathf.Max(_flagsLabel.GetCombinedMinimumSize().X, _statsVBox.GetCombinedMinimumSize().X));
-            float width = Mathf.Max(60f, 40f + textWidth + 9f);
+            float width = Mathf.Max(m.MinWidth, m.TextColumn + textWidth + m.RightPad);
 
-            // Header block runs to y≈46 (Flags label bottom); StatsVBox starts at y=48
+            // Header block runs to HeaderTop (Flags label bottom); StatsVBox starts at StatsTop
             // and its combined minimum size reflects only the visible stat lines.
             float statsHeight = _statsVBox.GetCombinedMinimumSize().Y;
-            float height = Mathf.Max(46f, 48f + statsHeight) + 4f;
+            float height = Mathf.Max(m.HeaderTop, m.StatsTop + statsHeight) + m.ExtraBottom;
             Size = new Vector2(width, height);
 
             PositionTooltip();

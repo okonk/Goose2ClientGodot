@@ -53,6 +53,9 @@ public partial class VendorWindow : BaseWindow, IWindow, INpcWindow
         GameManager.Instance.PacketManager.Listen<VendorSlotPacket>(OnVendorSlot);
         GameManager.Instance.PacketManager.Listen<ClearVendorPacket>(OnClearVendor);
         _listenersRegistered = true;
+
+        UiScaleApplier.Instance.ApplyFontSize(GetNode<Label>("TitleBar/TitleLabel"), 10);
+        ScaleRegister();
     }
 
     public override void _ExitTree()

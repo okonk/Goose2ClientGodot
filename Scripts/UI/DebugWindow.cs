@@ -1,11 +1,13 @@
 using Godot;
+using Goose2Client;
+using System.Collections.Generic;
 
 namespace Goose2Client.UI
 {
     /// <summary>
     /// HUD overlay showing current FPS and game version. Port of Unity DebugWindow.
     /// </summary>
-    public partial class DebugWindow : Control
+    public partial class DebugWindow : Control, IScalableWindow
     {
         private Label _fpsText;
         private Label _versionText;
@@ -15,12 +17,27 @@ namespace Goose2Client.UI
         private double _accum;
         private const double Frequency = 0.5;
 
+        private List<UiScaleLayout.GeomRecord> _geom = null!;
+
         public override void _Ready()
         {
             _fpsText = GetNode<Label>("FpsText");
             _versionText = GetNode<Label>("VersionText");
 
             _versionText.Text = (string)ProjectSettings.GetSetting("application/config/version", "");
+
+            var applier = UiScaleApplier.Instance;
+            applier.ApplyFontSize(_fpsText, 12);
+            applier.ApplyFontSize(_versionText, 12);
+            _geom = UiScaleLayout.Snapshot(this);
+            applier.RegisterWindow(this);
+            Relayout();
+            TreeExited += () => applier.UnregisterWindow(this);
+        }
+
+        public void Relayout()
+        {
+            UiScaleLayout.Apply(_geom, UiScaleApplier.Instance.Factor);
         }
 
         public override void _Process(double delta)

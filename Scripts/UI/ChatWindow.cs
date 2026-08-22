@@ -10,13 +10,14 @@ namespace Goose2Client.UI;
 /// Chat window — plain Control panel with hover alpha, chat log, and input line.
 /// Not a BaseWindow (no title bar). GameHud routes focus actions here via FocusChat().
 /// </summary>
-public partial class ChatWindow : Control
+public partial class ChatWindow : Control, IScalableWindow
 {
     private RichTextLabel _chatLog;
     private LineEdit _input;
     private Panel _panel;
 
     private bool _listenersRegistered;
+    private List<UiScaleLayout.GeomRecord> _geom = null!;
 
     public bool Typing => _input.HasFocus();
     public string ReplyToName { get; private set; }
@@ -75,6 +76,19 @@ public partial class ChatWindow : Control
         _chatColors[ChatType.Spells] = GameColors.Blue;
         _chatColors[ChatType.Tell] = GameColors.Yellow;
         _chatColors[ChatType.Server] = GameColors.Green;
+
+        var applier = UiScaleApplier.Instance;
+        applier.ApplyFontSize(_chatLog, 12, new StringName("normal_font_size"));
+        applier.ApplyFontSize(_input, 12);
+        _geom = UiScaleLayout.Snapshot(this);
+        applier.RegisterWindow(this);
+        Relayout();
+        TreeExited += () => applier.UnregisterWindow(this);
+    }
+
+    public void Relayout()
+    {
+        UiScaleLayout.Apply(_geom, UiScaleApplier.Instance.Factor);
     }
 
     public override void _ExitTree()

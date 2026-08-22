@@ -34,6 +34,9 @@ namespace Goose2Client.UI
 
             label.Modulate = new Color(1, 1, 1, 0.45f);
 
+            // Fixed by design — dev stamp must not scale; the font audit walks UiLayer only, this is outside it.
+            label.AddThemeFontSizeOverride("font_size", 10);
+
             AddChild(label);
         }
     }

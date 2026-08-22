@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Godot;
 using Goose2Client;
 
@@ -7,14 +8,20 @@ namespace Goose2Client.UI;
 /// Base floating window with title-bar drag, hover transparency, and persisted position.
 /// Replaces Unity TitleBar + WindowTransparency.
 /// </summary>
-public partial class BaseWindow : Control
+public partial class BaseWindow : Control, IScalableWindow
 {
     [Export] public string WindowName { get; set; }
 
     private Control _titleBar;
     private Button _closeButton;
     private bool _dragging;
+    private Vector2 _preDragPosition;
+    private bool _dragCancelled;
     private bool _hovered;
+
+    private List<UiScaleLayout.GeomRecord> _geom = null!;
+    private bool _scaleRegistered;
+    private Vector2 _tscnSize;
 
     private const float HoverOpacity = 1f;
     private const float UnhoveredOpacity = 0.7f;
@@ -27,6 +34,10 @@ public partial class BaseWindow : Control
 
     public override void _Ready()
     {
+        // tscn size is the 1x base for placement math; relayout (below, via ScaleRegister)
+        // resizes the frame after this capture.
+        _tscnSize = Size;
+
         _titleBar = GetNodeOrNull<Control>("TitleBar");
         _closeButton = GetNodeOrNull<Button>("TitleBar/CloseButton");
         TitleLabel = GetNodeOrNull<Label>("TitleBar/TitleLabel");
@@ -41,11 +52,6 @@ public partial class BaseWindow : Control
         if (Content != null)
             Content.MouseFilter = MouseFilterEnum.Ignore;
 
-        // Restore persisted position (or first-run default). Positions were saved in the native
-        // canvas of the window size they were saved on; legacy files (and the 1280x720 design
-        // defaults) are LegacyCanvas. Edge-stick + clamp re-anchors onto the current canvas.
-        // Reused on live window resize by GameManager.OnWindowResized (restart equivalence).
-        RepositionForCurrentCanvas();
         if (WindowName != null)
         {
             var ws = GameManager.Instance.CharacterSettings.GetWindowSettings(WindowName);
@@ -74,37 +80,59 @@ public partial class BaseWindow : Control
         // order follows tree order; last child = drawn on top = picked first.
         if (_titleBar != null)
             MoveChild(_titleBar, GetChildCount() - 1);
+
+        // Deferred so subclass _Ready build code runs first; their synchronous ScaleRegister
+        // calls make this a no-op (idempotent via _scaleRegistered).
+        Callable.From(() => ScaleRegister()).CallDeferred();
     }
 
-    /// <summary>
-    /// Recomputes this window's Position for the CURRENT root canvas using exactly the
-    /// first-restore branch logic: first-run transient dialog (no saved settings) → centered;
-    /// otherwise the saved/default position through <see cref="WindowPlacement.Resolve"/>
-    /// (saved canvas from settings, LegacyCanvas for legacy files and defaults).
-    /// Idempotent and safe to call any time after <see cref="_Ready"/>; the resize handler
-    /// relies on that to re-anchor windows onto the window edges (restart equivalence).
-    /// Silently skips before the tree/canvas is usable.
-    /// </summary>
-    public void RepositionForCurrentCanvas()
+    // Single owner of placement+scale at registration: the snapshot (1x base) must precede
+    // the first Relayout in the same frame, or it would capture already-scaled geometry.
+    protected void ScaleRegister()
     {
-        if (WindowName == null || GetTree() == null)
-            return;
-        var currentCanvas = (Vector2I)GetTree().Root.GetVisibleRect().Size;
-        if (currentCanvas.X < 2 || currentCanvas.Y < 2)
-            return;
+        if (_scaleRegistered) return;
+        _scaleRegistered = true;
+        _geom = UiScaleLayout.Snapshot(this);
+        var applier = UiScaleApplier.Instance;
+        applier.RegisterWindow(this);
+        Relayout();
+        RepositionFromSaved();
+        TreeExited += () => applier.UnregisterWindow(this);
+    }
+
+    public virtual void Relayout()
+    {
+        UiScaleLayout.Apply(_geom, UiScaleApplier.Instance.Factor);
+    }
+
+    public void RepositionFromSaved()
+    {
+        if (!IsInsideTree()) return;
+        var canvas = (Vector2I)GetTree().Root.GetVisibleRect().Size;
         var ws = GameManager.Instance?.CharacterSettings?.GetWindowSettings(WindowName);
-        if (ws == null && DefaultWindowLayout.IsDialog(WindowName))
+        var placed = ws != null && ws.Placed;                       // (b) valid quad — Position may legitimately be (0,0)
+        var legacy = !placed && ws != null && ws.Position != default; // (a) pre-feature position, honored with legacy size/factor
+        if (!placed && !legacy && WindowName == "Hotbar")
         {
-            // First-run transient dialog: open centered; a saved position (after a drag)
-            // always goes through Resolve below, so the edge-stick rule takes over.
-            Position = WindowPlacement.Center(currentCanvas, Size);
+            var ap = UiScaleApplier.Instance;
+            Position = WindowPlacement.HotbarDefault(canvas, Size,
+                ap != null ? ap.Factor : 1f, DefaultWindowLayout.For(WindowName), _tscnSize);
+            return;
         }
-        else
+        if (!placed && !legacy && DefaultWindowLayout.IsDialog(WindowName))
         {
-            var storedOrDefaultPos = ws != null ? ws.Position : DefaultWindowLayout.For(WindowName);
-            var savedCanvas = ws != null && ws.CanvasSize != default ? ws.CanvasSize : WindowPlacement.LegacyCanvas;
-            Position = WindowPlacement.Resolve(storedOrDefaultPos, Size, savedCanvas, currentCanvas);
+            Position = WindowPlacement.Center(canvas, Size);
+            return;
         }
+        var pos = placed || legacy ? ws.Position : DefaultWindowLayout.For(WindowName); // (c) unplaced non-dialog → default layout
+        var savedCanvas = ws != null && ws.CanvasSize != default ? ws.CanvasSize : WindowPlacement.LegacyCanvas;
+        var savedSize = placed && ws.Size == default ? (DefaultWindowLayout.LegacySize(WindowName) ?? _tscnSize)   // defensive: Placed is written with Size
+            : (!placed ? (DefaultWindowLayout.LegacySize(WindowName) ?? _tscnSize) : ws.Size);
+        var savedFactor = placed && ws.Factor > 0f ? ws.Factor : 1f;   // defensive: Placed is written with Factor
+        var applier = UiScaleApplier.Instance;
+        Position = WindowPlacement.ResolveScaled(pos, savedSize, savedFactor, savedCanvas, Size,
+            applier != null ? applier.Factor : 1f, canvas,
+            applier != null ? applier.ScaleSize(24f) : WindowPlacement.TitleBarHeight);
     }
 
     /// <summary>Makes a control a drag handle for this window (e.g. the hotbar's XP bar).
@@ -119,13 +147,19 @@ public partial class BaseWindow : Control
         {
             if (mb.Pressed)
             {
+                // Also cleared here: a cancelled release with the cursor off the title bar never
+                // reaches a guarded release, and the flag would otherwise swallow the next save.
+                if (_dragCancelled) _dragCancelled = false;
+                _preDragPosition = Position;
                 _dragging = true;
             }
             else
             {
                 _dragging = false;
-                if (WindowName != null)
-                    GameManager.Instance.CharacterSettings.SetWindowSetting(WindowName, Position, Visible, (Vector2I)GetTree().Root.GetVisibleRect().Size);
+                if (_dragCancelled)
+                    _dragCancelled = false;
+                else if (WindowName != null)
+                    GameManager.Instance.CharacterSettings.SetWindowSetting(WindowName, Position, Size, UiScaleApplier.Instance != null ? UiScaleApplier.Instance.Factor : 1f, null, (Vector2I)GetTree().Root.GetVisibleRect().Size);
             }
         }
         else if (@event is InputEventMouseMotion motion && _dragging)
@@ -133,12 +167,22 @@ public partial class BaseWindow : Control
             if (!Input.IsMouseButtonPressed(MouseButton.Left))
             {
                 _dragging = false;
-                if (WindowName != null)
-                    GameManager.Instance.CharacterSettings.SetWindowSetting(WindowName, Position, Visible, (Vector2I)GetTree().Root.GetVisibleRect().Size);
+                if (_dragCancelled)
+                    _dragCancelled = false;
+                else if (WindowName != null)
+                    GameManager.Instance.CharacterSettings.SetWindowSetting(WindowName, Position, Size, UiScaleApplier.Instance != null ? UiScaleApplier.Instance.Factor : 1f, null, (Vector2I)GetTree().Root.GetVisibleRect().Size);
                 return;
             }
             Position += motion.Relative;
         }
+    }
+
+    public void CancelDrag()
+    {
+        if (!_dragging) return;
+        _dragging = false;
+        _dragCancelled = true;
+        Position = _preDragPosition;
     }
 
     public override void _Process(double delta)
@@ -155,13 +199,13 @@ public partial class BaseWindow : Control
     {
         Visible = !Visible;
         if (WindowName != null)
-            GameManager.Instance.CharacterSettings.SetWindowSetting(WindowName, Position, Visible, (Vector2I)GetTree().Root.GetVisibleRect().Size);
+            GameManager.Instance.CharacterSettings.SetWindowVisible(WindowName, Visible);
     }
 
     protected virtual void OnClosePressed()
     {
         Hide();
         if (WindowName != null)
-            GameManager.Instance.CharacterSettings.SetWindowSetting(WindowName, Position, false, (Vector2I)GetTree().Root.GetVisibleRect().Size);
+            GameManager.Instance.CharacterSettings.SetWindowVisible(WindowName, false);
     }
 }
