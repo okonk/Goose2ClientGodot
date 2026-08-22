@@ -8,12 +8,13 @@ namespace Goose2Client.Overlays
         private Label _label;
         private Vector2 _bgScreen;
         private string _message;
+        private float _worldScale = 1f;
 
         public Character.Character AnchorOwner { get; set; }
 
         public Vector2 LocalOffsetWorld { get; set; }
 
-        /// Named DisplayScale: `Scale` would shadow CanvasItem.Scale (Vector2) (CS0108).
+        /// Text scale (UI factor). Named DisplayScale: `Scale` would shadow CanvasItem.Scale (Vector2) (CS0108).
         public float DisplayScale { get; private set; } = 1f;
 
         /// Cull rect = the background panel only; in the wrapped case the label overhangs it (transparent, MouseFilter.Ignore).
@@ -42,21 +43,22 @@ namespace Goose2Client.Overlays
                     - ChatBubbleLayout.VerticalGap);   // Character.Character: from Overlays, bare `Character` is the Goose2Client.Character namespace
         }
 
-        public void ApplyScale(float scale)
+        public void ApplyScale(float textScale, float worldScale)
         {
-            if (_message == null || DisplayScale == scale) return;
-            SetText(_message, scale);
+            if (_message == null || (DisplayScale == textScale && _worldScale == worldScale)) return;
+            SetText(_message, textScale, worldScale);
         }
 
-        public void SetText(string message, float scale)
+        public void SetText(string message, float textScale, float worldScale)
         {
             if (string.IsNullOrEmpty(message)) return;
             _message = message;
-            DisplayScale = scale;
+            DisplayScale = textScale;
+            _worldScale = worldScale;
 
-            int fontSize = Mathf.Max(1, Mathf.RoundToInt(12f * scale));
-            float maxTextWidth = ChatBubbleLayout.MaxWidth * scale;
-            Vector2 padding = ChatBubbleLayout.Padding * scale;
+            int fontSize = Mathf.Max(1, Mathf.RoundToInt(12f * textScale));
+            float maxTextWidth = ChatBubbleLayout.MaxWidth * textScale;
+            Vector2 padding = ChatBubbleLayout.Padding * textScale;
 
             if (_background == null)
             {
@@ -72,10 +74,10 @@ namespace Goose2Client.Overlays
             var styleBox = new StyleBoxFlat
             {
                 BgColor = new Color(0.15f, 0.15f, 0.15f, 0.85f),
-                CornerRadiusTopLeft = Mathf.RoundToInt(6f * scale),
-                CornerRadiusTopRight = Mathf.RoundToInt(6f * scale),
-                CornerRadiusBottomLeft = Mathf.RoundToInt(6f * scale),
-                CornerRadiusBottomRight = Mathf.RoundToInt(6f * scale),
+                CornerRadiusTopLeft = Mathf.RoundToInt(6f * textScale),
+                CornerRadiusTopRight = Mathf.RoundToInt(6f * textScale),
+                CornerRadiusBottomLeft = Mathf.RoundToInt(6f * textScale),
+                CornerRadiusBottomRight = Mathf.RoundToInt(6f * textScale),
             };
             _background.AddThemeStyleboxOverride("panel", styleBox);
 
@@ -93,7 +95,7 @@ namespace Goose2Client.Overlays
             }
             _label.Text = message;
             _label.AddThemeFontSizeOverride("font_size", fontSize);
-            _label.AddThemeConstantOverride("outline_size", Mathf.RoundToInt(4f * scale));
+            _label.AddThemeConstantOverride("outline_size", Mathf.RoundToInt(4f * textScale));
             _label.AddThemeColorOverride("font_outline_color", new Color(0, 0, 0, 0.9f));
             _label.AddThemeColorOverride("font_color", Colors.White);
 
@@ -110,7 +112,7 @@ namespace Goose2Client.Overlays
             {
                 // Effectively unreachable: the theme always provides a default font.
                 textWidth = maxTextWidth;
-                textHeight = 14f * scale;
+                textHeight = 14f * textScale;
             }
             else
             {
@@ -136,7 +138,9 @@ namespace Goose2Client.Overlays
             var textSize = new Vector2(textWidth, textHeight);
 
             var bgSize = textSize + padding * 2;
-            BackgroundWidth = bgSize.X / scale;   // WORLD units (self-anchoring is world-unit)
+            // WORLD units (self-anchoring is world-unit) — the world scale, not the text scale:
+            // the bubble's screen width must map back through the world's px-per-world-unit.
+            BackgroundWidth = bgSize.X / worldScale;
             _bgScreen = bgSize;
             _background.Size = bgSize;
             _background.Position = new Vector2(0, -bgSize.Y);

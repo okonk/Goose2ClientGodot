@@ -6,16 +6,18 @@ namespace Goose2Client.Overlays
     public partial class BridgedNameLabel : Label, IBridgedText
     {
         private float _scale = 1f;
+        private float _worldScale = 1f;
 
         public Character.Character AnchorOwner { get; set; }
         public Vector2 LocalOffsetWorld { get; set; }
         public Rect2 ScreenBounds => new Rect2(Vector2.Zero, Size);   // node origin = label top-left
 
-        public void ApplyScale(float scale)
+        public void ApplyScale(float textScale, float worldScale)
         {
-            _scale = scale;
-            AddThemeFontSizeOverride("font_size", Mathf.Max(1, Mathf.RoundToInt(12f * scale)));
-            AddThemeConstantOverride("outline_size", Mathf.RoundToInt(4f * scale));
+            _scale = textScale;
+            _worldScale = worldScale;
+            AddThemeFontSizeOverride("font_size", Mathf.Max(1, Mathf.RoundToInt(12f * textScale)));
+            AddThemeConstantOverride("outline_size", Mathf.RoundToInt(4f * textScale));
             Layout(AnchorOwner);
         }
 
@@ -36,7 +38,8 @@ namespace Goose2Client.Overlays
             // (Character.cs) — a character without a body slot must not anchor names to its feet.
             int bodyHeight = owner.Height <= 0 ? 48 : owner.Height;
             // Character.Character (not `Character` — from this namespace the bare name is the Goose2Client.Character namespace).
-            LocalOffsetWorld = new Vector2(-w / (2f * _scale), -(bodyHeight + Character.Character.NameTopOffset));
+            // -w/(2·worldScale): screen-px half-width back in world units for centering.
+            LocalOffsetWorld = new Vector2(-w / (2f * _worldScale), -(bodyHeight + Character.Character.NameTopOffset));
         }
     }
 }

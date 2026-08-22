@@ -13,6 +13,7 @@ namespace Goose2Client
 
         Rect2 ScreenBounds { get; }
 
-        void ApplyScale(float scale);
+        /// textScale (UI factor) sizes the text; worldScale converts world-unit offsets to screen px.
+        void ApplyScale(float textScale, float worldScale);
     }
 }

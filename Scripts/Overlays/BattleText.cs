@@ -15,14 +15,14 @@ namespace Goose2Client.Overlays
         /// +4 outline → x∈[−58,66], y∈[−52,20], all × S — oversized would under-cull (root-layer text is not clipped by the world blit).
         public Rect2 ScreenBounds => new Rect2(-58f * _scale, -52f * _scale, 124f * _scale, 72f * _scale);
 
-        public void ApplyScale(float scale)
+        public void ApplyScale(float textScale, float worldScale)
         {
-            _scale = scale;
+            _scale = textScale;
             for (int i = 0; i < GetChildCount(); i++)
-                if (GetChild(i) is BattleTextLine line) line.ApplyScale(scale);
+                if (GetChild(i) is BattleTextLine line) line.ApplyScale(textScale, worldScale);
         }
 
-        public void AddText(BattleTextType type, string text, int characterHeight, float scale)
+        public void AddText(BattleTextType type, string text, int characterHeight, float textScale, float worldScale)
         {
             if (GetChildCount() >= 18) return;
 
@@ -33,7 +33,7 @@ namespace Goose2Client.Overlays
 
             var line = new BattleTextLine { Name = $"Line_{childCount}" };
             AddChild(line);
-            line.Initialize(color, displayText, offset, scale);
+            line.Initialize(color, displayText, offset, textScale, worldScale);
         }
     }
 }

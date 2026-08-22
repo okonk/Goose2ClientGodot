@@ -43,6 +43,8 @@ public class UiScaleApplier
 
     public float Factor => Scale.CurrentFactor;
 
+    public event Action<float> FactorChanged;
+
     public int ScaleSize(float basePx) => Scale.ScaleSize(basePx);
 
     public IReadOnlyList<WindowRegistration> RegisteredWindows => _windows;
@@ -99,6 +101,7 @@ public class UiScaleApplier
             return;
         _appliedOnce = true;
         Scale.CurrentFactor = f;
+        FactorChanged?.Invoke(f);
 
         foreach (var r in _windows)
             if (r.Window is BaseWindow bw && GodotObject.IsInstanceValid(r.ControlRef))

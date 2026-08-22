@@ -9,18 +9,30 @@ namespace Goose2Client
         /// Must exceed every world node's process priority (all default 0 today); lower priority runs first (text_bridge_order.gd).
         private const int ProjectionProcessPriority = 100;
 
-        /// Current display scale — the single scale source for elements (T7: never read Layout.Scale here).
+        /// Text scale — the geometric mean of the UI factor and the world render scale, so labels
+        /// stay proportioned between the UI and the characters when the two scales diverge.
         /// Named DisplayScale: `Scale` would shadow Node.Scale (CS0108).
         public float DisplayScale { get; private set; } = 1f;
 
+        /// World render scale (world units → screen px): anchors' LocalOffsetWorld conversion only.
+        public float WorldScale => _worldScale;
+
         private WorldViewport _worldViewport;
+        private float _uiFactor = 1f;
+        private float _worldScale = 1f;
 
         public override void _EnterTree() => ProcessPriority = ProjectionProcessPriority;   // before the first _Process
 
         public void Attach(WorldViewport worldViewport)
         {
             _worldViewport = worldViewport;
-            _worldViewport.ScaleChanged += OnScaleChanged;
+            _worldViewport.ScaleChanged += OnWorldScaleChanged;
+            if (UiScaleApplier.Instance != null)
+                UiScaleApplier.Instance.FactorChanged += OnUiFactorChanged;
+            // Seed from live state: the viewport may have applied its first layout (and fired
+            // ScaleChanged) before this Attach, and the UI factor was applied at startup.
+            OnWorldScaleChanged(_worldViewport.Layout.Scale);
+            OnUiFactorChanged(UiScaleApplier.Instance?.Factor ?? 1f);
         }
 
         /// ApplyScale runs before AddChild: font metrics are correct off-tree, but GetMinimumSize()
@@ -28,7 +40,7 @@ namespace Goose2Client
         public void Register<T>(T element, Character.Character owner) where T : CanvasItem, IBridgedText
         {
             element.AnchorOwner = owner;
-            element.ApplyScale(DisplayScale);
+            element.ApplyScale(DisplayScale, _worldScale);
             element.Visible = false;   // no (0,0) flash before the first projection
             AddChild(element);
         }
@@ -37,23 +49,39 @@ namespace Goose2Client
 
         public override void _ExitTree()
         {
-            if (_worldViewport != null) _worldViewport.ScaleChanged -= OnScaleChanged;
+            if (_worldViewport != null) _worldViewport.ScaleChanged -= OnWorldScaleChanged;
+            if (UiScaleApplier.Instance != null)
+                UiScaleApplier.Instance.FactorChanged -= OnUiFactorChanged;
         }
 
-        private void OnScaleChanged(float s)
+        private void OnWorldScaleChanged(float s)
         {
-            DisplayScale = s;
+            // 0 is the pre-first-map default Layout, not a real scale — a 0 would pin DisplayScale to 0.
+            if (s <= 0f) return;
+            _worldScale = s;
+            DisplayScale = Mathf.Sqrt(_uiFactor * _worldScale);
+            RescaleChildren();   // text scale and world-unit centering offsets both depend on it
+        }
+
+        private void OnUiFactorChanged(float s)
+        {
+            _uiFactor = s;
+            DisplayScale = Mathf.Sqrt(_uiFactor * _worldScale);
+            RescaleChildren();
+        }
+
+        private void RescaleChildren()
+        {
             for (int i = 0; i < GetChildCount(); i++)
-                if (GetChild(i) is IBridgedText e) e.ApplyScale(s);
+                if (GetChild(i) is IBridgedText e) e.ApplyScale(DisplayScale, _worldScale);
         }
 
         private void UpdateProjection()
         {
             // Current is null only pre-first-map, when the bridge is empty (Attach never clears it) — no state to reset.
             if (_worldViewport == null || _worldViewport.Current == null) return;
-            // T7: DisplayScale is the single scale source (ScaleChanged keeps it in lockstep with
-            // Layout.Scale) — never read Layout.Scale here; only the display rect geometry comes from Layout.
-            float scale = DisplayScale;
+            // Offsets are world units, so their screen conversion uses the world scale —
+            // DisplayScale (UI factor) sizes the text but would misplace the anchor otherwise.
             var o = _worldViewport.Layout.DisplayOrigin;
             var s = _worldViewport.Layout.DisplaySize;
             // No Rect2(Vector2I, …) ctor in GodotSharp — construct from component casts.
@@ -71,7 +99,7 @@ namespace Goose2Client
                 // are still alive (queued free) — don't project them through the new map's canvas transform.
                 if (element.AnchorOwner.GetViewport() != _worldViewport.Current) { item.Visible = false; continue; }
                 var pos = _worldViewport.WorldToWindow(element.AnchorOwner.GlobalPosition)   // calls the shared forward transform (lockstep with WindowToWorld)
-                    + element.LocalOffsetWorld * scale;
+                    + element.LocalOffsetWorld * _worldScale;
                 // No Position on CanvasItem — branch on the concrete base (elements are always one or the other):
                 if (item is Node2D n) n.Position = pos;
                 else if (item is Control c) c.Position = pos;

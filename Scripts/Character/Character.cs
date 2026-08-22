@@ -675,7 +675,7 @@ namespace Goose2Client.Character
                 _battleText.LocalOffsetWorld = new Vector2(0, -40);
                 bridge.Register(_battleText, this);
             }
-            _battleText.AddText(type, text, Height, bridge.DisplayScale);
+            _battleText.AddText(type, text, Height, bridge.DisplayScale, bridge.WorldScale);
         }
 
         /// <summary>Show a speech chat bubble above this character's head. Replaces any existing bubble.</summary>
@@ -691,7 +691,7 @@ namespace Goose2Client.Character
             // Register before SetText: AnchorOwner must be set for the bubble's self-anchoring, and the
             // bubble must be in the tree before measurement — the wrap branch reads an in-tree label's min size.
             bridge.Register(_chatBubble, this);
-            _chatBubble.SetText(message, bridge.DisplayScale);
+            _chatBubble.SetText(message, bridge.DisplayScale, bridge.WorldScale);
         }
 
         /// <summary>Show a spell impact animation at this character's origin. Spells stack (no replacement).</summary>
