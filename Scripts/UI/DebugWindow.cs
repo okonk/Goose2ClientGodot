@@ -27,6 +27,8 @@ namespace Goose2Client.UI
             _versionText.Text = (string)ProjectSettings.GetSetting("application/config/version", "");
 
             var applier = UiScaleApplier.Instance;
+            applier.ApplyFontSize(_fpsText, 12);
+            applier.ApplyFontSize(_versionText, 12);
             _geom = UiScaleLayout.Snapshot(this);
             applier.RegisterWindow(this);
             Relayout();

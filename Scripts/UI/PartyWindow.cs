@@ -43,7 +43,10 @@ public partial class PartyWindow : Control, IScalableWindow
 
     public void Relayout()
     {
-        UiScaleLayout.Apply(_geom, UiScaleApplier.Instance.Factor);
+        var applier = UiScaleApplier.Instance;
+        UiScaleLayout.Apply(_geom, applier.Factor);
+        foreach (var tile in _members)
+            tile.CustomMinimumSize = PartyMemberMetrics.MinSize(applier.Factor);
     }
 
     public override void _ExitTree()

@@ -78,6 +78,8 @@ public partial class ChatWindow : Control, IScalableWindow
         _chatColors[ChatType.Server] = GameColors.Green;
 
         var applier = UiScaleApplier.Instance;
+        applier.ApplyFontSize(_chatLog, 12, new StringName("normal_font_size"));
+        applier.ApplyFontSize(_input, 12);
         _geom = UiScaleLayout.Snapshot(this);
         applier.RegisterWindow(this);
         Relayout();
