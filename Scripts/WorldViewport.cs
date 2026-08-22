@@ -74,6 +74,7 @@ namespace Goose2Client
         public void Attach(SubViewport mapScene)
         {
             Current = mapScene;
+            _mouseInDisplay = false;   // the new sub-viewport has not been mouse-notified
             // Force the sub-viewport to render its first frame even though its texture is not
             // displayed yet: the default UpdateMode (WhenVisible) would skip rendering while
             // WorldTexture still shows the previous map — exactly the frame we wait for —
@@ -179,6 +180,49 @@ namespace Goose2Client
         /// <summary>World (map) px → root-window px — exact inverse of <see cref="WindowToWorld"/>; keep the two in lockstep.</summary>
         public Vector2 WorldToWindow(Vector2 worldPos)
             => WorldTextProjection.Project(worldPos, Current.GetCanvasTransform(), (float)Layout.Scale, Layout.DisplayOrigin);
+
+        private bool _mouseInDisplay;
+        private bool _forwardingHover;
+
+        /// <summary>
+        /// Window mouse motion → sub-viewport hover. Like clicks, sub-viewport nodes never
+        /// receive window input (handle_input_locally=false), so the map items' Area2D
+        /// mouse_entered/mouse_exited (hover tooltips) need the motion driven in here:
+        /// push_input(local) updates the sub-viewport mouse position, but picking only runs
+        /// once notify_mouse_entered() has marked the mouse as inside the viewport — a plain
+        /// TextureRect display never does that (only SubViewportContainer would). Notify
+        /// exited when leaving the display rect: it drops the hovered area synchronously
+        /// (tools/tests/subviewport_hover_pick.gd pins all of this). _Input (not
+        /// _UnhandledInput) so motion over HUD windows still clears the hover.
+        /// </summary>
+        public override void _Input(InputEvent e)
+        {
+            if (e is not InputEventMouseMotion motion) return;
+            if (Current == null || !GodotObject.IsInstanceValid(Current))
+            {
+                _mouseInDisplay = false;
+                return;
+            }
+            if (_forwardingHover) return;   // push_input re-enters node _Input with local coords
+            if (WorldViewportScale.IsInsideDisplay(Layout, (Vector2I)motion.Position))
+            {
+                if (!_mouseInDisplay)
+                {
+                    _mouseInDisplay = true;
+                    Current.NotifyMouseEntered();
+                }
+                _forwardingHover = true;
+                var local = (InputEventMouseMotion)motion.Duplicate();
+                local.Position = (motion.Position - Layout.DisplayOrigin) / (float)Layout.Scale;
+                Current.PushInput(local, true);
+                _forwardingHover = false;
+            }
+            else if (_mouseInDisplay)
+            {
+                _mouseInDisplay = false;
+                Current.NotifyMouseExited();
+            }
+        }
 
         /// <summary>
         /// Window mouse clicks → world clicks. Sub-viewport nodes never receive window input

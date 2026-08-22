@@ -4,6 +4,7 @@
 
 [node name="Map" type="SubViewport"]
 handle_input_locally = false
+physics_object_picking = true
 transparent_bg = false
 
 [node name="World" type="Node2D" parent="."]
