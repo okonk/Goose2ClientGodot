@@ -134,6 +134,11 @@ namespace Goose2Client
             // that arrive after login — login scene is freed and would drop them.
             PacketManager.Listen<SendCurrentMapPacket>(OnSendCurrentMap);
 
+            // Nothing else observes a dropped connection after login; without this it
+            // is invisible (the game just sits frozen on a dead socket).
+            NetworkClient.Disconnected += OnDisconnected;
+            NetworkClient.SocketError += OnSocketError;
+
             Sprites = new SpriteCache();
             SpellTargetManager = new SpellTargetManager();
             AddChild(SpellTargetManager);
@@ -306,6 +311,12 @@ namespace Goose2Client
 
         private void OnPing(object packetObj) => NetworkClient.Pong();
 
+        private void OnDisconnected()
+            => GD.Print($"[net] DISCONNECTED, server closed the socket (tick {Time.GetTicksMsec()}) {System.DateTime.UtcNow:HH:mm:ss}");
+
+        private void OnSocketError(System.Exception e)
+            => GD.Print($"[net] SOCKET ERROR (tick {Time.GetTicksMsec()}) {System.DateTime.UtcNow:HH:mm:ss}: {e.GetType().Name}: {e.Message}");
+
         private void OnSendCurrentMap(object packetObj)
         {
             var p = (SendCurrentMapPacket)packetObj;
@@ -408,6 +419,8 @@ namespace Goose2Client
             PacketManager.Remove<ClassUpdatePacket>(OnClassUpdate);
             PacketManager.Remove<PingPacket>(OnPing);
             PacketManager.Remove<SendCurrentMapPacket>(OnSendCurrentMap);
+            NetworkClient.Disconnected -= OnDisconnected;
+            NetworkClient.SocketError -= OnSocketError;
             NetworkClient?.Disconnect();
         }
     }
