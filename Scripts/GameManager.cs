@@ -510,6 +510,8 @@ namespace Goose2Client
 
             var memberList = Hud.Party.GetNode<VBoxContainer>("MemberList");
             Assert(memberList.GetChildCount() == 8, $"party tiles {memberList.GetChildCount()} != 8");
+            var sep = memberList.GetThemeConstant("separation");
+            Assert(sep == 2, $"party separation {sep} != 2");
             var tile = (PartyMember)memberList.GetChild(0);
             Assert(tile.CustomMinimumSize == new Vector2(174, 66), $"party tile min {tile.CustomMinimumSize} != (174, 66)");
             var nameOffset = tile.GetNode<Label>("Content/NameText").OffsetBottom;
@@ -540,10 +542,8 @@ namespace Goose2Client
             await Frame();
             GD.Print($"[ui_scale_selftest] OK 2x audit: theme=20, {fontChecked} font overrides, spell tooltip {expectedSpell}");
 
-            // Step 2b: runtime spawn at 2x — a window built while the factor is 2 must scale its
-            // 1x snapshot, not divide or pre-scale. WindowSettings is a class mutated in place,
-            // so the record is deep-copied into locals; restore runs in finally before anything
-            // that can throw.
+            // Step 2b: runtime spawn at 2x. WindowSettings is a class mutated in place — the
+            // record is deep-copied into locals, and restore runs in finally before anything that can throw.
             var cs = CharacterSettings;
             bool bHad = false; Vector2 bPos = default; bool bVis = false; Vector2I bCanvas = default; Vector2 bSize = default; float bFactor = 0f; bool bPlaced = false;
             {
@@ -618,9 +618,8 @@ namespace Goose2Client
             Assert(!ContainsRoot(info), "info registration not pruned after free");
             GD.Print("[ui_scale_selftest] OK 2c multi-window lines (2x + 1x identity)");
 
-            // Step 2d: a saved (0,0) origin must survive — simulate drag-to-origin, verify the
-            // position honors it, then restore the deep-copied record and verify the persisted
-            // file via a throwaway instance (re-LoadSettings would swap the live object).
+            // Step 2d: a saved (0,0) origin must survive; the persisted file is verified via a
+            // throwaway instance because re-LoadSettings would swap the live object out from under the rest.
             var inv = Hud.Inventory;
             bool iHad = false; Vector2 iPos = default; bool iVis = false; Vector2I iCanvas = default; Vector2 iSize = default; float iFactor = 0f; bool iPlaced = false;
             {
@@ -726,6 +725,8 @@ namespace Goose2Client
                     $"restore: {kv.Key.WindowName} pos {kv.Key.Position} != {kv.Value}");
             var tile1 = (PartyMember)Hud.Party.GetNode<VBoxContainer>("MemberList").GetChild(0);
             Assert(tile1.CustomMinimumSize == new Vector2(87, 33), $"party tile min {tile1.CustomMinimumSize} != (87, 33)");
+            var sep1 = Hud.Party.GetNode<VBoxContainer>("MemberList").GetThemeConstant("separation");
+            Assert(sep1 == 1, $"party separation {sep1} != 1");
             GD.Print("[ui_scale_selftest] OK 1x restore (idempotence: geometry + positions)");
         }
 
