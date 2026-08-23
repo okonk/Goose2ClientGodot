@@ -31,7 +31,7 @@ bridge label suppression, spell-target exclusion) reads the evaluated state.
   `Modulate`, so a Modulate set by invisibility survives animation/slot-rebuild ordering as
   long as `ApplyInvisibility()` runs **after** `ApplyAppearance`.
 - `WorldTextBridge.UpdateProjection` per-element visibility loop:
-  `Scripts/WorldTextBridge.cs:89-119` (insert after the viewport check at `:100`) (overwrites `item.Visible` every frame — the bridge
+  `Scripts/WorldTextBridge.cs:89-108` (insert after the viewport check at `:100`) (overwrites `item.Visible` every frame — the bridge
   must consult hidden state or labels reappear).
 - `GameManager`: `SpellTargetManager` (public, `:39`), `IsTargeting` `:42`,
   `HandlePacket` `:157`.
@@ -101,12 +101,12 @@ existing `PacketHandler` shape — object returned, `override object Parse`).
 - Test: `tests/Goose2Client.Tests/CharacterPacketInvisibleTests.cs`
 
 **Mutation impact:**
-- Source of truth changed: the parser's interpretation of token 17 (MKC) / token 9 (CHP)
+- Source of truth changed: the parser's interpretation of token 17 (MKC) / token 8 (CHP)
   in the monster branch.
 - Important readers: today none (field parsed-then-dropped); after Task 4,
   `Character.SetAppearance`.
 - Derived/cached state affected: none. `GetInt32` and `GetString` each consume exactly one
-  token (`PacketParser.cs:43,:57`), so all later token reads (MoveSpeed, IsGM) keep their
+  token (`PacketParser.cs:63,:78`), so all later token reads (MoveSpeed, IsGM) keep their
   positions.
 - Required propagation sequence: change the read, nothing else to propagate.
 - Invariants to preserve: token count per packet unchanged; normal-character branch
@@ -337,7 +337,7 @@ No unit tests (node-level). Gate: full suite.
 ### Task 6: WorldTextBridge hides labels of hidden characters
 
 **Files:**
-- Modify: `Scripts/WorldTextBridge.cs` (`UpdateProjection`, `:89-119`)
+- Modify: `Scripts/WorldTextBridge.cs` (`UpdateProjection`, `:89-108`)
 
 No unit tests (node-level). Gate: full suite.
 
