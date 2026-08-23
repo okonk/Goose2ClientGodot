@@ -64,7 +64,8 @@ public partial class SpellTargetManager : Node
         if (_target == null
             || !GodotObject.IsInstanceValid(_target)
             || mm.GetCharacter(_target.LoginId) != _target
-            || FilterRejects(_target))
+            || FilterRejects(_target)
+            || _target.IsHiddenFromViewer)
         {
             _target = mm.LocalPlayer;
         }
@@ -101,8 +102,8 @@ public partial class SpellTargetManager : Node
         var mm = GameManager.Instance.CurrentMapManager;
         if (mm == null) return;
         
-        var candidates = mm.Characters.Select(c => 
-            new TargetCandidate(c.LoginId, c.X, c.Y, c.CharacterType)).ToList();
+        var candidates = mm.Characters.Where(c => !c.IsHiddenFromViewer)
+            .Select(c => new TargetCandidate(c.LoginId, c.X, c.Y, c.CharacterType)).ToList();
         
         var player = mm.LocalPlayer;
         TargetCandidate? current = _target != null ? new TargetCandidate(_target.LoginId, _target.X, _target.Y, _target.CharacterType) : (TargetCandidate?)null;
