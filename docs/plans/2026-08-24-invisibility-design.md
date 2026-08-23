@@ -41,8 +41,8 @@ Let `H` = character is invisible to the viewer.
 
 ### 2. `GameManager`
 
-- `public bool CanSeeInvisible { get; private set; }` (default false), set by the SINVS
-  handler in `MapManager`.
+- `public bool CanSeeInvisible { get; set; }` (default false), set by the SINVS handler
+  in `MapManager`.
 
 ### 3. `Character`
 

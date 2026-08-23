@@ -16,14 +16,14 @@ bridge label suppression, spell-target exclusion) reads the evaluated state.
 
 ## APIs verified
 
-- `PacketParser.GetInt32()` — `Scripts/Network/PacketParser.cs:43` (one token);
-  `PacketParser.GetString()` — `:57` (one token). Both consume exactly one comma-delimited
+- `PacketParser.GetInt32()` — `Scripts/Network/PacketParser.cs:63` (one token);
+  `PacketParser.GetString()` — `:78` (one token). Both consume exactly one comma-delimited
   token, so the monster-branch type change re-aligns nothing.
 - Packet-handler template: `Scripts/Network/Packets/AdminModeActivatePacket.cs` (prefix
   property + `Parse(PacketParser)`); registration: `PacketManager.Listen<T>` —
   `Scripts/Network/PacketManager.cs:13`.
-- `MapManager` listener registration/removal pairs: `Scripts/MapManager.cs:75-91` /
-  `:108-122`; `Characters` — `IEnumerable<Character.Character>` at `:38`;
+- `MapManager` listener registration/removal pairs: `Scripts/MapManager.cs:71-90` /
+  `:105-124`; `Characters` — `IEnumerable<Character.Character>` at `:38`;
   `OnMakeCharacter` `:138`, `OnUpdateCharacter` `:181`, `AttachLocalPlayer` `:213`.
 - `Character`: `IsLocalPlayer` `:19`, `_slots` (Dictionary<CharacterSlot, Slot> of
   AnimatedSprite2D) `:30`, `SetAppearance(MakeCharacterPacket)` `:171`,
@@ -31,12 +31,12 @@ bridge label suppression, spell-target exclusion) reads the evaluated state.
   `Modulate`, so a Modulate set by invisibility survives animation/slot-rebuild ordering as
   long as `ApplyInvisibility()` runs **after** `ApplyAppearance`.
 - `WorldTextBridge.UpdateProjection` per-element visibility loop:
-  `Scripts/WorldTextBridge.cs:96-119` (overwrites `item.Visible` every frame — the bridge
+  `Scripts/WorldTextBridge.cs:89-119` (insert after the viewport check at `:100`) (overwrites `item.Visible` every frame — the bridge
   must consult hidden state or labels reappear).
 - `GameManager`: `SpellTargetManager` (public, `:39`), `IsTargeting` `:42`,
   `HandlePacket` `:157`.
 - `SpellTargetManager`: `_target` `:9`, `Cast` `:57` (remembered-target validity block
-  `:65-71`), `CycleTarget` `:88` with candidates from `mm.Characters` at `:93`.
+  `:64-70`), `CycleTarget` `:88` with candidates from `mm.Characters` at `:93`.
 - Test pattern: `tests/Goose2Client.Tests/AdminModeActivatePacketTests.cs`
   (`new PacketParser("AMA123,1", "AMA")`). Test project compiles all of `Scripts/**`
   (`tests/Goose2Client.Tests/Goose2Client.Tests.csproj`), runs via `dotnet test
@@ -131,7 +131,7 @@ public class CharacterPacketInvisibleTests
     [Fact]
     public void MonsterMkc_InvisibleToken_IsStoredAndTrailingFieldsAlign()
     {
-        var raw = "MKC7,1,Mon,,"",0,3,4,1,50,150,255,0,0,255,0,1,999,1";
+        var raw = "MKC7,1,Mon,,,0,3,4,1,50,150,255,0,0,255,0,1,999,1";
         var p = (MakeCharacterPacket)new MakeCharacterPacket().Parse(new PacketParser(raw, "MKC"));
         Assert.Equal(1, p.Invisible);
         Assert.Equal(999, p.MoveSpeed);
@@ -256,13 +256,13 @@ No unit tests (node-level; repo tests are pure-logic only). Gate: full suite + c
 2. `SetAppearance(MakeCharacterPacket)`: store `IsInvisible = p.Invisible != 0`; call
    `ApplyInvisibility()` as the **last** statement (after `SetVitals`).
 3. `SetAppearance(UpdateCharacterPacket)`: same two changes.
-4. `ApplyInvisibility()`:
+4. `ApplyInvisibility()` (public — the Task 5 SINVS handler calls it):
 
    ```csharp
    private bool _hiddenBeforeApply;
-   private void ApplyInvisibility()
+   public void ApplyInvisibility()
    {
-       var rule = InvisibilityRuleEvaluator.Evaluate(
+       var rule = InvisibilityRule.Evaluate(
            IsInvisible, GameManager.Instance?.CanSeeInvisible ?? false, IsLocalPlayer);
        bool hidden = rule == InvisibilityRule.Hidden;
        IsHiddenFromViewer = hidden;
@@ -277,10 +277,12 @@ No unit tests (node-level; repo tests are pure-logic only). Gate: full suite + c
 
 5. `SpellTargetManager`: add `public void OnCharacterBecameHidden(Character.Character c)` —
    if `c == _target`, set `_target = GameManager.Instance.CurrentMapManager?.LocalPlayer`
-   and `PositionReticle()` when non-null (mirror the remembered-target fallback in
-   `Cast`, `:65-71`).
+   and reposition only while actively targeting: `if (IsTargeting) PositionReticle();`
+   (unconditional reposition would instantiate a stray reticle in the world — it is only
+   freed by `ExitTargeting`).
 
-**Gate:** `dotnet test tests/Goose2Client.Tests` — all green, zero warnings.
+**Gate:** `dotnet test tests/Goose2Client.Tests` — all green, no *new* warnings (the
+baseline build already emits many pre-existing nullable warnings).
 **Commit:** `git commit -m "feat: character invisibility render state"`.
 
 ---
@@ -289,7 +291,7 @@ No unit tests (node-level; repo tests are pure-logic only). Gate: full suite + c
 
 **Files:**
 - Modify: `Scripts/GameManager.cs` (new `CanSeeInvisible` property near `:42`)
-- Modify: `Scripts/MapManager.cs` (listen `:75-91`, remove `:108-122`, handler, `AttachLocalPlayer` `:213`)
+- Modify: `Scripts/MapManager.cs` (listen `:71-90`, remove `:105-124`, handler, `AttachLocalPlayer` `:213`)
 
 No unit tests (node-level). Gate: full suite.
 
@@ -320,7 +322,9 @@ No unit tests (node-level). Gate: full suite.
    }
    ```
 
-   `ApplyInvisibility` must therefore be `public` (adjust Task 4 visibility).
+   Add a one-line wire-protocol comment (AGENTS.md-permitted): the per-map listener is
+   safe only because the server sends SINVS after map load — a pre-map SINVS would be
+   dropped.
 4. `AttachLocalPlayer`: after `c.IsLocalPlayer = true;`, call `c.ApplyInvisibility()` —
    the "self" exception applies retroactively (attach happens after the MKC's own
    `SetAppearance`, in both the MKC path `:138` and the SYC path `:159`).
@@ -333,7 +337,7 @@ No unit tests (node-level). Gate: full suite.
 ### Task 6: WorldTextBridge hides labels of hidden characters
 
 **Files:**
-- Modify: `Scripts/WorldTextBridge.cs` (`UpdateProjection`, `:96-119`)
+- Modify: `Scripts/WorldTextBridge.cs` (`UpdateProjection`, `:89-119`)
 
 No unit tests (node-level). Gate: full suite.
 
@@ -390,8 +394,9 @@ filter lives in the manager — unit proof deferred, see matrix). Gate: full sui
 1. `CycleTarget`: filter the candidate source —
    `mm.Characters.Where(c => !c.IsHiddenFromViewer)` before building
    `TargetCandidate`s (`:93`).
-2. `Cast` remembered-target validity block (`:65-68`): add
-   `|| _target.IsHiddenFromViewer` to the discard condition.
+2. `Cast` remembered-target validity block (`:64-70`): add
+   `|| _target.IsHiddenFromViewer` at the **end** of the `||` chain (after the null /
+   `IsInstanceValid` / `GetCharacter` checks), so a dead `_target` can't NRE.
 
 **Gate:** full suite green.
 **Commit:** `git commit -m "feat: spell targeting skips invisible-to-viewer characters"`.
