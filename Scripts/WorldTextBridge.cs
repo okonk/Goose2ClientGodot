@@ -98,6 +98,7 @@ namespace Goose2Client
                 // Post-transition overlap: for ~2 frames the NEW map is Current while OLD-map characters
                 // are still alive (queued free) — don't project them through the new map's canvas transform.
                 if (element.AnchorOwner.GetViewport() != _worldViewport.Current) { item.Visible = false; continue; }
+                if (element.AnchorOwner.IsHiddenFromViewer) { item.Visible = false; continue; }
                 var pos = _worldViewport.WorldToWindow(element.AnchorOwner.GlobalPosition)   // calls the shared forward transform (lockstep with WindowToWorld)
                     + element.LocalOffsetWorld * _worldScale;
                 // No Position on CanvasItem — branch on the concrete base (elements are always one or the other):
