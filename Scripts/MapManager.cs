@@ -88,6 +88,7 @@ public partial class MapManager : Node2D
         pm.Listen<SpellCharacterPacket>(OnSpellCharacter);
         pm.Listen<SpellTilePacket>(OnSpellTile);
         pm.Listen<CastPacket>(OnCast);
+        pm.Listen<SeeInvisiblePacket>(OnSeeInvisible);
         _listenersRegistered = true;
 
         GameManager.Instance.CurrentMapManager = this;
@@ -122,6 +123,7 @@ public partial class MapManager : Node2D
         pm.Remove<SpellCharacterPacket>(OnSpellCharacter);
         pm.Remove<SpellTilePacket>(OnSpellTile);
         pm.Remove<CastPacket>(OnCast);
+        pm.Remove<SeeInvisiblePacket>(OnSeeInvisible);
     }
 
     /// <summary>Bounds + blocked + occupancy check (Unity IsValidMove).</summary>
@@ -154,6 +156,13 @@ public partial class MapManager : Node2D
     {
         var p = (AdminModeActivatePacket)packetObj;
         GetCharacter(p.LoginId)?.SetGm(p.Enabled != 0);
+    }
+
+    private void OnSeeInvisible(object packetObj)
+    {
+        // Per-map listener is safe only because the server sends SINVS after map load — a pre-map SINVS would be dropped.
+        GameManager.Instance.CanSeeInvisible = ((SeeInvisiblePacket)packetObj).CanSee;
+        foreach (var c in _characters.Values) c.ApplyInvisibility();
     }
 
     private void OnSetYourCharacter(object packetObj)
@@ -214,6 +223,7 @@ public partial class MapManager : Node2D
     {
         _localPlayer = c;
         c.IsLocalPlayer = true;
+        c.ApplyInvisibility();
         CenterCameraOn(c.X, c.Y);
     }
 
