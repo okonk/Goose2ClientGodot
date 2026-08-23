@@ -85,6 +85,17 @@ public partial class SpellTargetManager : Node
             || (_pendingSpell.TargetType == SpellTargetType.Player && target.CharacterType != CharacterType.Player);
     }
     
+    public void OnCharacterBecameHidden(Character.Character c)
+    {
+        if (c != _target) return;
+        var mm = GameManager.Instance.CurrentMapManager;
+        if (mm == null) return;
+        _target = mm.LocalPlayer;
+        // PositionReticle() instantiates the reticle, which is only freed by ExitTargeting —
+        // reposition only while actively targeting or a stray reticle would sit in the world.
+        if (IsTargeting) PositionReticle();
+    }
+
     private void CycleTarget(bool searchDown)
     {
         var mm = GameManager.Instance.CurrentMapManager;

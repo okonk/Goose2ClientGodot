@@ -18,6 +18,9 @@ namespace Goose2Client.Character
         public bool IsMounted { get; private set; }
         public bool IsLocalPlayer { get; set; }
         public bool IsGM { get; private set; }
+        public bool IsInvisible { get; private set; }
+        public bool IsHiddenFromViewer { get; private set; }
+        private bool _hiddenBeforeApply;
         public float HPPercent { get; private set; } = 1f;
         public float MPPercent { get; private set; } = 1f;
         public CharacterType CharacterType { get; private set; }
@@ -190,9 +193,11 @@ namespace Goose2Client.Character
             RepositionOverlays();
 
             IsGM = p.IsGM;
+            IsInvisible = p.Invisible != 0;
             if (EnsureNameLabel()) { _nameLabel.Text = FullName; _nameLabel.Layout(this); }
             UpdateNameColor();
             SetVitals(p.HPPercent, 1f);
+            ApplyInvisibility();
         }
 
         /// <summary>Set GM state from an AMA (AdminModeActivate) packet and recolor the name.</summary>
@@ -216,6 +221,7 @@ namespace Goose2Client.Character
             if (p.MoveSpeed > 0) MoveSpeed = p.MoveSpeed;   // keep existing speed if CHP omits it
             BodyState = p.BodyState;
 
+            IsInvisible = p.Invisible != 0;
             ApplyAppearance(p.BodyId, p.BodyR, p.BodyG, p.BodyB, p.BodyA,
                             p.HairId, p.HairR, p.HairG, p.HairB, p.HairA,
                             p.FaceId, p.DisplayedEquipment);
@@ -223,6 +229,21 @@ namespace Goose2Client.Character
             ApplyDrawOrder();
             PlayState();
             RepositionOverlays();
+            ApplyInvisibility();
+        }
+
+        public void ApplyInvisibility()
+        {
+            var rule = InvisibilityRule.Evaluate(
+                IsInvisible, GameManager.Instance?.CanSeeInvisible ?? false, IsLocalPlayer);
+            bool hidden = rule == InvisibilityState.Hidden;
+            IsHiddenFromViewer = hidden;
+            Visible = !hidden;
+            float a = rule == InvisibilityState.Translucent ? 0.5f : 1f;
+            foreach (var s in _slots.Values) s.Sprite.Modulate = new Color(1f, 1f, 1f, a);
+            if (hidden && !_hiddenBeforeApply)
+                GameManager.Instance?.SpellTargetManager?.OnCharacterBecameHidden(this);
+            _hiddenBeforeApply = hidden;
         }
 
         private void ApplyAppearance(int bodyId, int bodyR, int bodyG, int bodyB, int bodyA,

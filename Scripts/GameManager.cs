@@ -41,6 +41,8 @@ namespace Goose2Client
         /// <summary>Whether the player is currently in spell-targeting mode.</summary>
         public bool IsTargeting => SpellTargetManager?.IsTargeting ?? false;
 
+        public bool CanSeeInvisible { get; set; }
+
         /// <summary>The active MapManager node, set/cleared by MapManager itself.</summary>
         public MapManager CurrentMapManager { get; set; }
 
