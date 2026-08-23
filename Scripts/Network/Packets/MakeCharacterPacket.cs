@@ -84,7 +84,7 @@ namespace Goose2Client.Network.Packets
                 // hair g
                 // hair b
                 // hair a
-                p.GetString(); // invisible
+                packet.Invisible = p.GetInt32();
                 // face id
                 packet.MoveSpeed = p.GetInt32();
                 packet.IsGM = p.GetBool();
