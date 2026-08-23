@@ -50,9 +50,10 @@ Let `H` = character is invisible to the viewer.
   `SetAppearance` overloads.
 - `public bool IsHiddenFromViewer { get; private set; }` — the evaluated "hidden" state;
   consulted by `WorldTextBridge` and `SpellTargetManager`.
-- `static InvisibilityRule Evaluate(bool isInvisible, bool canSeeInvisible, bool isLocalPlayer)`
-  — pure decision function returning `Normal / Translucent / Hidden`. Extracted for
-  headless unit testing:
+- `static InvisibilityState InvisibilityRule.Evaluate(bool isInvisible, bool canSeeInvisible, bool isLocalPlayer)`
+  — pure decision function returning `InvisibilityState` (`Normal / Translucent / Hidden`;
+  separate types because C# enums cannot contain methods). Extracted for headless unit
+  testing:
   - `Hidden` iff `isInvisible && !isLocalPlayer && !canSeeInvisible`
   - `Translucent` iff `isInvisible` (and not `Hidden`)
   - else `Normal`

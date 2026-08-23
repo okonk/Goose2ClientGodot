@@ -185,15 +185,15 @@ namespace Goose2Client.Tests;
 public class InvisibilityRuleTests
 {
     [Theory]
-    [InlineData(false, false, false, InvisibilityRule.Normal)]
-    [InlineData(false, false, true,  InvisibilityRule.Normal)]
-    [InlineData(false, true,  false, InvisibilityRule.Normal)]
-    [InlineData(false, true,  true,  InvisibilityRule.Normal)]
-    [InlineData(true,  false, false, InvisibilityRule.Hidden)]
-    [InlineData(true,  false, true,  InvisibilityRule.Translucent)]
-    [InlineData(true,  true,  false, InvisibilityRule.Translucent)]
-    [InlineData(true,  true,  true,  InvisibilityRule.Translucent)]
-    public void Evaluate_MatchesTruthTable(bool isInvisible, bool canSee, bool isLocal, InvisibilityRule expected)
+    [InlineData(false, false, false, InvisibilityState.Normal)]
+    [InlineData(false, false, true,  InvisibilityState.Normal)]
+    [InlineData(false, true,  false, InvisibilityState.Normal)]
+    [InlineData(false, true,  true,  InvisibilityState.Normal)]
+    [InlineData(true,  false, false, InvisibilityState.Hidden)]
+    [InlineData(true,  false, true,  InvisibilityState.Translucent)]
+    [InlineData(true,  true,  false, InvisibilityState.Translucent)]
+    [InlineData(true,  true,  true,  InvisibilityState.Translucent)]
+    public void Evaluate_MatchesTruthTable(bool isInvisible, bool canSee, bool isLocal, InvisibilityState expected)
         => Assert.Equal(expected, InvisibilityRule.Evaluate(isInvisible, canSee, isLocal));
 }
 ```
@@ -206,17 +206,19 @@ Expected: compile failure, type missing.
 ```csharp
 namespace Goose2Client.Character
 {
-    public enum InvisibilityRule
-    {
-        Normal, Translucent, Hidden,
+    public enum InvisibilityState { Normal, Translucent, Hidden }
 
-        public static InvisibilityRule Evaluate(bool isInvisible, bool canSeeInvisible, bool isLocalPlayer)
+    public static class InvisibilityRule
+    {
+        public static InvisibilityState Evaluate(bool isInvisible, bool canSeeInvisible, bool isLocalPlayer)
             => isInvisible
-                ? (isLocalPlayer || canSeeInvisible ? Translucent : Hidden)
-                : Normal;
+                ? (isLocalPlayer || canSeeInvisible ? InvisibilityState.Translucent : InvisibilityState.Hidden)
+                : InvisibilityState.Normal;
     }
 }
 ```
+
+(Enums cannot contain methods in C# — the state and the rule are separate types.)
 
 **Step 4: Green** — same command, 8 passed.
 
@@ -264,10 +266,10 @@ No unit tests (node-level; repo tests are pure-logic only). Gate: full suite + c
    {
        var rule = InvisibilityRule.Evaluate(
            IsInvisible, GameManager.Instance?.CanSeeInvisible ?? false, IsLocalPlayer);
-       bool hidden = rule == InvisibilityRule.Hidden;
+       bool hidden = rule == InvisibilityState.Hidden;
        IsHiddenFromViewer = hidden;
        Visible = !hidden;
-       float a = rule == InvisibilityRule.Translucent ? 0.5f : 1f;
+       float a = rule == InvisibilityState.Translucent ? 0.5f : 1f;
        foreach (var s in _slots.Values) s.Sprite.Modulate = new Color(1f, 1f, 1f, a);
        if (hidden && !_hiddenBeforeApply)
            GameManager.Instance?.SpellTargetManager?.OnCharacterBecameHidden(this);
