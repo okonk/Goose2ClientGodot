@@ -109,13 +109,13 @@ public partial class SpellbookWindow : BaseWindow, IWindow
 
     public void UseSpell(SpellInfo info)
     {
-        if (!CurrentMapFlags.Value.SpellsEnabled)
+        var lp = GameManager.Instance.CurrentMapManager?.LocalPlayer;
+        if (!CurrentMapFlags.Value.SpellsEnabled && lp?.IsGM != true)
         {
             GameManager.Instance.Hud?.Chat?.AddChatLine("You can't cast spells in this map.", ChatType.Server);
             return;
         }
 
-        var lp = GameManager.Instance.CurrentMapManager?.LocalPlayer;
         if (GameManager.Instance.IsTargeting || (lp != null && lp.IsMounted)) return;
 
         if (info.TargetType == SpellTargetType.None)
