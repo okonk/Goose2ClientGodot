@@ -130,7 +130,8 @@ namespace Goose2Client
         Monster = 2,
         Vendor = 10,
         Banker = 11,
-        Quest = 12
+        Quest = 12,
+        Pet = 13
     }
 
     public static class Options
