@@ -175,6 +175,12 @@ namespace Goose2Client.Network
 
         public void UseItem(int slot)
         {
+            if (!CurrentMapFlags.Value.ItemsEnabled)
+            {
+                GameManager.Instance.Hud?.Chat?.AddChatLine("You can't use items in this map.", ChatType.Server);
+                return;
+            }
+
             Send($"USE{slot + 1}");
         }
 
