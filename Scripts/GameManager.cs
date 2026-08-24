@@ -135,6 +135,7 @@ namespace Goose2Client
             // SendCurrentMapPacket drives warp / door / death-recall map transitions
             // that arrive after login — login scene is freed and would drop them.
             PacketManager.Listen<SendCurrentMapPacket>(OnSendCurrentMap);
+            PacketManager.Listen<MapFlagsPacket>(OnMapFlags);
 
             // Nothing else observes a dropped connection after login; without this it
             // is invisible (the game just sits frozen on a dead socket).
@@ -325,6 +326,12 @@ namespace Goose2Client
             ChangeMap(p.MapFileName, p.MapName);
         }
 
+        private void OnMapFlags(object packetObj)
+        {
+            var p = (MapFlagsPacket)packetObj;
+            CurrentMapFlags.Value = new MapFlags(p.PvPEnabled, p.ItemsEnabled, p.SpellsEnabled);
+        }
+
         private void OnClassUpdate(object packetObj)
         {
             var packet = (ClassUpdatePacket)packetObj;
@@ -421,6 +428,7 @@ namespace Goose2Client
             PacketManager.Remove<ClassUpdatePacket>(OnClassUpdate);
             PacketManager.Remove<PingPacket>(OnPing);
             PacketManager.Remove<SendCurrentMapPacket>(OnSendCurrentMap);
+            PacketManager.Remove<MapFlagsPacket>(OnMapFlags);
             NetworkClient.Disconnected -= OnDisconnected;
             NetworkClient.SocketError -= OnSocketError;
             NetworkClient?.Disconnect();

@@ -82,8 +82,11 @@ public partial class SpellTargetManager : Node
     {
         var filteringEnabled = GameManager.Instance.CharacterSettings.GetOption<bool>(Options.TargetFiltering, true);
         if (!filteringEnabled) return false;
-        return (_pendingSpell.TargetType != SpellTargetType.Player && target.CharacterType == CharacterType.Player)
-            || (_pendingSpell.TargetType == SpellTargetType.Player && target.CharacterType != CharacterType.Player);
+        var playerSide = target.CharacterType is CharacterType.Player or CharacterType.Pet;
+        if (_pendingSpell.TargetType == SpellTargetType.Player) return !playerSide;
+        if (_pendingSpell.TargetType == SpellTargetType.NPC) return playerSide;
+        if (_pendingSpell.TargetType == SpellTargetType.NPCPlayer) return playerSide && !CurrentMapFlags.Value.PvPEnabled;
+        return false;
     }
     
     public void OnCharacterBecameHidden(Character.Character c)

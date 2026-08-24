@@ -16,13 +16,15 @@ namespace Goose2Client
         {
             var filtered = all.ToList();
             
-            // Filter by target type (skip filter for NPCPlayer which accepts everything)
-            if (filteringEnabled && type != SpellTargetType.NPCPlayer)
+            if (filteringEnabled)
             {
+                var pvpEnabled = CurrentMapFlags.Value.PvPEnabled;
                 filtered = filtered.Where(c =>
                 {
-                    if (type == SpellTargetType.Player) return c.Type == CharacterType.Player;
-                    if (type == SpellTargetType.NPC) return c.Type != CharacterType.Player;
+                    var playerSide = c.Type is CharacterType.Player or CharacterType.Pet;
+                    if (type == SpellTargetType.Player) return playerSide;
+                    if (type == SpellTargetType.NPC) return !playerSide;
+                    if (type == SpellTargetType.NPCPlayer) return !playerSide || pvpEnabled;
                     return true;
                 }).ToList();
             }
