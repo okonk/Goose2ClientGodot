@@ -124,6 +124,13 @@ public partial class CharacterWindow : BaseWindow, IWindow
 
     public void UseItem(ItemStats stats)
     {
+        if (!CurrentMapFlags.Value.ItemsEnabled &&
+            stats.UseType is ItemUseType.OneTime or ItemUseType.Scroll)
+        {
+            GameManager.Instance.Hud?.Chat?.AddChatLine("You can't use items in this map.", ChatType.Server);
+            return;
+        }
+
         GameManager.Instance.NetworkClient.UseItem(stats.SlotNumber);
     }
 
