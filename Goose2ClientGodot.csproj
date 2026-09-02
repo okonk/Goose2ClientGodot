@@ -8,6 +8,7 @@
 
   <ItemGroup>
     <Compile Remove="tools/**" />
+    <Compile Remove="src/**" />
     <Compile Remove=".godot/**" />
     <Compile Remove="tests/**" />
   </ItemGroup>
