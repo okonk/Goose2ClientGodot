@@ -14,6 +14,7 @@ public sealed class SpriteAssetCache : IDisposable
 
     public string AssetDirectory { get; }
     public SpriteManifest Manifest { get; }
+    public bool IsDisposed => _disposed;
 
     public SpriteAssetCache(string assetDirectory, SpriteManifest manifest, ISpriteSheetLoader loader)
     {

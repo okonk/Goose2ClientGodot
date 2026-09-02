@@ -1,0 +1,12 @@
+namespace MapEditor.Rendering;
+
+public interface IMapDrawSink
+{
+    void DrawSprite(in SpriteDrawOperation operation);
+
+    void DrawPlaceholder(in PlaceholderDrawOperation operation);
+
+    void DrawCellOverlay(in CellOverlayDrawOperation operation);
+
+    void DrawGridLine(in GridLineDrawOperation operation);
+}
