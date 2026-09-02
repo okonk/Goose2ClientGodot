@@ -7,6 +7,8 @@
     <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
     <PublishTrimmed>false</PublishTrimmed>
     <UseAppHost>true</UseAppHost>
+    <!-- Dialog windows are always constructed in code with parameterized constructors. -->
+    <NoWarn>$(NoWarn);AVLN3001</NoWarn>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Avalonia.Desktop" Version="11.3.20" />
