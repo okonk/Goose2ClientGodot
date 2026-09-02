@@ -4,32 +4,76 @@ namespace MapEditor.Core;
 
 internal sealed class MapEditHistory
 {
-    private readonly List<MapEditCommand> _undo = new();
-    private readonly List<MapEditCommand> _redo = new();
+    private readonly LinkedList<MapEditCommand> _undo = new();
+    private readonly LinkedList<MapEditCommand> _redo = new();
+    private long _capBytes;
+    private long _usedBytes;
+
+    internal MapEditHistory(long capBytes)
+    {
+        _capBytes = capBytes;
+    }
 
     internal int UndoCount => _undo.Count;
 
     internal int RedoCount => _redo.Count;
 
-    internal MapEditCommand? PeekUndo() => _undo.Count > 0 ? _undo[^1] : null;
+    internal long CapBytes => _capBytes;
 
-    internal MapEditCommand? PeekRedo() => _redo.Count > 0 ? _redo[^1] : null;
+    internal long UsedBytes => _usedBytes;
+
+    internal MapEditCommand? PeekUndo() => _undo.Last?.Value;
+
+    internal MapEditCommand? PeekRedo() => _redo.First?.Value;
 
     internal void PushUndo(MapEditCommand command)
     {
-        _undo.Add(command);
+        foreach (MapEditCommand discarded in _redo)
+        {
+            _usedBytes -= discarded.AccountedSizeBytes;
+        }
+
         _redo.Clear();
+        _undo.AddLast(command);
+        _usedBytes += command.AccountedSizeBytes;
+        EvictToCap();
     }
 
     internal void MoveUndoToRedo(MapEditCommand command)
     {
-        _undo.RemoveAt(_undo.Count - 1);
-        _redo.Add(command);
+        _undo.RemoveLast();
+        _redo.AddFirst(command);
     }
 
     internal void MoveRedoToUndo(MapEditCommand command)
     {
-        _redo.RemoveAt(_redo.Count - 1);
-        _undo.Add(command);
+        _redo.RemoveFirst();
+        _undo.AddLast(command);
+    }
+
+    internal void SetCap(long capBytes)
+    {
+        _capBytes = capBytes;
+        EvictToCap();
+    }
+
+    private void EvictToCap()
+    {
+        while (_usedBytes > _capBytes)
+        {
+            MapEditCommand? evicted = null;
+            if (_undo.Count > 0)
+            {
+                evicted = _undo.First!.Value;
+                _undo.RemoveFirst();
+            }
+            else
+            {
+                evicted = _redo.Last!.Value;
+                _redo.RemoveLast();
+            }
+
+            _usedBytes -= evicted!.AccountedSizeBytes;
+        }
     }
 }

@@ -4,8 +4,10 @@ namespace MapEditor.Core;
 
 public sealed class MapEditSession
 {
+    public const long DefaultRetainedHistoryCapBytes = 64 * 1024 * 1024;
+
     private readonly MapDocument _document;
-    private readonly MapEditHistory _history = new();
+    private readonly MapEditHistory _history;
     private MapEditStroke? _stroke;
     private int _activeLayer;
     private MapTileLayer _selectedTileLayer;
@@ -13,13 +15,23 @@ public sealed class MapEditSession
     private int? _savedStateId;
     private int _nextStateId = 1;
 
-    public MapEditSession(MapDocument document, bool initiallyDirty = false)
+    public MapEditSession(MapDocument document, bool initiallyDirty = false, long retainedHistoryCapBytes = DefaultRetainedHistoryCapBytes)
     {
+        if (retainedHistoryCapBytes < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(retainedHistoryCapBytes));
+        }
+
         _document = document ?? throw new ArgumentNullException(nameof(document));
         _savedStateId = initiallyDirty ? null : 0;
+        _history = new MapEditHistory(retainedHistoryCapBytes);
     }
 
     public MapDocument Document => _document;
+
+    public long RetainedHistoryCapBytes => _history.CapBytes;
+
+    public long RetainedHistoryUsedBytes => _history.UsedBytes;
 
     public int ActiveLayer
     {
@@ -113,8 +125,8 @@ public sealed class MapEditSession
         MapEditCommand command = stroke.LayerChanges is { } layerChanges
             ? MapEditCommand.ForLayerChanges(layerChanges, beforeStateId, afterStateId)
             : MapEditCommand.ForFlagsChanges(stroke.FlagsChanges!, beforeStateId, afterStateId);
-        _history.PushUndo(command);
         _currentStateId = afterStateId;
+        _history.PushUndo(command);
         stroke.Release();
         return true;
     }
@@ -186,6 +198,21 @@ public sealed class MapEditSession
         }
 
         _savedStateId = _currentStateId;
+    }
+
+    public void SetRetainedHistoryCap(long bytes)
+    {
+        if (bytes < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(bytes));
+        }
+
+        if (_stroke != null)
+        {
+            throw new InvalidOperationException();
+        }
+
+        _history.SetCap(bytes);
     }
 
     internal MapEditHistory History => _history;
