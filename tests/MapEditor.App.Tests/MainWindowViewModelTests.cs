@@ -299,6 +299,26 @@ public class MainWindowViewModelTests : IDisposable
     }
 
     [Fact]
+    public async Task New_ReplacesDocument_RaisesBrushAndActiveLayerWithSessionResetValues()
+    {
+        _viewModel.ActiveLayer = 2;
+        _viewModel.Brush = new MapTileLayer(9, 9);
+
+        _dialogs.NewMapResult = new NewMapRequest(10, 10);
+        _dialogs.DirtyResult = DirtyChoice.Discard;
+
+        var raised = new List<string>();
+        _viewModel.PropertyChanged += (sender, e) => raised.Add(e.PropertyName ?? string.Empty);
+
+        await _viewModel.NewAsync();
+
+        Assert.Contains(nameof(MainWindowViewModel.ActiveLayer), raised);
+        Assert.Contains(nameof(MainWindowViewModel.Brush), raised);
+        Assert.Equal(0, _viewModel.ActiveLayer);
+        Assert.Equal(new MapTileLayer(0, 0), _viewModel.Brush);
+    }
+
+    [Fact]
     public async Task Open_UpdatesTitleDimensionsAndCommands()
     {
         string path = MapPath("opened.bytes");

@@ -31,89 +31,136 @@ internal sealed class EditorDocumentController
 
     public async Task NewAsync()
     {
-        NewMapRequest? request = await _dialogs.ShowNewMapAsync();
-        if (request is null ||
-            request.Width < MapDocument.MinDimension || request.Width > MapDocument.MaxDimension ||
-            request.Height < MapDocument.MinDimension || request.Height > MapDocument.MaxDimension)
+        try
         {
-            return;
-        }
+            NewMapRequest? request = await _dialogs.ShowNewMapAsync();
+            if (request is null ||
+                request.Width < MapDocument.MinDimension || request.Width > MapDocument.MaxDimension ||
+                request.Height < MapDocument.MinDimension || request.Height > MapDocument.MaxDimension)
+            {
+                return;
+            }
 
-        if (!await ResolveDirtyAsync())
+            if (!await ResolveDirtyAsync())
+            {
+                return;
+            }
+
+            var session = new MapEditSession(MapDocument.Create(request.Width, request.Height), initiallyDirty: true);
+            _current = new EditorDocument(session, null, null);
+            NotifyStateChanged();
+        }
+        catch (OutOfMemoryException)
         {
-            return;
+            throw;
         }
-
-        var session = new MapEditSession(MapDocument.Create(request.Width, request.Height), initiallyDirty: true);
-        _current = new EditorDocument(session, null, null);
-        NotifyStateChanged();
+        catch (Exception ex)
+        {
+            await _dialogs.ShowErrorAsync(new ErrorPresentation("New map", ex.Message));
+        }
     }
 
     public async Task OpenAsync()
     {
-        string? picked = await _dialogs.PickOpenMapAsync();
-        if (picked is null)
-        {
-            return;
-        }
-
-        if (!await ResolveDirtyAsync())
-        {
-            return;
-        }
-
-        OpenedMap opened;
+        string? picked = null;
         try
         {
-            opened = _store.Open(picked);
-        }
-        catch (MapFormatException ex)
-        {
-            await _dialogs.ShowErrorAsync(new ErrorPresentation("Open map", $"{picked}: {DescribeFormatError(ex.Error)}."));
-            return;
-        }
-        catch (MapValidationException ex)
-        {
-            await _dialogs.ShowErrorAsync(new ErrorPresentation("Open map", $"{picked}: {ex.Message}"));
-            return;
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or PathTooLongException)
-        {
-            await _dialogs.ShowErrorAsync(new ErrorPresentation("Open map", $"{picked}: {ex.Message}"));
-            return;
-        }
+            picked = await _dialogs.PickOpenMapAsync();
+            if (picked is null)
+            {
+                return;
+            }
 
-        var session = new MapEditSession(opened.Document, initiallyDirty: false);
-        _current = new EditorDocument(session, Path.GetFullPath(picked), opened.Revision);
-        NotifyStateChanged();
+            if (!await ResolveDirtyAsync())
+            {
+                return;
+            }
+
+            OpenedMap opened;
+            try
+            {
+                opened = _store.Open(picked);
+            }
+            catch (MapFormatException ex)
+            {
+                await _dialogs.ShowErrorAsync(new ErrorPresentation("Open map", $"{picked}: {DescribeFormatError(ex.Error)}."));
+                return;
+            }
+            catch (MapValidationException ex)
+            {
+                await _dialogs.ShowErrorAsync(new ErrorPresentation("Open map", $"{picked}: {ex.Message}"));
+                return;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or PathTooLongException)
+            {
+                await _dialogs.ShowErrorAsync(new ErrorPresentation("Open map", $"{picked}: {ex.Message}"));
+                return;
+            }
+
+            var session = new MapEditSession(opened.Document, initiallyDirty: false);
+            _current = new EditorDocument(session, Path.GetFullPath(picked), opened.Revision);
+            NotifyStateChanged();
+        }
+        catch (OutOfMemoryException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            await _dialogs.ShowErrorAsync(new ErrorPresentation("Open map", picked is { } path ? $"{path}: {ex.Message}" : ex.Message));
+        }
     }
 
     public async Task SaveAsync()
     {
-        if (_current.Path is not { } path)
+        try
         {
-            await SaveAsAsync();
-            return;
-        }
+            if (_current.Path is not { } path)
+            {
+                await SaveAsAsync();
+                return;
+            }
 
-        await SaveCoreAsync(path, _current.Revision);
+            await SaveCoreAsync(path, _current.Revision);
+        }
+        catch (OutOfMemoryException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            string? path = _current.Path;
+            await _dialogs.ShowErrorAsync(new ErrorPresentation("Save map", path is { } known ? $"{known}: {ex.Message}" : ex.Message));
+        }
     }
 
     public async Task SaveAsAsync()
     {
-        string suggested = _current.Path is { } path ? Path.GetFileName(path) : "Untitled";
-        string? picked = await _dialogs.PickSaveMapAsync(suggested);
-        if (picked is null)
+        string? destination = null;
+        try
         {
-            return;
-        }
+            string suggested = _current.Path is { } path ? Path.GetFileName(path) : "Untitled";
+            string? picked = await _dialogs.PickSaveMapAsync(suggested);
+            if (picked is null)
+            {
+                return;
+            }
 
-        string destination = Path.GetFullPath(picked);
-        // Re-selecting the current path must keep the external-change guard active.
-        MapFileRevision? expected = string.Equals(destination, _current.Path, PathComparison)
-            ? _current.Revision
-            : null;
-        await SaveCoreAsync(destination, expected);
+            destination = Path.GetFullPath(picked);
+            // Re-selecting the current path must keep the external-change guard active.
+            MapFileRevision? expected = string.Equals(destination, _current.Path, PathComparison)
+                ? _current.Revision
+                : null;
+            await SaveCoreAsync(destination, expected);
+        }
+        catch (OutOfMemoryException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            await _dialogs.ShowErrorAsync(new ErrorPresentation("Save map", destination is { } path ? $"{path}: {ex.Message}" : ex.Message));
+        }
     }
 
     public bool Undo()

@@ -590,4 +590,74 @@ public class EditorDocumentControllerTests : IDisposable
         _dialogs.DirtyResult = DirtyChoice.Discard;
         Assert.True(await _controller.RequestCloseAsync());
     }
+
+    [Fact]
+    public async Task New_DialogFailure_PresentsLastResortErrorAndKeepsDocument()
+    {
+        EditorDocument before = _controller.Document;
+        _dialogs.ShowNewMapException = new InvalidOperationException("dialog failed");
+
+        await _controller.NewAsync();
+
+        Assert.Same(before, _controller.Document);
+        Assert.True(before.Session.IsDirty);
+        Assert.Null(before.Path);
+        Assert.Null(before.Revision);
+        ErrorPresentation error = Assert.Single(_dialogs.Errors);
+        Assert.Equal("New map", error.Title);
+        Assert.Contains("dialog failed", error.Message);
+    }
+
+    [Fact]
+    public async Task New_DirtyAndDirtyDialogFailure_PresentsLastResortErrorAndKeepsDocument()
+    {
+        EditorDocument before = _controller.Document;
+        _dialogs.NewMapResult = new NewMapRequest(10, 10);
+        _dialogs.ShowDirtyException = new InvalidOperationException("dialog failed");
+
+        await _controller.NewAsync();
+
+        Assert.Same(before, _controller.Document);
+        Assert.True(before.Session.IsDirty);
+        Assert.Null(before.Path);
+        Assert.Null(before.Revision);
+        Assert.Equal(1, _dialogs.DirtyShown);
+        ErrorPresentation error = Assert.Single(_dialogs.Errors);
+        Assert.Equal("New map", error.Title);
+        Assert.Contains("dialog failed", error.Message);
+    }
+
+    [Fact]
+    public async Task Open_DialogFailure_PresentsLastResortErrorAndKeepsDocument()
+    {
+        EditorDocument before = _controller.Document;
+        _dialogs.PickOpenException = new InvalidOperationException("dialog failed");
+
+        await _controller.OpenAsync();
+
+        Assert.Same(before, _controller.Document);
+        Assert.True(before.Session.IsDirty);
+        Assert.Null(before.Path);
+        Assert.Null(before.Revision);
+        ErrorPresentation error = Assert.Single(_dialogs.Errors);
+        Assert.Equal("Open map", error.Title);
+        Assert.Contains("dialog failed", error.Message);
+    }
+
+    [Fact]
+    public async Task SaveAs_DialogFailure_PresentsLastResortErrorAndKeepsDocument()
+    {
+        EditorDocument before = _controller.Document;
+        _dialogs.PickSaveException = new InvalidOperationException("dialog failed");
+
+        await _controller.SaveAsAsync();
+
+        Assert.Same(before, _controller.Document);
+        Assert.True(before.Session.IsDirty);
+        Assert.Null(before.Path);
+        Assert.Null(before.Revision);
+        ErrorPresentation error = Assert.Single(_dialogs.Errors);
+        Assert.Equal("Save map", error.Title);
+        Assert.Contains("dialog failed", error.Message);
+    }
 }

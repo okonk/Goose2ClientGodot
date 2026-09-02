@@ -272,6 +272,7 @@ internal sealed class MainWindowViewModel : ViewModelBase
                 SelectedX = null;
                 SelectedY = null;
                 OnPropertyChanged(nameof(ActiveLayer));
+                OnPropertyChanged(nameof(Brush));
             }
         }
 
