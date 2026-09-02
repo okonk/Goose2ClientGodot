@@ -4,6 +4,7 @@ using Goose2Client.Map;
 using Goose2Client.Network;
 using Goose2Client.Network.Packets;
 using Goose2Client.UI;
+using MapEditor.Core;
 
 namespace Goose2Client
 {
@@ -27,7 +28,7 @@ namespace Goose2Client
         public Dictionary<int, string> Classes { get; } = new();
 
         /// <summary>The parsed map for the scene currently being entered. Set in ChangeMap, read by MapManager._Ready.</summary>
-        public MapFile CurrentMap { get; set; }
+        public MapDocument CurrentMap { get; set; }
 
         /// <summary>Shared UI/icon sprite cache used by HUD windows.</summary>
         public SpriteCache Sprites { get; private set; }
@@ -215,8 +216,9 @@ namespace Goose2Client
                 await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
                 loading.SetMapName(mapName);
 
-                CurrentMap = LoadMap(mapFile);
-                if (CurrentMap == null) return;
+                var nextMap = LoadMap(mapFile);
+                if (nextMap == null) return;
+                CurrentMap = nextMap;
                 // finally: frees loading, unpauses; old world stays live, no DoneLoadingMap sent
 
                 // The Map scene IS its own SubViewport; attaching it to WorldViewport puts it in
@@ -348,7 +350,7 @@ namespace Goose2Client
             }
         }
 
-        private MapFile LoadMap(string mapFile)
+        private MapDocument LoadMap(string mapFile)
         {
             // The server's MapFileName carries the original ".map" extension (e.g. "Map2.map");
             // the converter emits "{basename}.bytes" (e.g. "Map2.bytes"). Normalize to the basename.
@@ -360,7 +362,15 @@ namespace Goose2Client
                 GD.PushError($"LoadMap: cannot open {path} (err {Godot.FileAccess.GetOpenError()})");
                 return null;
             }
-            return new MapFile(f.GetBuffer((long)f.GetLength()));
+            try
+            {
+                return MapCodec.Decode(f.GetBuffer((long)f.GetLength()));
+            }
+            catch (MapFormatException e)
+            {
+                GD.PushError($"LoadMap: malformed map {path} ({e.Error}): {e.Message}");
+                return null;
+            }
         }
 
         /// <summary>Quit the game (used by Toolbar Exit button).</summary>

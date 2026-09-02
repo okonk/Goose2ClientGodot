@@ -12,4 +12,8 @@
     <Compile Remove=".godot/**" />
     <Compile Remove="tests/**" />
   </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="src/MapEditor.Core/MapEditor.Core.csproj" />
+  </ItemGroup>
 </Project>

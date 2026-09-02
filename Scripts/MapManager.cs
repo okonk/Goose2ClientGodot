@@ -1,6 +1,7 @@
 using Godot;
 using Goose2Client.Map;
 using Goose2Client.Network.Packets;
+using MapEditor.Core;
 
 namespace Goose2Client;
 
@@ -9,7 +10,7 @@ namespace Goose2Client;
 /// runs the Camera2D, and handles TileUpdate / MapObject / EraseObject / SetYourPosition.</summary>
 public partial class MapManager : Node2D
 {
-    private MapFile _map;
+    private MapDocument _map;
     private SpriteCache _cache;
     private MapTileCatalog _tileCatalog;
     private readonly MapLayer[] _layers = new MapLayer[5];   // TileMapLayer bands; [2] is null (see _objectLayer)
@@ -324,21 +325,11 @@ public partial class MapManager : Node2D
         var p = (TileUpdatePacket)packetObj;
         if (p.X < 0 || p.Y < 0 || p.X >= _map.Width || p.Y >= _map.Height) return;
 
-        var tile = _map[p.X, p.Y];
-        tile.Flags = p.Flags;
-
-        for (int layer = 0; layer < 5; layer++)
+        MapTileUpdate.Apply(_map, p.X, p.Y, p.Flags, p.Tiles, layer =>
         {
-            int graphic = p.Tiles[layer * 2];
-            int sheet   = p.Tiles[layer * 2 + 1];
-            var l = tile.Layers[layer];
-            if (l.Graphic == graphic && l.Sheet == sheet) continue;   // unchanged
-
-            l.Graphic = sheet == 0 ? 0 : graphic;                      // sheet 0 ⇒ empty cell
-            l.Sheet   = sheet;
             if (layer == 2) _objectLayer.RefreshCell(p.X, p.Y);        // Y-sorted layer: rebuild the cell
             else _layers[layer].RefreshCell(p.X, p.Y);                 // TileMapLayer: update one cell
-        }
+        });
     }
 
     private int ItemKey(int x, int y) => y * _map.Height + x;
