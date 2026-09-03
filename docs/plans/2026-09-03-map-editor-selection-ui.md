@@ -41,7 +41,7 @@
   - mask is never 0 and never has bits ≥ `LayerCount`
   - `TopLayer` is always the highest set bit and is always within the mask
   - a stroke applies to `TopLayer` even when multiple layers are selected
-- Observable proof required: adversarial test asserting a pencil stroke with a multi-layer selection writes only to the topmost layer and leaves lower selected layers untouched.
+- Observable proof required: adversarial test asserting a pencil stroke with a multi-layer selection writes only to the topmost layer and leaves lower selected layers untouched; and that the eyedropper samples the topmost layer of a multi-selection (design-doc test list).
 
 **Step 1: Write the failing tests**
 
@@ -91,9 +91,23 @@ public void Pencil_WithMultiLayerSelection_EditsOnlyTopmostLayer()
     Assert.Equal(new MapTileLayer(7, 42), session.Document[0, 0].GetLayer(3));
     Assert.Equal(new MapTileLayer(0, 0), session.Document[0, 0].GetLayer(0));
 }
+
+[Fact]
+public void Eyedropper_WithMultiLayerSelection_SamplesTopmostLayer()
+{
+    var session = CreateSession();
+    session.Document.SetLayer(0, 0, 0, new MapTileLayer(1, 1));
+    session.Document.SetLayer(0, 0, 3, new MapTileLayer(2, 2));
+    session.SelectedLayers = 0b01001; // layers 0 and 3
+
+    session.BeginStroke(MapEditTool.Eyedropper, 0, 0);
+    session.CompleteStroke();
+
+    Assert.Equal(new MapTileLayer(2, 2), session.SelectedTileLayer);
+}
 ```
 
-Add a `CreateSession(int width, int height) => new MapEditSession(MapDocument.Create(width, height));` helper to the test file (no such helper exists — existing tests build sessions inline, e.g. `:13, :45`) and use it in the new tests. Match the existing test style — no comments.
+Add a `CreateSession(int width = 4, int height = 4) => new MapEditSession(MapDocument.Create(width, height));` helper to the test file (no such helper exists — existing tests build sessions inline, e.g. `:13, :45`) and use it in the new tests. Match the existing test style — no comments.
 
 **Step 2: Run tests to verify they fail (red)**
 
@@ -138,7 +152,7 @@ public int TopLayer
 }
 ```
 
-Update `BeginStroke` (`:80`; stroke construction at `:89`) to use `TopLayer` instead of `_activeLayer`, and the eyedropper branch (`:92`) likewise. Remove `_activeLayer`. Widen `ValidateTool` (`:266`, static) upper bound to `MapEditTool.FloodFill` is NOT done here — Part 2 does that; leave the bound at `BlockedToggle` in this task.
+Update `BeginStroke` (`:80`; stroke construction at `:89`) to use `TopLayer` instead of `_activeLayer`, and the eyedropper branch (`:92`) likewise. Remove `_activeLayer`. Leave `ValidateTool` (`:266`, static) at its current bound (`BlockedToggle`) — it guards `BeginStroke`, which must keep rejecting the non-stroking tools that Part 2 adds to the enum.
 
 Update `tests/MapEditor.Rendering.Tests/MapRendererTests.cs:289`: `session.ActiveLayer = 2;` → `session.SelectedLayers = 1 << 2;`.
 
@@ -256,17 +270,14 @@ public byte LayerVisibility
 
 In `MapCanvas.BuildRenderRequest` (`:344`): replace the five `if` blocks with `byte mask = _viewModel.LayerVisibility;` and pass `new MapLayerVisibility(mask)`.
 
-**Step 4: Run tests to verify they pass (green)**
+**Step 4: Verify (partial green)**
 
-Run: `dotnet test tests/MapEditor.App.Tests -v q --nologo`
-Expected: all pass (baseline 199).
+`MapEditor.App` intentionally does not compile yet: the code-behind (`MainWindow.axaml.cs:233,406,434-438`) and XAML (`MainWindow.axaml:72-76`) still reference the removed `ActiveLayer`/`LayerNVisible` properties until Task 3 migrates them. Tasks 2 and 3 are one compilation unit. Verify the projects that do compile:
 
-**Step 5: Commit**
+Run: `dotnet test tests/MapEditor.Core.Tests -v q --nologo && dotnet test tests/MapEditor.Rendering.Tests -v q --nologo`
+Expected: green. **Do not commit** — Task 3 commits both tasks together.
 
-```bash
-git add src/MapEditor.App/ViewModels/MainWindowViewModel.cs src/MapEditor.App/Controls/MapCanvas.cs tests/MapEditor.App.Tests/MainWindowViewModelTests.cs tests/MapEditor.App.Tests/MapCanvasTests.cs tests/MapEditor.App.Tests/MainWindowTests.cs
-git commit -m "feat: layer selection and visibility mask in editor view model"
-```
+**Step 5: (no commit — see Task 3 Step 5)**
 
 **Invariant-to-test matrix:**
 
@@ -343,6 +354,7 @@ public void Layout_ContainsNamedLayerListAndViewToggles()
     {
         Assert.NotNull(Find<Border>($"Layer{layer}Row"));
         Assert.True(Find<CheckBox>($"Layer{layer}VisibleCheck").IsChecked == true);
+        Assert.Equal($"{layer} — {names[layer]}", Find<TextBlock>($"Layer{layer}Label").Text);
     }
 
     Assert.Equal((byte)1, ViewModel.SelectedLayers);
@@ -355,7 +367,7 @@ public void Layout_ContainsNamedLayerListAndViewToggles()
     Point row1 = Find<Border>("Layer1Row").TranslatePoint(new Point(10, 5), Window).Value;
     Window.MouseDown(row1, MouseButton.Left, RawInputModifiers.None);
     Window.MouseUp(row1, MouseButton.Left, RawInputModifiers.None);
-    Assert.Equal((byte)0b00100, ViewModel.SelectedLayers);
+    Assert.Equal((byte)0b00010, ViewModel.SelectedLayers);
 
     Find<CheckBox>("Layer2VisibleCheck").IsChecked = false;
     Assert.Equal((byte)0b11011, ViewModel.LayerVisibility);
@@ -374,6 +386,8 @@ public void Layout_ContainsNamedLayerListAndViewToggles()
 - `CommandEnablement_FollowsSessionState` (`:281`): drop `undoButton`/`saveButton` references; assert menu-item `IsEnabled` only.
 - `NewSmallerMap_WithOutOfRangeSelection_ClearsSelectionWithoutError` (`:333`): `Find<Button>("NewButton").RaiseEvent(...)` → `Find<MenuItem>("NewCommand").RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent))`.
 - `OpenCommand_UnexpectedExceptionAtWindowBoundary_ShowsLastErrorDialogAndKeepsDocument` (`:364`): same swap to `OpenCommand`.
+- Selection readout test (`:240`): `ViewModel.ActiveLayer = 2;` → `ViewModel.SelectedLayers = 1 << 2;` (update the readout assertions accordingly).
+- `MainWindowTests` declares `Dispose()` (`:97`) without implementing `IDisposable` (`:75`), so xUnit never calls it — add `: IDisposable` to the class declaration.
 
 **Step 2: Run tests to verify they fail (red)**
 
@@ -382,25 +396,32 @@ Expected: compile failure (`LayerSelection` missing) + layout test failures (rad
 
 **Step 3: Implement**
 
-`src/MapEditor.App/Views/LayerSelection.cs` (new, pure logic, no Avalonia dependencies):
+`src/MapEditor.App/LayerSelection.cs` (new, pure logic, no Avalonia dependencies; namespace `MapEditor.App` — the `MainWindow` code-behind is in `MapEditor.App` with no `using MapEditor.App.Views;`, and the test file already imports `MapEditor.App`):
 
 ```csharp
 using System;
 
-namespace MapEditor.App.Views;
+namespace MapEditor.App;
 
 internal static class LayerSelection
 {
-    public static byte Plain(int layer) => (byte)(1 << layer);
+    public static byte Plain(int layer)
+    {
+        Validate(layer);
+        return (byte)(1 << layer);
+    }
 
     public static byte Toggle(byte current, int layer, bool keepNonEmpty = false)
     {
+        Validate(layer);
         byte next = (byte)(current ^ (1 << layer));
         return keepNonEmpty && next == 0 ? (byte)(1 << layer) : next;
     }
 
     public static byte Range(int anchor, int layer)
     {
+        Validate(anchor);
+        Validate(layer);
         int lo = Math.Min(anchor, layer);
         int hi = Math.Max(anchor, layer);
         byte next = 0;
@@ -410,6 +431,14 @@ internal static class LayerSelection
         }
 
         return next;
+    }
+
+    private static void Validate(int layer)
+    {
+        if (layer < 0 || layer >= MapDocument.LayerCount)
+        {
+            throw new ArgumentOutOfRangeException(nameof(layer));
+        }
     }
 }
 ```
@@ -426,19 +455,19 @@ internal static class LayerSelection
 
 (`Mode=TwoWay` is required — probe-verified that the default OneWay binding never writes menu clicks back to the view model.)
 
-- Toolbar: remove `NewButton`, `OpenButton`, `SaveButton`, `UndoButton`, `RedoButton`, `ZoomInButton`, `ZoomOutButton`. Keep the four tool toggles unchanged.
+- Toolbar: remove `NewButton`, `OpenButton`, `SaveButton`, `UndoButton`, `RedoButton`, `ZoomInButton`, `ZoomOutButton`. Keep the four tool toggles, adding `Unchecked="OnToolUnchecked"` to each (clicking the active tool's toggle can otherwise uncheck it and leave every toggle unchecked while `ActiveTool` is unchanged).
 - Right panel: replace the "Active layer" radio group, the "Visibility" checkbox group, `ShowGridCheck`, and `ShowBlockedCheck` with:
 
 ```xml
 <TextBlock Text="Layers" FontWeight="SemiBold" />
 <Border x:Name="Layer0Row" Tag="0" Background="Transparent" PointerPressed="OnLayerRowPressed">
   <Grid ColumnDefinitions="*,Auto">
-    <TextBlock Text="0 — Ground" VerticalAlignment="Center" />
+    <TextBlock x:Name="Layer0Label" Text="0 — Ground" VerticalAlignment="Center" />
     <CheckBox x:Name="Layer0VisibleCheck" Tag="0" VerticalAlignment="Center"
               Checked="OnLayerVisibilityChanged" Unchecked="OnLayerVisibilityChanged" />
   </Grid>
 </Border>
-<!-- repeat for Layer1Row "1 — Below Entities" … Layer4Row "4 — Roof" -->
+<!-- repeat for Layer1Row/Layer1Label/Layer1VisibleCheck "1 — Below Entities" … Layer4Row/Layer4Label/Layer4VisibleCheck "4 — Roof" -->
 ```
 
 Keep the "Selected tile" readout section unchanged.
@@ -517,6 +546,19 @@ private void SyncLayerRows()
 ```
 
 with `private static readonly IBrush SelectedRowBrush = new SolidColorBrush(Color.FromRgb(0x33, 0x99, 0xFF));`.
+- Add (paired with the `Unchecked` handlers above):
+
+```csharp
+private void OnToolUnchecked(object? sender, RoutedEventArgs e)
+{
+    if (sender is ToggleButton { Tag: string tag } &&
+        Enum.TryParse<MapEditTool>(tag, out MapEditTool tool) &&
+        tool == _viewModel.ActiveTool)
+    {
+        ((ToggleButton)sender).IsChecked = true;
+    }
+}
+```
 - `OnViewModelPropertyChanged`: `ActiveLayer` case → `SelectedLayers` case calling `SyncLayerRows()`; add a `LayerVisibility` case calling `SyncLayerRows()`.
 - Constructor: replace `SyncLayerRadios()` with `SyncLayerRows()`.
 - Hotkeys in `OnKeyDown`: `case Key.B:` → `case Key.X:` (blocked tool; `B` is reserved for flood fill in Part 2).
@@ -531,9 +573,11 @@ Expected: all pass. Then full sweep:
 **Step 5: Commit**
 
 ```bash
-git add src/MapEditor.App/Views/ tests/MapEditor.App.Tests/
+git add src/MapEditor.App tests/MapEditor.App.Tests
 git commit -m "feat: named multi-select layer list, View menu, tool-only toolbar"
 ```
+
+(One commit covers Task 2 + Task 3 — they are a single compilation unit.)
 
 **Invariant-to-test matrix:**
 
@@ -558,9 +602,9 @@ Manual smoke (optional, headless environment may not allow): `./build-map-editor
 
 ## Design alignment notes
 
-- Layer names exactly: Ground / Below Entities / Entities / Above Entities / Roof, displayed as "0 — Ground" etc.
+- Layer names exactly: Ground / Below Entities / Entities / Above Entities / Roof, displayed as "0 — Ground" etc. (names live in the XAML rows and the test's `names` array; the design doc's "shared constant array" wording is updated to match).
 - Selected-tile readout keeps `L0 …` index format (unchanged).
 - Toolbar order for Part 1: Pencil, Eraser, Eyedropper, Blocked (Part 2 appends Select, Multi-select, Flood fill).
 - Hotkey change: Blocked B → X (B reserved for Part 2 flood fill); `ShortcutTests.cs:126-127` updated accordingly.
 - Ctrl/Shift-click is not headless-testable (probe-verified); coverage strategy: plain-click window test + `LayerSelection` unit tests.
-- No new comments/doc strings anywhere (AGENTS.md).
+- No comments/doc strings beyond the non-obvious-invariant comments shown in the proposed code (AGENTS.md default: none).

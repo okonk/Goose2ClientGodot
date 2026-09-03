@@ -44,7 +44,7 @@
 - Test: `tests/MapEditor.Core.Tests/MapEditSessionTests.cs`
 
 **Mutation impact:**
-- Source of truth changed: none existing — additive API on `MapEditSession` and a new public type; `MapEditTool` enum extended (existing members keep their values, so nothing persisted or switch-based breaks; `ValidateTool` at `MapEditSession.cs:266` and the ViewModel range check at `MainWindowViewModel.cs:72` must widen to the new max)
+- Source of truth changed: none existing — additive API on `MapEditSession` and a new public type; `MapEditTool` enum extended (existing members keep their values, so nothing persisted or switch-based breaks; the ViewModel range check at `MainWindowViewModel.cs:72` must widen to the new max — `ValidateTool` at `MapEditSession.cs:266` must NOT widen, see below)
 - Important readers: `MapEditStroke.ApplySegment` switch on `MapEditTool` (`src/MapEditor.Core/Editing/MapEditStroke.cs:71-79`) — the new tools never reach it (canvas routes them to the new entry points); C# switches on enums are not required to be exhaustive, so no change needed
 - Derived/cached state affected: undo history (new commands via the existing `MapEditHistory`), dirty tracking (`IsDirty` via `_currentStateId`) — both work unchanged because the new entry points use the same state-id bookkeeping as `CompleteStroke`
 - Required propagation sequence: each new entry point appends to a `MapEditChangeBuffer<MapLayerChange>`, mutates the document via `MapDocument.SetLayer`, then pushes one `MapEditCommand.ForLayerChanges` with fresh before/after state ids
@@ -97,20 +97,40 @@ public void FloodFill_SquareBoundary_FillsOnlyInterior()
 }
 
 [Fact]
-public void FloodFill_DiagonalBlocker_DoesNotBlockFill()
+public void FloodFill_DiagonalOnlyConnection_DoesNotFill()
 {
     var session = CreateSession(4, 4);
-    session.Document.SetLayer(1, 1, 0, new MapTileLayer(1, 1));
+    // both in-map orthogonal neighbours of (0,0) are blockers; (1,1) and (2,2)
+    // match the start value and are reachable only diagonally
+    session.Document.SetLayer(1, 0, 0, new MapTileLayer(1, 1));
+    session.Document.SetLayer(0, 1, 0, new MapTileLayer(1, 1));
 
     session.SelectedTileLayer = new MapTileLayer(9, 9);
     Assert.True(session.ApplyFloodFill(0, 0));
 
-    Assert.Equal(new MapTileLayer(9, 9), session.Document[0, 1].GetLayer(0));
-    Assert.Equal(new MapTileLayer(9, 9), session.Document[1, 0].GetLayer(0));
-    Assert.Equal(new MapTileLayer(1, 1), session.Document[1, 1].GetLayer(0));
-    // an 8-directional fill would reach these via the diagonal — 4-directional must not
-    Assert.Equal(new MapTileLayer(0, 0), session.Document[1, 2].GetLayer(0));
-    Assert.Equal(new MapTileLayer(0, 0), session.Document[2, 1].GetLayer(0));
+    Assert.Equal(new MapTileLayer(9, 9), session.Document[0, 0].GetLayer(0));
+    // an 8-directional fill would reach (1,1) and then (2,2) through the diagonal
+    Assert.Equal(new MapTileLayer(0, 0), session.Document[1, 1].GetLayer(0));
+    Assert.Equal(new MapTileLayer(0, 0), session.Document[2, 2].GetLayer(0));
+}
+
+[Fact]
+public void FloodFill_NonEmptyStartRegion_RefillsWithBrush()
+{
+    var session = CreateSession(4, 4);
+    for (int x = 0; x < 4; x++)
+    {
+        for (int y = 0; y < 4; y++)
+        {
+            session.Document.SetLayer(x, y, 0, new MapTileLayer(3, 3));
+        }
+    }
+
+    session.SelectedTileLayer = new MapTileLayer(9, 9);
+    Assert.True(session.ApplyFloodFill(0, 0));
+
+    Assert.Equal(new MapTileLayer(9, 9), session.Document[0, 0].GetLayer(0));
+    Assert.Equal(new MapTileLayer(9, 9), session.Document[3, 3].GetLayer(0));
 }
 
 [Fact]
@@ -137,7 +157,7 @@ public void FloodFill_WithMultiLayerSelection_FillsOnlyTopmostLayer()
 public void LayerPatch_WritesCorrespondingLayersAsOneUndoableCommand()
 {
     var session = CreateSession(5, 5);
-    MapTileLayer?[] patch = new MapTileLayer?[MapDocument.LayerCount];
+    MapTileLayer[]?[] patch = new MapTileLayer[MapDocument.LayerCount][];
     patch[1] = new MapTileLayer[] { new(5, 5), new(6, 6) };
     patch[3] = new MapTileLayer[] { new(7, 7), new(8, 8) };
 
@@ -159,7 +179,7 @@ public void LayerPatch_WritesCorrespondingLayersAsOneUndoableCommand()
 public void LayerPatch_NoDifferingCells_ReturnsFalseWithoutHistory()
 {
     var session = CreateSession(5, 5);
-    MapTileLayer?[] patch = new MapTileLayer?[MapDocument.LayerCount];
+    MapTileLayer[]?[] patch = new MapTileLayer[MapDocument.LayerCount][];
     patch[0] = new MapTileLayer[] { new(0, 0) };
     Assert.False(session.ApplyLayerPatch(0, 0, 1, 1, patch));
     Assert.False(session.CanUndo);
@@ -172,10 +192,32 @@ public void LayerPatch_NoDifferingCells_ReturnsFalseWithoutHistory()
 public void LayerPatch_OutOfBounds_ThrowsWithoutMutation(int originX, int originY, int width, int height)
 {
     var session = CreateSession(5, 5);
-    MapTileLayer?[] patch = new MapTileLayer?[MapDocument.LayerCount];
+    MapTileLayer[]?[] patch = new MapTileLayer[MapDocument.LayerCount][];
     patch[0] = new MapTileLayer[width * height];
     Assert.Throws<ArgumentOutOfRangeException>(() => session.ApplyLayerPatch(originX, originY, width, height, patch));
     Assert.False(session.IsDirty);
+}
+
+[Fact]
+public void LayerPatch_WrongInnerArrayLength_ThrowsWithoutMutation()
+{
+    var session = CreateSession(5, 5);
+    session.Document.SetLayer(0, 0, 0, new MapTileLayer(1, 1));
+    MapTileLayer[]?[] patch = new MapTileLayer[MapDocument.LayerCount][];
+    patch[0] = new MapTileLayer[3];
+    Assert.Throws<ArgumentException>(() => session.ApplyLayerPatch(0, 0, 2, 2, patch));
+    Assert.Equal(new MapTileLayer(1, 1), session.Document[0, 0].GetLayer(0));
+    Assert.False(session.CanUndo);
+}
+
+[Theory]
+[InlineData(MapEditTool.Select)]
+[InlineData(MapEditTool.MultiSelect)]
+[InlineData(MapEditTool.FloodFill)]
+public void BeginStroke_NonStrokingTool_Throws(MapEditTool tool)
+{
+    var session = CreateSession();
+    Assert.Throws<ArgumentOutOfRangeException>(() => session.BeginStroke(tool, 0, 0));
 }
 
 [Fact]
@@ -184,7 +226,7 @@ public void FloodFill_AndLayerPatch_WithActiveStroke_Throw()
     var session = CreateSession(5, 5);
     session.BeginStroke(MapEditTool.Pencil, 0, 0);
     Assert.Throws<InvalidOperationException>(() => session.ApplyFloodFill(1, 1));
-    MapTileLayer?[] patch = new MapTileLayer?[MapDocument.LayerCount];
+    MapTileLayer[]?[] patch = new MapTileLayer[MapDocument.LayerCount][];
     patch[0] = new MapTileLayer[] { new(1, 1) };
     Assert.Throws<InvalidOperationException>(() => session.ApplyLayerPatch(0, 0, 1, 1, patch));
 }
@@ -225,7 +267,7 @@ public readonly record struct MapTileRectangle(int X, int Y, int Width, int Heig
 ```
 
 `MapEditSession`:
-- Widen `ValidateTool` (`:266`, `private static`) upper bound to `MapEditTool.FloodFill`.
+- Do NOT widen `ValidateTool` (`:266`, `private static`) — it guards `BeginStroke`, which constructs a `MapEditStroke` for whatever passes; letting `Select`/`MultiSelect`/`FloodFill` through would leave an active no-op stroke (the stroke's `ApplySegment` switch silently ignores them). Keep it at `tool > MapEditTool.BlockedToggle → throw`. Only the ViewModel's `ActiveTool` range check (`MainWindowViewModel.cs:72`) widens to `MapEditTool.FloodFill`. Add a test: `BeginStroke(MapEditTool.Select, 0, 0)` throws `ArgumentOutOfRangeException`.
 - Add a private helper extracted from `CompleteStroke`'s bookkeeping (`:124-131`):
 
 ```csharp
@@ -267,7 +309,9 @@ public bool ApplyFloodFill(int x, int y)
     int start = y * width + x;
     visited.TryMark(start);
     frontier.Enqueue(start);
+```
 
+(`MapEditSession.cs` currently imports only `System` and the Core project has no implicit usings — add `using System.Collections.Generic;` for `Queue<int>`.)
     while (frontier.Count > 0)
     {
         int index = frontier.Dequeue();
@@ -309,7 +353,7 @@ public bool ApplyFloodFill(int x, int y)
 (Keep the row-wrap guards: `-1`/`+1` offsets must not cross rows — the `cx == 0` / `cx == width - 1` checks above handle that; `-width`/`+width` are always in-bounds when `ni` is.)
 
 ```csharp
-public bool ApplyLayerPatch(int originX, int originY, int width, int height, MapTileLayer?[] layerTiles)
+public bool ApplyLayerPatch(int originX, int originY, int width, int height, MapTileLayer[]?[] layerTiles)
 {
     if (_stroke != null)
     {
@@ -322,9 +366,17 @@ public bool ApplyLayerPatch(int originX, int originY, int width, int height, Map
     }
 
     if (width <= 0 || height <= 0 || originX < 0 || originY < 0 ||
-        originX + width > _document.Width || originY + height > _document.Height)
+        width > _document.Width - originX || height > _document.Height - originY)
     {
         throw new ArgumentOutOfRangeException();
+    }
+
+    for (int layer = 0; layer < MapDocument.LayerCount; layer++)
+    {
+        if (layerTiles[layer] is { } tiles && tiles.Length != width * height)
+        {
+            throw new ArgumentException(nameof(layerTiles));
+        }
     }
 
     var changes = new MapEditChangeBuffer<MapLayerChange>();
@@ -380,12 +432,15 @@ git commit -m "feat: flood fill and layer patch entry points in MapEditSession"
 |-----------|-----------|
 | Empty-region fill covers the map, one undo restores (happy path) | `FloodFill_EmptyRegion_FillsWholeMapAsOneUndoableCommand` |
 | Fill bounded by a square of other tiles (adversarial) | `FloodFill_SquareBoundary_FillsOnlyInterior` |
-| 4-directional: diagonal blocker leaks, diagonally-adjacent cells stay unfilled (adversarial) | `FloodFill_DiagonalBlocker_DoesNotBlockFill` |
+| 4-directional: diagonal-only connection does not fill (adversarial) | `FloodFill_DiagonalOnlyConnection_DoesNotFill` |
 | No-op fill pushes no history (adversarial) | `FloodFill_TargetEqualsStartValue_ReturnsFalseWithoutHistory` |
 | Fill targets topmost of a multi-selection | `FloodFill_WithMultiLayerSelection_FillsOnlyTopmostLayer` |
 | Patch writes corresponding layers only, one undo/redo round-trips | `LayerPatch_WritesCorrespondingLayersAsOneUndoableCommand` |
 | No-op patch pushes no history (adversarial) | `LayerPatch_NoDifferingCells_ReturnsFalseWithoutHistory` |
 | Out-of-bounds patch throws, document untouched (adversarial) | `LayerPatch_OutOfBounds_ThrowsWithoutMutation` |
+| Wrong inner-array length throws before any mutation (adversarial) | `LayerPatch_WrongInnerArrayLength_ThrowsWithoutMutation` |
+| Non-stroking tools rejected by `BeginStroke` (adversarial) | `BeginStroke_NonStrokingTool_Throws` |
+| Non-empty start region refills with the brush | `FloodFill_NonEmptyStartRegion_RefillsWithBrush` |
 | Stroke exclusivity | `FloodFill_AndLayerPatch_WithActiveStroke_Throw` |
 
 ---
@@ -433,11 +488,13 @@ public void SelectionRectangle_DrawsFourOutlineLinesWithSelectionStroke()
 [Fact]
 public void PasteGhost_StraddlingEdge_ClipsFillToDocumentBounds()
 {
+    string manifest = ManifestJson((1, 1, 0, 0, 32, 32));
+    MapRenderer renderer = new(CreateCache(new FakeSpriteSheetLoader(), manifest));
     var document = MapDocument.Create(5, 5);
     var options = new MapRenderOptions(MapLayerVisibility.All, false, false, null, null,
         PasteGhost: new MapTileRectangle(3, 3, 4, 4));
     var sink = new RecordingMapDrawSink();
-    renderer.Render(new MapRenderRequest(document, viewportShowingWholeMap, options), sink);
+    renderer.Render(Request(document, Viewport(5 * 32, 5 * 32), options), sink);
 
     var fills = sink.Calls.OfType<CellOverlayDrawOperation>()
         .Where(op => op.Kind == CellOverlayKind.PasteGhost)
@@ -448,12 +505,13 @@ public void PasteGhost_StraddlingEdge_ClipsFillToDocumentBounds()
 [Fact]
 public void PasteGhost_FullyInBounds_DrawsFillAndOutline()
 {
-    // 5x5 document, 2x2 ghost at (1,1): 4 PasteGhost fill overlays + 4 outline lines in PasteGhostStroke
+    string manifest = ManifestJson((1, 1, 0, 0, 32, 32));
+    MapRenderer renderer = new(CreateCache(new FakeSpriteSheetLoader(), manifest));
     var document = MapDocument.Create(5, 5);
     var options = new MapRenderOptions(MapLayerVisibility.All, false, false, null, null,
         PasteGhost: new MapTileRectangle(1, 1, 2, 2));
     var sink = new RecordingMapDrawSink();
-    renderer.Render(new MapRenderRequest(document, viewportShowingWholeMap, options), sink);
+    renderer.Render(Request(document, Viewport(5 * 32, 5 * 32), options), sink);
 
     Assert.Equal(4, sink.Calls.OfType<CellOverlayDrawOperation>()
         .Count(op => op.Kind == CellOverlayKind.PasteGhost));
@@ -541,6 +599,7 @@ git commit -m "feat: selection rectangle and paste ghost render overlays"
 | Selection rectangle draws exactly 4 outline lines in the selection stroke color | `SelectionRectangle_DrawsFourOutlineLinesWithSelectionStroke` |
 | Ghost clipped to document bounds (adversarial) | `PasteGhost_StraddlingEdge_ClipsFillToDocumentBounds` |
 | In-bounds ghost draws per-cell fills + outline in distinct colors | `PasteGhost_FullyInBounds_DrawsFillAndOutline` |
+| Negative paste origin clips both source and destination (adversarial) | `ApplyPasteAt_NegativeOrigin_ClipsSourceAndDestination` |
 | Existing renders unaffected when new options are null | all pre-existing `MapRendererTests` still green |
 
 ---
@@ -570,7 +629,23 @@ git commit -m "feat: selection rectangle and paste ghost render overlays"
 
 **Step 1: Write the failing tests**
 
-In `tests/MapEditor.App.Tests/MainWindowViewModelTests.cs` (the file's existing pattern: `_viewModel`, `_controller`, `RaisedProperties` helper):
+In `tests/MapEditor.App.Tests/MainWindowViewModelTests.cs` (the file's existing pattern: `_viewModel`, `_controller`, `RaisedProperties` helper). Add a shared setup helper first — every paste test uses it:
+
+```csharp
+private void SeedClipboard(int size = 3, MapTileLayer tile = new(7, 7))
+{
+    for (int x = 0; x < size; x++)
+    {
+        for (int y = 0; y < size; y++)
+        {
+            _viewModel.Session.Document.SetLayer(x, y, 0, tile);
+        }
+    }
+
+    _viewModel.SelectionRectangle = new MapTileRectangle(0, 0, size, size);
+    _viewModel.CopySelection();
+}
+```
 
 ```csharp
 [Fact]
@@ -596,8 +671,8 @@ public void CopySelection_CapturesOnlySelectedLayers()
 [Fact]
 public void ApplyPasteAt_EdgeOrigin_ClipsToDocumentBounds()
 {
-    // 100x100 default document; fill a 3x3 clipboard from a painted region
-    ...
+    // 100x100 default document; 3x3 clipboard seeded at the origin
+    SeedClipboard();
     _viewModel.BeginPasteMode();
     Assert.True(_viewModel.PasteMode);
     _viewModel.ApplyPasteAt(98, 98);
@@ -611,11 +686,24 @@ public void ApplyPasteAt_EdgeOrigin_ClipsToDocumentBounds()
 }
 
 [Fact]
+public void ApplyPasteAt_NegativeOrigin_ClipsSourceAndDestination()
+{
+    SeedClipboard();
+    _viewModel.BeginPasteMode();
+    _viewModel.ApplyPasteAt(-2, -2);
+
+    // only the bottom-right 1x1 of the 3x3 clipboard lands, at (0,0)
+    Assert.Equal(new MapTileLayer(7, 7), _viewModel.Session.Document[0, 0].GetLayer(0));
+    Assert.False(_viewModel.PasteMode);
+    Assert.True(_viewModel.CanUndo);
+}
+
+[Fact]
 public void ApplyPasteAt_FullyOutOfBounds_ChangesNothing()
 {
     // 100x100 default document, 3x3 clipboard; origin at x == Width puts the
     // whole ghost past the right edge (clip width computes to 0)
-    ...
+    SeedClipboard();
     _viewModel.BeginPasteMode();
     _viewModel.ApplyPasteAt(100, 0);
     Assert.False(_viewModel.PasteMode);
@@ -625,7 +713,7 @@ public void ApplyPasteAt_FullyOutOfBounds_ChangesNothing()
 [Fact]
 public void PasteMode_CancelsWhenLayerSelectionChanges()
 {
-    ...
+    SeedClipboard();
     _viewModel.BeginPasteMode();
     _viewModel.SelectedLayers = 1 << 2;
     Assert.False(_viewModel.PasteMode);
@@ -634,8 +722,9 @@ public void PasteMode_CancelsWhenLayerSelectionChanges()
 [Fact]
 public void NewDocument_ClearsClipboardPasteAndSelectionRectangle()
 {
-    ...
-    _harness-style New flow (mirror the existing New_ReplacesDocument test)
+    SeedClipboard();
+    _viewModel.BeginPasteMode();
+    // New flow: mirror the existing New_ReplacesDocument test (replace document via the controller)
     Assert.Null(_viewModel.Clipboard);
     Assert.Null(_viewModel.SelectionRectangle);
     Assert.False(_viewModel.PasteMode);
@@ -658,7 +747,7 @@ namespace MapEditor.App.ViewModels;
 
 internal sealed class TileClipboard
 {
-    private TileClipboard(int width, int height, MapTileLayer?[] layers)
+    private TileClipboard(int width, int height, MapTileLayer[]?[] layers)
     {
         Width = width;
         Height = height;
@@ -669,7 +758,7 @@ internal sealed class TileClipboard
 
     public int Height { get; }
 
-    public MapTileLayer?[] Layers { get; }
+    public MapTileLayer[]?[] Layers { get; }
 
     public static TileClipboard Capture(MapDocument document, byte selectedLayers, MapTileRectangle rect)
     {
@@ -679,7 +768,7 @@ internal sealed class TileClipboard
             throw new ArgumentOutOfRangeException(nameof(rect));
         }
 
-        var layers = new MapTileLayer?[MapDocument.LayerCount];
+        var layers = new MapTileLayer[MapDocument.LayerCount][];
         for (int layer = 0; layer < MapDocument.LayerCount; layer++)
         {
             if ((selectedLayers & (1 << layer)) == 0)
@@ -771,13 +860,15 @@ public void ApplyPasteAt(int x, int y)
         return;
     }
 
-    int originX = Math.Max(x, 0);
-    int originY = Math.Max(y, 0);
-    int clipWidth = Math.Min(clip.Width, _session.Document.Width - x);
-    int clipHeight = Math.Min(clip.Height, _session.Document.Height - y);
+    int sourceX = Math.Max(0, -x);
+    int sourceY = Math.Max(0, -y);
+    int originX = Math.Max(0, x);
+    int originY = Math.Max(0, y);
+    int clipWidth = Math.Min(clip.Width - sourceX, _session.Document.Width - originX);
+    int clipHeight = Math.Min(clip.Height - sourceY, _session.Document.Height - originY);
     if (clipWidth > 0 && clipHeight > 0)
     {
-        var sub = new MapTileLayer?[MapDocument.LayerCount];
+        var sub = new MapTileLayer[MapDocument.LayerCount][];
         for (int layer = 0; layer < MapDocument.LayerCount; layer++)
         {
             if (clip.Layers[layer] is not { } data)
@@ -788,7 +879,7 @@ public void ApplyPasteAt(int x, int y)
             var slice = new MapTileLayer[clipWidth * clipHeight];
             for (int row = 0; row < clipHeight; row++)
             {
-                Array.Copy(data, (originY - y + row) * clip.Width + (originX - x), slice, row * clipWidth, clipWidth);
+                Array.Copy(data, (sourceY + row) * clip.Width + sourceX, slice, row * clipWidth, clipWidth);
             }
 
             sub[layer] = slice;
@@ -803,6 +894,7 @@ public void ApplyPasteAt(int x, int y)
 ```
 
 - `SelectedLayers` setter: after writing, call `CancelPasteMode()`.
+- `BeginPasteMode`/`CancelPasteMode`: call `Refresh(EditorRefresh.Canvas)` — the canvas only redraws on `CanvasInvalidated` or a local `Invalidate()` (hover move), so without this the ghost would not appear when Ctrl+V is pressed while the cursor is already over a cell, nor disappear on cancel via a layer change.
 - `Refresh` document-replaced branch (`:301-318`): `_clipboard = null; CancelPasteMode(); SelectionRectangle = null;` (alongside the existing `HoverX`/`SelectedX` resets at `:312-315`).
 - Do NOT add `PasteGhost` re-raise to the `HoverX`/`HoverY` setters — nothing binds to `PasteGhost`; the canvas re-renders via `Invalidate()` in `UpdateHover` (`MapCanvas.cs:189`).
 
@@ -850,8 +942,9 @@ git commit -m "feat: tile clipboard and paste mode in editor view model"
   4. `OnPointerMoved` while `_multiSelecting`: normalize `_rectDragStart`→current tile into inclusive bounds, **clamped to the map** (if `TileAt` is null mid-drag, clamp to the last in-bounds tile / map edge), set `_viewModel.SelectionRectangle = new MapTileRectangle(minX, minY, w, h)` (w/h = span+1), `_rectDragMoved = true`, `Invalidate()`
   5. `OnPointerReleased` while `_multiSelecting`: if no move occurred, set a 1×1 rectangle at the pressed tile; clear `_multiSelecting`; `Invalidate()`
   6. `OnKeyDown` Escape (`:268`): existing `FinishInteraction(commit: false)` plus `_viewModel.CancelPasteMode()`
-  7. `FinishInteraction`: add `_viewModel.CancelPasteMode()`
-  8. `BuildRenderRequest` (`:344`): pass `SelectionRectangle: _viewModel.SelectionRectangle, PasteGhost: _viewModel.PasteGhost`
+  7. `FinishInteraction`: add `_viewModel.CancelPasteMode()`, and clear `_multiSelecting`/`_rectDragStart` + `ReleaseCapture()` — a menu command or Escape mid-drag must not leave the canvas permanently gesture-active (`FinishInteraction` currently clears only `_stroking`/`_panning`)
+  8. `MainWindow.OnKeyDown`: add `case Key.Escape:` → `Canvas.FinishInteraction(commit: false); _viewModel.CancelPasteMode();` — window-level so Esc cancels paste regardless of focus (the canvas's own Escape handler sets `e.Handled` and wins when the canvas is focused; both paths reach the same state). The paste-Escape test must therefore not require canvas focus
+  9. `BuildRenderRequest` (`:344`): pass `SelectionRectangle: _viewModel.SelectionRectangle, PasteGhost: _viewModel.PasteGhost`
 - Invariants to preserve:
   - Select and FloodFill never leave `session.HasActiveStroke` true
   - paste mode ends after exactly one click (apply or cancel)
@@ -957,7 +1050,12 @@ public async Task PasteMode_ClickAppliesOnceAndSecondClickIsInert()
 public async Task PasteMode_EscapeCancelsWithoutPasting()
 {
     Harness harness = await CreateSmallMapAsync();
-    // ... populate clipboard + BeginPasteMode as above ...
+    MapDocument document = harness.ViewModel.Session.Document;
+    document.SetLayer(0, 0, 0, new MapTileLayer(7, 7));
+    harness.ViewModel.SelectionRectangle = new MapTileRectangle(0, 0, 1, 1);
+    harness.ViewModel.CopySelection();
+    harness.ViewModel.BeginPasteMode();
+
     harness.Window.KeyPressQwerty(PhysicalKey.Escape, RawInputModifiers.None);
     Assert.False(harness.ViewModel.PasteMode);
     Assert.False(harness.ViewModel.Session.CanUndo);
@@ -967,7 +1065,12 @@ public async Task PasteMode_EscapeCancelsWithoutPasting()
 public async Task PasteMode_ClickOutsideMapCancelsWithoutPasting()
 {
     Harness harness = await CreateSmallMapAsync();
-    // ... populate clipboard + BeginPasteMode as above ...
+    MapDocument document = harness.ViewModel.Session.Document;
+    document.SetLayer(0, 0, 0, new MapTileLayer(7, 7));
+    harness.ViewModel.SelectionRectangle = new MapTileRectangle(0, 0, 1, 1);
+    harness.ViewModel.CopySelection();
+    harness.ViewModel.BeginPasteMode();
+
     Point outside = new(4 * Cell + Cell / 2, 4 * Cell + Cell / 2); // past the 4x4 map
     harness.Window.MouseDown(outside, MouseButton.Left, RawInputModifiers.None);
     harness.Window.MouseUp(outside, MouseButton.Left, RawInputModifiers.None);
@@ -978,9 +1081,23 @@ public async Task PasteMode_ClickOutsideMapCancelsWithoutPasting()
 [AvaloniaFact]
 public async Task PasteMode_FinishInteractionCancelsBeforeNextClick()
 {
-    // adversarial: begin paste mode, call harness.Window.Canvas.FinishInteraction(commit: true),
-    // then click a tile with the pencil tool -> normal pencil stroke, no paste
-    ...
+    Harness harness = await CreateSmallMapAsync();
+    MapDocument document = harness.ViewModel.Session.Document;
+    document.SetLayer(0, 0, 0, new MapTileLayer(7, 7));
+    harness.ViewModel.SelectionRectangle = new MapTileRectangle(0, 0, 1, 1);
+    harness.ViewModel.CopySelection();
+    harness.ViewModel.BeginPasteMode();
+
+    harness.Window.Canvas.FinishInteraction(commit: true);
+    Assert.False(harness.ViewModel.PasteMode);
+
+    harness.ViewModel.Brush = new MapTileLayer(4, 4);
+    harness.ViewModel.ActiveTool = MapEditTool.Pencil;
+    Point p = new(Cell + Cell / 2, Cell + Cell / 2);
+    harness.Window.MouseDown(p, MouseButton.Left, RawInputModifiers.None);
+    harness.Window.MouseUp(p, MouseButton.Left, RawInputModifiers.None);
+
+    Assert.Equal(new MapTileLayer(4, 4), document[1, 1].GetLayer(0));
 }
 ```
 
@@ -1008,9 +1125,9 @@ Expected: new tests fail (tools not wired, toggles missing).
 `MainWindow.axaml` toolbar: after `BlockedTool` add:
 
 ```xml
-<ToggleButton x:Name="SelectTool" Content="Select" Tag="Select" Checked="OnToolChecked" />
-<ToggleButton x:Name="MultiSelectTool" Content="Multi-select" Tag="MultiSelect" Checked="OnToolChecked" />
-<ToggleButton x:Name="FloodFillTool" Content="Flood fill" Tag="FloodFill" Checked="OnToolChecked" />
+<ToggleButton x:Name="SelectTool" Content="Select" Tag="Select" Checked="OnToolChecked" Unchecked="OnToolUnchecked" />
+<ToggleButton x:Name="MultiSelectTool" Content="Multi-select" Tag="MultiSelect" Checked="OnToolChecked" Unchecked="OnToolUnchecked" />
+<ToggleButton x:Name="FloodFillTool" Content="Flood fill" Tag="FloodFill" Checked="OnToolChecked" Unchecked="OnToolUnchecked" />
 ```
 
 (`OnToolChecked` already parses the tag into `MapEditTool` — `MainWindow.axaml.cs:217`.)
@@ -1031,9 +1148,9 @@ case Key.V when modifiers == PrimaryModifier && e.Source is not TextBox:
     break;
 ```
 
-**Step 4: Sync the design doc**
+**Step 4: Verify design-doc sync**
 
-`docs/plans/2026-09-03-map-editor-ui-tools-design.md` describes the paste ghost as "drawn on their corresponding layers" (sprite preview). The implementation is a flat per-cell translucent highlight + outline (the draw sink has no per-sprite alpha). Update that sentence to match, in the same commit as Step 5.
+The design doc was already updated during planning to describe the paste ghost as a flat per-cell translucent highlight + outline (not a sprite preview — the draw sink has no per-sprite alpha). If the implementation diverges from that description, re-sync `docs/plans/2026-09-03-map-editor-ui-tools-design.md` in the Step 5 commit.
 
 **Step 5: Run tests to verify they pass (green)**
 
@@ -1081,4 +1198,4 @@ Manual smoke (optional): run `src/MapEditor.App` — draw a square ring on the E
 - Flood fill: 4-directional, matches the clicked cell's tile, topmost selected layer, one undo entry, no-op produces nothing.
 - Paste: top-left anchored ghost, clipped to map bounds, one undo entry, Esc/outside-click/selection-change cancels.
 - Ghost rendering is a region highlight (per-cell translucent fill + outline), not a sprite preview — the draw sink has no per-sprite alpha; a sprite-accurate preview is a follow-up if wanted.
-- No new comments/doc strings anywhere (AGENTS.md).
+- No comments/doc strings beyond the non-obvious-invariant comments shown in the proposed code (AGENTS.md default: none).

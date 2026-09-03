@@ -38,7 +38,7 @@ Implementation notes:
 
 - Rows are a StackPanel of 5 Grids (TextBlock + CheckBox) with row-level pointer handling; Avalonia ListBox does not give per-row checkboxes cleanly.
 - ViewModel: the five `LayerNVisible` properties are replaced by one visibility-mask property (byte/int); the canvas already composes a mask for `MapLayerVisibility`.
-- Layer names live in one shared constant array (App layer; the core stays name-agnostic).
+- Layer names are displayed in the XAML layer rows ("0 — Ground" style); the core stays name-agnostic.
 
 ## 2. Toolbar & hotkeys
 
@@ -76,7 +76,7 @@ Click a tile: it becomes the selected tile (existing cyan outline) and the right
 
 - Drag a rectangle; the region shows an outline overlay. The selection persists until a new drag.
 - Ctrl+C copies the tiles in the rectangle for all selected layers into an app-level clipboard (fixed size + per-layer data).
-- Ctrl+V (from any tool) enters paste mode if the clipboard is non-empty: a ghost of the copied tiles follows the cursor, top-left anchored to the hovered cell, drawn on their corresponding layers.
+- Ctrl+V (from any tool) enters paste mode if the clipboard is non-empty: a ghost of the copied region follows the cursor, top-left anchored to the hovered cell, shown as a flat translucent cell highlight + outline (not a per-sprite preview — the draw sink has no per-sprite alpha).
 - Click applies the paste: one undoable command writing each layer's tiles to the matching layer, overwriting existing tiles.
 - Esc, a click outside the map, or changing the layer selection cancels paste mode.
 - Paste is clipped to the map: only in-bounds cells are written.
@@ -90,13 +90,13 @@ Single click on the topmost selected layer: BFS, 4-directional, fills the connec
 - `MapEditTool` gains `Select`, `MultiSelect`, `FloodFill`.
 - Select/MultiSelect make no document changes; the session treats them as non-stroking tools (no change buffers).
 - Flood fill gets a click-only entry point in the session: BFS over the document using the existing visit bitmap, appending to the layer-change buffer, committed as one command.
-- `MapRenderOptions` gains a selection-rectangle overlay and a paste-ghost option (offset + per-layer tile data).
+- `MapRenderOptions` gains a selection-rectangle overlay and a paste-ghost option (rectangle offset; rendered as a flat cell highlight, not per-layer sprites).
 
 ## 5. Testing
 
 - **Core** (`MapEditSessionTests` + new tests): flood fill — empty region fills everything; square boundary contains the fill; 4-directional so diagonal tiles leak; differing-tile region refilled with the brush; no-op click yields no undo entry; undo/redo restores state. Multi-layer selection — editing targets topmost only; invalid/empty selection rejected; eyedropper samples topmost.
 - **App** (`MainWindowViewModelTests`, `MapCanvasTests`, `MainWindowTests`): selection-set logic (plain/Ctrl/Shift click, selection never empties); clipboard capture per selected layer; paste writes corresponding layers and clips at map edges; Esc cancels paste mode; toolbar/menu wiring (View menu toggles, hotkeys P/E/I/X/V/M/B).
-- **Rendering** (`MapRendererTests`): selection-rectangle overlay and paste ghost drawn per layer.
+- **Rendering** (`MapRendererTests`): selection-rectangle overlay and paste ghost drawn as a clipped flat cell highlight.
 
 ## Deferred (consciously out of scope)
 
