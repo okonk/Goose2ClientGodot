@@ -26,7 +26,7 @@ public class TileSheetGeneratorTests : IDisposable
     }
 
     [Fact]
-    public void Generate_AppliesStaticNonPartNonIconRulePlusMapReferencesPlusAsperetaRange()
+    public void Generate_AppliesStaticNonPartNonIconRulePlusMapReferences()
     {
         WriteAdf(10, AdfType.Graphic, frameCount: 2, animCount: 0);
         WriteAdf(11, AdfType.Graphic, frameCount: 2, animCount: 2);
@@ -36,9 +36,6 @@ public class TileSheetGeneratorTests : IDisposable
 
         WriteEnc((type: 1, id: 1, files: new[] { 12, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }));
 
-        string manifest = Path.Combine(_dir, "manifest.json");
-        File.WriteAllText(manifest, """{ "tileSize": 32, "sheets": { "10": { "1": [0, 0, 4, 4] }, "20000": { "1": [0, 0, 4, 4] }, "20001": { "1": [0, 0, 4, 4] } } }""");
-
         string icons = Path.Combine(_dir, "sheets.json");
         File.WriteAllText(icons, """{ "atlasWidth": 2048, "iconSheets": [13] }""");
 
@@ -46,9 +43,9 @@ public class TileSheetGeneratorTests : IDisposable
         Directory.CreateDirectory(mapsDir);
         WriteMap(mapsDir, "Map1.bytes", sheetsByLayer: new[] { 13, 0, 0, 0, 0 });
 
-        IReadOnlyList<int> tiles = TileSheetGenerator.Generate(_dir, manifest, icons, mapsDir);
+        IReadOnlyList<int> tiles = TileSheetGenerator.Generate(_dir, icons, mapsDir);
 
-        Assert.Equal(new[] { 10, 13, 20000, 20001 }, tiles);
+        Assert.Equal(new[] { 10, 13 }, tiles);
     }
 
     [Fact]
@@ -57,9 +54,6 @@ public class TileSheetGeneratorTests : IDisposable
         WriteAdf(11, AdfType.Graphic, frameCount: 2, animCount: 2);
         WriteEnc();
 
-        string manifest = Path.Combine(_dir, "manifest.json");
-        File.WriteAllText(manifest, """{ "tileSize": 32, "sheets": { "11": { "1": [0, 0, 4, 4] } } }""");
-
         string icons = Path.Combine(_dir, "sheets.json");
         File.WriteAllText(icons, """{ "atlasWidth": 2048, "iconSheets": [] }""");
 
@@ -67,7 +61,7 @@ public class TileSheetGeneratorTests : IDisposable
         Directory.CreateDirectory(mapsDir);
         WriteMap(mapsDir, "Map1.bytes", sheetsByLayer: new[] { 11, 0, 0, 0, 0 });
 
-        IReadOnlyList<int> tiles = TileSheetGenerator.Generate(_dir, manifest, icons, mapsDir);
+        IReadOnlyList<int> tiles = TileSheetGenerator.Generate(_dir, icons, mapsDir);
 
         Assert.Equal(new[] { 11 }, tiles);
     }
