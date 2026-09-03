@@ -94,7 +94,7 @@ Single click on the topmost selected layer: BFS, 4-directional, fills the connec
 
 ## 5. Testing
 
-- **Core** (`MapEditSessionTests` + new tests): flood fill — empty region fills everything; square boundary contains the fill; 4-directional so diagonal tiles leak; differing-tile region refilled with the brush; no-op click yields no undo entry; undo/redo restores state. Multi-layer selection — editing targets topmost only; invalid/empty selection rejected; eyedropper samples topmost.
+- **Core** (`MapEditSessionTests` + new tests): flood fill — empty region fills everything; square boundary contains the fill; 4-directional so a diagonal-only connection does not fill (conversely, diagonally touching blockers do not seal a 4-directional boundary); differing-tile region refilled with the brush; no-op click yields no undo entry; undo/redo restores state. Multi-layer selection — editing targets topmost only; invalid/empty selection rejected; eyedropper samples topmost. `MapTileRectangle.ClipTo` — partial clip, negative origin, no-overlap null.
 - **App** (`MainWindowViewModelTests`, `MapCanvasTests`, `MainWindowTests`): selection-set logic (plain/Ctrl/Shift click, selection never empties); clipboard capture per selected layer; paste writes corresponding layers and clips at map edges; Esc cancels paste mode; toolbar/menu wiring (View menu toggles, hotkeys P/E/I/X/V/M/B).
 - **Rendering** (`MapRendererTests`): selection-rectangle overlay and paste ghost drawn as a clipped flat cell highlight.
 

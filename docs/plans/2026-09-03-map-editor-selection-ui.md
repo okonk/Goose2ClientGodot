@@ -296,7 +296,7 @@ Expected: green. **Do not commit** — Task 3 commits both tasks together.
 **Files:**
 - Modify: `src/MapEditor.App/Views/MainWindow.axaml`
 - Modify: `src/MapEditor.App/Views/MainWindow.axaml.cs`
-- Create: `src/MapEditor.App/Views/LayerSelection.cs`
+- Create: `src/MapEditor.App/LayerSelection.cs`
 - Test: `tests/MapEditor.App.Tests/MainWindowTests.cs`
 - Test: `tests/MapEditor.App.Tests/ShortcutTests.cs` (B → X, per Step 1)
 - Test: `tests/MapEditor.App.Tests/LayerSelectionTests.cs` (create)
@@ -306,8 +306,8 @@ Expected: green. **Do not commit** — Task 3 commits both tasks together.
 `tests/MapEditor.App.Tests/LayerSelectionTests.cs` (new):
 
 ```csharp
+using MapEditor.App;
 using Xunit;
-using MapEditor.App.Views;
 
 namespace MapEditor.App.Tests;
 
@@ -337,6 +337,34 @@ public class LayerSelectionTests
     {
         Assert.Equal((byte)0b01110, LayerSelection.Range(1, 3));
         Assert.Equal((byte)0b01110, LayerSelection.Range(3, 1));
+    }
+
+    [Fact]
+    public void Apply_Plain_SingleSelectsAndReanchors()
+    {
+        Assert.Equal(((byte)0b00010, 1), LayerSelection.Apply(0b01000, 2, 1, LayerClickMode.Plain));
+    }
+
+    [Fact]
+    public void Apply_Toggle_UpdatesMaskAndReanchors()
+    {
+        Assert.Equal(((byte)0b00110, 1), LayerSelection.Apply(0b00010, 0, 1, LayerClickMode.Toggle));
+    }
+
+    [Fact]
+    public void Apply_Toggle_OffLastSelectedLayer_KeepsNonEmpty()
+    {
+        Assert.Equal(((byte)0b00001, 0), LayerSelection.Apply(0b00001, 0, 0, LayerClickMode.Toggle));
+    }
+
+    [Fact]
+    public void Apply_Range_KeepsAnchorForExtension()
+    {
+        var (first, anchor) = LayerSelection.Apply(0b00001, 0, 3, LayerClickMode.Range);
+        Assert.Equal((byte)0b01111, first);
+        Assert.Equal(0, anchor);
+        var (second, _) = LayerSelection.Apply(first, anchor, 4, LayerClickMode.Range);
+        Assert.Equal((byte)0b11111, second);
     }
 }
 ```
@@ -372,9 +400,18 @@ public void Layout_ContainsNamedLayerListAndViewToggles()
     Find<CheckBox>("Layer2VisibleCheck").IsChecked = false;
     Assert.Equal((byte)0b11011, ViewModel.LayerVisibility);
 
-    Assert.True(Find<MenuItem>("GridMenuItem").IsChecked == true);
-    Assert.False(Find<MenuItem>("BlockedMenuItem").IsChecked == true);
-    Find<MenuItem>("BlockedMenuItem").IsChecked = true;
+    Point check2 = Find<CheckBox>("Layer2VisibleCheck").TranslatePoint(new Point(5, 5), Window).Value;
+    Window.MouseDown(check2, MouseButton.Left, RawInputModifiers.None);
+    Window.MouseUp(check2, MouseButton.Left, RawInputModifiers.None);
+    Assert.True(Find<CheckBox>("Layer2VisibleCheck").IsChecked == true);
+    Assert.Equal((byte)0b11111, ViewModel.LayerVisibility);
+    Assert.Equal((byte)0b00010, ViewModel.SelectedLayers);
+
+    Find<MenuItem>("GridMenuItem").RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+    Assert.False(Find<MenuItem>("GridMenuItem").IsChecked == true);
+    Assert.False(ViewModel.ShowGrid);
+    Find<MenuItem>("BlockedMenuItem").RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+    Assert.True(Find<MenuItem>("BlockedMenuItem").IsChecked == true);
     Assert.True(ViewModel.ShowBlocked);
 }
 ```
@@ -403,8 +440,28 @@ using System;
 
 namespace MapEditor.App;
 
+public enum LayerClickMode
+{
+    Plain,
+    Toggle,
+    Range,
+}
+
 internal static class LayerSelection
 {
+    public static (byte Next, int Anchor) Apply(byte current, int anchor, int layer, LayerClickMode mode)
+    {
+        byte next = mode switch
+        {
+            LayerClickMode.Plain => Plain(layer),
+            LayerClickMode.Toggle => Toggle(current, layer, keepNonEmpty: true),
+            _ => Range(anchor, layer),
+        };
+
+        int nextAnchor = mode == LayerClickMode.Range ? anchor : layer;
+        return (next, nextAnchor);
+    }
+
     public static byte Plain(int layer)
     {
         Validate(layer);
@@ -485,38 +542,27 @@ private void OnLayerRowPressed(object? sender, PointerPressedEventArgs e)
         return;
     }
 
-    if (e.Source is CheckBox)
-    {
-        return;
-    }
-
     if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
     {
         return;
     }
 
     KeyModifiers modifiers = e.KeyModifiers;
-    byte next;
-    if (modifiers.HasFlag(KeyModifiers.Control))
-    {
-        next = LayerSelection.Toggle(_viewModel.SelectedLayers, layer, keepNonEmpty: true);
-    }
-    else if (modifiers.HasFlag(KeyModifiers.Shift))
-    {
-        next = LayerSelection.Range(_layerAnchor, layer);
-    }
-    else
-    {
-        next = LayerSelection.Plain(layer);
-        _layerAnchor = layer;
-    }
+    LayerClickMode mode = modifiers.HasFlag(KeyModifiers.Control)
+        ? LayerClickMode.Toggle
+        : modifiers.HasFlag(KeyModifiers.Shift)
+            ? LayerClickMode.Range
+            : LayerClickMode.Plain;
 
-    _viewModel.SelectedLayers = next;
+    (_viewModel.SelectedLayers, _layerAnchor) = LayerSelection.Apply(_viewModel.SelectedLayers, _layerAnchor, layer, mode);
     e.Handled = true;
 }
 ```
 
-Notes: `e.KeyModifiers` comes from `PointerEventArgs` (Avalonia 11.3.20 — `PointerPointProperties` has no `KeyModifiers` member). The `e.Source is CheckBox` guard stops visibility-checkbox clicks (which bubble `PointerPressed` to the row Border) from changing the selection.
+Notes:
+- `e.KeyModifiers` comes from `PointerEventArgs` (Avalonia 11.3.20 — `PointerPointProperties` has no `KeyModifiers` member).
+- No checkbox guard is needed: probe-verified that a pointer press on a `CheckBox` is handled by `ToggleButton` (`e.Handled = true`), so it never bubbles to the row `Border` — the visibility-checkbox pointer-click test in `Layout_ContainsNamedLayerListAndViewToggles` proves the selection is untouched.
+- Anchor semantics (probe-verified pure logic): Plain and Ctrl-toggle re-anchor to the clicked layer; Shift-range keeps the anchor so successive Shift-clicks extend from the original anchor. Ctrl+Shift resolves to Toggle (Ctrl checked first).
 
 private void OnLayerVisibilityChanged(object? sender, RoutedEventArgs e)
 {

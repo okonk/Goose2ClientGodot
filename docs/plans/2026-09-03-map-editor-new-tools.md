@@ -74,6 +74,11 @@ public void FloodFill_EmptyRegion_FillsWholeMapAsOneUndoableCommand()
     for (int y = 0; y < 5; y++)
         for (int x = 0; x < 5; x++)
             Assert.Equal(new MapTileLayer(0, 0), session.Document[x, y].GetLayer(0));
+    Assert.True(session.CanRedo);
+    Assert.True(session.Redo());
+    for (int y = 0; y < 5; y++)
+        for (int x = 0; x < 5; x++)
+            Assert.Equal(new MapTileLayer(3, 3), session.Document[x, y].GetLayer(0));
 }
 
 [Fact]
@@ -263,7 +268,41 @@ public enum MapEditTool
 ```csharp
 namespace MapEditor.Core;
 
-public readonly record struct MapTileRectangle(int X, int Y, int Width, int Height);
+public readonly record struct MapTileRectangle(int X, int Y, int Width, int Height)
+{
+    public MapTileRectangle? ClipTo(int boundsWidth, int boundsHeight)
+    {
+        int x = Math.Max(0, X);
+        int y = Math.Max(0, Y);
+        int width = Math.Min(Width, boundsWidth - x);
+        int height = Math.Min(Height, boundsHeight - y);
+        return width > 0 && height > 0 ? new MapTileRectangle(x, y, width, height) : null;
+    }
+}
+```
+
+`ClipTo` is the single shared clip-to-bounds operation — the renderer overlays, the VM paste application, and the canvas drag clamp all use it (or its inverse, clamping a point), so edge/overflow behavior is defined and tested in one place. Add core tests:
+
+```csharp
+[Theory]
+[InlineData(0, 0, 3, 3, 5, 5, 0, 0, 3, 3)]
+[InlineData(3, 3, 4, 4, 5, 5, 3, 3, 2, 2)]
+[InlineData(-2, -2, 3, 3, 5, 5, 0, 0, 1, 1)]
+public void ClipTo_ClipsToBounds(int x, int y, int w, int h, int bw, int bh, int ex, int ey, int ew, int eh)
+{
+    var clipped = new MapTileRectangle(x, y, w, h).ClipTo(bw, bh);
+    Assert.Equal(new MapTileRectangle(ex, ey, ew, eh), clipped);
+}
+
+[Theory]
+[InlineData(5, 0, 2, 2, 5, 5)]
+[InlineData(0, 5, 2, 2, 5, 5)]
+[InlineData(-7, -7, 2, 2, 5, 5)]
+[InlineData(0, 0, 0, 3, 5, 5)]
+public void ClipTo_NoOverlapOrEmpty_ReturnsNull(int x, int y, int w, int h, int bw, int bh)
+{
+    Assert.Null(new MapTileRectangle(x, y, w, h).ClipTo(bw, bh));
+}
 ```
 
 `MapEditSession`:
@@ -440,6 +479,7 @@ git commit -m "feat: flood fill and layer patch entry points in MapEditSession"
 | Out-of-bounds patch throws, document untouched (adversarial) | `LayerPatch_OutOfBounds_ThrowsWithoutMutation` |
 | Wrong inner-array length throws before any mutation (adversarial) | `LayerPatch_WrongInnerArrayLength_ThrowsWithoutMutation` |
 | Non-stroking tools rejected by `BeginStroke` (adversarial) | `BeginStroke_NonStrokingTool_Throws` |
+| Rectangle clip-to-bounds: partial clip, negative origin, no-overlap null (adversarial) | `ClipTo_ClipsToBounds`, `ClipTo_NoOverlapOrEmpty_ReturnsNull` |
 | Non-empty start region refills with the brush | `FloodFill_NonEmptyStartRegion_RefillsWithBrush` |
 | Stroke exclusivity | `FloodFill_AndLayerPatch_WithActiveStroke_Throw` |
 
@@ -472,12 +512,13 @@ In `tests/MapEditor.Rendering.Tests/MapRendererTests.cs` (follow the file's exis
 [Fact]
 public void SelectionRectangle_DrawsFourOutlineLinesWithSelectionStroke()
 {
-    // 5x5 document, viewport showing the whole map (mirror the file's existing viewport helper)
+    string manifest = ManifestJson((1, 1, 0, 0, 32, 32));
+    MapRenderer renderer = new(CreateCache(new FakeSpriteSheetLoader(), manifest));
     var document = MapDocument.Create(5, 5);
     var options = new MapRenderOptions(MapLayerVisibility.All, false, false, null, null,
         SelectionRectangle: new MapTileRectangle(1, 1, 3, 2));
     var sink = new RecordingMapDrawSink();
-    new MapRenderer(CreateCache(...)).Render(new MapRenderRequest(document, Viewport(...), options), sink);
+    renderer.Render(Request(document, Viewport(5 * 32, 5 * 32), options), sink);
 
     var lines = sink.Calls.OfType<GridLineDrawOperation>()
         .Where(op => op.Color == MapRenderer.MapRenderPalette.SelectionStroke)
@@ -517,6 +558,43 @@ public void PasteGhost_FullyInBounds_DrawsFillAndOutline()
         .Count(op => op.Kind == CellOverlayKind.PasteGhost));
     Assert.Equal(4, sink.Calls.OfType<GridLineDrawOperation>()
         .Count(op => op.Color == MapRenderer.MapRenderPalette.PasteGhostStroke));
+}
+
+[Fact]
+public void RectangleOverlays_FullyOutOfBounds_DrawNothing()
+{
+    string manifest = ManifestJson((1, 1, 0, 0, 32, 32));
+    MapRenderer renderer = new(CreateCache(new FakeSpriteSheetLoader(), manifest));
+    var document = MapDocument.Create(5, 5);
+    var options = new MapRenderOptions(MapLayerVisibility.All, false, false, null, null,
+        SelectionRectangle: new MapTileRectangle(5, 5, 2, 2),
+        PasteGhost: new MapTileRectangle(5, 5, 2, 2));
+    var sink = new RecordingMapDrawSink();
+    renderer.Render(Request(document, Viewport(5 * 32, 5 * 32), options), sink);
+
+    Assert.Empty(sink.Calls.OfType<GridLineDrawOperation>()
+        .Where(op => op.Color == MapRenderer.MapRenderPalette.SelectionStroke));
+    Assert.Empty(sink.Calls.OfType<CellOverlayDrawOperation>()
+        .Where(op => op.Kind == CellOverlayKind.PasteGhost));
+}
+
+[Fact]
+public void RectangleOverlays_PartiallyOutOfBounds_ClipsToDocument()
+{
+    string manifest = ManifestJson((1, 1, 0, 0, 32, 32));
+    MapRenderer renderer = new(CreateCache(new FakeSpriteSheetLoader(), manifest));
+    var document = MapDocument.Create(5, 5);
+    var options = new MapRenderOptions(MapLayerVisibility.All, false, false, null, null,
+        SelectionRectangle: new MapTileRectangle(-3, -3, 4, 4),
+        PasteGhost: new MapTileRectangle(-3, -3, 4, 4));
+    var sink = new RecordingMapDrawSink();
+    renderer.Render(Request(document, Viewport(5 * 32, 5 * 32), options), sink);
+
+    // both rectangles clip to the single cell (0,0)
+    Assert.Equal(4, sink.Calls.OfType<GridLineDrawOperation>()
+        .Count(op => op.Color == MapRenderer.MapRenderPalette.SelectionStroke));
+    Assert.Equal(1, sink.Calls.OfType<CellOverlayDrawOperation>()
+        .Count(op => op.Kind == CellOverlayKind.PasteGhost));
 }
 ```
 
@@ -578,7 +656,7 @@ if (options.PasteGhost is { } ghost)
 }
 ```
 
-- Add two private static helpers (model on `DrawGrid`/`DrawTarget`, `:145-162,212`): clip the rectangle to the document bounds first; skip if empty. `DrawRectangleOutline` emits four `GridLineDrawOperation`s along the clipped rectangle's edges (world coords via `viewport.WorldToScreen`), skipping edges outside `viewport.VisibleWorldRect` like `DrawGrid` does. `DrawRectangleFill` emits one `CellOverlayDrawOperation(PasteGhost, ...)` per cell in the clipped rectangle ∩ visible cells, fill = the given color, stroke = `MapRenderPalette.Transparent`.
+- Add two private static helpers (model on `DrawGrid`/`DrawTarget`, `:145-162,212`): clip the rectangle with `MapTileRectangle.ClipTo(document.Width, document.Height)`; skip if null. `DrawRectangleOutline` emits four `GridLineDrawOperation`s along the clipped rectangle's edges (world coords via `viewport.WorldToScreen`), skipping edges outside `viewport.VisibleWorldRect` like `DrawGrid` does. `DrawRectangleFill` emits one `CellOverlayDrawOperation(PasteGhost, ...)` per cell in the clipped rectangle ∩ visible cells, fill = the given color, stroke = `MapRenderPalette.Transparent`.
 
 **Step 4: Run tests to verify they pass (green)**
 
@@ -599,6 +677,8 @@ git commit -m "feat: selection rectangle and paste ghost render overlays"
 | Selection rectangle draws exactly 4 outline lines in the selection stroke color | `SelectionRectangle_DrawsFourOutlineLinesWithSelectionStroke` |
 | Ghost clipped to document bounds (adversarial) | `PasteGhost_StraddlingEdge_ClipsFillToDocumentBounds` |
 | In-bounds ghost draws per-cell fills + outline in distinct colors | `PasteGhost_FullyInBounds_DrawsFillAndOutline` |
+| Fully out-of-bounds rectangle draws nothing (adversarial) | `RectangleOverlays_FullyOutOfBounds_DrawNothing` |
+| Partially out-of-bounds rectangle clips to the document (adversarial) | `RectangleOverlays_PartiallyOutOfBounds_ClipsToDocument` |
 | Negative paste origin clips both source and destination (adversarial) | `ApplyPasteAt_NegativeOrigin_ClipsSourceAndDestination` |
 | Existing renders unaffected when new options are null | all pre-existing `MapRendererTests` still green |
 
@@ -669,9 +749,36 @@ public void CopySelection_CapturesOnlySelectedLayers()
 }
 
 [Fact]
+public void ApplyPasteAt_WritesEachCapturedLayerToItsCorrespondingLayer()
+{
+    _viewModel.SelectedLayers = 0b01001;
+    for (int x = 0; x < 3; x++)
+    {
+        _viewModel.Session.Document.SetLayer(x, 0, 0, new MapTileLayer(5, 5));
+        _viewModel.Session.Document.SetLayer(x, 0, 3, new MapTileLayer(6, 6));
+    }
+
+    _viewModel.SelectionRectangle = new MapTileRectangle(0, 0, 3, 1);
+    _viewModel.CopySelection();
+    _viewModel.BeginPasteMode();
+    _viewModel.ApplyPasteAt(5, 2);
+
+    for (int x = 5; x < 8; x++)
+    {
+        Assert.Equal(new MapTileLayer(5, 5), _viewModel.Session.Document[x, 2].GetLayer(0));
+        Assert.Equal(new MapTileLayer(6, 6), _viewModel.Session.Document[x, 2].GetLayer(3));
+        Assert.Equal(new MapTileLayer(0, 0), _viewModel.Session.Document[x, 2].GetLayer(1));
+        Assert.Equal(new MapTileLayer(0, 0), _viewModel.Session.Document[x, 2].GetLayer(2));
+        Assert.Equal(new MapTileLayer(0, 0), _viewModel.Session.Document[x, 2].GetLayer(4));
+    }
+
+    Assert.False(_viewModel.PasteMode);
+    Assert.True(_viewModel.CanUndo);
+}
+
+[Fact]
 public void ApplyPasteAt_EdgeOrigin_ClipsToDocumentBounds()
 {
-    // 100x100 default document; 3x3 clipboard seeded at the origin
     SeedClipboard();
     _viewModel.BeginPasteMode();
     Assert.True(_viewModel.PasteMode);
@@ -720,11 +827,13 @@ public void PasteMode_CancelsWhenLayerSelectionChanges()
 }
 
 [Fact]
-public void NewDocument_ClearsClipboardPasteAndSelectionRectangle()
+public async Task NewDocument_ClearsClipboardPasteAndSelectionRectangle()
 {
     SeedClipboard();
     _viewModel.BeginPasteMode();
-    // New flow: mirror the existing New_ReplacesDocument test (replace document via the controller)
+    _dialogs.NewMapResult = new NewMapRequest(10, 10);
+    _dialogs.DirtyResult = DirtyChoice.Discard;
+    await _viewModel.NewAsync();
     Assert.Null(_viewModel.Clipboard);
     Assert.Null(_viewModel.SelectionRectangle);
     Assert.False(_viewModel.PasteMode);
@@ -860,14 +969,12 @@ public void ApplyPasteAt(int x, int y)
         return;
     }
 
-    int sourceX = Math.Max(0, -x);
-    int sourceY = Math.Max(0, -y);
-    int originX = Math.Max(0, x);
-    int originY = Math.Max(0, y);
-    int clipWidth = Math.Min(clip.Width - sourceX, _session.Document.Width - originX);
-    int clipHeight = Math.Min(clip.Height - sourceY, _session.Document.Height - originY);
-    if (clipWidth > 0 && clipHeight > 0)
+    MapTileRectangle? dest = new MapTileRectangle(x, y, clip.Width, clip.Height)
+        .ClipTo(_session.Document.Width, _session.Document.Height);
+    if (dest is { } d)
     {
+        int sourceX = d.X - x;
+        int sourceY = d.Y - y;
         var sub = new MapTileLayer[MapDocument.LayerCount][];
         for (int layer = 0; layer < MapDocument.LayerCount; layer++)
         {
@@ -876,16 +983,16 @@ public void ApplyPasteAt(int x, int y)
                 continue;
             }
 
-            var slice = new MapTileLayer[clipWidth * clipHeight];
-            for (int row = 0; row < clipHeight; row++)
+            var slice = new MapTileLayer[d.Width * d.Height];
+            for (int row = 0; row < d.Height; row++)
             {
-                Array.Copy(data, (sourceY + row) * clip.Width + sourceX, slice, row * clipWidth, clipWidth);
+                Array.Copy(data, (sourceY + row) * clip.Width + sourceX, slice, row * d.Width, d.Width);
             }
 
             sub[layer] = slice;
         }
 
-        _session.ApplyLayerPatch(originX, originY, clipWidth, clipHeight, sub);
+        _session.ApplyLayerPatch(d.X, d.Y, d.Width, d.Height, sub);
     }
 
     CancelPasteMode();
@@ -915,6 +1022,7 @@ git commit -m "feat: tile clipboard and paste mode in editor view model"
 | Invariant | Proved by |
 |-----------|-----------|
 | Copy captures only selected layers, null for the rest | `CopySelection_CapturesOnlySelectedLayers` |
+| Paste writes each captured layer to its corresponding layer only (adversarial) | `ApplyPasteAt_WritesEachCapturedLayerToItsCorrespondingLayer` |
 | Edge paste clips to bounds, one undo restores (adversarial) | `ApplyPasteAt_EdgeOrigin_ClipsToDocumentBounds` |
 | Fully out-of-bounds paste is a no-op with no history (adversarial) | `ApplyPasteAt_FullyOutOfBounds_ChangesNothing` |
 | Layer-selection change cancels paste mode | `PasteMode_CancelsWhenLayerSelectionChanges` |
@@ -937,12 +1045,12 @@ git commit -m "feat: tile clipboard and paste mode in editor view model"
 - Derived/cached state affected: paste mode must be cancelled by `FinishInteraction` (menu commands, close) and Escape, or a stale paste would fire on the next click after e.g. Ctrl+Z
 - Required propagation sequence:
   1. `OnPointerPressed` (left, not space-pan): if `_viewModel.PasteMode` → `TileAt` hit: `ApplyPasteAt(tile.X, tile.Y)`; miss: `CancelPasteMode()`; consume the press — set `e.Handled = true` and do NOT start a stroke or capture
-  2. else route by `_viewModel.ActiveTool`: `Select` → set `SelectedX/SelectedY`, no stroke; `MultiSelect` → begin local rectangle drag (`_rectDragStart = tile`, `_multiSelecting = true`, `_rectDragMoved = false`) and capture the pointer; `FloodFill` → `_viewModel.Session.ApplyFloodFill(tile.X, tile.Y)`, set `SelectedX/SelectedY`, refresh; default → existing `BeginStroke`
+  2. else route by `_viewModel.ActiveTool`: `Select` → set `SelectedX/SelectedY`, then `_viewModel.Refresh(EditorRefresh.Canvas)` (the selected-tile overlay only redraws on `CanvasInvalidated`/`Invalidate` — without this it stays stale until the next hover move); no stroke; `MultiSelect` → begin local rectangle drag (`_rectDragStart = tile`, `_multiSelecting = true`, `_rectDragMoved = false`) and capture the pointer (store it in a new `IPointer? _capturedPointer` field — the existing capture site `:131` stores nothing, and `FinishInteraction` has no event to release through); `FloodFill` → `_viewModel.Session.ApplyFloodFill(tile.X, tile.Y)`, set `SelectedX/SelectedY`, refresh; default → existing `BeginStroke`
   3. `IsGestureActive` (`:100`) and the capture condition (`:131`): include `_multiSelecting` — otherwise the drag freezes when the pointer leaves the canvas and release-outside never finalizes
   4. `OnPointerMoved` while `_multiSelecting`: normalize `_rectDragStart`→current tile into inclusive bounds, **clamped to the map** (if `TileAt` is null mid-drag, clamp to the last in-bounds tile / map edge), set `_viewModel.SelectionRectangle = new MapTileRectangle(minX, minY, w, h)` (w/h = span+1), `_rectDragMoved = true`, `Invalidate()`
   5. `OnPointerReleased` while `_multiSelecting`: if no move occurred, set a 1×1 rectangle at the pressed tile; clear `_multiSelecting`; `Invalidate()`
   6. `OnKeyDown` Escape (`:268`): existing `FinishInteraction(commit: false)` plus `_viewModel.CancelPasteMode()`
-  7. `FinishInteraction`: add `_viewModel.CancelPasteMode()`, and clear `_multiSelecting`/`_rectDragStart` + `ReleaseCapture()` — a menu command or Escape mid-drag must not leave the canvas permanently gesture-active (`FinishInteraction` currently clears only `_stroking`/`_panning`)
+  7. `FinishInteraction`: add `_viewModel.CancelPasteMode()`, and clear `_multiSelecting`/`_rectDragStart` + release the captured pointer via `_capturedPointer?.Capture(null); _capturedPointer = null;` (Avalonia 11.3.20 has no `ReleaseCapture()` — the codebase pattern is `Pointer.Capture(null)`, see `MapCanvas.cs:224`) — a menu command or Escape mid-drag must not leave the canvas permanently gesture-active (`FinishInteraction` currently clears only `_stroking`/`_panning`)
   8. `MainWindow.OnKeyDown`: add `case Key.Escape:` → `Canvas.FinishInteraction(commit: false); _viewModel.CancelPasteMode();` — window-level so Esc cancels paste regardless of focus (the canvas's own Escape handler sets `e.Handled` and wins when the canvas is focused; both paths reach the same state). The paste-Escape test must therefore not require canvas focus
   9. `BuildRenderRequest` (`:344`): pass `SelectionRectangle: _viewModel.SelectionRectangle, PasteGhost: _viewModel.PasteGhost`
 - Invariants to preserve:
@@ -1014,11 +1122,25 @@ public async Task MultiSelectTool_Drag_SetsSelectionRectangle()
 }
 
 [AvaloniaFact]
-public async Task PasteMode_ClickAppliesOnceAndSecondClickIsInert()
+public async Task MultiSelectTool_DragOutsideMap_ClampsToMapBounds()
+{
+    Harness harness = await CreateSmallMapAsync();
+    harness.ViewModel.ActiveTool = MapEditTool.MultiSelect;
+    Point start = new(Cell / 2, Cell / 2);
+    Point outside = new(3 * Cell + Cell / 2 + 400, 3 * Cell + Cell / 2 + 400);
+    harness.Window.MouseDown(start, MouseButton.Left, RawInputModifiers.None);
+    harness.Window.MouseMove(outside, RawInputModifiers.None);
+    harness.Window.MouseUp(outside, MouseButton.Left, RawInputModifiers.None);
+
+    // the 4x4 map fully covered — the out-of-bounds drag endpoint clamps to the map edge
+    Assert.Equal(new MapTileRectangle(0, 0, 4, 4), harness.ViewModel.SelectionRectangle);
+}
+
+[AvaloniaFact]
+public async Task PasteMode_IsOneShot_SecondClickRunsActiveTool()
 {
     Harness harness = await CreateSmallMapAsync();
     MapDocument document = harness.ViewModel.Session.Document;
-    // known 2x2 source region of (7,7) at the origin
     document.SetLayer(0, 0, 0, new MapTileLayer(7, 7));
     document.SetLayer(1, 0, 0, new MapTileLayer(7, 7));
     document.SetLayer(0, 1, 0, new MapTileLayer(7, 7));
@@ -1037,8 +1159,9 @@ public async Task PasteMode_ClickAppliesOnceAndSecondClickIsInert()
     Assert.Equal(new MapTileLayer(7, 7), document[2, 2].GetLayer(0));
     Assert.True(harness.ViewModel.Session.CanUndo);
 
-    // second click: brush now equals the pasted value, so a pencil stroke has zero deltas
-    // and CompleteStroke pushes no history entry (MapEditSession.CompleteStroke returns false on !HasDeltas)
+    // paste mode is one-shot: the second click runs the active tool (Pencil). With the
+    // brush set to the pasted value the pencil stroke has zero deltas, so no second
+    // history entry appears — a second paste would have pushed one
     harness.ViewModel.Brush = new MapTileLayer(7, 7);
     harness.Window.MouseDown(target, MouseButton.Left, RawInputModifiers.None);
     harness.Window.MouseUp(target, MouseButton.Left, RawInputModifiers.None);
@@ -1104,7 +1227,44 @@ public async Task PasteMode_FinishInteractionCancelsBeforeNextClick()
 `tests/MapEditor.App.Tests/MainWindowTests.cs`:
 - `Layout_ContainsFourToolTogglesWithPencilActive` (`:176`): rename to `Layout_ContainsSevenToolTogglesWithPencilActive`; assert the three new toggles (`SelectTool`, `MultiSelectTool`, `FloodFillTool`) exist and Pencil is still checked by default.
 - Hotkey tests (use `KeyPressQwerty` — the `KeyPress(Key, …)` overload is `[Obsolete]`): `PhysicalKey.V` → `ActiveTool == Select`; `PhysicalKey.M` → `MultiSelect`; `PhysicalKey.B` → `FloodFill`; `PhysicalKey.X` → `BlockedToggle` (regression for the Part 1 change). Also add the V/M/B cases to `ShortcutTests.cs` next to the existing B/X cases (`:126-127`).
-- Ctrl+C/Ctrl+V: with a `SelectionRectangle` set, `Window.KeyPressQwerty(PhysicalKey.C, RawInputModifiers.Control)` populates `ViewModel.Clipboard`; `Window.KeyPressQwerty(PhysicalKey.V, RawInputModifiers.Control)` sets `PasteMode`. Also: Ctrl+C with no selection rectangle does nothing.
+- Ctrl+C/Ctrl+V (probe-verified: `KeyPressQwerty(PhysicalKey.C, RawInputModifiers.Control)` delivers `KeyModifiers.Control` headless — unlike pointer modifiers, which cannot be simulated): in `MainWindowTests` using the `MainWindowHarness`:
+
+```csharp
+[AvaloniaFact]
+public void CtrlC_PopulatesClipboardAndCtrlV_EntersPasteMode()
+{
+    MainWindowHarness harness = Create();
+    harness.ViewModel.Session.Document.SetLayer(0, 0, 0, new MapTileLayer(7, 7));
+    harness.ViewModel.SelectionRectangle = new MapTileRectangle(0, 0, 1, 1);
+
+    harness.Window.KeyPressQwerty(PhysicalKey.C, RawInputModifiers.Control);
+    Assert.NotNull(harness.ViewModel.Clipboard);
+
+    harness.Window.KeyPressQwerty(PhysicalKey.V, RawInputModifiers.Control);
+    Assert.True(harness.ViewModel.PasteMode);
+}
+
+[AvaloniaFact]
+public void CtrlC_WithoutSelectionRectangle_DoesNothing()
+{
+    MainWindowHarness harness = Create();
+    harness.Window.KeyPressQwerty(PhysicalKey.C, RawInputModifiers.Control);
+    Assert.Null(harness.ViewModel.Clipboard);
+}
+
+[AvaloniaFact]
+public void CtrlC_WithBrushFieldFocused_KeepsNativeBehavior()
+{
+    MainWindowHarness harness = Create();
+    harness.ViewModel.SelectionRectangle = new MapTileRectangle(0, 0, 1, 1);
+    Find<TextBox>("BrushGraphic").Focus();
+
+    harness.Window.KeyPressQwerty(PhysicalKey.C, RawInputModifiers.Control);
+    Assert.Null(harness.ViewModel.Clipboard);
+}
+```
+
+The last test proves the `e.Source is not TextBox` guard: with a brush field focused, Ctrl+C must not populate the editor clipboard.
 
 **Step 2: Run tests to verify they fail (red)**
 
@@ -1175,12 +1335,14 @@ git commit -m "feat: select, multi-select copy/paste, and flood fill tools in th
 | Select sets selection with no stroke/history (adversarial) | `SelectTool_Click_SetsSelectionWithoutStrokeOrHistory` |
 | Flood fill click = bounded fill, one undo | `FloodFillTool_Click_FillsRegionAsOneUndoableCommand` |
 | Multi-select drag yields the exact rectangle, no document change | `MultiSelectTool_Drag_SetsSelectionRectangle` |
-| Paste applies exactly once; second click is inert (adversarial) | `PasteMode_ClickAppliesOnceAndSecondClickIsInert` |
+| Drag outside the map clamps the rectangle to map bounds (adversarial) | `MultiSelectTool_DragOutsideMap_ClampsToMapBounds` |
+| Paste applies exactly once; second click runs the active tool (adversarial) | `PasteMode_IsOneShot_SecondClickRunsActiveTool` |
 | Escape cancels paste mode without pasting | `PasteMode_EscapeCancelsWithoutPasting` |
 | Click outside the map cancels paste mode without pasting | `PasteMode_ClickOutsideMapCancelsWithoutPasting` |
 | Menu/close path cancels paste mode before the next click (adversarial) | `PasteMode_FinishInteractionCancelsBeforeNextClick` |
 | Toolbar shows all seven tools; hotkeys V/M/B/X route correctly | extended `MainWindowTests` toolbar + hotkey tests |
-| Ctrl+C/V guarded against TextBox focus | `MainWindowTests` Ctrl+C/V test (assert no clipboard change when a brush field is focused) |
+| Ctrl+C populates clipboard, Ctrl+V enters paste mode; no-selection Ctrl+C is a no-op | `CtrlC_PopulatesClipboardAndCtrlV_EntersPasteMode`, `CtrlC_WithoutSelectionRectangle_DoesNothing` |
+| Ctrl+C guarded against TextBox focus | `CtrlC_WithBrushFieldFocused_KeepsNativeBehavior` |
 
 ---
 
