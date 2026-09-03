@@ -31,6 +31,8 @@ internal partial class MainWindow : Window
     private readonly TextBlock[] _layerRefs;
     private bool _closeGuardRunning;
     private bool _closeApproved;
+    // Picker/settings continuations can resume after Closed; publishing then leaks an undisposed context.
+    private bool _closed;
 
     public MainWindow(IEditorDialogs dialogs, AppSettingsStore settings, MainWindowViewModel viewModel, AssetContextController assets)
     {
@@ -59,7 +61,11 @@ internal partial class MainWindow : Window
         SyncReadouts();
         SyncAssetDirectory();
         Closing += OnClosing;
-        Closed += (sender, e) => _assets.Dispose();
+        Closed += (sender, e) =>
+        {
+            _closed = true;
+            _assets.Dispose();
+        };
         Opened += OnOpened;
     }
 
@@ -298,6 +304,11 @@ internal partial class MainWindow : Window
 
     private async Task<bool> TryOpenAssetsAsync(string path)
     {
+        if (_closed)
+        {
+            return false;
+        }
+
         if (_assets.TryOpen(path, out Exception? failure))
         {
             SyncAssetDirectory();

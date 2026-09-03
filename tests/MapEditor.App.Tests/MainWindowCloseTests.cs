@@ -230,6 +230,44 @@ public class MainWindowCloseTests
     }
 
     [AvaloniaFact]
+    public void Close_WhileAssetPickerPending_CompletingAfterClose_DoesNotPublishContext()
+    {
+        using MainWindowHarness harness = MainWindowHarness.Create();
+        string assets = WriteAssetDirectory(harness.TempDirectory);
+        var gate = new TaskCompletionSource<string?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        harness.Dialogs.AssetDirectoryPickGate = gate;
+        harness.Dialogs.DirtyResult = DirtyChoice.Discard;
+
+        harness.Window.FindControl<Avalonia.Controls.Button>("LoadAssetsButton")!.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Avalonia.Controls.Button.ClickEvent));
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal(2, harness.Dialogs.AssetDirectoryPickShown);
+        Assert.Empty(harness.ViewModel.SheetIds);
+
+        harness.Window.Close();
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.False(harness.Window.IsVisible);
+        Assert.True(harness.Assets.Current.IsDisposed);
+
+        gate.SetResult(assets);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Empty(harness.ViewModel.SheetIds);
+        Assert.Equal(0, harness.ViewModel.SelectedSheet);
+        Assert.True(harness.Assets.Current.IsDisposed);
+        Assert.Empty(harness.Dialogs.Errors);
+    }
+
+    private static string WriteAssetDirectory(string root)
+    {
+        string directory = Path.Combine(root, "assets-close");
+        Directory.CreateDirectory(Path.Combine(directory, "sheets"));
+        File.WriteAllText(Path.Combine(directory, "manifest.json"),
+            """{ "tileSize": 32, "sheets": { "1": { "10": [0, 0, 32, 32] } } }""");
+        return directory;
+    }
+
+    [AvaloniaFact]
     public void Close_AfterApprovedClose_SecondClosingIsNotCancelledAgain()
     {
         using MainWindowHarness harness = MainWindowHarness.Create();

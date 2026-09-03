@@ -23,6 +23,7 @@ internal sealed class FakeEditorDialogs : IEditorDialogs
     public Exception? ShowDirtyException;
     public Exception? ShowErrorException;
     public TaskCompletionSource<DirtyChoice>? DirtyGate;
+    public TaskCompletionSource<string?>? AssetDirectoryPickGate;
 
     public int NewMapShown;
     public int DirtyShown;
@@ -96,6 +97,11 @@ internal sealed class FakeEditorDialogs : IEditorDialogs
         if (PickAssetDirectoryException is { } exception)
         {
             return Task.FromException<string?>(exception);
+        }
+
+        if (AssetDirectoryPickGate is { } gate)
+        {
+            return gate.Task;
         }
 
         return Task.FromResult(AssetDirectoryPickResult);
