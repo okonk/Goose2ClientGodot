@@ -134,43 +134,85 @@ internal sealed class MainWindowViewModel : ViewModelBase
     public bool Layer0Visible
     {
         get => _layer0Visible;
-        set => SetField(ref _layer0Visible, value);
+        set
+        {
+            if (SetField(ref _layer0Visible, value))
+            {
+                Refresh(EditorRefresh.Canvas);
+            }
+        }
     }
 
     public bool Layer1Visible
     {
         get => _layer1Visible;
-        set => SetField(ref _layer1Visible, value);
+        set
+        {
+            if (SetField(ref _layer1Visible, value))
+            {
+                Refresh(EditorRefresh.Canvas);
+            }
+        }
     }
 
     public bool Layer2Visible
     {
         get => _layer2Visible;
-        set => SetField(ref _layer2Visible, value);
+        set
+        {
+            if (SetField(ref _layer2Visible, value))
+            {
+                Refresh(EditorRefresh.Canvas);
+            }
+        }
     }
 
     public bool Layer3Visible
     {
         get => _layer3Visible;
-        set => SetField(ref _layer3Visible, value);
+        set
+        {
+            if (SetField(ref _layer3Visible, value))
+            {
+                Refresh(EditorRefresh.Canvas);
+            }
+        }
     }
 
     public bool Layer4Visible
     {
         get => _layer4Visible;
-        set => SetField(ref _layer4Visible, value);
+        set
+        {
+            if (SetField(ref _layer4Visible, value))
+            {
+                Refresh(EditorRefresh.Canvas);
+            }
+        }
     }
 
     public bool ShowGrid
     {
         get => _showGrid;
-        set => SetField(ref _showGrid, value);
+        set
+        {
+            if (SetField(ref _showGrid, value))
+            {
+                Refresh(EditorRefresh.Canvas);
+            }
+        }
     }
 
     public bool ShowBlocked
     {
         get => _showBlocked;
-        set => SetField(ref _showBlocked, value);
+        set
+        {
+            if (SetField(ref _showBlocked, value))
+            {
+                Refresh(EditorRefresh.Canvas);
+            }
+        }
     }
 
     public int? HoverX

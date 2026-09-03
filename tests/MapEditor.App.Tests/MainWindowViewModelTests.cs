@@ -255,6 +255,23 @@ public class MainWindowViewModelTests : IDisposable
     }
 
     [Fact]
+    public void DisplayToggles_RepaintCanvasOnlyOnChange()
+    {
+        int canvasInvalidations = 0;
+        _viewModel.CanvasInvalidated += () => canvasInvalidations++;
+
+        _viewModel.Layer0Visible = false;
+        Assert.Equal(1, canvasInvalidations);
+
+        _viewModel.Layer0Visible = false;
+        Assert.Equal(1, canvasInvalidations);
+
+        _viewModel.ShowGrid = false;
+        _viewModel.ShowBlocked = true;
+        Assert.Equal(3, canvasInvalidations);
+    }
+
+    [Fact]
     public void Refresh_TitleWithoutChange_RaisesNothing()
     {
         var raised = RaisedProperties(() => _viewModel.Refresh(EditorRefresh.Title));
