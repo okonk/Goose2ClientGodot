@@ -32,7 +32,8 @@ internal sealed class AssetContext : IDisposable
     public static AssetContext Create(string assetDirectory, ISpriteSheetLoader loader)
     {
         SpriteAssetCache cache = SpriteAssetCache.Open(assetDirectory, loader);
-        return new(cache, new MapRenderer(cache), cache.Manifest!.SheetIds);
+        IReadOnlyList<int> sheetIds = TileSheetFilter.Apply(cache.Manifest!.SheetIds, TileSheetFilter.Load(assetDirectory));
+        return new(cache, new MapRenderer(cache), sheetIds);
     }
 
     public SpriteResolution Resolve(SpriteReference reference)

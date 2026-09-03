@@ -53,6 +53,34 @@ public class AssetContextControllerTests : IDisposable
         => new AppSettingsStore(_settingsPath).Save(new AppSettings(assetDirectory));
 
     [Fact]
+    public void TryOpen_WithTileSheetSidecar_FiltersPublishedSheetIds()
+    {
+        using AssetContextController controller = CreateController();
+        string assetDirectory = WriteAssetDirectory("assets-tiles", TwoSheetJson);
+        File.WriteAllText(Path.Combine(assetDirectory, "tile-sheets.json"), "[2]");
+
+        bool opened = controller.TryOpen(assetDirectory);
+
+        Assert.True(opened);
+        Assert.Equal(new[] { 2 }, controller.Current.SheetIds);
+        Assert.Equal(2, _viewModel.SelectedSheet);
+        Assert.Single(controller.Current.GetFrames(2));
+    }
+
+    [Fact]
+    public void TryOpen_WithInvalidTileSheetSidecar_FallsBackToAllSheets()
+    {
+        using AssetContextController controller = CreateController();
+        string assetDirectory = WriteAssetDirectory("assets-bad-tiles", TwoSheetJson);
+        File.WriteAllText(Path.Combine(assetDirectory, "tile-sheets.json"), "not json");
+
+        bool opened = controller.TryOpen(assetDirectory);
+
+        Assert.True(opened);
+        Assert.Equal(new[] { 1, 2 }, controller.Current.SheetIds);
+    }
+
+    [Fact]
     public void InitialContext_IsUnavailableWithEmptyPalette()
     {
         using AssetContextController controller = CreateController();

@@ -2,6 +2,7 @@ using Goose2.AssetConverter;
 using Goose2.AssetConverter.Aspereta;
 using Goose2.AssetConverter.Manifest;
 using Goose2.AssetConverter.Maps;
+using Goose2.AssetConverter.Tiles;
 using Goose2.AssetConverter.SpriteFrames;
 
 static string ResolveAsperetaMappingPath(string? repoRoot = null)
@@ -201,4 +202,17 @@ if (args.Length >= 1 && args[0] == "all")
     return;
 }
 
-Console.WriteLine("Usage: AssetConverter batch [outDir] | frames <id> | animations [repoRoot] | maps [outDir] | manifest [outPath] | aspereta-mapping [outPath] | aspereta [repoRoot] | all [repoRoot]");
+if (args.Length >= 1 && args[0] == "tiles")
+{
+    string repoRoot = args.Length >= 2
+        ? args[1]
+        : Path.GetFullPath(Path.Combine("..", ".."));
+
+    string assetDir = Path.Combine(repoRoot, "Assets", "Sprites");
+    var sheets = TileSheetGenerator.Generate(Paths.IllutiaData, Path.Combine(assetDir, "manifest.json"), Paths.SpriteBundleConfig);
+    TileSheetGenerator.Write(assetDir, sheets);
+    Console.WriteLine($"Wrote {sheets.Count} tile sheets -> {Path.Combine(assetDir, TileSheetGenerator.OutputFileName)}");
+    return;
+}
+
+Console.WriteLine("Usage: AssetConverter batch [outDir] | frames <id> | animations [repoRoot] | maps [outDir] | manifest [outPath] | aspereta-mapping [outPath] | aspereta [repoRoot] | tiles [repoRoot] | all [repoRoot]");
