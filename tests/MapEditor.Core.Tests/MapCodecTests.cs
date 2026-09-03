@@ -1,4 +1,5 @@
 using System;
+using System.Buffers.Binary;
 using System.IO;
 using System.Reflection;
 using MapEditor.Core;
@@ -222,15 +223,43 @@ public class MapCodecTests
     }
 
     [Fact]
-    public void Decode_RejectsTrailingByte()
+    public void Decode_IgnoresTrailingBytes()
     {
-        var bytes = new byte[47];
-        Array.Copy(ValidOneTileBytes(), bytes, 46);
-        bytes[46] = 0xFF;
+        var baseBytes = ValidOneTileBytes();
+        var bytes = new byte[baseBytes.Length + 404];
+        Array.Copy(baseBytes, bytes, baseBytes.Length);
+        for (var i = baseBytes.Length; i < bytes.Length; i++)
+        {
+            bytes[i] = 0xFF;
+        }
 
-        var ex = Assert.Throws<MapFormatException>(() => MapCodec.Decode(bytes));
+        var document = MapCodec.Decode(bytes);
 
-        Assert.Equal(MapFormatError.LengthMismatch, ex.Error);
+        Assert.Equal(1, document.Width);
+        Assert.Equal(1, document.Height);
+        Assert.Equal(0, document.GetTile(0).Flags);
+    }
+
+    [Fact]
+    public void Encode_DoesNotEmitTrailingBytes()
+    {
+        var document = MapCodec.Decode(ValidOneTileBytes());
+
+        var encoded = MapCodec.Encode(document);
+
+        Assert.Equal(MapCodec.HeaderSize + MapCodec.BytesPerTile, encoded.Length);
+    }
+
+    [Fact]
+    public void Decode_AcceptsLegacyEditorVersionAndPreservesIt()
+    {
+        var bytes = ValidOneTileBytes();
+        bytes[2] = 3;
+
+        var document = MapCodec.Decode(bytes);
+
+        Assert.Equal(3, document.EditorVersion);
+        Assert.Equal(3, BinaryPrimitives.ReadInt16LittleEndian(MapCodec.Encode(document).AsSpan(2, 2)));
     }
 
     [Theory]
@@ -273,9 +302,9 @@ public class MapCodecTests
         Assert.Equal(typeof(MapDocument), decode!.ReturnType);
         Assert.DoesNotContain(decode.GetParameters(), p => p.IsOut);
 
-        var withTrailing = new byte[47];
-        Array.Copy(ValidOneTileBytes(), withTrailing, 46);
-        Assert.Throws<MapFormatException>(() => MapCodec.Decode(withTrailing));
+        var truncated = new byte[45];
+        Array.Copy(ValidOneTileBytes(), truncated, 45);
+        Assert.Throws<MapFormatException>(() => MapCodec.Decode(truncated));
     }
 
     private static byte[] ValidOneTileBytes()

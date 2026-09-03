@@ -73,6 +73,8 @@ public sealed class MapDocument
     public const int MaxDimension = 1000;
     public const short NewMapVersion = 1;
     public const short SupportedEditorVersion = 10;
+    // Aspereta maps were written by the older editor; the tile layout is identical.
+    public const short LegacyEditorVersion = 3;
 
     public short Version { get; }
 

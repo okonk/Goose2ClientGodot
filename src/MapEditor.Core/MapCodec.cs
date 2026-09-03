@@ -9,7 +9,9 @@ public static class MapCodec
     public const int BytesPerTile = 34;
 
     // Wire layout, all little-endian: Int16 version, Int16 editor version, Int32 width, Int32 height,
-    // then per tile Int32 flags followed by five Int32 graphic, Int16 sheet pairs.
+    // then per tile Int32 flags followed by five Int32 graphic, Int16 sheet pairs. Converted Illutia
+    // maps append a 404-byte used-sheet index after the tiles; the Godot client ignores it, so does
+    // this decoder.
     public static MapDocument Decode(ReadOnlySpan<byte> bytes)
     {
         if (bytes.Length < HeaderSize)
@@ -23,10 +25,10 @@ public static class MapCodec
         var width = BinaryPrimitives.ReadInt32LittleEndian(bytes[4..]);
         var height = BinaryPrimitives.ReadInt32LittleEndian(bytes[8..]);
 
-        if (editorVersion != MapDocument.SupportedEditorVersion)
+        if (editorVersion != MapDocument.SupportedEditorVersion && editorVersion != MapDocument.LegacyEditorVersion)
         {
             throw new MapFormatException(MapFormatError.UnsupportedEditorVersion,
-                $"Decode: unsupported editor version {editorVersion}; expected {MapDocument.SupportedEditorVersion}.");
+                $"Decode: unsupported editor version {editorVersion}; expected {MapDocument.SupportedEditorVersion} or {MapDocument.LegacyEditorVersion}.");
         }
 
         if (width < MapDocument.MinDimension || height < MapDocument.MinDimension)
@@ -43,10 +45,10 @@ public static class MapCodec
 
         var tileCount = checked(width * height);
         var expectedLength = checked(HeaderSize + BytesPerTile * tileCount);
-        if (bytes.Length != expectedLength)
+        if (bytes.Length < expectedLength)
         {
             throw new MapFormatException(MapFormatError.LengthMismatch,
-                $"Decode: expected {expectedLength} bytes for a {width}x{height} map, got {bytes.Length}.");
+                $"Decode: expected at least {expectedLength} bytes for a {width}x{height} map, got {bytes.Length}.");
         }
 
         var tiles = new MapTile[tileCount];
