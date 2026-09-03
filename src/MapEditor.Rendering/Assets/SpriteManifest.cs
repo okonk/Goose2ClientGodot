@@ -306,25 +306,28 @@ public sealed class SpriteManifest
     {
         value = 0;
 
-        if (name.Length == 0 || name.Length > 10)
+        // Map ids are signed Int32 (0 reserved for empty); converter manifests emit negative ids.
+        int start = name.Length > 0 && name[0] == '-' ? 1 : 0;
+
+        if (start == name.Length || name.Length - start > 10)
         {
             return false;
         }
 
-        foreach (char character in name)
+        for (int i = start; i < name.Length; i++)
         {
-            if (character is < '0' or > '9')
+            if (name[i] is < '0' or > '9')
             {
                 return false;
             }
         }
 
-        if (!int.TryParse(name, NumberStyles.None, CultureInfo.InvariantCulture, out value))
+        if (!int.TryParse(name, NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out value))
         {
             return false;
         }
 
-        return value > 0;
+        return value != 0;
     }
 
     private static SpriteManifestException Fail(SpriteManifestError error, string sourcePath, string message)

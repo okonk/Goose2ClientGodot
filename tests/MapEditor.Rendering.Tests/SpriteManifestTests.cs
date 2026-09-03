@@ -66,6 +66,25 @@ public class SpriteManifestTests
     }
 
     [Fact]
+    public void Parse_NegativeSheetAndGraphicIdsAreAcceptedAndSorted()
+    {
+        string json = """
+            { "tileSize": 32, "sheets": { "53": { "7": [16, 0, 16, 16], "-197": [0, 0, 16, 16] }, "-2": { "1": [0, 0, 4, 4] } } }
+            """;
+
+        SpriteManifest manifest = SpriteManifest.Parse(json);
+
+        Assert.Equal(new[] { -2, 53 }, manifest.SheetIds);
+        Assert.Equal(new[]
+        {
+            new SpriteFrame(new SpriteReference(53, -197), new SpriteSourceRect(0, 0, 16, 16)),
+            new SpriteFrame(new SpriteReference(53, 7), new SpriteSourceRect(16, 0, 16, 16))
+        }, manifest.GetFrames(53));
+        Assert.True(manifest.TryGetSourceRect(new SpriteReference(53, -197), out SpriteSourceRect rect));
+        Assert.Equal(new SpriteSourceRect(0, 0, 16, 16), rect);
+    }
+
+    [Fact]
     public void Parse_ComputesMaximumFrameDimensionsWithTileSizeFloor()
     {
         SpriteManifest manifest = SpriteManifest.Parse("""{ "tileSize": 32, "sheets": { "1": { "2": [0, 0, 100, 10] } } }""");
@@ -296,10 +315,12 @@ public class SpriteManifestTests
 
     [Theory]
     [InlineData("""{ "tileSize": 32, "sheets": { "0": {} } }""", "0")]
-    [InlineData("""{ "tileSize": 32, "sheets": { "-1": {} } }""", "-1")]
+    [InlineData("""{ "tileSize": 32, "sheets": { "-": {} } }""", "-")]
+    [InlineData("""{ "tileSize": 32, "sheets": { "--1": {} } }""", "--1")]
     [InlineData("""{ "tileSize": 32, "sheets": { " 1": {} } }""", " 1")]
     [InlineData("""{ "tileSize": 32, "sheets": { "1e0": {} } }""", "1e0")]
     [InlineData("""{ "tileSize": 32, "sheets": { "99999999999": {} } }""", "99999999999")]
+    [InlineData("""{ "tileSize": 32, "sheets": { "-2147483649": {} } }""", "-2147483649")]
     public void Parse_InvalidSheetIdsAreRejected(string json, string messageFragment)
     {
         AssertParseError(json, SpriteManifestError.InvalidSheetId, messageFragment);
@@ -323,10 +344,12 @@ public class SpriteManifestTests
 
     [Theory]
     [InlineData("""{ "tileSize": 32, "sheets": { "5": { "0": [0, 0, 4, 4] } } }""", "0")]
-    [InlineData("""{ "tileSize": 32, "sheets": { "5": { "-1": [0, 0, 4, 4] } } }""", "-1")]
+    [InlineData("""{ "tileSize": 32, "sheets": { "5": { "-": [0, 0, 4, 4] } } }""", "-")]
+    [InlineData("""{ "tileSize": 32, "sheets": { "5": { "--1": [0, 0, 4, 4] } } }""", "--1")]
     [InlineData("""{ "tileSize": 32, "sheets": { "5": { " 1": [0, 0, 4, 4] } } }""", " 1")]
     [InlineData("""{ "tileSize": 32, "sheets": { "5": { "1e0": [0, 0, 4, 4] } } }""", "1e0")]
     [InlineData("""{ "tileSize": 32, "sheets": { "5": { "99999999999": [0, 0, 4, 4] } } }""", "99999999999")]
+    [InlineData("""{ "tileSize": 32, "sheets": { "5": { "-2147483649": [0, 0, 4, 4] } } }""", "-2147483649")]
     public void Parse_InvalidGraphicIdsAreRejected(string json, string messageFragment)
     {
         AssertParseError(json, SpriteManifestError.InvalidGraphicId, messageFragment);
