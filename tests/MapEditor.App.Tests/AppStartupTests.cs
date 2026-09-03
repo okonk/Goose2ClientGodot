@@ -36,7 +36,7 @@ public class AppStartupTests : IDisposable
     }
 
     [AvaloniaFact]
-    public void ClassicDesktopInitialization_CreatesOneMainWindowWithDirtySessionAndUnavailableContext()
+    public void ClassicDesktopInitialization_CreatesOneMainWindowWithCleanSessionAndUnavailableContext()
     {
         var app = new App();
         app.Initialize();
@@ -46,8 +46,8 @@ public class AppStartupTests : IDisposable
         app.OnFrameworkInitializationCompleted();
 
         var window = Assert.IsType<MainWindow>(lifetime.MainWindow);
-        Assert.True(window.ViewModel.Session.IsDirty);
-        Assert.Equal("Goose2 Map Editor — Untitled*", window.ViewModel.Title);
+        Assert.False(window.ViewModel.Session.IsDirty);
+        Assert.Equal("Goose2 Map Editor — Untitled", window.ViewModel.Title);
         Assert.False(window.Assets.Current.IsAvailable);
     }
 
@@ -64,7 +64,7 @@ public class AppStartupTests : IDisposable
         Assert.Same(composed.ViewModel, composed.Window.ViewModel);
         Assert.Same(composed.Assets, composed.Window.Assets);
         Assert.Same(composed.Controller.Document.Session, composed.Window.ViewModel.Session);
-        Assert.True(composed.Window.ViewModel.Session.IsDirty);
+        Assert.False(composed.Window.ViewModel.Session.IsDirty);
         Assert.False(composed.Window.Assets.Current.IsAvailable);
     }
 

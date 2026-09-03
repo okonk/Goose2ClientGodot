@@ -34,11 +34,11 @@ public class EditorDocumentControllerTests : IDisposable
     }
 
     [Fact]
-    public void Startup_IsDirtyUntitledDocumentWithEmptyHistory()
+    public void Startup_IsCleanUntitledDocumentWithEmptyHistory()
     {
         EditorDocument document = _controller.Document;
 
-        Assert.True(document.Session.IsDirty);
+        Assert.False(document.Session.IsDirty);
         Assert.Null(document.Path);
         Assert.Null(document.Revision);
         Assert.Equal(MapDocument.DefaultWidth, document.Session.Document.Width);
@@ -64,10 +64,10 @@ public class EditorDocumentControllerTests : IDisposable
         Assert.NotSame(before, document.Session);
         Assert.Equal(50, document.Session.Document.Width);
         Assert.Equal(60, document.Session.Document.Height);
-        Assert.True(document.Session.IsDirty);
+        Assert.False(document.Session.IsDirty);
         Assert.Null(document.Path);
         Assert.Null(document.Revision);
-        Assert.Equal(1, _dialogs.DirtyShown);
+        Assert.Equal(0, _dialogs.DirtyShown);
         Assert.Equal(1, stateChanges);
     }
 
@@ -109,6 +109,7 @@ public class EditorDocumentControllerTests : IDisposable
     public async Task New_DirtyAndCanceled_KeepsCurrentDocument()
     {
         EditorDocument before = _controller.Document;
+        Paint(_controller.Document.Session, 0, 0, new MapTileLayer(1, 1));
 
         _dialogs.NewMapResult = new NewMapRequest(10, 10);
         _dialogs.DirtyResult = DirtyChoice.Cancel;
@@ -147,6 +148,7 @@ public class EditorDocumentControllerTests : IDisposable
     public async Task New_DirtyAndSaveCanceled_AbortsNew()
     {
         EditorDocument before = _controller.Document;
+        Paint(_controller.Document.Session, 0, 0, new MapTileLayer(1, 1));
 
         _dialogs.NewMapResult = new NewMapRequest(10, 10);
         _dialogs.DirtyResult = DirtyChoice.Save;
@@ -238,6 +240,7 @@ public class EditorDocumentControllerTests : IDisposable
     public async Task Open_DirtyAndCanceled_KeepsCurrentDocument()
     {
         EditorDocument before = _controller.Document;
+        Paint(_controller.Document.Session, 0, 0, new MapTileLayer(1, 1));
         string path = MapPath("open2.bytes");
         _store.Save(path, MapDocument.Create(10, 10));
 
@@ -294,6 +297,7 @@ public class EditorDocumentControllerTests : IDisposable
     public async Task SaveAs_CanceledPicker_KeepsDirtyState()
     {
         EditorDocument before = _controller.Document;
+        Paint(_controller.Document.Session, 0, 0, new MapTileLayer(1, 1));
         int stateChanges = 0;
         _controller.StateChanged += () => stateChanges++;
 
@@ -335,6 +339,7 @@ public class EditorDocumentControllerTests : IDisposable
         File.WriteAllText(blocker, "x");
         string path = Path.Combine(blocker, "nested.bytes");
         _dialogs.SavePickResult = path;
+        Paint(_controller.Document.Session, 0, 0, new MapTileLayer(1, 1));
 
         await _controller.SaveAsAsync();
 
@@ -518,6 +523,8 @@ public class EditorDocumentControllerTests : IDisposable
     [Fact]
     public async Task RequestClose_DirtyAndCanceled_Rejects()
     {
+        Paint(_controller.Document.Session, 0, 0, new MapTileLayer(1, 1));
+
         Assert.False(await _controller.RequestCloseAsync());
         Assert.Equal(1, _dialogs.DirtyShown);
         Assert.True(_controller.Document.Session.IsDirty);
@@ -526,6 +533,7 @@ public class EditorDocumentControllerTests : IDisposable
     [Fact]
     public async Task RequestClose_DirtyAndDiscarded_Approves()
     {
+        Paint(_controller.Document.Session, 0, 0, new MapTileLayer(1, 1));
         _dialogs.DirtyResult = DirtyChoice.Discard;
 
         Assert.True(await _controller.RequestCloseAsync());
@@ -535,6 +543,7 @@ public class EditorDocumentControllerTests : IDisposable
     [Fact]
     public async Task RequestClose_DirtyAndSaveSucceeds_Approves()
     {
+        Paint(_controller.Document.Session, 0, 0, new MapTileLayer(1, 1));
         _dialogs.DirtyResult = DirtyChoice.Save;
         _dialogs.SavePickResult = MapPath("close-save.bytes");
 
@@ -545,6 +554,7 @@ public class EditorDocumentControllerTests : IDisposable
     [Fact]
     public async Task RequestClose_DirtyAndSaveCanceled_Rejects()
     {
+        Paint(_controller.Document.Session, 0, 0, new MapTileLayer(1, 1));
         _dialogs.DirtyResult = DirtyChoice.Save;
         _dialogs.SavePickResult = null;
 
@@ -555,6 +565,7 @@ public class EditorDocumentControllerTests : IDisposable
     [Fact]
     public async Task RequestClose_SecondCallAfterApproval_DoesNotPromptAgain()
     {
+        Paint(_controller.Document.Session, 0, 0, new MapTileLayer(1, 1));
         _dialogs.DirtyResult = DirtyChoice.Discard;
 
         Assert.True(await _controller.RequestCloseAsync());
@@ -567,6 +578,7 @@ public class EditorDocumentControllerTests : IDisposable
     [Fact]
     public async Task RequestClose_DuplicateWhilePending_YieldsExactlyOnePrompt()
     {
+        Paint(_controller.Document.Session, 0, 0, new MapTileLayer(1, 1));
         var gate = new TaskCompletionSource<DirtyChoice>(TaskCreationOptions.RunContinuationsAsynchronously);
         _dialogs.DirtyGate = gate;
 
@@ -581,6 +593,7 @@ public class EditorDocumentControllerTests : IDisposable
     [Fact]
     public async Task RequestClose_DialogFailure_PresentsErrorAndRemainsCancelableAgain()
     {
+        Paint(_controller.Document.Session, 0, 0, new MapTileLayer(1, 1));
         _dialogs.ShowDirtyException = new InvalidOperationException("dialog failed");
 
         Assert.False(await _controller.RequestCloseAsync());
@@ -595,6 +608,7 @@ public class EditorDocumentControllerTests : IDisposable
     public async Task New_DialogFailure_PresentsLastResortErrorAndKeepsDocument()
     {
         EditorDocument before = _controller.Document;
+        Paint(before.Session, 0, 0, new MapTileLayer(1, 1));
         _dialogs.ShowNewMapException = new InvalidOperationException("dialog failed");
 
         await _controller.NewAsync();
@@ -612,6 +626,7 @@ public class EditorDocumentControllerTests : IDisposable
     public async Task New_DirtyAndDirtyDialogFailure_PresentsLastResortErrorAndKeepsDocument()
     {
         EditorDocument before = _controller.Document;
+        Paint(before.Session, 0, 0, new MapTileLayer(1, 1));
         _dialogs.NewMapResult = new NewMapRequest(10, 10);
         _dialogs.ShowDirtyException = new InvalidOperationException("dialog failed");
 
@@ -631,6 +646,7 @@ public class EditorDocumentControllerTests : IDisposable
     public async Task Open_DialogFailure_PresentsLastResortErrorAndKeepsDocument()
     {
         EditorDocument before = _controller.Document;
+        Paint(before.Session, 0, 0, new MapTileLayer(1, 1));
         _dialogs.PickOpenException = new InvalidOperationException("dialog failed");
 
         await _controller.OpenAsync();
@@ -648,6 +664,7 @@ public class EditorDocumentControllerTests : IDisposable
     public async Task SaveAs_DialogFailure_PresentsLastResortErrorAndKeepsDocument()
     {
         EditorDocument before = _controller.Document;
+        Paint(before.Session, 0, 0, new MapTileLayer(1, 1));
         _dialogs.PickSaveException = new InvalidOperationException("dialog failed");
 
         await _controller.SaveAsAsync();

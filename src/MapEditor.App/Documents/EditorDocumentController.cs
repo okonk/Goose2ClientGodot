@@ -22,7 +22,7 @@ internal sealed class EditorDocumentController
     {
         _dialogs = dialogs ?? throw new ArgumentNullException(nameof(dialogs));
         _store = store ?? throw new ArgumentNullException(nameof(store));
-        _current = new EditorDocument(new MapEditSession(MapDocument.Create(), initiallyDirty: true), null, null);
+        _current = new EditorDocument(new MapEditSession(MapDocument.Create(), initiallyDirty: false), null, null);
     }
 
     public EditorDocument Document => _current;
@@ -46,7 +46,7 @@ internal sealed class EditorDocumentController
                 return;
             }
 
-            var session = new MapEditSession(MapDocument.Create(request.Width, request.Height), initiallyDirty: true);
+            var session = new MapEditSession(MapDocument.Create(request.Width, request.Height), initiallyDirty: false);
             _current = new EditorDocument(session, null, null);
             NotifyStateChanged();
         }

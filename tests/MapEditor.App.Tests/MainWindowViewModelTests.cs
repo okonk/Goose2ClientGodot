@@ -47,9 +47,9 @@ public class MainWindowViewModelTests : IDisposable
     }
 
     [Fact]
-    public void InitialState_ReflectsNewDirtyDocument()
+    public void InitialState_ReflectsNewCleanDocument()
     {
-        Assert.Equal("Goose2 Map Editor — Untitled*", _viewModel.Title);
+        Assert.Equal("Goose2 Map Editor — Untitled", _viewModel.Title);
         Assert.Same(_controller.Document.Session, _viewModel.Session);
         Assert.Equal(MapEditTool.Pencil, _viewModel.ActiveTool);
         Assert.Equal(0, _viewModel.ActiveLayer);
@@ -72,7 +72,7 @@ public class MainWindowViewModelTests : IDisposable
         Assert.Equal(100, _viewModel.MapHeight);
         Assert.False(_viewModel.CanUndo);
         Assert.False(_viewModel.CanRedo);
-        Assert.True(_viewModel.CanSave);
+        Assert.False(_viewModel.CanSave);
     }
 
     [Fact]
@@ -197,6 +197,11 @@ public class MainWindowViewModelTests : IDisposable
     [Fact]
     public async Task Title_StarFollowsDirtyState()
     {
+        MapEditSession session = _viewModel.Session;
+        session.SelectedTileLayer = new MapTileLayer(1, 1);
+        session.BeginStroke(MapEditTool.Pencil, 0, 0);
+        Assert.True(session.CompleteStroke());
+        _viewModel.Refresh(EditorRefresh.Title);
         Assert.EndsWith("*", _viewModel.Title);
 
         _dialogs.SavePickResult = MapPath("titled.bytes");
@@ -204,9 +209,9 @@ public class MainWindowViewModelTests : IDisposable
         await _viewModel.SaveAsAsync();
         Assert.Equal("Goose2 Map Editor — titled.bytes", _viewModel.Title);
 
-        MapEditSession session = _viewModel.Session;
+        session = _viewModel.Session;
         session.SelectedTileLayer = new MapTileLayer(1, 1);
-        session.BeginStroke(MapEditTool.Pencil, 0, 0);
+        session.BeginStroke(MapEditTool.Pencil, 1, 0);
         Assert.True(session.CompleteStroke());
         _viewModel.Refresh(EditorRefresh.Title);
         Assert.Equal("Goose2 Map Editor — titled.bytes*", _viewModel.Title);
@@ -294,7 +299,7 @@ public class MainWindowViewModelTests : IDisposable
         Assert.Null(_viewModel.HoverY);
         Assert.Null(_viewModel.SelectedX);
         Assert.Null(_viewModel.SelectedY);
-        Assert.Equal("Goose2 Map Editor — Untitled*", _viewModel.Title);
+        Assert.Equal("Goose2 Map Editor — Untitled", _viewModel.Title);
         Assert.Equal(1, canvasInvalidations);
     }
 
@@ -338,6 +343,10 @@ public class MainWindowViewModelTests : IDisposable
     [Fact]
     public async Task RequestClose_DelegatesToController()
     {
+        MapEditSession session = _viewModel.Session;
+        session.SelectedTileLayer = new MapTileLayer(1, 1);
+        session.BeginStroke(MapEditTool.Pencil, 0, 0);
+        Assert.True(session.CompleteStroke());
         _dialogs.DirtyResult = DirtyChoice.Discard;
 
         Assert.True(await _viewModel.RequestCloseAsync());

@@ -291,7 +291,7 @@ public class MainWindowTests
 
         Assert.False(undo.IsEnabled);
         Assert.False(redo.IsEnabled);
-        Assert.True(save.IsEnabled);
+        Assert.False(save.IsEnabled);
 
         ViewModel.Brush = new MapTileLayer(1, 1);
         Point tileCenter = TileCenter();
@@ -357,7 +357,7 @@ public class MainWindowTests
         Assert.Equal(4, ViewModel.MapHeight);
         Assert.Equal("—", Find<TextBlock>("SelectedText").Text);
         Assert.True(Window.Canvas.InvalidationCount > invalidationsBefore);
-        Assert.Equal("Goose2 Map Editor — Untitled*", Window.Title);
+        Assert.Equal("Goose2 Map Editor — Untitled", Window.Title);
     }
 
     [AvaloniaFact]
@@ -373,7 +373,7 @@ public class MainWindowTests
         ErrorPresentation lastResort = Assert.Single(_harness.Dialogs.Errors, error => error.Title == "Error");
         Assert.Contains("dialog down", lastResort.Message);
         Assert.Same(before, _harness.Controller.Document);
-        Assert.True(_harness.ViewModel.Session.IsDirty);
+        Assert.False(_harness.ViewModel.Session.IsDirty);
         Assert.True(Window.IsVisible);
     }
 
@@ -399,6 +399,12 @@ public class MainWindowTests
     [AvaloniaFact]
     public async Task Title_TracksDirtyState()
     {
+        Assert.Equal("Goose2 Map Editor — Untitled", Window.Title);
+
+        _harness.ViewModel.Brush = new MapTileLayer(1, 2);
+        _harness.ViewModel.Session.BeginStroke(MapEditTool.Pencil, 0, 0);
+        Assert.True(_harness.ViewModel.Session.CompleteStroke());
+        _harness.ViewModel.Refresh(EditorRefresh.Title);
         Assert.Equal("Goose2 Map Editor — Untitled*", Window.Title);
 
         _harness.Dialogs.SavePickResult = Path.Combine(_harness.TempDirectory, "titled.bytes");

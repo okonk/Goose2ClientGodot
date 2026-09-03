@@ -42,7 +42,7 @@ public class MainWindowCloseTests
         Dispatcher.UIThread.RunJobs();
 
         Assert.False(harness.Window.IsVisible);
-        Assert.Equal(1, harness.Dialogs.DirtyShown);
+        Assert.Equal(0, harness.Dialogs.DirtyShown);
         Assert.Equal(2, counter.Count);
     }
 
@@ -50,6 +50,9 @@ public class MainWindowCloseTests
     public void Close_DirtyDocument_Discard_PromptsOnceThenCloses()
     {
         using MainWindowHarness harness = MainWindowHarness.Create();
+        harness.ViewModel.Brush = new MapTileLayer(1, 2);
+        harness.ViewModel.Session.BeginStroke(MapEditTool.Pencil, 0, 0);
+        Assert.True(harness.ViewModel.Session.CompleteStroke());
         harness.Dialogs.DirtyResult = DirtyChoice.Discard;
 
         var counter = new ClosingCounter(harness.Window);
@@ -65,6 +68,9 @@ public class MainWindowCloseTests
     public void Close_DirtyDocument_Save_SavesThenCloses()
     {
         using MainWindowHarness harness = MainWindowHarness.Create();
+        harness.ViewModel.Brush = new MapTileLayer(1, 2);
+        harness.ViewModel.Session.BeginStroke(MapEditTool.Pencil, 0, 0);
+        Assert.True(harness.ViewModel.Session.CompleteStroke());
         string mapPath = Path.Combine(harness.TempDirectory, "closed-saved.bytes");
         harness.Dialogs.DirtyResult = DirtyChoice.Save;
         harness.Dialogs.SavePickResult = mapPath;
@@ -85,6 +91,9 @@ public class MainWindowCloseTests
     public void Close_DirtyDocument_Cancel_StaysOpen()
     {
         using MainWindowHarness harness = MainWindowHarness.Create();
+        harness.ViewModel.Brush = new MapTileLayer(1, 2);
+        harness.ViewModel.Session.BeginStroke(MapEditTool.Pencil, 0, 0);
+        Assert.True(harness.ViewModel.Session.CompleteStroke());
         harness.Dialogs.DirtyResult = DirtyChoice.Cancel;
 
         var counter = new ClosingCounter(harness.Window);
@@ -101,6 +110,9 @@ public class MainWindowCloseTests
     public void Close_DirtyDocument_SavePickerCancelled_StaysOpenAndDirty()
     {
         using MainWindowHarness harness = MainWindowHarness.Create();
+        harness.ViewModel.Brush = new MapTileLayer(1, 2);
+        harness.ViewModel.Session.BeginStroke(MapEditTool.Pencil, 0, 0);
+        Assert.True(harness.ViewModel.Session.CompleteStroke());
         harness.Dialogs.DirtyResult = DirtyChoice.Save;
         harness.Dialogs.SavePickResult = null;
 
@@ -119,6 +131,9 @@ public class MainWindowCloseTests
     public void Close_DirtyDocument_SaveFails_ShowsErrorAndStaysOpen()
     {
         using MainWindowHarness harness = MainWindowHarness.Create();
+        harness.ViewModel.Brush = new MapTileLayer(1, 2);
+        harness.ViewModel.Session.BeginStroke(MapEditTool.Pencil, 0, 0);
+        Assert.True(harness.ViewModel.Session.CompleteStroke());
         harness.Dialogs.DirtyResult = DirtyChoice.Save;
         harness.Dialogs.PickSaveException = new IOException("disk full");
 
@@ -137,6 +152,9 @@ public class MainWindowCloseTests
     public void Close_DialogFails_ShowsCloseErrorAndStaysOpen()
     {
         using MainWindowHarness harness = MainWindowHarness.Create();
+        harness.ViewModel.Brush = new MapTileLayer(1, 2);
+        harness.ViewModel.Session.BeginStroke(MapEditTool.Pencil, 0, 0);
+        Assert.True(harness.ViewModel.Session.CompleteStroke());
         harness.Dialogs.ShowDirtyException = new InvalidOperationException("dialog down");
 
         var counter = new ClosingCounter(harness.Window);
@@ -154,6 +172,9 @@ public class MainWindowCloseTests
     public void Close_DuplicateClosingWhilePromptPending_SinglePromptAndNoRecursion()
     {
         using MainWindowHarness harness = MainWindowHarness.Create();
+        harness.ViewModel.Brush = new MapTileLayer(1, 2);
+        harness.ViewModel.Session.BeginStroke(MapEditTool.Pencil, 0, 0);
+        Assert.True(harness.ViewModel.Session.CompleteStroke());
         var gate = new TaskCompletionSource<DirtyChoice>(TaskCreationOptions.RunContinuationsAsynchronously);
         harness.Dialogs.DirtyGate = gate;
 
@@ -219,6 +240,9 @@ public class MainWindowCloseTests
     public void Close_Canceled_KeepsAssetContextUsable()
     {
         using MainWindowHarness harness = MainWindowHarness.Create();
+        harness.ViewModel.Brush = new MapTileLayer(1, 2);
+        harness.ViewModel.Session.BeginStroke(MapEditTool.Pencil, 0, 0);
+        Assert.True(harness.ViewModel.Session.CompleteStroke());
         harness.Dialogs.DirtyResult = DirtyChoice.Cancel;
 
         harness.Window.Close();
