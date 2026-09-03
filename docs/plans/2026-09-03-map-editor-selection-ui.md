@@ -10,14 +10,18 @@
 
 **Repo rules:** Per `AGENTS.md`, add no comments or doc strings to new/modified code. Leave unrelated existing comments untouched.
 
-**APIs verified:**
-- `MapEditSession.ActiveLayer` — `src/MapEditor.Core/Editing/MapEditSession.cs:36`; used by `BeginStroke` at `:89`
+**APIs verified** (all line numbers against the worktree at this plan's base commit):
+- `MapEditSession.ActiveLayer` — `src/MapEditor.Core/Editing/MapEditSession.cs:36`; `BeginStroke` `:80` (stroke constructed with `_activeLayer` at `:89`; eyedropper branch reads `_activeLayer` at `:92`); `ValidateTool` `:266` (`private static`)
 - `MapDocument.LayerCount = 5` — `src/MapEditor.Core/MapDocument.cs:68`
-- `MainWindowViewModel.ActiveLayer` — `src/MapEditor.App/ViewModels/MainWindowViewModel.cs:81`; `Layer0Visible` `:134` (five copies through `:182`); `ShowGrid` `:194`; `ShowBlocked` `:206`
+- `MainWindowViewModel.ActiveLayer` — `src/MapEditor.App/ViewModels/MainWindowViewModel.cs:81-97`; `Layer0Visible` `:134` (five copies through `:182`); `ShowGrid` `:194`; `ShowBlocked` `:206`; `Refresh` document-replaced branch `:301-318` (hover/selection resets `:312-315`, `OnPropertyChanged(nameof(ActiveLayer))` `:316`)
 - `MapCanvas.BuildRenderRequest` composes the visibility mask — `src/MapEditor.App/Controls/MapCanvas.cs:344`
-- Checkable menu items: `MenuItem.ToggleType` + `MenuItemToggleType.CheckBox` and `MenuItem.IsChecked` (Avalonia 11.3.20, `Avalonia.Controls.xml`: `P:Avalonia.Controls.MenuItem.ToggleType`, `F:Avalonia.Controls.MenuItemToggleType.CheckBox`, `P:Avalonia.Controls.MenuItem.IsChecked`)
-- Headless pointer/keyboard test helpers: `HeadlessWindowExtensions.MouseDown(TopLevel, Point, MouseButton, RawInputModifiers)`, `.MouseMove`, `.MouseUp`, `.KeyPress(TopLevel, Key, RawInputModifiers)` (`Avalonia.Headless.xml`, Avalonia.Headless 11.3.20)
-- Test harness: `MainWindowHarness.Create()` — `tests/MapEditor.App.Tests/MainWindowTests.cs:34`; `Find<T>(name)` helper `:105`
+- `MapLayerVisibility(byte mask)` throws `ArgumentOutOfRangeException` for `mask > 0b11111` — `src/MapEditor.Rendering/Composition/MapLayerVisibility.cs:18-21`
+- Checkable menu items: `MenuItem.ToggleType` + `MenuItemToggleType.CheckBox`, `MenuItem.IsChecked`, `MenuItem.ClickEvent` (Avalonia 11.3.20). **Probe-verified:** `IsChecked` binds OneWay by default — `IsChecked="{Binding …, Mode=TwoWay}"` is required for click write-back; `RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent))` toggles `IsChecked` under a TwoWay binding in headless
+- Pointer modifiers: `PointerEventArgs.KeyModifiers` exists (`Avalonia.Base.xml` `P:Avalonia.Input.PointerEventArgs.KeyModifiers`) — use `e.KeyModifiers` in the row handler. **Probe-verified:** headless `MouseDown(…, RawInputModifiers.Control)` and `KeyPressQwerty(PhysicalKey.ControlLeft)` + `MouseDown` both yield `KeyModifiers.None` — Ctrl/Shift cannot be simulated headless, so modifier behavior is covered by `LayerSelectionTests` only
+- Headless test helpers: `HeadlessWindowExtensions.MouseDown/MouseMove/MouseUp/KeyPressQwerty/KeyReleaseQwerty` (`Avalonia.Headless.xml`). Codebase convention is `KeyPressQwerty(PhysicalKey, RawInputModifiers)` (see `tests/MapEditor.App.Tests/ShortcutTests.cs:34-127`); the `KeyPress(Key, …)` overload is `[Obsolete]`
+- `ShortcutTests.cs:126-127` asserts `PhysicalKey.B` → `BlockedToggle` (breaks when B is freed for Part 2)
+- Test harness: `MainWindowHarness.Create()` — `tests/MapEditor.App.Tests/MainWindowTests.cs:53`; `Find<T>(name)` helper `:105`; `Layout_ContainsFourToolTogglesWithPencilActive` `:176` (Part 1 keeps exactly four tool toggles, so this test stays green unchanged; Part 2 extends it)
+- `MapEditSessionTests` has no `CreateSession` helper — tests build `new MapEditSession(MapDocument.Create(w, h))` inline (e.g. `:13, :45`)
 
 ---
 
@@ -53,7 +57,7 @@ public void SelectedLayers_DefaultsToLayer0Only()
 }
 
 [Theory]
-[InlineData(0, 0)]
+[InlineData(0b00001, 0)]
 [InlineData(0b00101, 2)]
 [InlineData(0b11111, 4)]
 public void SelectedLayers_Mask_TopLayerIsHighestSetBit(byte mask, int expectedTop)
@@ -65,7 +69,8 @@ public void SelectedLayers_Mask_TopLayerIsHighestSetBit(byte mask, int expectedT
 
 [Theory]
 [InlineData((byte)0)]
-[InlineData((byte)0b111110)]
+[InlineData((byte)32)]
+[InlineData((byte)0b111111)]
 public void SelectedLayers_InvalidMask_ThrowsWithoutChangingSelection(byte mask)
 {
     var session = CreateSession();
@@ -88,7 +93,7 @@ public void Pencil_WithMultiLayerSelection_EditsOnlyTopmostLayer()
 }
 ```
 
-Use the existing session-creation helper pattern in that file (check how `CreateSession`/fixtures are built there; the existing tests at lines 16-64 show the shape). Match the existing test style — no comments.
+Add a `CreateSession(int width, int height) => new MapEditSession(MapDocument.Create(width, height));` helper to the test file (no such helper exists — existing tests build sessions inline, e.g. `:13, :45`) and use it in the new tests. Match the existing test style — no comments.
 
 **Step 2: Run tests to verify they fail (red)**
 
@@ -133,7 +138,7 @@ public int TopLayer
 }
 ```
 
-Update `BeginStroke` (`:89`) to use `TopLayer` instead of `_activeLayer`. Remove `_activeLayer`.
+Update `BeginStroke` (`:80`; stroke construction at `:89`) to use `TopLayer` instead of `_activeLayer`, and the eyedropper branch (`:92`) likewise. Remove `_activeLayer`. Widen `ValidateTool` (`:266`, static) upper bound to `MapEditTool.FloodFill` is NOT done here — Part 2 does that; leave the bound at `BlockedToggle` in this task.
 
 Update `tests/MapEditor.Rendering.Tests/MapRendererTests.cs:289`: `session.ActiveLayer = 2;` → `session.SelectedLayers = 1 << 2;`.
 
@@ -167,42 +172,38 @@ git commit -m "feat: multi-layer selection mask in MapEditSession"
 **Files:**
 - Modify: `src/MapEditor.App/ViewModels/MainWindowViewModel.cs`
 - Modify: `src/MapEditor.App/Controls/MapCanvas.cs:344-371` (`BuildRenderRequest` mask composition)
-- Test: `tests/MapEditor.App.Tests/MainWindowViewModelTests.cs`
-- Test: `tests/MapEditor.App.Tests/MapCanvasTests.cs` (lines 165, 297, 371-384)
-- Test: `tests/MapEditor.App.Tests/MainWindowTests.cs` (mechanical API updates only: lines 202, 240, 337; layout tests rewritten in Task 3)
+- Test: `tests/MapEditor.App.Tests/MainWindowViewModelTests.cs` (includes `New_ReplacesDocument_RaisesBrushAndActiveLayerWithSessionResetValues` at `:324-340`)
+- Test: `tests/MapEditor.App.Tests/MapCanvasTests.cs` (lines 165, 297, 371-380)
+- Test: `tests/MapEditor.App.Tests/MainWindowTests.cs` — **no `ActiveLayer` references exist in this file**; layout tests rewritten in Task 3, nothing mechanical here
 
 **Mutation impact:**
 - Source of truth changed: `MainWindowViewModel._layer0Visible`…`_layer4Visible` (`src/MapEditor.App/ViewModels/MainWindowViewModel.cs:134-182`) → single `_layerVisibility` byte; `ActiveLayer` property (`:81`) → `SelectedLayers`/`TopLayer`
 - Important readers: `MapCanvas.BuildRenderRequest` (`src/MapEditor.App/Controls/MapCanvas.cs:344`); code-behind `SyncLayerRadios`/`OnViewModelPropertyChanged` (`src/MapEditor.App/Views/MainWindow.axaml.cs:406,430-439` — updated in Task 3); tests listed
 - Derived/cached state affected: none — visibility is view-only state, never persisted; `MapRenderOptions` is rebuilt per render
 - Required propagation sequence:
-  1. `LayerVisibility` setter: `SetField` then `Refresh(EditorRefresh.Canvas)` (same as today's `LayerNVisible` setters at `:134-141`)
+  1. `LayerVisibility` setter: `SetField` then `Refresh(EditorRefresh.Canvas)` (same as today's `LayerNVisible` setters at `:134-141`); **validate `value > 0b11111` and throw `ArgumentOutOfRangeException`** — `MapLayerVisibility` (Rendering) throws for the same range and `BuildRenderRequest` feeds the mask straight into it
   2. `SelectedLayers` setter: write to `_session.SelectedLayers`, `OnPropertyChanged()` when changed (same shape as today's `ActiveLayer` at `:81-97`)
   3. `Refresh(EditorRefresh.Document)` raises `OnPropertyChanged(nameof(SelectedLayers))` in place of `ActiveLayer` (`:316`)
   4. `MapCanvas.BuildRenderRequest`: replace the five `if (_viewModel.LayerNVisible)` blocks with `byte mask = _viewModel.LayerVisibility;`
 - Invariants to preserve:
   - default visibility mask is `0b11111` (all visible), default selection is `0b00001`
-  - `LayerVisibility` accepts any byte (mask is view-only; no validation needed beyond byte range — it is a byte)
+  - `LayerVisibility` rejects `> 0b11111` (matches `MapLayerVisibility`), so the canvas can never receive an out-of-range mask
   - canvas invalidation still fires on visibility change
-- Observable proof required: existing `MapCanvasTests` visibility-toggle test (lines 371-384) rewritten against the mask and still passing.
+- Observable proof required: existing `MapCanvasTests` visibility-toggle test (lines 371-380) rewritten against the mask and still passing.
 
 **Step 1: Update tests first (red)**
 
 `MainWindowViewModelTests.cs`:
-- Lines 55, 59-63: `Assert.Equal(0, _viewModel.ActiveLayer)` → `Assert.Equal((byte)1, _viewModel.SelectedLayers)`; the five `LayerNVisible` asserts → `Assert.Equal((byte)0b11111, _viewModel.LayerVisibility)`
-- Lines 100-114 (`ActiveLayer_ValidValue…`, `ActiveLayer_OutOfRange…`): rewrite for `SelectedLayers` — valid value `(byte)0b01000` writes to session and raises only `SelectedLayers`; invalid values `0` and `(byte)0b111110` throw without mutating the session
-- Lines 147-150: `Layer2Visible = false` → `LayerVisibility = 0b11011`, assert raised property is `LayerVisibility`
+- Lines 55, 59-63 (`InitialState_ReflectsNewCleanDocument`): `Assert.Equal(0, _viewModel.ActiveLayer)` → `Assert.Equal((byte)1, _viewModel.SelectedLayers)`; the five `LayerNVisible` asserts → `Assert.Equal((byte)0b11111, _viewModel.LayerVisibility)`
+- Lines 100-114 (`ActiveLayer_ValidValue…`, `ActiveLayer_OutOfRange…`): rewrite for `SelectedLayers` — valid value `(byte)0b01000` writes to session and raises only `SelectedLayers`; invalid values `0` and `(byte)32` throw without mutating the session
+- Lines 147-150 (`LayerVisibility_RaisesOnlyChangedProperty`): `Layer2Visible = false` → `LayerVisibility = 0b11011`, assert raised property is `LayerVisibility`
 - Lines 263-270: `Layer0Visible = false` → `LayerVisibility = 0b11110`
+- Add: `LayerVisibility_OutOfRange_Throws` — `0b100000` throws `ArgumentOutOfRangeException` without invalidating the canvas
+- Lines 324-340 (`New_ReplacesDocument_RaisesBrushAndActiveLayerWithSessionResetValues`): rename to `…SelectedLayers…`; `_viewModel.ActiveLayer = 2;` → `_viewModel.SelectedLayers = 1 << 2;`; `Assert.Contains(nameof(MainWindowViewModel.ActiveLayer), raised);` → `SelectedLayers`; `Assert.Equal(0, _viewModel.ActiveLayer);` → `Assert.Equal((byte)1, _viewModel.SelectedLayers);`
 
 `MapCanvasTests.cs`:
 - Lines 165, 297: `harness.ViewModel.ActiveLayer = 2;` → `harness.ViewModel.SelectedLayers = 1 << 2;`
 - Lines 371-380: the five `LayerNVisible = false/true` pairs → single `harness.ViewModel.LayerVisibility = (byte)0b11110;` / `= (byte)0b11111;` (keep the `ShowGrid`/`ShowBlocked` lines unchanged)
-
-`MainWindowTests.cs` (mechanical only, keeps the project compiling; the layout tests themselves are rewritten in Task 3):
-- Line 202: `Assert.Equal(3, ViewModel.ActiveLayer);` → `Assert.Equal((byte)0b01000, ViewModel.SelectedLayers);`
-- Line 240: `ViewModel.ActiveLayer = 2;` → `ViewModel.SelectedLayers = 1 << 2;`
-- Line 337: `Assert.Contains(nameof(MainWindowViewModel.ActiveLayer), raised);` → `SelectedLayers`; line 339: `Assert.Equal(0, _viewModel.ActiveLayer)` → `Assert.Equal((byte)1, _viewModel.SelectedLayers)`
-- Line 326: `_viewModel.ActiveLayer = 2;` → `_viewModel.SelectedLayers = 1 << 2;`
 
 **Step 2: Run tests to verify they fail (red)**
 
@@ -238,6 +239,11 @@ public byte LayerVisibility
     get => _layerVisibility;
     set
     {
+        if (value > 0b11111)
+        {
+            throw new ArgumentOutOfRangeException(nameof(value));
+        }
+
         if (SetField(ref _layerVisibility, value))
         {
             Refresh(EditorRefresh.Canvas);
@@ -268,7 +274,8 @@ git commit -m "feat: layer selection and visibility mask in editor view model"
 |-----------|-----------|
 | Selection writes through to session, raises `SelectedLayers` only | rewritten `SelectedLayers_ValidValue_WritesToSessionAndRaisesOnlySelectedLayers` |
 | Invalid mask throws without mutating session (adversarial) | rewritten `SelectedLayers_OutOfRange_ThrowsWithoutMutatingSession` |
-| Visibility change invalidates canvas | existing canvas-invalidation test in `MapCanvasTests` (rewritten, lines 371-384) |
+| Visibility change invalidates canvas | existing canvas-invalidation test in `MapCanvasTests` (rewritten, lines 371-380) |
+| Out-of-range visibility mask rejected (adversarial) | `LayerVisibility_OutOfRange_Throws` |
 | Document replacement resets selection readout | rewritten `New_ReplacesDocument_RaisesBrushAndSelectedLayers…` |
 
 ---
@@ -280,6 +287,7 @@ git commit -m "feat: layer selection and visibility mask in editor view model"
 - Modify: `src/MapEditor.App/Views/MainWindow.axaml.cs`
 - Create: `src/MapEditor.App/Views/LayerSelection.cs`
 - Test: `tests/MapEditor.App.Tests/MainWindowTests.cs`
+- Test: `tests/MapEditor.App.Tests/ShortcutTests.cs` (B → X, per Step 1)
 - Test: `tests/MapEditor.App.Tests/LayerSelectionTests.cs` (create)
 
 **Step 1: Write the failing tests**
@@ -345,14 +353,9 @@ public void Layout_ContainsNamedLayerListAndViewToggles()
     Assert.Equal((byte)0b01000, ViewModel.SelectedLayers);
 
     Point row1 = Find<Border>("Layer1Row").TranslatePoint(new Point(10, 5), Window).Value;
-    Window.MouseDown(row1, MouseButton.Left, RawInputModifiers.Control);
-    Window.MouseUp(row1, MouseButton.Left, RawInputModifiers.Control);
-    Assert.Equal((byte)0b00110, ViewModel.SelectedLayers);
-
-    Point row4 = Find<Border>("Layer4Row").TranslatePoint(new Point(10, 5), Window).Value;
-    Window.MouseDown(row4, MouseButton.Left, RawInputModifiers.Shift);
-    Window.MouseUp(row4, MouseButton.Left, RawInputModifiers.Shift);
-    Assert.Equal((byte)0b11100, ViewModel.SelectedLayers);
+    Window.MouseDown(row1, MouseButton.Left, RawInputModifiers.None);
+    Window.MouseUp(row1, MouseButton.Left, RawInputModifiers.None);
+    Assert.Equal((byte)0b00100, ViewModel.SelectedLayers);
 
     Find<CheckBox>("Layer2VisibleCheck").IsChecked = false;
     Assert.Equal((byte)0b11011, ViewModel.LayerVisibility);
@@ -364,9 +367,10 @@ public void Layout_ContainsNamedLayerListAndViewToggles()
 }
 ```
 
-(Shift-click above starts from the anchor set by the last plain click — layer 3 — so the range 3..4 gives `0b11100`. If the headless `MouseDown` with `RawInputModifiers.Shift` does not surface modifiers through `PointerPointProperties.KeyModifiers`, verify with a quick probe test before wiring the handler; the `KeyModifiers` must come from the pressed pointer point, not `e.KeyModifiers`.)
+**Headless modifier limitation (probe-verified):** `RawInputModifiers.Control/Shift` on `MouseDown` and a held `KeyPressQwerty(PhysicalKey.ControlLeft)` both yield `e.KeyModifiers == None` — Ctrl/Shift-click cannot be simulated headless. The window test therefore covers plain-click single-select only; the Ctrl-toggle and Shift-range semantics are proven by `LayerSelectionTests` (pure logic) and the production handler is a thin dispatch onto it. Do not attempt to make the modifier path headless-testable.
 
-- Replace `ToolbarZoomButtons_ExistAndZoomAroundCanvasCenter` (`:391`) with a key-based zoom test: `Window.KeyPress(Key.Add, RawInputModifiers.None)` → `ZoomPercent == 200`, `Window.KeyPress(Key.Subtract, RawInputModifiers.None)` → back to `100`.
+- Replace `ToolbarZoomButtons_ExistAndZoomAroundCanvasCenter` (`:391`) with a key-based zoom test: `Window.KeyPressQwerty(PhysicalKey.Add, RawInputModifiers.None)` → `ZoomPercent == 200`, `Window.KeyPressQwerty(PhysicalKey.Subtract, RawInputModifiers.None)` → back to `100`.
+- `ShortcutTests.cs:126-127`: `KeyPressQwerty(PhysicalKey.B, …)` → `BlockedToggle` becomes `KeyPressQwerty(PhysicalKey.X, …)` → `BlockedToggle`; add an assert that `PhysicalKey.B` leaves `ActiveTool` unchanged (B is unbound in Part 1; Part 2 binds it to Flood fill).
 - `CommandEnablement_FollowsSessionState` (`:281`): drop `undoButton`/`saveButton` references; assert menu-item `IsEnabled` only.
 - `NewSmallerMap_WithOutOfRangeSelection_ClearsSelectionWithoutError` (`:333`): `Find<Button>("NewButton").RaiseEvent(...)` → `Find<MenuItem>("NewCommand").RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent))`.
 - `OpenCommand_UnexpectedExceptionAtWindowBoundary_ShowsLastErrorDialogAndKeepsDocument` (`:364`): same swap to `OpenCommand`.
@@ -415,10 +419,12 @@ internal static class LayerSelection
 
 ```xml
 <MenuItem x:Name="ViewMenu" Header="_View">
-  <MenuItem x:Name="GridMenuItem" Header="Grid" ToggleType="CheckBox" IsChecked="{Binding ShowGrid}" />
-  <MenuItem x:Name="BlockedMenuItem" Header="Blocked" ToggleType="CheckBox" IsChecked="{Binding ShowBlocked}" />
+  <MenuItem x:Name="GridMenuItem" Header="Grid" ToggleType="CheckBox" IsChecked="{Binding ShowGrid, Mode=TwoWay}" />
+  <MenuItem x:Name="BlockedMenuItem" Header="Blocked" ToggleType="CheckBox" IsChecked="{Binding ShowBlocked, Mode=TwoWay}" />
 </MenuItem>
 ```
+
+(`Mode=TwoWay` is required — probe-verified that the default OneWay binding never writes menu clicks back to the view model.)
 
 - Toolbar: remove `NewButton`, `OpenButton`, `SaveButton`, `UndoButton`, `RedoButton`, `ZoomInButton`, `ZoomOutButton`. Keep the four tool toggles unchanged.
 - Right panel: replace the "Active layer" radio group, the "Visibility" checkbox group, `ShowGridCheck`, and `ShowBlockedCheck` with:
@@ -450,13 +456,17 @@ private void OnLayerRowPressed(object? sender, PointerPressedEventArgs e)
         return;
     }
 
-    PointerPoint point = e.GetCurrentPoint(this);
-    if (!point.Properties.IsLeftButtonPressed)
+    if (e.Source is CheckBox)
     {
         return;
     }
 
-    KeyModifiers modifiers = point.Properties.KeyModifiers;
+    if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
+    {
+        return;
+    }
+
+    KeyModifiers modifiers = e.KeyModifiers;
     byte next;
     if (modifiers.HasFlag(KeyModifiers.Control))
     {
@@ -473,7 +483,11 @@ private void OnLayerRowPressed(object? sender, PointerPressedEventArgs e)
     }
 
     _viewModel.SelectedLayers = next;
+    e.Handled = true;
 }
+```
+
+Notes: `e.KeyModifiers` comes from `PointerEventArgs` (Avalonia 11.3.20 — `PointerPointProperties` has no `KeyModifiers` member). The `e.Source is CheckBox` guard stops visibility-checkbox clicks (which bubble `PointerPressed` to the row Border) from changing the selection.
 
 private void OnLayerVisibilityChanged(object? sender, RoutedEventArgs e)
 {
@@ -525,7 +539,8 @@ git commit -m "feat: named multi-select layer list, View menu, tool-only toolbar
 
 | Invariant | Proved by |
 |-----------|-----------|
-| Plain click single-selects; Ctrl toggles; Shift ranges from anchor | `Layout_ContainsNamedLayerListAndViewToggles` + `LayerSelectionTests` |
+| Plain click single-selects (window level) | `Layout_ContainsNamedLayerListAndViewToggles` |
+| Ctrl toggles; Shift ranges from anchor (logic level; headless cannot simulate modifiers) | `LayerSelectionTests` |
 | Selection never empties via Ctrl toggle (adversarial) | `Toggle_OffLastSelectedLayer_SingleSelectsIt` |
 | Visibility checkbox drives `LayerVisibility` mask without touching selection | `Layout_ContainsNamedLayerListAndViewToggles` (checkbox uncheck leaves `SelectedLayers` unchanged) |
 | Grid/Blocked toggled from View menu, defaults on/off | `Layout_ContainsNamedLayerListAndViewToggles` |
@@ -546,5 +561,6 @@ Manual smoke (optional, headless environment may not allow): `./build-map-editor
 - Layer names exactly: Ground / Below Entities / Entities / Above Entities / Roof, displayed as "0 — Ground" etc.
 - Selected-tile readout keeps `L0 …` index format (unchanged).
 - Toolbar order for Part 1: Pencil, Eraser, Eyedropper, Blocked (Part 2 appends Select, Multi-select, Flood fill).
-- Hotkey change: Blocked B → X (B reserved for Part 2 flood fill).
+- Hotkey change: Blocked B → X (B reserved for Part 2 flood fill); `ShortcutTests.cs:126-127` updated accordingly.
+- Ctrl/Shift-click is not headless-testable (probe-verified); coverage strategy: plain-click window test + `LayerSelection` unit tests.
 - No new comments/doc strings anywhere (AGENTS.md).
