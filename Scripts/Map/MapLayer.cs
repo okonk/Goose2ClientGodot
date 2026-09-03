@@ -1,5 +1,6 @@
 using Godot;
 using Goose2Client;
+using MapEditor.Core;
 
 namespace Goose2Client.Map;
 
@@ -8,11 +9,11 @@ namespace Goose2Client.Map;
 /// characters. Cell art is bottom-center anchored via <see cref="MapTileCatalog"/>.</summary>
 public partial class MapLayer : TileMapLayer
 {
-    private MapFile _map;
+    private MapDocument _map;
     private int _layer;
     private MapTileCatalog _catalog;
 
-    public void Setup(MapFile map, int layer, MapTileCatalog catalog)
+    public void Setup(MapDocument map, int layer, MapTileCatalog catalog)
     {
         _map = map;
         _layer = layer;
@@ -33,7 +34,7 @@ public partial class MapLayer : TileMapLayer
     public void RefreshCell(int x, int y)
     {
         var coords = new Vector2I(x, y);
-        var l = _map[x, y].Layers[_layer];
+        var l = _map[x, y].GetLayer(_layer);
         if (l.Graphic == 0 || !_catalog.TryGetTile(l.Sheet, l.Graphic, out int sourceId, out var atlas))
         {
             EraseCell(coords);

@@ -1,4 +1,4 @@
-<Project Sdk="Godot.NET.Sdk/4.7.1">
+<Project Sdk="Godot.NET.Sdk/4.7.2">
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
     <EnableDynamicLoading>true</EnableDynamicLoading>
@@ -8,7 +8,12 @@
 
   <ItemGroup>
     <Compile Remove="tools/**" />
+    <Compile Remove="src/**" />
     <Compile Remove=".godot/**" />
     <Compile Remove="tests/**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="src/MapEditor.Core/MapEditor.Core.csproj" />
   </ItemGroup>
 </Project>

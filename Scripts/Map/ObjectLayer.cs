@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using Godot;
 using Goose2Client;
+using MapEditor.Core;
 
 namespace Goose2Client.Map;
 
@@ -12,12 +13,12 @@ namespace Goose2Client.Map;
 /// per-cell with sibling character nodes the way individual Sprite2Ds can.)</summary>
 public partial class ObjectLayer : Node2D
 {
-    private MapFile _map;
+    private MapDocument _map;
     private int _layer;
     private SpriteCache _cache;
     private readonly Dictionary<(int X, int Y), Sprite2D> _sprites = new();
 
-    public void Setup(MapFile map, int layer, SpriteCache cache)
+    public void Setup(MapDocument map, int layer, SpriteCache cache)
     {
         _map = map;
         _layer = layer;
@@ -33,7 +34,7 @@ public partial class ObjectLayer : Node2D
         if (_sprites.Remove((x, y), out var old))
             old.QueueFree();
 
-        var l = _map[x, y].Layers[_layer];
+        var l = _map[x, y].GetLayer(_layer);
         if (l.Graphic == 0) return;                       // empty cell
 
         var tex = _cache.Get(l.Sheet, l.Graphic);

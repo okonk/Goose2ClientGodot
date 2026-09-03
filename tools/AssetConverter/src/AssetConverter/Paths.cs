@@ -18,6 +18,9 @@ public static class Paths
         "/home/hayden/code/gooseclient/AsperetaClient/bin/Release/net8/maps");
 
     public static string CompiledEnc => Path.Combine(IllutiaData, "compiled.enc");
+
+    public static string SpriteBundleConfig => Env("SPRITE_BUNDLE_CONFIG",
+        "/home/agent/workspace/illutiagooseserver/tools/SpriteBundle/sheets.json");
     public static string AsperetaCompiledEnc => Path.Combine(AsperetaData, "compiled.enc");
 
     public static string Adf(int fileNumber) => Path.Combine(IllutiaData, $"{fileNumber}.adf");
