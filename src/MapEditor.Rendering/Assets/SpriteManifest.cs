@@ -306,7 +306,8 @@ public sealed class SpriteManifest
     {
         value = 0;
 
-        // Map ids are signed Int32 (0 reserved for empty); converter manifests emit negative ids.
+        // Map ids are signed Int32 and converter manifests emit negative and zero ids;
+        // the empty-frame semantics live in SpriteReference/MapRenderer, not in manifest parsing.
         int start = name.Length > 0 && name[0] == '-' ? 1 : 0;
 
         if (start == name.Length || name.Length - start > 10)
@@ -322,12 +323,7 @@ public sealed class SpriteManifest
             }
         }
 
-        if (!int.TryParse(name, NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out value))
-        {
-            return false;
-        }
-
-        return value != 0;
+        return int.TryParse(name, NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out value);
     }
 
     private static SpriteManifestException Fail(SpriteManifestError error, string sourcePath, string message)

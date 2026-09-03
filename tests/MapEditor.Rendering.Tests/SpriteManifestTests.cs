@@ -85,6 +85,23 @@ public class SpriteManifestTests
     }
 
     [Fact]
+    public void Parse_ZeroSheetAndGraphicIdsAreAccepted()
+    {
+        string json = """
+            { "tileSize": 32, "sheets": { "61": { "3": [16, 0, 16, 16], "0": [0, 0, 16, 16] }, "0": { "1": [0, 0, 4, 4] } } }
+            """;
+
+        SpriteManifest manifest = SpriteManifest.Parse(json);
+
+        Assert.Equal(new[] { 0, 61 }, manifest.SheetIds);
+        Assert.Equal(new[]
+        {
+            new SpriteFrame(new SpriteReference(61, 0), new SpriteSourceRect(0, 0, 16, 16)),
+            new SpriteFrame(new SpriteReference(61, 3), new SpriteSourceRect(16, 0, 16, 16))
+        }, manifest.GetFrames(61));
+    }
+
+    [Fact]
     public void Parse_ComputesMaximumFrameDimensionsWithTileSizeFloor()
     {
         SpriteManifest manifest = SpriteManifest.Parse("""{ "tileSize": 32, "sheets": { "1": { "2": [0, 0, 100, 10] } } }""");
@@ -314,7 +331,6 @@ public class SpriteManifestTests
     }
 
     [Theory]
-    [InlineData("""{ "tileSize": 32, "sheets": { "0": {} } }""", "0")]
     [InlineData("""{ "tileSize": 32, "sheets": { "-": {} } }""", "-")]
     [InlineData("""{ "tileSize": 32, "sheets": { "--1": {} } }""", "--1")]
     [InlineData("""{ "tileSize": 32, "sheets": { " 1": {} } }""", " 1")]
@@ -343,7 +359,6 @@ public class SpriteManifestTests
     }
 
     [Theory]
-    [InlineData("""{ "tileSize": 32, "sheets": { "5": { "0": [0, 0, 4, 4] } } }""", "0")]
     [InlineData("""{ "tileSize": 32, "sheets": { "5": { "-": [0, 0, 4, 4] } } }""", "-")]
     [InlineData("""{ "tileSize": 32, "sheets": { "5": { "--1": [0, 0, 4, 4] } } }""", "--1")]
     [InlineData("""{ "tileSize": 32, "sheets": { "5": { " 1": [0, 0, 4, 4] } } }""", " 1")]
