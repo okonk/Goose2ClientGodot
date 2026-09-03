@@ -7,6 +7,8 @@ using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Input;
 using Avalonia.Layout;
+using Avalonia.Media;
+using Avalonia.Media.Imaging;
 using Avalonia.Threading;
 using MapEditor.App.Controls;
 using MapEditor.App.Dialogs;
@@ -282,6 +284,72 @@ public class MapCanvasTests
     }
 
     [AvaloniaFact]
+    public async Task MidStrokeLayerAndBrushChange_AffectsOnlySubsequentStrokes()
+    {
+        Harness harness = await CreateSmallMapAsync();
+        MapEditSession session = harness.ViewModel.Session;
+        MapDocument document = session.Document;
+        harness.ViewModel.Brush = new MapTileLayer(7, 42);
+
+        harness.Window.MouseDown(new Point(Cell / 2, Cell / 2), MouseButton.Left, RawInputModifiers.None);
+        Assert.True(session.HasActiveStroke);
+
+        harness.ViewModel.ActiveLayer = 2;
+        harness.ViewModel.Brush = new MapTileLayer(9, 9);
+
+        harness.Window.MouseMove(new Point(2 * Cell - Cell / 2, Cell / 2), RawInputModifiers.None);
+        harness.Window.MouseUp(new Point(2 * Cell - Cell / 2, Cell / 2), MouseButton.Left, RawInputModifiers.None);
+
+        Assert.False(session.HasActiveStroke);
+        Assert.Equal(new MapTileLayer(7, 42), document[0, 0].GetLayer(0));
+        Assert.Equal(new MapTileLayer(7, 42), document[1, 0].GetLayer(0));
+        Assert.Equal(new MapTileLayer(0, 0), document[0, 0].GetLayer(2));
+        Assert.Equal(new MapTileLayer(0, 0), document[1, 0].GetLayer(2));
+
+        harness.Window.MouseDown(new Point(Cell / 2, 2 * Cell - Cell / 2), MouseButton.Left, RawInputModifiers.None);
+        harness.Window.MouseMove(new Point(2 * Cell - Cell / 2, 2 * Cell - Cell / 2), RawInputModifiers.None);
+        harness.Window.MouseUp(new Point(2 * Cell - Cell / 2, 2 * Cell - Cell / 2), MouseButton.Left, RawInputModifiers.None);
+
+        Assert.Equal(new MapTileLayer(9, 9), document[0, 1].GetLayer(2));
+        Assert.Equal(new MapTileLayer(9, 9), document[1, 1].GetLayer(2));
+        Assert.Equal(new MapTileLayer(0, 0), document[0, 1].GetLayer(0));
+        Assert.Equal(new MapTileLayer(0, 0), document[1, 1].GetLayer(0));
+    }
+
+    [AvaloniaFact]
+    public async Task RenderMapSinkFailure_PropagatesAndLeavesStateIntact()
+    {
+        Harness harness = await CreateSmallMapAsync();
+        MapEditSession session = harness.ViewModel.Session;
+        byte[] before = MapCodec.Encode(session.Document);
+        bool dirtyBefore = session.IsDirty;
+
+        harness.Window.MouseMove(new Point(2 * Cell - Cell / 2, 2 * Cell - Cell / 2), RawInputModifiers.None);
+        harness.Window.MouseDown(new Point(2 * Cell - Cell / 2, 2 * Cell - Cell / 2), MouseButton.Left, RawInputModifiers.None);
+        harness.Window.MouseUp(new Point(2 * Cell - Cell / 2, 2 * Cell - Cell / 2), MouseButton.Left, RawInputModifiers.None);
+        Assert.Equal(1, harness.ViewModel.HoverX);
+        Assert.Equal(1, harness.ViewModel.HoverY);
+        Assert.Equal(1, harness.ViewModel.SelectedX);
+        Assert.Equal(1, harness.ViewModel.SelectedY);
+
+        Assert.Throws<InvalidOperationException>(() => harness.Canvas.RenderMap(new ThrowingMapDrawTarget()));
+
+        Assert.Equal(before, MapCodec.Encode(session.Document));
+        Assert.Equal(dirtyBefore, session.IsDirty);
+        Assert.False(session.HasActiveStroke);
+        Assert.False(session.CanUndo);
+        Assert.False(session.CanRedo);
+        Assert.Equal(1, harness.ViewModel.HoverX);
+        Assert.Equal(1, harness.ViewModel.HoverY);
+        Assert.Equal(1, harness.ViewModel.SelectedX);
+        Assert.Equal(1, harness.ViewModel.SelectedY);
+
+        RecordingMapDrawTarget healthy = new();
+        harness.Canvas.RenderMap(healthy);
+        Assert.Single(healthy.Clips);
+    }
+
+    [AvaloniaFact]
     public async Task PanAndZoom_NeverChangeDocumentHistoryOrDirty()
     {
         Harness harness = await CreateSmallMapAsync();
@@ -299,6 +367,21 @@ public class MapCanvasTests
         harness.Window.KeyReleaseQwerty(PhysicalKey.Space, RawInputModifiers.None);
         harness.Window.MouseWheel(new Point(50, 50), new Vector(0, 1), RawInputModifiers.None);
         harness.Window.MouseWheel(new Point(50, 50), new Vector(0, -1), RawInputModifiers.None);
+
+        harness.ViewModel.Layer0Visible = false;
+        harness.ViewModel.Layer0Visible = true;
+        harness.ViewModel.Layer1Visible = false;
+        harness.ViewModel.Layer1Visible = true;
+        harness.ViewModel.Layer2Visible = false;
+        harness.ViewModel.Layer2Visible = true;
+        harness.ViewModel.Layer3Visible = false;
+        harness.ViewModel.Layer3Visible = true;
+        harness.ViewModel.Layer4Visible = false;
+        harness.ViewModel.Layer4Visible = true;
+        harness.ViewModel.ShowGrid = false;
+        harness.ViewModel.ShowGrid = true;
+        harness.ViewModel.ShowBlocked = true;
+        harness.ViewModel.ShowBlocked = false;
 
         Assert.Equal(before, MapCodec.Encode(session.Document));
         Assert.Equal(dirtyBefore, session.IsDirty);
@@ -374,6 +457,17 @@ public class MapCanvasTests
         harness.Canvas.FinishInteraction(commit: false);
         Assert.False(session.HasActiveStroke);
         Assert.Equal(new MapTileLayer(0, 0), document[1, 0].GetLayer(0));
+    }
+
+    private sealed class ThrowingMapDrawTarget : IMapDrawTarget
+    {
+        public void DrawImage(Bitmap bitmap, Rect sourceRect, Rect destinationRect) => throw new InvalidOperationException("sink failure");
+
+        public void DrawLine(Pen pen, Point start, Point end) => throw new InvalidOperationException("sink failure");
+
+        public void DrawRectangle(Brush fill, Pen? stroke, Rect rect) => throw new InvalidOperationException("sink failure");
+
+        public IDisposable PushClip(Rect rect) => throw new InvalidOperationException("sink failure");
     }
 
     private static async Task<Harness> CreateSmallMapAsync()
