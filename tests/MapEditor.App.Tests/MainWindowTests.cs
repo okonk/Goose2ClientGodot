@@ -81,6 +81,13 @@ public class MainWindowTests
         } }
         """;
 
+    private const string NonContiguousSheetJson = """
+        { "tileSize": 32, "sheets": {
+          "2": { "10": [0, 0, 32, 32], "11": [32, 0, 32, 32] },
+          "7": { "20": [0, 0, 32, 32], "21": [32, 0, 32, 32], "22": [64, 0, 32, 32] }
+        } }
+        """;
+
     private readonly MainWindowHarness _harness = MainWindowHarness.Create();
 
     public MainWindowTests()
@@ -458,6 +465,43 @@ public class MainWindowTests
         Assert.Contains(emptyDirectory, _harness.Dialogs.Errors[0].Message);
         Assert.True(_harness.Assets.Current.IsAvailable);
         Assert.Equal(Path.GetFullPath(oldDirectory), _harness.Assets.Current.Cache.AssetDirectory);
+    }
+
+    [AvaloniaFact]
+    public void SheetCombo_BindsSelectedItemBySheetId_NotListPosition()
+    {
+        _harness.Dialogs.AssetDirectoryPickResult = WriteAssetDirectory("assets-noncontiguous", NonContiguousSheetJson);
+        Find<Button>("LoadAssetsButton").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        Dispatcher.UIThread.RunJobs();
+
+        ComboBox combo = Find<ComboBox>("SheetCombo");
+        Assert.Equal(2, combo.SelectedItem);
+        Assert.Equal(2, ViewModel.SelectedSheet);
+        Assert.Equal(2, Window.Palette.FrameCount);
+
+        combo.SelectedItem = 7;
+        Assert.Equal(7, ViewModel.SelectedSheet);
+        Assert.Equal(3, Window.Palette.FrameCount);
+
+        ViewModel.SelectedSheet = 2;
+        Assert.Equal(2, combo.SelectedItem);
+        Assert.Equal(2, Window.Palette.FrameCount);
+    }
+
+    [AvaloniaFact]
+    public async Task LoadAssetsButton_UnexpectedExceptionAtWindowBoundary_ShowsLastErrorDialogAndStaysUsable()
+    {
+        EditorDocument before = _harness.Controller.Document;
+        _harness.Dialogs.PickAssetDirectoryException = new InvalidOperationException("pick failed");
+
+        Find<Button>("LoadAssetsButton").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        Dispatcher.UIThread.RunJobs();
+
+        ErrorPresentation lastResort = Assert.Single(_harness.Dialogs.Errors, error => error.Title == "Error");
+        Assert.Contains("pick failed", lastResort.Message);
+        Assert.Same(before, _harness.Controller.Document);
+        Assert.True(Window.IsVisible);
+        Assert.False(_harness.Assets.Current.IsAvailable);
     }
 
     [AvaloniaFact]

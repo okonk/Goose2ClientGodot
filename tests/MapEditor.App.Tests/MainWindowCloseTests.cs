@@ -203,6 +203,33 @@ public class MainWindowCloseTests
     }
 
     [AvaloniaFact]
+    public void Close_Approved_DisposesAssetContext()
+    {
+        using MainWindowHarness harness = MainWindowHarness.Create();
+        harness.Dialogs.DirtyResult = DirtyChoice.Discard;
+
+        harness.Window.Close();
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.False(harness.Window.IsVisible);
+        Assert.True(harness.Assets.Current.IsDisposed);
+    }
+
+    [AvaloniaFact]
+    public void Close_Canceled_KeepsAssetContextUsable()
+    {
+        using MainWindowHarness harness = MainWindowHarness.Create();
+        harness.Dialogs.DirtyResult = DirtyChoice.Cancel;
+
+        harness.Window.Close();
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.True(harness.Window.IsVisible);
+        Assert.False(harness.Assets.Current.IsDisposed);
+        Assert.Empty(harness.Assets.Current.GetFrames(1));
+    }
+
+    [AvaloniaFact]
     public void Close_AfterApprovedClose_SecondClosingIsNotCancelledAgain()
     {
         using MainWindowHarness harness = MainWindowHarness.Create();

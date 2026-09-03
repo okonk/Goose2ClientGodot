@@ -46,7 +46,7 @@
         <StackPanel DockPanel.Dock="Top" Spacing="6" Margin="8">
           <Button x:Name="LoadAssetsButton" Content="Load assets…" Click="OnLoadAssets" />
           <TextBlock x:Name="AssetDirectoryText" Text="—" TextWrapping="Wrap" />
-          <ComboBox x:Name="SheetCombo" ItemsSource="{Binding SheetIds}" SelectedIndex="{Binding SelectedSheet, Mode=TwoWay}" />
+          <ComboBox x:Name="SheetCombo" ItemsSource="{Binding SheetIds}" SelectedItem="{Binding SelectedSheet, Mode=TwoWay}" />
           <StackPanel Orientation="Horizontal" Spacing="4">
             <TextBlock Text="Sheet" VerticalAlignment="Center" />
             <TextBox x:Name="BrushSheet" Width="64" />

@@ -93,6 +93,27 @@ public class AppStartupTests : IDisposable
     }
 
     [AvaloniaFact]
+    public void Opened_AssetPickerThrows_ShowsLastErrorDialogAndStaysUsable()
+    {
+        var dialogs = new FakeEditorDialogs();
+        dialogs.PickAssetDirectoryException = new InvalidOperationException("pick failed");
+        var composed = App.ComposeMainWindow(dialogs, new AppSettingsStore(Path.Combine(_directory, "startup-pick.json")));
+
+        composed.Window.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        ErrorPresentation lastResort = Assert.Single(dialogs.Errors, error => error.Title == "Error");
+        Assert.Contains("pick failed", lastResort.Message);
+        Assert.True(composed.Window.IsVisible);
+        Assert.False(composed.Assets.Current.IsAvailable);
+
+        dialogs.DirtyResult = DirtyChoice.Discard;
+        composed.Window.Close();
+        Dispatcher.UIThread.RunJobs();
+        Assert.False(composed.Window.IsVisible);
+    }
+
+    [AvaloniaFact]
     public void Opened_WithStoredAssetDirectory_LoadsItWithoutOfferingPicker()
     {
         var dialogs = new FakeEditorDialogs();

@@ -59,6 +59,7 @@ internal partial class MainWindow : Window
         SyncReadouts();
         SyncAssetDirectory();
         Closing += OnClosing;
+        Closed += (sender, e) => _assets.Dispose();
         Opened += OnOpened;
     }
 
@@ -254,16 +255,17 @@ internal partial class MainWindow : Window
         }
     }
 
-    private async void OnLoadAssets(object? sender, RoutedEventArgs e)
-    {
-        string? picked = await _dialogs.PickAssetDirectoryAsync();
-        if (picked is { } directory)
+    private void OnLoadAssets(object? sender, RoutedEventArgs e)
+        => _ = RunCommandAsync(async () =>
         {
-            await TryOpenAssetsAsync(directory);
-        }
-    }
+            string? picked = await _dialogs.PickAssetDirectoryAsync();
+            if (picked is { } directory)
+            {
+                await TryOpenAssetsAsync(directory);
+            }
+        });
 
-    private void OnOpened(object? sender, EventArgs e) => _ = InitializeAssetsAsync();
+    private void OnOpened(object? sender, EventArgs e) => _ = RunCommandAsync(InitializeAssetsAsync);
 
     private async Task InitializeAssetsAsync()
     {

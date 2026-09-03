@@ -18,6 +18,7 @@ internal sealed class FakeEditorDialogs : IEditorDialogs
     public string? LastSaveSuggestedName;
     public Exception? ShowNewMapException;
     public Exception? PickOpenException;
+    public Exception? PickAssetDirectoryException;
     public Exception? PickSaveException;
     public Exception? ShowDirtyException;
     public Exception? ShowErrorException;
@@ -92,6 +93,11 @@ internal sealed class FakeEditorDialogs : IEditorDialogs
     public Task<string?> PickAssetDirectoryAsync()
     {
         AssetDirectoryPickShown++;
+        if (PickAssetDirectoryException is { } exception)
+        {
+            return Task.FromException<string?>(exception);
+        }
+
         return Task.FromResult(AssetDirectoryPickResult);
     }
 
