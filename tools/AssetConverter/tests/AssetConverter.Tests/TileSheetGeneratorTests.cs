@@ -26,7 +26,7 @@ public class TileSheetGeneratorTests : IDisposable
     }
 
     [Fact]
-    public void Generate_AppliesStaticNonPartNonIconRulePlusAsperetaRange()
+    public void Generate_AppliesStaticNonPartNonIconRulePlusMapReferencesPlusAsperetaRange()
     {
         WriteAdf(10, AdfType.Graphic, frameCount: 2, animCount: 0);
         WriteAdf(11, AdfType.Graphic, frameCount: 2, animCount: 2);
@@ -42,9 +42,34 @@ public class TileSheetGeneratorTests : IDisposable
         string icons = Path.Combine(_dir, "sheets.json");
         File.WriteAllText(icons, """{ "atlasWidth": 2048, "iconSheets": [13] }""");
 
-        IReadOnlyList<int> tiles = TileSheetGenerator.Generate(_dir, manifest, icons);
+        string mapsDir = Path.Combine(_dir, "maps");
+        Directory.CreateDirectory(mapsDir);
+        WriteMap(mapsDir, "Map1.bytes", sheetsByLayer: new[] { 13, 0, 0, 0, 0 });
 
-        Assert.Equal(new[] { 10, 20000, 20001 }, tiles);
+        IReadOnlyList<int> tiles = TileSheetGenerator.Generate(_dir, manifest, icons, mapsDir);
+
+        Assert.Equal(new[] { 10, 13, 20000, 20001 }, tiles);
+    }
+
+    [Fact]
+    public void Generate_MapReferencedSheet_IsIncludedEvenWhenAnimated()
+    {
+        WriteAdf(11, AdfType.Graphic, frameCount: 2, animCount: 2);
+        WriteEnc();
+
+        string manifest = Path.Combine(_dir, "manifest.json");
+        File.WriteAllText(manifest, """{ "tileSize": 32, "sheets": { "11": { "1": [0, 0, 4, 4] } } }""");
+
+        string icons = Path.Combine(_dir, "sheets.json");
+        File.WriteAllText(icons, """{ "atlasWidth": 2048, "iconSheets": [] }""");
+
+        string mapsDir = Path.Combine(_dir, "maps");
+        Directory.CreateDirectory(mapsDir);
+        WriteMap(mapsDir, "Map1.bytes", sheetsByLayer: new[] { 11, 0, 0, 0, 0 });
+
+        IReadOnlyList<int> tiles = TileSheetGenerator.Generate(_dir, manifest, icons, mapsDir);
+
+        Assert.Equal(new[] { 11 }, tiles);
     }
 
     [Fact]
@@ -86,6 +111,24 @@ public class TileSheetGeneratorTests : IDisposable
         w.Write(0 + offset);
         w.Write(new byte[] { 1, 2, 3 });
         File.WriteAllBytes(Path.Combine(_dir, $"{fileNumber}.adf"), ms.ToArray());
+    }
+
+    private void WriteMap(string mapsDir, string name, int[] sheetsByLayer)
+    {
+        using var ms = new MemoryStream();
+        using var w = new BinaryWriter(ms);
+        w.Write((short)1);
+        w.Write((short)1);
+        w.Write(1);
+        w.Write(1);
+        w.Write(0);
+        foreach (int sheet in sheetsByLayer)
+        {
+            w.Write(7);
+            w.Write((short)sheet);
+        }
+
+        File.WriteAllBytes(Path.Combine(mapsDir, name), ms.ToArray());
     }
 
     private void WriteEnc(params (int type, int id, int[] files)[] entries)

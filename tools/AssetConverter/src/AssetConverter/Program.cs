@@ -209,7 +209,7 @@ if (args.Length >= 1 && args[0] == "tiles")
         : Path.GetFullPath(Path.Combine("..", ".."));
 
     string assetDir = Path.Combine(repoRoot, "Assets", "Sprites");
-    var sheets = TileSheetGenerator.Generate(Paths.IllutiaData, Path.Combine(assetDir, "manifest.json"), Paths.SpriteBundleConfig);
+    var sheets = TileSheetGenerator.Generate(Paths.IllutiaData, Path.Combine(assetDir, "manifest.json"), Paths.SpriteBundleConfig, Path.Combine(repoRoot, "Assets", "Maps"));
     TileSheetGenerator.Write(assetDir, sheets);
     Console.WriteLine($"Wrote {sheets.Count} tile sheets -> {Path.Combine(assetDir, TileSheetGenerator.OutputFileName)}");
     return;
