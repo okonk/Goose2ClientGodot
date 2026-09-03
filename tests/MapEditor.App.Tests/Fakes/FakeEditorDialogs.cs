@@ -14,11 +14,13 @@ internal sealed class FakeEditorDialogs : IEditorDialogs
     public string? OpenPickResult;
     public string? SavePickResult;
     public string? AssetDirectoryPickResult { get; set; }
+    public int AssetDirectoryPickShown;
     public string? LastSaveSuggestedName;
     public Exception? ShowNewMapException;
     public Exception? PickOpenException;
     public Exception? PickSaveException;
     public Exception? ShowDirtyException;
+    public Exception? ShowErrorException;
     public TaskCompletionSource<DirtyChoice>? DirtyGate;
 
     public int NewMapShown;
@@ -89,12 +91,18 @@ internal sealed class FakeEditorDialogs : IEditorDialogs
 
     public Task<string?> PickAssetDirectoryAsync()
     {
+        AssetDirectoryPickShown++;
         return Task.FromResult(AssetDirectoryPickResult);
     }
 
     public Task ShowErrorAsync(ErrorPresentation error)
     {
         Errors.Add(error);
+        if (ShowErrorException is { } exception)
+        {
+            return Task.FromException(exception);
+        }
+
         return Task.CompletedTask;
     }
 }

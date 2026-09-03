@@ -1,0 +1,90 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="MapEditor.App.MainWindow"
+        Title="Goose2 Map Editor — Untitled"
+        Width="1200"
+        Height="800">
+  <DockPanel x:Name="Root">
+    <Menu x:Name="Menu" DockPanel.Dock="Top">
+      <MenuItem x:Name="FileMenu" Header="_File">
+        <MenuItem x:Name="NewCommand" Header="_New" Click="OnNew" />
+        <MenuItem x:Name="OpenCommand" Header="_Open" Click="OnOpen" />
+        <MenuItem x:Name="SaveCommand" Header="_Save" IsEnabled="{Binding CanSave}" Click="OnSave" />
+        <MenuItem x:Name="SaveAsCommand" Header="Save _As" Click="OnSaveAs" />
+        <Separator />
+        <MenuItem x:Name="ExitCommand" Header="E_xit" Click="OnExit" />
+      </MenuItem>
+      <MenuItem x:Name="EditMenu" Header="_Edit">
+        <MenuItem x:Name="UndoCommand" Header="_Undo" IsEnabled="{Binding CanUndo}" Click="OnUndo" />
+        <MenuItem x:Name="RedoCommand" Header="_Redo" IsEnabled="{Binding CanRedo}" Click="OnRedo" />
+      </MenuItem>
+    </Menu>
+    <Border x:Name="Toolbar" DockPanel.Dock="Top" Padding="4" BorderBrush="#FFCCCCCC" BorderThickness="0,0,0,1">
+      <StackPanel Orientation="Horizontal" Spacing="4">
+        <Button x:Name="NewButton" Content="New" Click="OnNew" />
+        <Button x:Name="OpenButton" Content="Open" Click="OnOpen" />
+        <Button x:Name="SaveButton" Content="Save" IsEnabled="{Binding CanSave}" Click="OnSave" />
+        <Button x:Name="UndoButton" Content="Undo" IsEnabled="{Binding CanUndo}" Click="OnUndo" />
+        <Button x:Name="RedoButton" Content="Redo" IsEnabled="{Binding CanRedo}" Click="OnRedo" />
+        <ToggleButton x:Name="PencilTool" Content="Pencil" Tag="Pencil" IsChecked="True" Checked="OnToolChecked" />
+        <ToggleButton x:Name="EraserTool" Content="Eraser" Tag="Eraser" Checked="OnToolChecked" />
+        <ToggleButton x:Name="EyedropperTool" Content="Eyedropper" Tag="Eyedropper" Checked="OnToolChecked" />
+        <ToggleButton x:Name="BlockedTool" Content="Blocked" Tag="BlockedToggle" Checked="OnToolChecked" />
+        <Button x:Name="ZoomInButton" Content="Zoom in" Click="OnZoomIn" />
+        <Button x:Name="ZoomOutButton" Content="Zoom out" Click="OnZoomOut" />
+      </StackPanel>
+    </Border>
+    <Border x:Name="StatusBar" DockPanel.Dock="Bottom" Padding="8,3" BorderBrush="#FFCCCCCC" BorderThickness="0,1,0,0">
+      <StackPanel Orientation="Horizontal" Spacing="16">
+        <TextBlock x:Name="HoverText" Text="—" />
+        <TextBlock x:Name="ZoomText" Text="100%" />
+        <TextBlock x:Name="SizeText" Text="100 × 100" />
+      </StackPanel>
+    </Border>
+    <Grid x:Name="Body" ColumnDefinitions="260,*,260">
+      <DockPanel x:Name="LeftPanel" Grid.Column="0">
+        <StackPanel DockPanel.Dock="Top" Spacing="6" Margin="8">
+          <Button x:Name="LoadAssetsButton" Content="Load assets…" Click="OnLoadAssets" />
+          <TextBlock x:Name="AssetDirectoryText" Text="—" TextWrapping="Wrap" />
+          <ComboBox x:Name="SheetCombo" ItemsSource="{Binding SheetIds}" SelectedIndex="{Binding SelectedSheet, Mode=TwoWay}" />
+          <StackPanel Orientation="Horizontal" Spacing="4">
+            <TextBlock Text="Sheet" VerticalAlignment="Center" />
+            <TextBox x:Name="BrushSheet" Width="64" />
+            <TextBlock Text="Graphic" VerticalAlignment="Center" />
+            <TextBox x:Name="BrushGraphic" Width="64" />
+          </StackPanel>
+          <TextBlock x:Name="BrushValidationError" Text="Must be a signed integer." Foreground="#FFCC0000" IsVisible="False" />
+        </StackPanel>
+        <Grid x:Name="PaletteHost" Margin="8,0,8,8" ColumnDefinitions="*,Auto">
+          <Border x:Name="PaletteBorder" Grid.Column="0" BorderBrush="#FFCCCCCC" BorderThickness="1" />
+          <ScrollBar x:Name="PaletteBar" Grid.Column="1" Orientation="Vertical" />
+        </Grid>
+      </DockPanel>
+      <Border x:Name="CanvasHost" Grid.Column="1" Margin="8" BorderBrush="#FF888888" BorderThickness="1" />
+      <StackPanel x:Name="RightPanel" Grid.Column="2" Spacing="4" Margin="8">
+        <TextBlock Text="Active layer" FontWeight="SemiBold" />
+        <RadioButton x:Name="Layer0Radio" Content="Layer 0" Tag="0" IsChecked="True" Checked="OnLayerSelected" />
+        <RadioButton x:Name="Layer1Radio" Content="Layer 1" Tag="1" Checked="OnLayerSelected" />
+        <RadioButton x:Name="Layer2Radio" Content="Layer 2" Tag="2" Checked="OnLayerSelected" />
+        <RadioButton x:Name="Layer3Radio" Content="Layer 3" Tag="3" Checked="OnLayerSelected" />
+        <RadioButton x:Name="Layer4Radio" Content="Layer 4" Tag="4" Checked="OnLayerSelected" />
+        <TextBlock Text="Visibility" FontWeight="SemiBold" Margin="0,8,0,0" />
+        <CheckBox x:Name="Layer0Visible" Content="Layer 0" IsChecked="{Binding Layer0Visible}" />
+        <CheckBox x:Name="Layer1Visible" Content="Layer 1" IsChecked="{Binding Layer1Visible}" />
+        <CheckBox x:Name="Layer2Visible" Content="Layer 2" IsChecked="{Binding Layer2Visible}" />
+        <CheckBox x:Name="Layer3Visible" Content="Layer 3" IsChecked="{Binding Layer3Visible}" />
+        <CheckBox x:Name="Layer4Visible" Content="Layer 4" IsChecked="{Binding Layer4Visible}" />
+        <CheckBox x:Name="ShowGridCheck" Content="Grid" IsChecked="{Binding ShowGrid}" />
+        <CheckBox x:Name="ShowBlockedCheck" Content="Blocked" IsChecked="{Binding ShowBlocked}" />
+        <TextBlock Text="Selected tile" FontWeight="SemiBold" Margin="0,8,0,0" />
+        <TextBlock x:Name="SelectedText" Text="—" />
+        <TextBlock x:Name="BlockedText" Text="blocked: no" />
+        <TextBlock x:Name="Layer0Ref" Text="L0 0/0" />
+        <TextBlock x:Name="Layer1Ref" Text="L1 0/0" />
+        <TextBlock x:Name="Layer2Ref" Text="L2 0/0" />
+        <TextBlock x:Name="Layer3Ref" Text="L3 0/0" />
+        <TextBlock x:Name="Layer4Ref" Text="L4 0/0" />
+      </StackPanel>
+    </Grid>
+  </DockPanel>
+</Window>

@@ -28,8 +28,11 @@ internal sealed class AssetContextController : IDisposable
 
     public AssetContext Current => _current;
 
-    public bool TryOpen(string path)
+    public bool TryOpen(string path) => TryOpen(path, out _);
+
+    internal bool TryOpen(string path, out Exception? failure)
     {
+        failure = null;
         if (string.IsNullOrWhiteSpace(path))
         {
             return false;
@@ -42,8 +45,9 @@ internal sealed class AssetContextController : IDisposable
             fullPath = Path.GetFullPath(path);
             candidate = _openContext(fullPath);
         }
-        catch (SpriteManifestException)
+        catch (SpriteManifestException ex)
         {
+            failure = ex;
             return false;
         }
         catch (IOException)

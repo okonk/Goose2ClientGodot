@@ -265,8 +265,8 @@ internal sealed class MainWindowViewModel : ViewModelBase
             {
                 documentReplaced = true;
                 _session = session;
-                SetField(ref _mapWidth, session.Document.Width);
-                SetField(ref _mapHeight, session.Document.Height);
+                SetField(ref _mapWidth, session.Document.Width, nameof(MapWidth));
+                SetField(ref _mapHeight, session.Document.Height, nameof(MapHeight));
                 HoverX = null;
                 HoverY = null;
                 SelectedX = null;
@@ -278,14 +278,14 @@ internal sealed class MainWindowViewModel : ViewModelBase
 
         if (flags.HasFlag(EditorRefresh.Title))
         {
-            SetField(ref _title, BuildTitle());
+            SetField(ref _title, BuildTitle(), nameof(Title));
         }
 
         if (flags.HasFlag(EditorRefresh.Commands))
         {
-            SetField(ref _canUndo, _session.CanUndo);
-            SetField(ref _canRedo, _session.CanRedo);
-            SetField(ref _canSave, _session.IsDirty);
+            SetField(ref _canUndo, _session.CanUndo, nameof(CanUndo));
+            SetField(ref _canRedo, _session.CanRedo, nameof(CanRedo));
+            SetField(ref _canSave, _session.IsDirty, nameof(CanSave));
         }
 
         if (documentReplaced || flags.HasFlag(EditorRefresh.Canvas))

@@ -59,6 +59,18 @@ internal sealed class MapCanvas : Control, ICustomHitTest
         _viewModel.Refresh(EditorRefresh.Canvas | EditorRefresh.Commands | EditorRefresh.Title);
     }
 
+    internal void ZoomStep(bool zoomIn)
+    {
+        MapZoom next = zoomIn ? MapZoomLevels.ZoomIn(_viewport.Zoom) : MapZoomLevels.ZoomOut(_viewport.Zoom);
+        if (next != _viewport.Zoom)
+        {
+            Point center = new(Bounds.Width / 2, Bounds.Height / 2);
+            _viewport = _viewport.ZoomAt(next, new RenderPoint(center.X, center.Y));
+            _viewModel.ZoomPercent = (int)next;
+            Invalidate();
+        }
+    }
+
     internal void RenderMap(IMapDrawTarget target)
     {
         using IDisposable clip = target.PushClip(new Rect(Bounds.Size));
