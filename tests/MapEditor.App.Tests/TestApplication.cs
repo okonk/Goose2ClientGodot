@@ -1,12 +1,23 @@
 using Avalonia;
-using Avalonia.Markup.Xaml;
+using Avalonia.Headless;
+using Avalonia.Themes.Fluent;
+
+[assembly: AvaloniaTestApplication(typeof(MapEditor.App.Tests.HeadlessTestAppBuilder))]
 
 namespace MapEditor.App.Tests;
 
-public class TestApplication : Application
+public class HeadlessTestApplication : Application
 {
-    public override void Initialize()
+    public HeadlessTestApplication()
     {
-        AvaloniaXamlLoader.Load(this);
+        Styles.Add(new FluentTheme());
     }
+}
+
+public static class HeadlessTestAppBuilder
+{
+    public static AppBuilder BuildAvaloniaApp()
+        => AppBuilder.Configure<HeadlessTestApplication>()
+            .UseSkia()
+            .UseHeadless(new AvaloniaHeadlessPlatformOptions { UseHeadlessDrawing = false });
 }

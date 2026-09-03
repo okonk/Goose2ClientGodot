@@ -406,6 +406,106 @@ public class SpriteAssetCacheTests
     }
 
     [Fact]
+    public void CreateUnavailable_ReportsUnavailableWithNoManifestAnd32Maxima()
+    {
+        SpriteAssetCache cache = SpriteAssetCache.CreateUnavailable();
+
+        Assert.False(cache.IsAvailable);
+        Assert.Null(cache.Manifest);
+        Assert.Equal(32, cache.MaxFrameWidth);
+        Assert.Equal(32, cache.MaxFrameHeight);
+        Assert.False(cache.IsDisposed);
+
+        cache.Dispose();
+        Assert.True(cache.IsDisposed);
+    }
+
+    [Fact]
+    public void RealCache_IsAvailableAndExposesManifestMaxima()
+    {
+        using Fixture fixture = new(TwoSheetJson);
+        SpriteAssetCache cache = CreateCache(fixture, SpriteManifest.Parse(TwoSheetJson), new FakeSpriteSheetLoader());
+
+        Assert.True(cache.IsAvailable);
+        Assert.NotNull(cache.Manifest);
+        Assert.Equal(cache.Manifest.MaxFrameWidth, cache.MaxFrameWidth);
+        Assert.Equal(cache.Manifest.MaxFrameHeight, cache.MaxFrameHeight);
+
+        cache.Dispose();
+    }
+
+    [Theory]
+    [InlineData(0, 0)]
+    [InlineData(5, 0)]
+    [InlineData(-3, 0)]
+    public void CreateUnavailable_GraphicZeroReturnsEmpty(int sheet, int graphic)
+    {
+        SpriteAssetCache cache = SpriteAssetCache.CreateUnavailable();
+
+        SpriteResolution resolution = cache.Resolve(new SpriteReference(sheet, graphic));
+
+        Assert.Equal(SpriteResolutionStatus.Empty, resolution.Status);
+        Assert.Null(resolution.Image);
+        Assert.Equal(new SpriteReference(sheet, graphic), resolution.Reference);
+
+        cache.Dispose();
+    }
+
+    [Theory]
+    [InlineData(1, 1)]
+    [InlineData(0, 5)]
+    [InlineData(-3, 5)]
+    [InlineData(1, -1)]
+    [InlineData(0, -1)]
+    [InlineData(-1, -1)]
+    [InlineData(int.MaxValue, int.MinValue)]
+    public void CreateUnavailable_NonEmptyReferenceReturnsAssetsUnavailable(int sheet, int graphic)
+    {
+        SpriteAssetCache cache = SpriteAssetCache.CreateUnavailable();
+
+        SpriteResolution resolution = cache.Resolve(new SpriteReference(sheet, graphic));
+
+        Assert.Equal(SpriteResolutionStatus.AssetsUnavailable, resolution.Status);
+        Assert.Null(resolution.Image);
+        Assert.False(string.IsNullOrEmpty(resolution.Diagnostic));
+
+        cache.Dispose();
+    }
+
+    [Fact]
+    public void CreateUnavailable_NoReferenceResolvesReadyAndNothingIsReserved()
+    {
+        SpriteAssetCache cache = SpriteAssetCache.CreateUnavailable();
+        SpriteReference[] references =
+        {
+            new(1, 1), new(0, 1), new(-1, 1), new(1, -1), new(0, -1), new(-1, -1),
+            new(1, 0), new(0, 0), new(-1, 0), new(int.MaxValue, int.MinValue)
+        };
+
+        foreach (SpriteReference reference in references)
+        {
+            SpriteResolution resolution = cache.Resolve(reference);
+            Assert.NotEqual(SpriteResolutionStatus.Ready, resolution.Status);
+            Assert.Null(resolution.Image);
+        }
+
+        cache.Dispose();
+    }
+
+    [Fact]
+    public void CreateUnavailable_DisposeIsIdempotentAndPostDisposeResolveThrows()
+    {
+        SpriteAssetCache cache = SpriteAssetCache.CreateUnavailable();
+
+        cache.Dispose();
+        cache.Dispose();
+
+        Assert.True(cache.IsDisposed);
+        Assert.Throws<ObjectDisposedException>(() => cache.Resolve(new SpriteReference(1, 1)));
+        Assert.Throws<ObjectDisposedException>(() => cache.Resolve(new SpriteReference(0, 0)));
+    }
+
+    [Fact]
     public void FailedOpenDoesNotCreateCacheOrInvokeLoader()
     {
         using Fixture fixture = new(null);

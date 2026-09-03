@@ -6,27 +6,42 @@ namespace MapEditor.Rendering;
 
 public sealed class SpriteAssetCache : IDisposable
 {
-    private readonly ISpriteSheetLoader _loader;
+    private const int UnavailableMaxFrameSize = 32;
+
+    private readonly ISpriteSheetLoader? _loader;
     private readonly Dictionary<int, SpriteSheetEntry> _sheets = new();
     private readonly Dictionary<SpriteReference, SpriteResolution> _resolutions = new();
     private readonly List<ISpriteSheetImage> _ownedImages = new();
     private bool _disposed;
 
     public string AssetDirectory { get; }
-    public SpriteManifest Manifest { get; }
+    public SpriteManifest? Manifest { get; }
+    public bool IsAvailable { get; }
+    public int MaxFrameWidth { get; }
+    public int MaxFrameHeight { get; }
     public bool IsDisposed => _disposed;
 
     public SpriteAssetCache(string assetDirectory, SpriteManifest manifest, ISpriteSheetLoader loader)
+        : this(
+            string.IsNullOrWhiteSpace(assetDirectory)
+                ? throw new ArgumentException("Asset directory is required.", nameof(assetDirectory))
+                : Path.GetFullPath(assetDirectory),
+            manifest ?? throw new ArgumentNullException(nameof(manifest)),
+            loader ?? throw new ArgumentNullException(nameof(loader)),
+            available: true)
     {
-        if (string.IsNullOrWhiteSpace(assetDirectory))
-        {
-            throw new ArgumentException("Asset directory is required.", nameof(assetDirectory));
-        }
+    }
 
-        ArgumentNullException.ThrowIfNull(manifest);
-        ArgumentNullException.ThrowIfNull(loader);
-        AssetDirectory = Path.GetFullPath(assetDirectory);
+    public static SpriteAssetCache CreateUnavailable()
+        => new(string.Empty, null, null, available: false);
+
+    private SpriteAssetCache(string assetDirectory, SpriteManifest? manifest, ISpriteSheetLoader? loader, bool available)
+    {
+        AssetDirectory = assetDirectory;
         Manifest = manifest;
+        IsAvailable = available;
+        MaxFrameWidth = manifest?.MaxFrameWidth ?? UnavailableMaxFrameSize;
+        MaxFrameHeight = manifest?.MaxFrameHeight ?? UnavailableMaxFrameSize;
         _loader = loader;
     }
 
@@ -45,6 +60,18 @@ public sealed class SpriteAssetCache : IDisposable
             return new SpriteResolution(SpriteResolutionStatus.Empty, reference, null, default, null);
         }
 
+        if (!IsAvailable)
+        {
+            return new SpriteResolution(
+                SpriteResolutionStatus.AssetsUnavailable,
+                reference,
+                null,
+                default,
+                $"Sprite assets are unavailable ({ReferenceText(reference)}); load an asset directory to resolve sprites.");
+        }
+
+        SpriteManifest manifest = Manifest!;
+
         if (_resolutions.TryGetValue(reference, out SpriteResolution cached))
         {
             return cached;
@@ -52,7 +79,7 @@ public sealed class SpriteAssetCache : IDisposable
 
         SpriteResolution resolution;
 
-        if (!Manifest.ContainsSheet(reference.Sheet))
+        if (!manifest.ContainsSheet(reference.Sheet))
         {
             resolution = new SpriteResolution(
                 SpriteResolutionStatus.UnknownSheet,
@@ -61,7 +88,7 @@ public sealed class SpriteAssetCache : IDisposable
                 default,
                 $"Sheet {reference.Sheet} is not declared in the manifest ({ReferenceText(reference)}, sheet path {SheetPath(reference.Sheet)}).");
         }
-        else if (!Manifest.TryGetSourceRect(reference, out SpriteSourceRect sourceRect))
+        else if (!manifest.TryGetSourceRect(reference, out SpriteSourceRect sourceRect))
         {
             resolution = new SpriteResolution(
                 SpriteResolutionStatus.UnknownGraphic,
@@ -116,7 +143,7 @@ public sealed class SpriteAssetCache : IDisposable
         }
 
         string path = SheetPath(sheet);
-        SpriteSheetLoadResult result = _loader.Load(path);
+        SpriteSheetLoadResult result = _loader!.Load(path);
         SpriteSheetEntry entry = ValidateAndStore(path, result);
         _sheets[sheet] = entry;
         return entry;

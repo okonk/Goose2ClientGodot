@@ -45,7 +45,8 @@ public enum SpriteResolutionStatus
     UnknownGraphic,
     MissingSheetFile,
     SheetLoadFailed,
-    FrameOutsideSheet
+    FrameOutsideSheet,
+    AssetsUnavailable
 }
 
 public readonly record struct SpriteResolution(

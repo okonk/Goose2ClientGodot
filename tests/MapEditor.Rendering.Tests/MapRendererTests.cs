@@ -874,6 +874,69 @@ public class MapRendererTests
     }
 
     [Fact]
+    public void Render_UnavailableAssetsEmitAssetsUnavailablePlaceholdersForNonEmptyReferences()
+    {
+        SpriteAssetCache cache = SpriteAssetCache.CreateUnavailable();
+        MapRenderer renderer = new(cache);
+        MapDocument document = MapDocument.Create(3, 1);
+        document.SetLayer(0, 0, 0, new MapTileLayer(1, 5));
+        document.SetLayer(1, 0, 1, new MapTileLayer(0, -7));
+        document.SetLayer(2, 0, 2, new MapTileLayer(-3, 9));
+
+        RecordingMapDrawSink sink = new();
+        renderer.Render(Request(document, Viewport(96, 32)), sink);
+
+        Assert.Equal(3, sink.CallCount);
+        (int Layer, int X, int Sheet, int Graphic)[] expected =
+        {
+            (0, 0, 1, 5), (1, 1, 0, -7), (2, 2, -3, 9)
+        };
+        for (int i = 0; i < expected.Length; i++)
+        {
+            PlaceholderDrawOperation operation = (PlaceholderDrawOperation)sink.Calls[i];
+            Assert.Equal(SpriteResolutionStatus.AssetsUnavailable, operation.Reason);
+            Assert.Equal(expected[i].Layer, operation.Layer);
+            Assert.Equal(new MapTileCoordinate(expected[i].X, 0), operation.Tile);
+            Assert.Equal(new SpriteReference(expected[i].Sheet, expected[i].Graphic), operation.Reference);
+            Assert.False(string.IsNullOrEmpty(operation.Diagnostic));
+        }
+    }
+
+    [Fact]
+    public void Render_UnavailableAssetsGraphicZeroEmitsNothing()
+    {
+        SpriteAssetCache cache = SpriteAssetCache.CreateUnavailable();
+        MapRenderer renderer = new(cache);
+        MapDocument document = MapDocument.Create(2, 1);
+        document.SetLayer(0, 0, 0, new MapTileLayer(9, 0));
+        document.SetLayer(1, 0, 1, new MapTileLayer(-4, 0));
+
+        RecordingMapDrawSink sink = new();
+        renderer.Render(Request(document, Viewport(64, 32)), sink);
+
+        Assert.Equal(0, sink.CallCount);
+    }
+
+    [Fact]
+    public void Render_UnavailableAssetsCullPlaceholdersToVisibleCellsUsing32Maxima()
+    {
+        SpriteAssetCache cache = SpriteAssetCache.CreateUnavailable();
+        MapRenderer renderer = new(cache);
+        MapDocument document = MapDocument.Create(4, 4);
+        document.SetLayer(0, 0, 0, new MapTileLayer(1, 1));
+        document.SetLayer(3, 3, 0, new MapTileLayer(1, 1));
+
+        RecordingMapDrawSink sink = new();
+        renderer.Render(Request(document, Viewport(32, 32)), sink);
+
+        Assert.Equal(1, sink.CallCount);
+        PlaceholderDrawOperation operation = (PlaceholderDrawOperation)sink.Calls[0];
+        Assert.Equal(SpriteResolutionStatus.AssetsUnavailable, operation.Reason);
+        Assert.Equal(new MapTileCoordinate(0, 0), operation.Tile);
+        Assert.Equal(new RenderRect(0, 0, 32, 32), operation.DestinationRect);
+    }
+
+    [Fact]
     public void Render_DisposedAssetsThrowsBeforeSinkCalls()
     {
         FakeSpriteSheetLoader loader = new();

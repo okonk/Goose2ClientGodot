@@ -26,8 +26,8 @@ public sealed class MapRenderer
             viewport,
             document.Width,
             document.Height,
-            _assets.Manifest.MaxFrameWidth,
-            _assets.Manifest.MaxFrameHeight);
+            _assets.MaxFrameWidth,
+            _assets.MaxFrameHeight);
         MapLayerVisibility visibility = options.VisibleLayers;
 
         long visibleLayerCount = 0;
@@ -54,7 +54,7 @@ public sealed class MapRenderer
         }
 
         RenderRect visibleWorld = viewport.VisibleWorldRect;
-        SpriteManifest manifest = _assets.Manifest;
+        SpriteManifest? manifest = _assets.Manifest;
 
         for (int layer = 0; layer < MapDocument.LayerCount; layer++)
         {
@@ -74,7 +74,8 @@ public sealed class MapRenderer
                     }
 
                     SpriteReference reference = new(tileLayer.Sheet, tileLayer.Graphic);
-                    bool knownFrame = manifest.TryGetSourceRect(reference, out SpriteSourceRect sourceRect);
+                    SpriteSourceRect sourceRect = default;
+                    bool knownFrame = manifest is not null && manifest.TryGetSourceRect(reference, out sourceRect);
                     RenderRect cell = CellRect(x, y);
                     bool cellIntersects = Intersects(cell, visibleWorld);
                     bool spriteIntersects = false;
