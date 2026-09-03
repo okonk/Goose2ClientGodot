@@ -74,12 +74,28 @@ internal sealed class MapCanvas : Control, ICustomHitTest
     private void OnSizeChanged(object? sender, SizeChangedEventArgs e)
     {
         _viewport = new ViewportTransform(new RenderSize(Bounds.Width, Bounds.Height), _viewport.WorldOrigin, _viewport.Zoom);
+        Invalidate();
+    }
+
+    internal int InvalidationCount { get; private set; }
+
+    private void Invalidate()
+    {
+        InvalidationCount++;
         InvalidateVisual();
     }
+
+    internal bool IsGestureActive => _stroking || _panning;
 
     protected override void OnPointerPressed(PointerPressedEventArgs e)
     {
         base.OnPointerPressed(e);
+        if (IsGestureActive)
+        {
+            e.Handled = true;
+            return;
+        }
+
         PointerPoint point = e.GetCurrentPoint(this);
         PointerPointProperties properties = point.Properties;
         if (properties.IsLeftButtonPressed)
@@ -136,7 +152,7 @@ internal sealed class MapCanvas : Control, ICustomHitTest
         {
             _viewport = _viewport.PanByScreenDelta(new RenderPoint(position.X - _lastPanPosition.X, position.Y - _lastPanPosition.Y));
             _lastPanPosition = position;
-            InvalidateVisual();
+            Invalidate();
             return;
         }
 
@@ -161,16 +177,21 @@ internal sealed class MapCanvas : Control, ICustomHitTest
     private void UpdateHover(Point position)
     {
         MapTileCoordinate? tile = Bounds.Contains(position) ? TileAt(position) : null;
+        int? hoverX = null;
+        int? hoverY = null;
         if (tile is { } hovered)
         {
-            _viewModel.HoverX = hovered.X;
-            _viewModel.HoverY = hovered.Y;
+            hoverX = hovered.X;
+            hoverY = hovered.Y;
         }
-        else
+        if (hoverX == _viewModel.HoverX && hoverY == _viewModel.HoverY)
         {
-            _viewModel.HoverX = null;
-            _viewModel.HoverY = null;
+            return;
         }
+
+        _viewModel.HoverX = hoverX;
+        _viewModel.HoverY = hoverY;
+        Invalidate();
     }
 
     protected override void OnPointerReleased(PointerReleasedEventArgs e)
@@ -226,7 +247,7 @@ internal sealed class MapCanvas : Control, ICustomHitTest
             Point position = e.GetCurrentPoint(this).Position;
             _viewport = _viewport.ZoomAt(next, new RenderPoint(position.X, position.Y));
             _viewModel.ZoomPercent = (int)next;
-            InvalidateVisual();
+            Invalidate();
         }
 
         e.Handled = true;
@@ -305,7 +326,7 @@ internal sealed class MapCanvas : Control, ICustomHitTest
             _spaceDown = false;
         }
 
-        InvalidateVisual();
+        Invalidate();
     }
 
     private MapRenderRequest BuildRenderRequest()

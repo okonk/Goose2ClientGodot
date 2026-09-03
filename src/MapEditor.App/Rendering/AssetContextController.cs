@@ -35,13 +35,22 @@ internal sealed class AssetContextController : IDisposable
             return false;
         }
 
-        string fullPath = Path.GetFullPath(path);
+        string fullPath;
         AssetContext candidate;
         try
         {
+            fullPath = Path.GetFullPath(path);
             candidate = _openContext(fullPath);
         }
         catch (SpriteManifestException)
+        {
+            return false;
+        }
+        catch (IOException)
+        {
+            return false;
+        }
+        catch (ArgumentException)
         {
             return false;
         }

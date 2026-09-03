@@ -459,6 +459,42 @@ public class MapCanvasTests
         Assert.Equal(new MapTileLayer(0, 0), document[1, 0].GetLayer(0));
     }
 
+    [AvaloniaFact]
+    public async Task HoverMoves_InvalidateOnlyWhenHoveredTileChanges()
+    {
+        Harness harness = await CreateSmallMapAsync();
+        MapCanvas canvas = harness.Canvas;
+
+        int before = canvas.InvalidationCount;
+        harness.Window.MouseMove(new Point(Cell / 2, Cell / 2), RawInputModifiers.None);
+        Assert.Equal(before + 1, canvas.InvalidationCount);
+
+        harness.Window.MouseMove(new Point(2 * Cell - Cell / 2, Cell / 2), RawInputModifiers.None);
+        Assert.Equal(before + 2, canvas.InvalidationCount);
+
+        harness.Window.MouseMove(new Point(2 * Cell - Cell / 4, Cell / 4), RawInputModifiers.None);
+        Assert.Equal(before + 2, canvas.InvalidationCount);
+
+        harness.Window.MouseMove(new Point(8 * Cell, 8 * Cell), RawInputModifiers.None);
+        Assert.Equal(before + 3, canvas.InvalidationCount);
+        Assert.Null(harness.ViewModel.HoverX);
+        Assert.Null(harness.ViewModel.HoverY);
+    }
+
+    [AvaloniaFact]
+    public async Task StrokeActive_ReportsGestureActiveUntilRelease()
+    {
+        Harness harness = await CreateSmallMapAsync();
+        MapCanvas canvas = harness.Canvas;
+        Assert.False(canvas.IsGestureActive);
+
+        harness.Window.MouseDown(new Point(Cell / 2, Cell / 2), MouseButton.Left, RawInputModifiers.None);
+        Assert.True(canvas.IsGestureActive);
+
+        harness.Window.MouseUp(new Point(Cell / 2, Cell / 2), MouseButton.Left, RawInputModifiers.None);
+        Assert.False(canvas.IsGestureActive);
+    }
+
     private sealed class ThrowingMapDrawTarget : IMapDrawTarget
     {
         public void DrawImage(Bitmap bitmap, Rect sourceRect, Rect destinationRect) => throw new InvalidOperationException("sink failure");

@@ -137,6 +137,24 @@ public class AssetContextControllerTests : IDisposable
         Assert.False(oldContext.IsDisposed);
     }
 
+    [Fact]
+    public void TryOpen_PathWithInvalidCharacter_PreservesOldContextAndSettings()
+    {
+        using AssetContextController controller = CreateController();
+        string oldDirectory = WriteAssetDirectory("assets-old", TwoSheetJson);
+        Assert.True(controller.TryOpen(oldDirectory));
+        AssetContext oldContext = controller.Current;
+        WriteSettings(oldDirectory);
+        string settingsBefore = File.ReadAllText(_settingsPath);
+
+        bool opened = controller.TryOpen("bad\0path");
+
+        Assert.False(opened);
+        Assert.Same(oldContext, controller.Current);
+        Assert.False(oldContext.IsDisposed);
+        Assert.Equal(settingsBefore, File.ReadAllText(_settingsPath));
+    }
+
     [Theory]
     [InlineData("")]
     [InlineData("   ")]
