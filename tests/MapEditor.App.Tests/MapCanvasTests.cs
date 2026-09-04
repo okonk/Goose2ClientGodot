@@ -34,6 +34,10 @@ public class MapCanvasTests
     private const int MapSize = 4;
     private const int Cell = 32;
 
+    // ARGB literals mirroring the internal MapRenderPalette preview fills (RenderColor is RGBA)
+    private static readonly Color BlockPreviewColor = Color.FromArgb(0x60, 0xFF, 0x00, 0x00);
+    private static readonly Color UnblockPreviewColor = Color.FromArgb(0x60, 0x00, 0xFF, 0x00);
+
     private sealed record Harness(MapCanvas Canvas, MainWindowViewModel ViewModel, FakeEditorDialogs Dialogs, Window Window, AssetContextController Assets);
 
     [AvaloniaFact]
@@ -137,26 +141,168 @@ public class MapCanvasTests
     }
 
     [AvaloniaFact]
-    public async Task BlockedToggleLoopOverItself_TogglesCrossedCellOnce()
+    public async Task BlockedDrag_BlocksTheRectangleAsOneUndoEntry()
     {
         Harness harness = await CreateSmallMapAsync();
-        MapEditSession session = harness.ViewModel.Session;
-        MapDocument document = session.Document;
         harness.ViewModel.ActiveTool = MapEditTool.Blocked;
+        MapDocument document = harness.ViewModel.Session.Document;
 
         harness.Window.MouseDown(new Point(Cell / 2, Cell / 2), MouseButton.Left, RawInputModifiers.None);
-        harness.Window.MouseMove(new Point(2 * Cell - Cell / 2, Cell / 2), RawInputModifiers.None);
-        harness.Window.MouseMove(new Point(2 * Cell - Cell / 2, 2 * Cell - Cell / 2), RawInputModifiers.None);
-        harness.Window.MouseMove(new Point(Cell / 2, 2 * Cell - Cell / 2), RawInputModifiers.None);
-        harness.Window.MouseMove(new Point(Cell / 2, Cell / 2), RawInputModifiers.None);
-        harness.Window.MouseUp(new Point(Cell / 2, Cell / 2), MouseButton.Left, RawInputModifiers.None);
+        harness.Window.MouseMove(new Point(Cell * 2 + Cell / 2, Cell * 2 + Cell / 2), RawInputModifiers.None);
+        harness.Window.MouseUp(new Point(Cell * 2 + Cell / 2, Cell * 2 + Cell / 2), MouseButton.Left, RawInputModifiers.None);
 
-        Assert.False(session.HasActiveStroke);
+        for (int y = 0; y <= 2; y++)
+            for (int x = 0; x <= 2; x++)
+                Assert.True(document[x, y].IsBlocked);
+
+        Assert.False(document[3, 3].IsBlocked);
+        Assert.True(harness.ViewModel.ShowBlocked);
+        Assert.True(harness.ViewModel.Undo());
+        Assert.False(document[0, 0].IsBlocked);
+        Assert.False(harness.ViewModel.CanUndo);
+    }
+
+    [AvaloniaFact]
+    public async Task BlockedShiftDrag_ClearsInsteadOfSetting()
+    {
+        Harness harness = await CreateSmallMapAsync();
+        harness.ViewModel.ActiveTool = MapEditTool.Blocked;
+        MapDocument document = harness.ViewModel.Session.Document;
+        for (int y = 0; y < MapSize; y++)
+            for (int x = 0; x < MapSize; x++)
+                document.SetFlags(x, y, MapDocument.BlockedFlag);
+
+        harness.Window.MouseDown(new Point(Cell / 2, Cell / 2), MouseButton.Left, RawInputModifiers.Shift);
+        harness.Window.MouseMove(new Point(Cell * 2 + Cell / 2, Cell * 2 + Cell / 2), RawInputModifiers.Shift);
+        harness.Window.MouseUp(new Point(Cell * 2 + Cell / 2, Cell * 2 + Cell / 2), MouseButton.Left, RawInputModifiers.Shift);
+
+        for (int y = 0; y <= 2; y++)
+            for (int x = 0; x <= 2; x++)
+                Assert.False(document[x, y].IsBlocked);
+
+        Assert.True(document[3, 3].IsBlocked);
+        Assert.True(harness.ViewModel.ShowBlocked);
+        Assert.True(harness.ViewModel.Undo());
         Assert.True(document[0, 0].IsBlocked);
-        Assert.True(document[1, 0].IsBlocked);
+        Assert.False(harness.ViewModel.CanUndo);
+    }
+
+    [AvaloniaFact]
+    public async Task BlockedDragEscape_AppliesNothing()
+    {
+        Harness harness = await CreateSmallMapAsync();
+        harness.ViewModel.ActiveTool = MapEditTool.Blocked;
+        MapDocument document = harness.ViewModel.Session.Document;
+
+        harness.Window.MouseDown(new Point(Cell / 2, Cell / 2), MouseButton.Left, RawInputModifiers.None);
+        harness.Window.MouseMove(new Point(Cell * 2 + Cell / 2, Cell * 2 + Cell / 2), RawInputModifiers.None);
+        harness.Window.KeyPressQwerty(PhysicalKey.Escape, RawInputModifiers.None);
+        harness.Window.MouseUp(new Point(Cell * 2 + Cell / 2, Cell * 2 + Cell / 2), MouseButton.Left, RawInputModifiers.None);
+
+        for (int y = 0; y < MapSize; y++)
+            for (int x = 0; x < MapSize; x++)
+                Assert.False(document[x, y].IsBlocked);
+
+        Assert.False(harness.ViewModel.CanUndo);
+    }
+
+    [AvaloniaFact]
+    public async Task BlockedDragCaptureLost_AppliesNothing()
+    {
+        Harness harness = await CreateSmallMapAsync();
+        harness.ViewModel.ActiveTool = MapEditTool.Blocked;
+        MapDocument document = harness.ViewModel.Session.Document;
+
+        harness.Window.MouseDown(new Point(Cell / 2, Cell / 2), MouseButton.Left, RawInputModifiers.None);
+        harness.Window.MouseMove(new Point(Cell * 2 + Cell / 2, Cell * 2 + Cell / 2), RawInputModifiers.None);
+        Assert.Equal(9, CountRectanglesWithFill(harness, BlockPreviewColor));
+        harness.Window.Content = new Border();
+
+        for (int y = 0; y < MapSize; y++)
+            for (int x = 0; x < MapSize; x++)
+                Assert.False(document[x, y].IsBlocked);
+
+        Assert.False(harness.ViewModel.CanUndo);
+        Assert.Equal(0, CountRectanglesWithFill(harness, BlockPreviewColor));
+    }
+
+    [AvaloniaFact]
+    public async Task FinishInteractionCommit_AppliesTheBlockRectangle()
+    {
+        Harness harness = await CreateSmallMapAsync();
+        harness.ViewModel.ActiveTool = MapEditTool.Blocked;
+        MapDocument document = harness.ViewModel.Session.Document;
+
+        harness.Window.MouseDown(new Point(Cell / 2, Cell / 2), MouseButton.Left, RawInputModifiers.None);
+        harness.Window.MouseMove(new Point(Cell * 2 + Cell / 2, Cell * 2 + Cell / 2), RawInputModifiers.None);
+        harness.Canvas.FinishInteraction(commit: true);
+
+        for (int y = 0; y <= 2; y++)
+            for (int x = 0; x <= 2; x++)
+                Assert.True(document[x, y].IsBlocked);
+
+        Assert.False(document[3, 3].IsBlocked);
+        Assert.True(harness.ViewModel.CanUndo);
+        Assert.True(harness.ViewModel.Undo());
+        Assert.False(document[0, 0].IsBlocked);
+        Assert.False(harness.ViewModel.CanUndo);
+    }
+
+    [AvaloniaFact]
+    public async Task BlockedDragShiftReleasedMidDrag_StillClears()
+    {
+        Harness harness = await CreateSmallMapAsync();
+        harness.ViewModel.ActiveTool = MapEditTool.Blocked;
+        MapDocument document = harness.ViewModel.Session.Document;
+        for (int y = 0; y < MapSize; y++)
+            for (int x = 0; x < MapSize; x++)
+                document.SetFlags(x, y, MapDocument.BlockedFlag);
+
+        harness.Window.MouseDown(new Point(Cell / 2, Cell / 2), MouseButton.Left, RawInputModifiers.Shift);
+        harness.Window.MouseMove(new Point(Cell * 2 + Cell / 2, Cell * 2 + Cell / 2), RawInputModifiers.None);
+        harness.Window.MouseUp(new Point(Cell * 2 + Cell / 2, Cell * 2 + Cell / 2), MouseButton.Left, RawInputModifiers.None);
+
+        for (int y = 0; y <= 2; y++)
+            for (int x = 0; x <= 2; x++)
+                Assert.False(document[x, y].IsBlocked);
+
+        Assert.True(document[3, 3].IsBlocked);
+        Assert.True(harness.ViewModel.CanUndo);
+    }
+
+    [AvaloniaFact]
+    public async Task BlockPreview_VanishesAfterCommitAndAfterCancel()
+    {
+        Harness harness = await CreateSmallMapAsync();
+        harness.ViewModel.ActiveTool = MapEditTool.Blocked;
+        MapDocument document = harness.ViewModel.Session.Document;
+
+        for (int y = 0; y <= 2; y++)
+            for (int x = 0; x <= 2; x++)
+                document.SetFlags(x, y, MapDocument.BlockedFlag);
+
+        harness.Window.MouseDown(new Point(Cell / 2, Cell / 2), MouseButton.Left, RawInputModifiers.Shift);
+        harness.Window.MouseMove(new Point(Cell * 2 + Cell / 2, Cell * 2 + Cell / 2), RawInputModifiers.Shift);
+        Assert.Equal(9, CountRectanglesWithFill(harness, UnblockPreviewColor));
+        harness.Window.MouseUp(new Point(Cell * 2 + Cell / 2, Cell * 2 + Cell / 2), MouseButton.Left, RawInputModifiers.Shift);
+        Assert.Equal(0, CountRectanglesWithFill(harness, UnblockPreviewColor));
+        Assert.False(document[0, 0].IsBlocked);
+        Assert.True(harness.ViewModel.CanUndo);
+
+        for (int y = 1; y <= 3; y++)
+            for (int x = 1; x <= 3; x++)
+                document.SetFlags(x, y, MapDocument.BlockedFlag);
+
+        harness.Window.MouseDown(new Point(Cell + Cell / 2, Cell + Cell / 2), MouseButton.Left, RawInputModifiers.Shift);
+        harness.Window.MouseMove(new Point(3 * Cell + Cell / 2, 3 * Cell + Cell / 2), RawInputModifiers.Shift);
+        Assert.Equal(9, CountRectanglesWithFill(harness, UnblockPreviewColor));
+        harness.Window.KeyPressQwerty(PhysicalKey.Escape, RawInputModifiers.Shift);
+        Assert.Equal(0, CountRectanglesWithFill(harness, UnblockPreviewColor));
         Assert.True(document[1, 1].IsBlocked);
-        Assert.True(document[0, 1].IsBlocked);
-        Assert.True(session.CanUndo);
+
+        Assert.True(harness.ViewModel.Undo());
+        Assert.True(document[0, 0].IsBlocked);
+        Assert.False(harness.ViewModel.CanUndo);
     }
 
     [AvaloniaFact]
@@ -728,6 +874,13 @@ public class MapCanvasTests
         Assert.False(harness.ViewModel.PasteMode);
         Assert.Equal(MapEditTool.Eraser, harness.ViewModel.ActiveTool);
         Assert.False(harness.ViewModel.Session.CanUndo);
+    }
+
+    private static int CountRectanglesWithFill(Harness harness, Color fill)
+    {
+        RecordingMapDrawTarget target = new();
+        harness.Canvas.RenderMap(target);
+        return target.Rectangles.Count(r => r.Fill is SolidColorBrush brush && brush.Color == fill);
     }
 
     private sealed class ThrowingMapDrawTarget : IMapDrawTarget

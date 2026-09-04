@@ -21,9 +21,7 @@ internal sealed class MapCanvas : Control, ICustomHitTest
     private bool _stroking;
     private bool _panning;
     private bool _spaceDown;
-    private bool _multiSelecting;
-    private bool _rectDragMoved;
-    private MapTileCoordinate? _rectDragStart;
+    private RectDrag? _rectDrag;
     private IPointer? _capturedPointer;
     private Point _lastPanPosition;
     private Window? _hoverWindow;
@@ -60,9 +58,18 @@ internal sealed class MapCanvas : Control, ICustomHitTest
 
         _stroking = false;
         _panning = false;
-        _multiSelecting = false;
-        _rectDragStart = null;
-        _rectDragMoved = false;
+        if (_rectDrag is not null)
+        {
+            if (commit)
+            {
+                CommitRectDrag();
+            }
+            else
+            {
+                CancelRectDrag();
+            }
+        }
+
         _capturedPointer?.Capture(null);
         _capturedPointer = null;
         _viewModel.CancelPasteMode();
@@ -107,7 +114,7 @@ internal sealed class MapCanvas : Control, ICustomHitTest
         InvalidateVisual();
     }
 
-    internal bool IsGestureActive => _stroking || _panning || _multiSelecting;
+    internal bool IsGestureActive => _stroking || _panning || _rectDrag is not null;
 
     protected override void OnPointerPressed(PointerPressedEventArgs e)
     {
@@ -142,7 +149,7 @@ internal sealed class MapCanvas : Control, ICustomHitTest
             }
             else
             {
-                BeginToolPress(point.Position);
+                BeginToolPress(point.Position, e.KeyModifiers);
             }
         }
         else if (properties.IsMiddleButtonPressed)
@@ -150,7 +157,7 @@ internal sealed class MapCanvas : Control, ICustomHitTest
             BeginPan(point.Position);
         }
 
-        if (_stroking || _panning || _multiSelecting)
+        if (IsGestureActive)
         {
             _capturedPointer = e.Pointer;
             e.Pointer.Capture(this);
@@ -193,19 +200,24 @@ internal sealed class MapCanvas : Control, ICustomHitTest
             return;
         }
 
-        if (_multiSelecting)
+        if (_rectDrag is { } drag)
         {
             MapEditSession session = _viewModel.Session;
             MapTileCoordinate current = _viewport.ScreenToTile(new RenderPoint(position.X, position.Y));
             int x = Math.Clamp(current.X, 0, session.Document.Width - 1);
             int y = Math.Clamp(current.Y, 0, session.Document.Height - 1);
-            MapTileCoordinate origin = _rectDragStart!.Value;
-            _viewModel.SelectionRectangle = new MapTileRectangle(
+            MapTileCoordinate origin = drag.Origin;
+            MapTileRectangle rect = new(
                 Math.Min(origin.X, x),
                 Math.Min(origin.Y, y),
                 Math.Abs(x - origin.X) + 1,
                 Math.Abs(y - origin.Y) + 1);
-            _rectDragMoved = true;
+            if (drag.Purpose == RectDragPurpose.Select)
+            {
+                _viewModel.SelectionRectangle = rect;
+            }
+
+            _rectDrag = drag with { Current = rect };
             Invalidate();
             return;
         }
@@ -251,7 +263,7 @@ internal sealed class MapCanvas : Control, ICustomHitTest
     protected override void OnPointerReleased(PointerReleasedEventArgs e)
     {
         base.OnPointerReleased(e);
-        if (!_stroking && !_panning && !_multiSelecting)
+        if (!IsGestureActive)
         {
             return;
         }
@@ -262,7 +274,7 @@ internal sealed class MapCanvas : Control, ICustomHitTest
             _stroking = false;
         }
 
-        FinalizeMultiSelection();
+        CommitRectDrag();
         _panning = false;
         e.Pointer.Capture(null);
         _capturedPointer = null;
@@ -273,7 +285,7 @@ internal sealed class MapCanvas : Control, ICustomHitTest
     protected override void OnPointerCaptureLost(PointerCaptureLostEventArgs e)
     {
         base.OnPointerCaptureLost(e);
-        if (!_stroking && !_panning && !_multiSelecting)
+        if (!IsGestureActive)
         {
             return;
         }
@@ -283,7 +295,7 @@ internal sealed class MapCanvas : Control, ICustomHitTest
             _viewModel.Session.CompleteStroke();
         }
 
-        FinalizeMultiSelection();
+        CancelRectDrag();
         _stroking = false;
         _panning = false;
         _capturedPointer = null;
@@ -337,7 +349,7 @@ internal sealed class MapCanvas : Control, ICustomHitTest
         }
     }
 
-    private void BeginToolPress(Point position)
+    private void BeginToolPress(Point position, KeyModifiers modifiers)
     {
         switch (_viewModel.ActiveTool)
         {
@@ -353,9 +365,16 @@ internal sealed class MapCanvas : Control, ICustomHitTest
             case MapEditTool.MultiSelect:
                 if (TileAt(position) is { } origin)
                 {
-                    _rectDragStart = origin;
-                    _multiSelecting = true;
-                    _rectDragMoved = false;
+                    _rectDrag = new RectDrag(RectDragPurpose.Select, origin, new MapTileRectangle(origin.X, origin.Y, 1, 1));
+                }
+
+                break;
+            case MapEditTool.Blocked:
+                if (TileAt(position) is { } blockedOrigin)
+                {
+                    RectDragPurpose purpose = modifiers.HasFlag(KeyModifiers.Shift) ? RectDragPurpose.Unblock : RectDragPurpose.Block;
+                    _rectDrag = new RectDrag(purpose, blockedOrigin, new MapTileRectangle(blockedOrigin.X, blockedOrigin.Y, 1, 1));
+                    _viewModel.ShowBlocked = true;
                 }
 
                 break;
@@ -375,21 +394,37 @@ internal sealed class MapCanvas : Control, ICustomHitTest
         }
     }
 
-    private void FinalizeMultiSelection()
+    private void CommitRectDrag()
     {
-        if (!_multiSelecting)
+        if (_rectDrag is not { } drag)
         {
             return;
         }
 
-        if (!_rectDragMoved && _rectDragStart is { } origin)
+        switch (drag.Purpose)
         {
-            _viewModel.SelectionRectangle = new MapTileRectangle(origin.X, origin.Y, 1, 1);
+            case RectDragPurpose.Block:
+            case RectDragPurpose.Unblock:
+                _viewModel.Session.ApplyBlockedPatch(drag.Current, drag.Purpose == RectDragPurpose.Block);
+                break;
+            default:
+                _viewModel.SelectionRectangle = drag.Current;
+                break;
         }
 
-        _multiSelecting = false;
-        _rectDragStart = null;
-        _rectDragMoved = false;
+        _rectDrag = null;
+        Invalidate();
+        _viewModel.Refresh(EditorRefresh.Canvas | EditorRefresh.Commands | EditorRefresh.Title);
+    }
+
+    private void CancelRectDrag()
+    {
+        if (_rectDrag is null)
+        {
+            return;
+        }
+
+        _rectDrag = null;
         Invalidate();
     }
 
@@ -439,9 +474,7 @@ internal sealed class MapCanvas : Control, ICustomHitTest
             _stroking = false;
             _panning = false;
             _spaceDown = false;
-            _multiSelecting = false;
-            _rectDragStart = null;
-            _rectDragMoved = false;
+            _rectDrag = null;
         }
 
         Invalidate();
@@ -458,6 +491,9 @@ internal sealed class MapCanvas : Control, ICustomHitTest
         MapTileCoordinate? selected = _viewModel.SelectedX is { } selectedX && _viewModel.SelectedY is { } selectedY
             ? new MapTileCoordinate(selectedX, selectedY)
             : null;
+        BlockPreview? blockPreview = _rectDrag is { } drag && drag.Purpose is not RectDragPurpose.Select
+            ? new BlockPreview(drag.Current, drag.Purpose == RectDragPurpose.Block)
+            : null;
         MapRenderOptions options = new(
             new MapLayerVisibility(mask),
             _viewModel.ShowGrid,
@@ -465,7 +501,8 @@ internal sealed class MapCanvas : Control, ICustomHitTest
             hovered,
             selected,
             SelectionRectangle: _viewModel.SelectionRectangle,
-            PasteGhost: _viewModel.PasteGhost);
+            PasteGhost: _viewModel.PasteGhost,
+            BlockPreview: blockPreview);
         return new MapRenderRequest(session.Document, _viewport, options);
     }
 }
