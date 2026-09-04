@@ -108,6 +108,28 @@ public class MainWindowViewModelTests : IDisposable
     }
 
     [Fact]
+    public void ActiveTool_SwitchingAwayFromMultiSelect_ClearsSelectionRectangle()
+    {
+        _viewModel.ActiveTool = MapEditTool.MultiSelect;
+        _viewModel.SelectionRectangle = new MapTileRectangle(1, 2, 3, 4);
+
+        _viewModel.ActiveTool = MapEditTool.Pencil;
+
+        Assert.Null(_viewModel.SelectionRectangle);
+    }
+
+    [Fact]
+    public void ActiveTool_SwitchingToMultiSelect_KeepsSelectionRectangle()
+    {
+        _viewModel.ActiveTool = MapEditTool.MultiSelect;
+        _viewModel.SelectionRectangle = new MapTileRectangle(1, 2, 3, 4);
+
+        _viewModel.ActiveTool = MapEditTool.MultiSelect;
+
+        Assert.Equal(new MapTileRectangle(1, 2, 3, 4), _viewModel.SelectionRectangle);
+    }
+
+    [Fact]
     public void SelectedLayers_ValidValue_WritesToSessionAndRaisesOnlySelectedLayers()
     {
         var raised = RaisedProperties(() => _viewModel.SelectedLayers = (byte)0b01000);

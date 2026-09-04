@@ -209,6 +209,17 @@ public class MainWindowTests : IDisposable
     }
 
     [AvaloniaFact]
+    public void Toolbar_SwitchingAwayFromMultiSelect_ClearsSelectionRectangle()
+    {
+        Find<ToggleButton>("MultiSelectTool").IsChecked = true;
+        ViewModel.SelectionRectangle = new MapTileRectangle(0, 0, 2, 2);
+
+        Find<ToggleButton>("PencilTool").IsChecked = true;
+
+        Assert.Null(ViewModel.SelectionRectangle);
+    }
+
+    [AvaloniaFact]
     public void Layout_ContainsNamedLayerListAndViewToggles()
     {
         string[] names = { "Ground", "Below Entities", "Entities", "Above Entities", "Roof" };

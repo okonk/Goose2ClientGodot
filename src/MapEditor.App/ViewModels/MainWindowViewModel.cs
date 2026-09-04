@@ -73,6 +73,12 @@ internal sealed class MainWindowViewModel : ViewModelBase
                 throw new ArgumentOutOfRangeException(nameof(value));
             }
 
+            if (value != MapEditTool.MultiSelect && _selectionRectangle is not null)
+            {
+                SelectionRectangle = null;
+                Refresh(EditorRefresh.Canvas);
+            }
+
             SetField(ref _activeTool, value);
         }
     }
