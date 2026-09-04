@@ -189,6 +189,11 @@ public class MainWindowTests : IDisposable
         Assert.Equal(MapEditTool.Eraser, ViewModel.ActiveTool);
         Assert.False(Find<ToggleButton>("PencilTool").IsChecked);
         Assert.True(Find<ToggleButton>("EraserTool").IsChecked);
+
+        Find<ToggleButton>("PencilTool").IsChecked = true;
+        Find<ToggleButton>("PencilTool").IsChecked = false;
+        Assert.True(Find<ToggleButton>("PencilTool").IsChecked == true);
+        Assert.Equal(MapEditTool.Pencil, ViewModel.ActiveTool);
     }
 
     [AvaloniaFact]
