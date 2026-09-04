@@ -66,17 +66,20 @@
         </Grid>
       </DockPanel>
       <DockPanel Grid.Column="2">
-        <!-- A floating tool strip: the toolbar no longer spans the window, so a card reads better than a band. -->
+        <!-- A floating tool strip: the toolbar no longer spans the window, so a card reads better than a band.
+             Ordered by what the tool does to the map: pick tiles, then sample and paint them, then flag them blocked. -->
         <Border x:Name="Toolbar" Classes="card" DockPanel.Dock="Top"
                 Padding="4" Margin="10,10,10,0" HorizontalAlignment="Left">
           <StackPanel Orientation="Horizontal" Spacing="2">
-            <ToggleButton x:Name="PencilTool" Content="Pencil" Tag="Pencil" IsChecked="True" Checked="OnToolChecked" Unchecked="OnToolUnchecked" />
-            <ToggleButton x:Name="EraserTool" Content="Eraser" Tag="Eraser" Checked="OnToolChecked" Unchecked="OnToolUnchecked" />
-            <ToggleButton x:Name="EyedropperTool" Content="Eyedropper" Tag="Eyedropper" Checked="OnToolChecked" Unchecked="OnToolUnchecked" />
-            <ToggleButton x:Name="BlockedTool" Content="Blocked" Tag="BlockedToggle" Checked="OnToolChecked" Unchecked="OnToolUnchecked" />
-            <ToggleButton x:Name="SelectTool" Content="Select" Tag="Select" Checked="OnToolChecked" Unchecked="OnToolUnchecked" />
-            <ToggleButton x:Name="MultiSelectTool" Content="Multi-select" Tag="MultiSelect" Checked="OnToolChecked" Unchecked="OnToolUnchecked" />
-            <ToggleButton x:Name="FloodFillTool" Content="Flood fill" Tag="FloodFill" Checked="OnToolChecked" Unchecked="OnToolUnchecked" />
+            <ToggleButton x:Name="SelectTool" Classes="tool" Tag="Select" Content="{StaticResource IconSelect}" ToolTip.Tip="Select (V)" Checked="OnToolChecked" Unchecked="OnToolUnchecked" />
+            <ToggleButton x:Name="MultiSelectTool" Classes="tool" Tag="MultiSelect" Content="{StaticResource IconMultiSelect}" ToolTip.Tip="Multi-select (M)" Checked="OnToolChecked" Unchecked="OnToolUnchecked" />
+            <Rectangle Classes="toolSeparator" />
+            <ToggleButton x:Name="EyedropperTool" Classes="tool" Tag="Eyedropper" Content="{StaticResource IconEyedropper}" ToolTip.Tip="Eyedropper (I)" Checked="OnToolChecked" Unchecked="OnToolUnchecked" />
+            <ToggleButton x:Name="PencilTool" Classes="tool" Tag="Pencil" IsChecked="True" Content="{StaticResource IconPencil}" ToolTip.Tip="Pencil (P)" Checked="OnToolChecked" Unchecked="OnToolUnchecked" />
+            <ToggleButton x:Name="EraserTool" Classes="tool" Tag="Eraser" Content="{StaticResource IconEraser}" ToolTip.Tip="Eraser (E)" Checked="OnToolChecked" Unchecked="OnToolUnchecked" />
+            <ToggleButton x:Name="FloodFillTool" Classes="tool" Tag="FloodFill" Content="{StaticResource IconFloodFill}" ToolTip.Tip="Flood fill (B)" Checked="OnToolChecked" Unchecked="OnToolUnchecked" />
+            <Rectangle Classes="toolSeparator" />
+            <ToggleButton x:Name="BlockedTool" Classes="tool" Tag="BlockedToggle" Content="{StaticResource IconBlocked}" ToolTip.Tip="Blocked (X)" Checked="OnToolChecked" Unchecked="OnToolUnchecked" />
           </StackPanel>
         </Border>
         <Border x:Name="CanvasHost" Classes="sunken" Margin="10,8,10,10" ClipToBounds="True" />

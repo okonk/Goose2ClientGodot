@@ -194,7 +194,7 @@ public class MainWindowTests : IDisposable
         Assert.Equal(MapEditTool.Pencil, ViewModel.ActiveTool);
 
         Assert.Equal(
-            new[] { "PencilTool", "EraserTool", "EyedropperTool", "BlockedTool", "SelectTool", "MultiSelectTool", "FloodFillTool" },
+            new[] { "SelectTool", "MultiSelectTool", "EyedropperTool", "PencilTool", "EraserTool", "FloodFillTool", "BlockedTool" },
             Find<Border>("Toolbar").GetVisualDescendants().OfType<ToggleButton>().Select(toggle => toggle.Name).ToArray());
 
         Find<ToggleButton>("EraserTool").IsChecked = true;

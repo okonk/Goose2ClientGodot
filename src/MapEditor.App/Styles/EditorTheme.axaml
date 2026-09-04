@@ -2,6 +2,9 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
   <Styles.Resources>
     <ResourceDictionary>
+      <ResourceDictionary.MergedDictionaries>
+        <ResourceInclude Source="avares://MapEditor.App/Styles/Icons.axaml" />
+      </ResourceDictionary.MergedDictionaries>
       <ResourceDictionary.ThemeDictionaries>
         <!-- Neutral, slightly cool dark palette. -->
         <ResourceDictionary x:Key="Dark">
@@ -128,29 +131,17 @@
     <Setter Property="TextElement.Foreground" Value="{DynamicResource EditorTextBrush}" />
   </Style>
 
-  <!-- Toolbar toggle buttons -->
-  <Style Selector="ToggleButton">
-    <Setter Property="Background" Value="Transparent" />
-    <Setter Property="Foreground" Value="{DynamicResource EditorMutedTextBrush}" />
-    <Setter Property="BorderBrush" Value="Transparent" />
-    <Setter Property="BorderThickness" Value="1" />
-    <Setter Property="CornerRadius" Value="6" />
-    <Setter Property="Padding" Value="12,6" />
-    <Setter Property="FontWeight" Value="Medium" />
+  <!-- Toolbar tool buttons. The icon-only look lives in the ToolButton control theme
+       (Styles/Icons.axaml); this only opts the toolbar's buttons into it. -->
+  <Style Selector="ToggleButton.tool">
+    <Setter Property="Theme" Value="{StaticResource ToolButton}" />
   </Style>
-  <Style Selector="ToggleButton:pointerover /template/ ContentPresenter">
-    <Setter Property="Background" Value="{DynamicResource EditorHoverBrush}" />
-    <Setter Property="BorderBrush" Value="Transparent" />
-    <Setter Property="TextElement.Foreground" Value="{DynamicResource EditorTextBrush}" />
-  </Style>
-  <Style Selector="ToggleButton:checked /template/ ContentPresenter">
-    <Setter Property="Background" Value="{DynamicResource EditorAccentBrush}" />
-    <Setter Property="BorderBrush" Value="Transparent" />
-    <Setter Property="TextElement.Foreground" Value="White" />
-  </Style>
-  <Style Selector="ToggleButton:checked:pointerover /template/ ContentPresenter">
-    <Setter Property="Background" Value="{DynamicResource EditorAccentHoverBrush}" />
-    <Setter Property="TextElement.Foreground" Value="White" />
+  <Style Selector="Rectangle.toolSeparator">
+    <Setter Property="Width" Value="1" />
+    <Setter Property="Height" Value="18" />
+    <Setter Property="Margin" Value="3,0" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+    <Setter Property="Fill" Value="{DynamicResource EditorBorderBrush}" />
   </Style>
 
   <Style Selector="Button.accent">
