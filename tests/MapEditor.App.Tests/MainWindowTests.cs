@@ -322,6 +322,21 @@ public class MainWindowTests : IDisposable
     }
 
     [AvaloniaFact]
+    public void PaletteScrollBar_IsHiddenUntilTheGridOverflows()
+    {
+        ScrollBar bar = Find<ScrollBar>("PaletteBar");
+
+        Assert.False(bar.IsVisible);
+
+        _harness.Dialogs.AssetDirectoryPickResult = WriteManyFrameAssetDirectory();
+        Find<Button>("LoadAssetsButton").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.True(bar.Maximum > 0);
+        Assert.True(bar.IsVisible);
+    }
+
+    [AvaloniaFact]
     public void PaletteScrollBar_IsSynchronizedWithControlViewportAndExtent()
     {
         SpritePaletteControl palette = Window.Palette;

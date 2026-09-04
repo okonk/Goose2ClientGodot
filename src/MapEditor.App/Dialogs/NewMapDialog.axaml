@@ -5,21 +5,21 @@
         CanResize="False"
         SizeToContent="WidthAndHeight"
         WindowStartupLocation="CenterOwner">
-    <StackPanel Margin="12" Spacing="12">
+    <StackPanel Margin="18" Spacing="14">
         <StackPanel Orientation="Horizontal" Spacing="12">
             <StackPanel Spacing="4">
-                <TextBlock Text="Width"/>
+                <TextBlock Text="Width" Classes="muted"/>
                 <TextBox Name="WidthBox" Width="80" HorizontalContentAlignment="Right"/>
             </StackPanel>
             <StackPanel Spacing="4">
-                <TextBlock Text="Height"/>
+                <TextBlock Text="Height" Classes="muted"/>
                 <TextBox Name="HeightBox" Width="80" HorizontalContentAlignment="Right"/>
             </StackPanel>
         </StackPanel>
-        <TextBlock Name="ErrorText" Foreground="Red" IsVisible="False" TextWrapping="Wrap"/>
+        <TextBlock Name="ErrorText" Foreground="{DynamicResource EditorDangerBrush}" IsVisible="False" TextWrapping="Wrap"/>
         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
-            <Button Name="OkButton" Content="OK" MinWidth="80" IsDefault="True"/>
-            <Button Name="CancelButton" Content="Cancel" MinWidth="80" IsCancel="True"/>
+            <Button Name="OkButton" Classes="accent" Content="OK" MinWidth="84" IsDefault="True"/>
+            <Button Name="CancelButton" Content="Cancel" MinWidth="84" IsCancel="True"/>
         </StackPanel>
     </StackPanel>
 </Window>

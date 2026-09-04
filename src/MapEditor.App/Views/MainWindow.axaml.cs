@@ -8,6 +8,7 @@ using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Markup.Xaml;
 using Avalonia.Media;
+using Avalonia.Styling;
 using MapEditor.App.Controls;
 using MapEditor.App.Dialogs;
 using MapEditor.App.Rendering;
@@ -21,11 +22,12 @@ namespace MapEditor.App;
 internal partial class MainWindow : Window
 {
     private const int DefaultPaletteColumns = 10;
-    // PaletteHost margin (16) + scrollbar (16) + palette border (2).
-    private const double PaletteChromeWidth = 34;
+    // PaletteHost margin (24) + palette border (2); the scrollbar overlays the grid.
+    private const double PaletteChromeWidth = 26;
 
-    private static readonly IBrush FieldErrorBrush = new SolidColorBrush(Color.FromRgb(0xCC, 0x00, 0x00));
-    private static readonly IBrush SelectedRowBrush = new SolidColorBrush(Color.FromRgb(0x33, 0x99, 0xFF));
+    // Readable against both the light and the dark field background.
+    private static readonly IBrush FieldErrorBrush = new SolidColorBrush(Color.FromRgb(0xE0, 0x55, 0x55));
+    private static readonly IBrush SelectedRowBrush = new SolidColorBrush(Color.FromArgb(0x59, 0x4C, 0x8D, 0xFF));
 
     private readonly IEditorDialogs _dialogs;
     private readonly AppSettingsStore _settings;
@@ -37,6 +39,7 @@ internal partial class MainWindow : Window
     private Border[] _layerRows;
     private CheckBox[] _layerVisibleChecks;
     private int _layerAnchor;
+    private AppTheme _theme = AppTheme.Dark;
     private bool _closeGuardRunning;
     private bool _closeApproved;
     // Picker/settings continuations can resume after Closed; publishing then leaks an undisposed context.
@@ -65,6 +68,8 @@ internal partial class MainWindow : Window
         BrushGraphic.PropertyChanged += OnBrushFieldTextChanged;
         DataContext = _viewModel;
         Title = _viewModel.Title;
+        // The async settings load reports failures; here a broken file just leaves the default theme.
+        ApplyTheme(_settings.LoadOrDefault().Theme);
         ApplyHotKeys();
         _viewModel.PropertyChanged += OnViewModelPropertyChanged;
         _viewModel.CanvasInvalidated += SyncReadouts;
@@ -357,6 +362,50 @@ internal partial class MainWindow : Window
                 await TryOpenAssetsAsync(directory);
             }
         });
+
+    private void OnThemeSelected(object? sender, RoutedEventArgs e)
+    {
+        if (sender is not MenuItem { Tag: string tag } || !Enum.TryParse(tag, out AppTheme theme))
+        {
+            return;
+        }
+
+        if (theme == _theme)
+        {
+            SyncThemeMenu();
+            return;
+        }
+
+        ApplyTheme(theme);
+        try
+        {
+            _settings.Update(current => current with { Theme = theme });
+        }
+        catch (AppSettingsException)
+        {
+            // A settings file that cannot be written must not break the running session.
+        }
+    }
+
+    private void ApplyTheme(AppTheme theme)
+    {
+        _theme = theme;
+        ThemeVariant variant = theme == AppTheme.Light ? ThemeVariant.Light : ThemeVariant.Dark;
+        RequestedThemeVariant = variant;
+        // Dialogs are separate top-level windows, so the variant has to reach the application too.
+        if (Application.Current is { } application)
+        {
+            application.RequestedThemeVariant = variant;
+        }
+
+        SyncThemeMenu();
+    }
+
+    private void SyncThemeMenu()
+    {
+        DarkThemeMenuItem.IsChecked = _theme == AppTheme.Dark;
+        LightThemeMenuItem.IsChecked = _theme == AppTheme.Light;
+    }
 
     private void OnOpened(object? sender, EventArgs e) => _ = RunCommandAsync(InitializeAssetsAsync);
 

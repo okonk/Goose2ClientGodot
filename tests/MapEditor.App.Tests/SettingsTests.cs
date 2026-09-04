@@ -80,6 +80,83 @@ public class SettingsTests
         }
     }
 
+    [Theory]
+    [InlineData(AppTheme.Dark)]
+    [InlineData(AppTheme.Light)]
+    public void SaveThenLoad_RoundTripsTheme(AppTheme theme)
+    {
+        var directory = CreateTempDirectory();
+        try
+        {
+            var store = new AppSettingsStore(Path.Combine(directory, "settings.json"));
+            store.Save(new AppSettings("/data/assets", theme));
+
+            Assert.Equal(theme, store.Load().Theme);
+        }
+        finally
+        {
+            Directory.Delete(directory, true);
+        }
+    }
+
+    [Theory]
+    [InlineData("\"theme\": \"chartreuse\",")]
+    [InlineData("")]
+    public void Load_MissingOrUnknownTheme_FallsBackToDark(string themeMember)
+    {
+        var directory = CreateTempDirectory();
+        try
+        {
+            var path = Path.Combine(directory, "settings.json");
+            File.WriteAllText(path, "{ " + themeMember + " \"assetDirectory\": \"/data/assets\" }");
+
+            Assert.Equal(new AppSettings("/data/assets"), new AppSettingsStore(path).Load());
+        }
+        finally
+        {
+            Directory.Delete(directory, true);
+        }
+    }
+
+    [Fact]
+    public void Update_RewritesOneFieldAndKeepsTheRest()
+    {
+        var directory = CreateTempDirectory();
+        try
+        {
+            var store = new AppSettingsStore(Path.Combine(directory, "settings.json"));
+            store.Save(new AppSettings("/data/assets"));
+
+            store.Update(current => current with { Theme = AppTheme.Light });
+
+            Assert.Equal(new AppSettings("/data/assets", AppTheme.Light), store.Load());
+        }
+        finally
+        {
+            Directory.Delete(directory, true);
+        }
+    }
+
+    [Fact]
+    public void Update_UnreadableFile_StartsFromDefaults()
+    {
+        var directory = CreateTempDirectory();
+        try
+        {
+            var path = Path.Combine(directory, "settings.json");
+            File.WriteAllText(path, "{ not json");
+            var store = new AppSettingsStore(path);
+
+            store.Update(current => current with { Theme = AppTheme.Light });
+
+            Assert.Equal(new AppSettings(null, AppTheme.Light), store.Load());
+        }
+        finally
+        {
+            Directory.Delete(directory, true);
+        }
+    }
+
     [Fact]
     public void Save_CreatesMissingDirectory()
     {

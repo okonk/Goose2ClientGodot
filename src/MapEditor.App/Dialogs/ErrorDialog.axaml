@@ -5,8 +5,8 @@
         CanResize="False"
         SizeToContent="WidthAndHeight"
         WindowStartupLocation="CenterOwner">
-    <StackPanel Margin="12" Spacing="12" MinWidth="300">
+    <StackPanel Margin="18" Spacing="16" MinWidth="320">
         <TextBlock Name="MessageText" TextWrapping="Wrap"/>
-        <Button Name="OkButton" Content="OK" MinWidth="80" HorizontalAlignment="Right" IsDefault="True" IsCancel="True"/>
+        <Button Name="OkButton" Classes="accent" Content="OK" MinWidth="84" HorizontalAlignment="Right" IsDefault="True" IsCancel="True"/>
     </StackPanel>
 </Window>

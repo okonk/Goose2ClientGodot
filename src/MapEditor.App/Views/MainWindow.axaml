@@ -3,7 +3,8 @@
         x:Class="MapEditor.App.MainWindow"
         Title="Goose2 Map Editor — Untitled"
         Width="1200"
-        Height="800">
+        Height="800"
+        FontFamily="Inter, $Default">
   <DockPanel x:Name="Root">
     <Menu x:Name="Menu" DockPanel.Dock="Top">
       <MenuItem x:Name="FileMenu" Header="_File">
@@ -21,10 +22,15 @@
       <MenuItem x:Name="ViewMenu" Header="_View">
         <MenuItem x:Name="GridMenuItem" Header="Grid" ToggleType="CheckBox" IsChecked="{Binding ShowGrid, Mode=TwoWay}" />
         <MenuItem x:Name="BlockedMenuItem" Header="Blocked" ToggleType="CheckBox" IsChecked="{Binding ShowBlocked, Mode=TwoWay}" />
+        <Separator />
+        <MenuItem x:Name="ThemeMenuItem" Header="_Theme">
+          <MenuItem x:Name="DarkThemeMenuItem" Header="Dark" Tag="Dark" ToggleType="Radio" GroupName="EditorTheme" Click="OnThemeSelected" />
+          <MenuItem x:Name="LightThemeMenuItem" Header="Light" Tag="Light" ToggleType="Radio" GroupName="EditorTheme" Click="OnThemeSelected" />
+        </MenuItem>
       </MenuItem>
     </Menu>
-    <Border x:Name="Toolbar" DockPanel.Dock="Top" Padding="4" BorderBrush="#FFCCCCCC" BorderThickness="0,0,0,1">
-      <StackPanel Orientation="Horizontal" Spacing="4">
+    <Border x:Name="Toolbar" Classes="chrome" DockPanel.Dock="Top" Padding="8,6" BorderThickness="0,0,0,1">
+      <StackPanel Orientation="Horizontal" Spacing="2">
         <ToggleButton x:Name="PencilTool" Content="Pencil" Tag="Pencil" IsChecked="True" Checked="OnToolChecked" Unchecked="OnToolUnchecked" />
         <ToggleButton x:Name="EraserTool" Content="Eraser" Tag="Eraser" Checked="OnToolChecked" Unchecked="OnToolUnchecked" />
         <ToggleButton x:Name="EyedropperTool" Content="Eyedropper" Tag="Eyedropper" Checked="OnToolChecked" Unchecked="OnToolUnchecked" />
@@ -34,11 +40,11 @@
         <ToggleButton x:Name="FloodFillTool" Content="Flood fill" Tag="FloodFill" Checked="OnToolChecked" Unchecked="OnToolUnchecked" />
       </StackPanel>
     </Border>
-    <Border x:Name="StatusBar" DockPanel.Dock="Bottom" Padding="8,3" BorderBrush="#FFCCCCCC" BorderThickness="0,1,0,0">
-      <StackPanel Orientation="Horizontal" Spacing="16">
-        <TextBlock x:Name="HoverText" Text="—" />
-        <TextBlock x:Name="ZoomText" Text="100%" />
-        <TextBlock x:Name="SizeText" Text="100 × 100" />
+    <Border x:Name="StatusBar" Classes="chrome" DockPanel.Dock="Bottom" Padding="12,5" BorderThickness="0,1,0,0">
+      <StackPanel Orientation="Horizontal" Spacing="18">
+        <TextBlock x:Name="HoverText" Classes="mono muted" Text="—" />
+        <TextBlock x:Name="ZoomText" Classes="mono muted" Text="100%" />
+        <TextBlock x:Name="SizeText" Classes="mono muted" Text="100 × 100" />
       </StackPanel>
     </Border>
     <Grid x:Name="Body">
@@ -48,71 +54,82 @@
         <ColumnDefinition Width="*" />
         <ColumnDefinition Width="260" />
       </Grid.ColumnDefinitions>
-      <GridSplitter x:Name="LeftSplitter" Grid.Column="1" Width="4" Background="#FFCCCCCC" />
-      <DockPanel x:Name="LeftPanel" Grid.Column="0">
-        <StackPanel DockPanel.Dock="Top" Spacing="6" Margin="8">
-          <Button x:Name="LoadAssetsButton" Content="Load assets…" Click="OnLoadAssets" />
-          <TextBlock x:Name="AssetDirectoryText" Text="—" TextWrapping="Wrap" />
+      <GridSplitter x:Name="LeftSplitter" Grid.Column="1" Width="4" />
+      <DockPanel x:Name="LeftPanel" Grid.Column="0" Background="{DynamicResource EditorPanelBrush}">
+        <StackPanel DockPanel.Dock="Top" Spacing="8" Margin="12,12,12,10">
+          <Button x:Name="LoadAssetsButton" Content="Load assets…" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Click="OnLoadAssets" />
+          <TextBlock x:Name="AssetDirectoryText" Classes="muted" FontSize="11" Text="—" TextWrapping="Wrap" TextTrimming="CharacterEllipsis" />
           <ComboBox x:Name="SheetCombo" ItemsSource="{Binding SheetIds}" SelectedItem="{Binding SelectedSheet, Mode=TwoWay}" />
-          <StackPanel Orientation="Horizontal" Spacing="4">
-            <TextBlock Text="Sheet" VerticalAlignment="Center" />
-            <TextBox x:Name="BrushSheet" Width="64" />
-            <TextBlock Text="Graphic" VerticalAlignment="Center" />
-            <TextBox x:Name="BrushGraphic" Width="64" />
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <TextBlock Text="Sheet" Classes="muted" VerticalAlignment="Center" />
+            <TextBox x:Name="BrushSheet" Width="58" />
+            <TextBlock Text="Graphic" Classes="muted" VerticalAlignment="Center" />
+            <TextBox x:Name="BrushGraphic" Width="58" />
           </StackPanel>
-          <TextBlock x:Name="BrushValidationError" Text="Must be a signed integer." Foreground="#FFCC0000" IsVisible="False" />
+          <TextBlock x:Name="BrushValidationError" Text="Must be a signed integer."
+                     Foreground="{DynamicResource EditorDangerBrush}" FontSize="11" IsVisible="False" />
         </StackPanel>
-        <Grid x:Name="PaletteHost" Margin="8,0,8,8" ColumnDefinitions="*,Auto">
-          <Border x:Name="PaletteBorder" Grid.Column="0" BorderBrush="#FFCCCCCC" BorderThickness="1" />
-          <ScrollBar x:Name="PaletteBar" Grid.Column="1" Orientation="Vertical" />
+        <!-- The scrollbar overlays the palette so the tile grid keeps the full panel width. -->
+        <Grid x:Name="PaletteHost" Margin="12,0,12,12">
+          <Border x:Name="PaletteBorder" Classes="sunken" ClipToBounds="True" />
+          <ScrollBar x:Name="PaletteBar" Classes="overlay" Orientation="Vertical"
+                     HorizontalAlignment="Right" Margin="0,3,3,3" IsVisible="False" />
         </Grid>
       </DockPanel>
-      <Border x:Name="CanvasHost" Grid.Column="2" Margin="8" BorderBrush="#FF888888" BorderThickness="1" />
-      <StackPanel x:Name="RightPanel" Grid.Column="3" Spacing="4" Margin="8">
-        <TextBlock Text="Layers" FontWeight="SemiBold" />
-        <Border x:Name="Layer0Row" Tag="0" Background="Transparent" PointerPressed="OnLayerRowPressed">
+      <Border x:Name="CanvasHost" Classes="sunken" Grid.Column="2" Margin="10" ClipToBounds="True" />
+      <StackPanel x:Name="RightPanel" Grid.Column="3" Spacing="0" Margin="12" Background="Transparent">
+        <TextBlock Text="LAYERS" Classes="section" Margin="2,0,0,6" />
+        <Border Classes="card">
+        <StackPanel>
+        <Border x:Name="Layer0Row" Classes="row" Tag="0" Background="Transparent" PointerPressed="OnLayerRowPressed">
           <Grid ColumnDefinitions="*,Auto">
             <TextBlock x:Name="Layer0Label" Text="Ground (0)" VerticalAlignment="Center" />
             <CheckBox x:Name="Layer0VisibleCheck" Tag="0" Grid.Column="1" VerticalAlignment="Center"
                       Checked="OnLayerVisibilityChanged" Unchecked="OnLayerVisibilityChanged" />
           </Grid>
         </Border>
-        <Border x:Name="Layer1Row" Tag="1" Background="Transparent" PointerPressed="OnLayerRowPressed">
+        <Border x:Name="Layer1Row" Classes="row" Tag="1" Background="Transparent" PointerPressed="OnLayerRowPressed">
           <Grid ColumnDefinitions="*,Auto">
             <TextBlock x:Name="Layer1Label" Text="Below Entities (1)" VerticalAlignment="Center" />
             <CheckBox x:Name="Layer1VisibleCheck" Tag="1" Grid.Column="1" VerticalAlignment="Center"
                       Checked="OnLayerVisibilityChanged" Unchecked="OnLayerVisibilityChanged" />
           </Grid>
         </Border>
-        <Border x:Name="Layer2Row" Tag="2" Background="Transparent" PointerPressed="OnLayerRowPressed">
+        <Border x:Name="Layer2Row" Classes="row" Tag="2" Background="Transparent" PointerPressed="OnLayerRowPressed">
           <Grid ColumnDefinitions="*,Auto">
             <TextBlock x:Name="Layer2Label" Text="Entities (2)" VerticalAlignment="Center" />
             <CheckBox x:Name="Layer2VisibleCheck" Tag="2" Grid.Column="1" VerticalAlignment="Center"
                       Checked="OnLayerVisibilityChanged" Unchecked="OnLayerVisibilityChanged" />
           </Grid>
         </Border>
-        <Border x:Name="Layer3Row" Tag="3" Background="Transparent" PointerPressed="OnLayerRowPressed">
+        <Border x:Name="Layer3Row" Classes="row" Tag="3" Background="Transparent" PointerPressed="OnLayerRowPressed">
           <Grid ColumnDefinitions="*,Auto">
             <TextBlock x:Name="Layer3Label" Text="Above Entities (3)" VerticalAlignment="Center" />
             <CheckBox x:Name="Layer3VisibleCheck" Tag="3" Grid.Column="1" VerticalAlignment="Center"
                       Checked="OnLayerVisibilityChanged" Unchecked="OnLayerVisibilityChanged" />
           </Grid>
         </Border>
-        <Border x:Name="Layer4Row" Tag="4" Background="Transparent" PointerPressed="OnLayerRowPressed">
+        <Border x:Name="Layer4Row" Classes="row last" Tag="4" Background="Transparent" PointerPressed="OnLayerRowPressed">
           <Grid ColumnDefinitions="*,Auto">
             <TextBlock x:Name="Layer4Label" Text="Roof (4)" VerticalAlignment="Center" />
             <CheckBox x:Name="Layer4VisibleCheck" Tag="4" Grid.Column="1" VerticalAlignment="Center"
                       Checked="OnLayerVisibilityChanged" Unchecked="OnLayerVisibilityChanged" />
           </Grid>
         </Border>
-        <TextBlock Text="Selected tile" FontWeight="SemiBold" Margin="0,8,0,0" />
-        <TextBlock x:Name="SelectedText" Text="—" />
-        <TextBlock x:Name="BlockedText" Text="blocked: no" />
-        <TextBlock x:Name="Layer0Ref" Text="L0 0/0" />
-        <TextBlock x:Name="Layer1Ref" Text="L1 0/0" />
-        <TextBlock x:Name="Layer2Ref" Text="L2 0/0" />
-        <TextBlock x:Name="Layer3Ref" Text="L3 0/0" />
-        <TextBlock x:Name="Layer4Ref" Text="L4 0/0" />
+        </StackPanel>
+        </Border>
+        <TextBlock Text="SELECTED TILE" Classes="section" Margin="2,18,0,6" />
+        <Border Classes="card" Padding="10,8">
+          <StackPanel Spacing="3">
+            <TextBlock x:Name="SelectedText" Classes="mono" Text="—" />
+            <TextBlock x:Name="BlockedText" Classes="mono muted" Margin="0,0,0,5" Text="blocked: no" />
+            <TextBlock x:Name="Layer0Ref" Classes="mono muted" Text="L0 0/0" />
+            <TextBlock x:Name="Layer1Ref" Classes="mono muted" Text="L1 0/0" />
+            <TextBlock x:Name="Layer2Ref" Classes="mono muted" Text="L2 0/0" />
+            <TextBlock x:Name="Layer3Ref" Classes="mono muted" Text="L3 0/0" />
+            <TextBlock x:Name="Layer4Ref" Classes="mono muted" Text="L4 0/0" />
+          </StackPanel>
+        </Border>
       </StackPanel>
     </Grid>
   </DockPanel>

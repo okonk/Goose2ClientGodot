@@ -66,7 +66,7 @@ internal sealed class AssetContextController : IDisposable
         _viewModel.Refresh(EditorRefresh.Canvas | EditorRefresh.Palette);
         try
         {
-            _settings.Save(new AppSettings(fullPath));
+            _settings.Update(current => current with { AssetDirectory = fullPath });
         }
         catch (AppSettingsException)
         {

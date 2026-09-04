@@ -53,6 +53,19 @@ public class AssetContextControllerTests : IDisposable
         => new AppSettingsStore(_settingsPath).Save(new AppSettings(assetDirectory));
 
     [Fact]
+    public void TryOpen_PersistsAssetDirectoryWithoutDiscardingTheTheme()
+    {
+        var store = new AppSettingsStore(_settingsPath);
+        store.Save(new AppSettings(null, AppTheme.Light));
+        using AssetContextController controller = CreateController();
+        string assetDirectory = WriteAssetDirectory("assets-theme", TwoSheetJson);
+
+        Assert.True(controller.TryOpen(assetDirectory));
+
+        Assert.Equal(new AppSettings(assetDirectory, AppTheme.Light), store.Load());
+    }
+
+    [Fact]
     public void TryOpen_WithTileSheetSidecar_FiltersPublishedSheetIds()
     {
         using AssetContextController controller = CreateController();

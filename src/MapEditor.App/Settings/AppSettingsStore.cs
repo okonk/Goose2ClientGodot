@@ -61,12 +61,14 @@ public sealed class AppSettingsStore
             throw new AppSettingsException(_path, $"assetDirectory must be an absolute path, got '{assetDirectory}'.");
         }
 
-        return new AppSettings(assetDirectory);
+        return new AppSettings(assetDirectory, ParseTheme(file?.Theme));
     }
 
     public void Save(AppSettings settings)
     {
-        var json = JsonSerializer.Serialize(new SettingsFile { AssetDirectory = settings.AssetDirectory }, SerializerOptions);
+        var json = JsonSerializer.Serialize(
+            new SettingsFile { AssetDirectory = settings.AssetDirectory, Theme = settings.Theme.ToString() },
+            SerializerOptions);
         var directory = Path.GetDirectoryName(Path.GetFullPath(_path))!;
         var temp = Path.Combine(directory, TempPrefix + Guid.NewGuid().ToString("N") + TempSuffix);
         var failed = false;
@@ -97,9 +99,35 @@ public sealed class AppSettingsStore
         }
     }
 
+    /// <summary>Loads the current settings, falling back to defaults when the file is unreadable.</summary>
+    public AppSettings LoadOrDefault()
+    {
+        try
+        {
+            return Load();
+        }
+        catch (AppSettingsException)
+        {
+            return new AppSettings(null);
+        }
+    }
+
+    /// <summary>Rewrites one field without discarding the others already on disk.</summary>
+    public void Update(Func<AppSettings, AppSettings> mutate)
+    {
+        ArgumentNullException.ThrowIfNull(mutate);
+        Save(mutate(LoadOrDefault()));
+    }
+
+    // An unrecognised or missing theme falls back to the default rather than failing the load.
+    private static AppTheme ParseTheme(string? value)
+        => Enum.TryParse(value, ignoreCase: true, out AppTheme theme) ? theme : AppTheme.Dark;
+
     private sealed class SettingsFile
     {
         public string? AssetDirectory { get; set; }
+
+        public string? Theme { get; set; }
     }
 
     private sealed class SystemFileOperations : ISettingsFileOperations

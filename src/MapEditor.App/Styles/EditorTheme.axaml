@@ -1,0 +1,262 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <Styles.Resources>
+    <ResourceDictionary>
+      <ResourceDictionary.ThemeDictionaries>
+        <!-- Neutral, slightly cool dark palette. -->
+        <ResourceDictionary x:Key="Dark">
+          <Color x:Key="EditorWindowColor">#FF16181D</Color>
+          <Color x:Key="EditorPanelColor">#FF1C1F26</Color>
+          <Color x:Key="EditorElevatedColor">#FF23272F</Color>
+          <Color x:Key="EditorHoverColor">#FF2C313B</Color>
+          <Color x:Key="EditorBorderColor">#FF31363F</Color>
+          <Color x:Key="EditorAccentColor">#FF4C8DFF</Color>
+          <Color x:Key="EditorAccentHoverColor">#FF6AA1FF</Color>
+          <Color x:Key="EditorTextColor">#FFE6E9EF</Color>
+          <Color x:Key="EditorMutedTextColor">#FF9AA3B2</Color>
+          <Color x:Key="EditorDangerColor">#FFFF6B6B</Color>
+          <Color x:Key="EditorSubtleHoverColor">#14FFFFFF</Color>
+          <Color x:Key="EditorArtboardColor">#FF16181D</Color>
+          <Color x:Key="SystemAccentColor">#FF4C8DFF</Color>
+          <Color x:Key="SystemAccentColorDark1">#FF3C7BEB</Color>
+          <Color x:Key="SystemAccentColorDark2">#FF2E66CC</Color>
+          <Color x:Key="SystemAccentColorDark3">#FF23509F</Color>
+          <Color x:Key="SystemAccentColorLight1">#FF6AA1FF</Color>
+          <Color x:Key="SystemAccentColorLight2">#FF8BB7FF</Color>
+          <Color x:Key="SystemAccentColorLight3">#FFAECEFF</Color>
+        </ResourceDictionary>
+        <!-- Light palette: same roles, inverted surfaces. -->
+        <ResourceDictionary x:Key="Light">
+          <Color x:Key="EditorWindowColor">#FFEDEFF3</Color>
+          <Color x:Key="EditorPanelColor">#FFF7F8FA</Color>
+          <Color x:Key="EditorElevatedColor">#FFFFFFFF</Color>
+          <Color x:Key="EditorHoverColor">#FFE2E6EC</Color>
+          <Color x:Key="EditorBorderColor">#FFD3D8E0</Color>
+          <Color x:Key="EditorAccentColor">#FF2F6FED</Color>
+          <Color x:Key="EditorAccentHoverColor">#FF1F5BD6</Color>
+          <Color x:Key="EditorTextColor">#FF1B1F26</Color>
+          <Color x:Key="EditorMutedTextColor">#FF5F6875</Color>
+          <Color x:Key="EditorDangerColor">#FFC0392B</Color>
+          <Color x:Key="EditorSubtleHoverColor">#12000000</Color>
+          <!-- Sprites and grid lines are authored for a dark ground, so the artboard stays dark in both themes. -->
+          <Color x:Key="EditorArtboardColor">#FF16181D</Color>
+          <Color x:Key="SystemAccentColor">#FF2F6FED</Color>
+          <Color x:Key="SystemAccentColorDark1">#FF2A63D4</Color>
+          <Color x:Key="SystemAccentColorDark2">#FF2255B7</Color>
+          <Color x:Key="SystemAccentColorDark3">#FF1A4391</Color>
+          <Color x:Key="SystemAccentColorLight1">#FF5288F1</Color>
+          <Color x:Key="SystemAccentColorLight2">#FF80A9F5</Color>
+          <Color x:Key="SystemAccentColorLight3">#FFB0C9F9</Color>
+        </ResourceDictionary>
+      </ResourceDictionary.ThemeDictionaries>
+
+      <!-- Role brushes resolve against whichever palette is active. -->
+      <SolidColorBrush x:Key="EditorWindowBrush" Color="{DynamicResource EditorWindowColor}" />
+      <SolidColorBrush x:Key="EditorPanelBrush" Color="{DynamicResource EditorPanelColor}" />
+      <SolidColorBrush x:Key="EditorElevatedBrush" Color="{DynamicResource EditorElevatedColor}" />
+      <SolidColorBrush x:Key="EditorHoverBrush" Color="{DynamicResource EditorHoverColor}" />
+      <SolidColorBrush x:Key="EditorBorderBrush" Color="{DynamicResource EditorBorderColor}" />
+      <SolidColorBrush x:Key="EditorAccentBrush" Color="{DynamicResource EditorAccentColor}" />
+      <SolidColorBrush x:Key="EditorAccentHoverBrush" Color="{DynamicResource EditorAccentHoverColor}" />
+      <SolidColorBrush x:Key="EditorTextBrush" Color="{DynamicResource EditorTextColor}" />
+      <SolidColorBrush x:Key="EditorMutedTextBrush" Color="{DynamicResource EditorMutedTextColor}" />
+      <SolidColorBrush x:Key="EditorDangerBrush" Color="{DynamicResource EditorDangerColor}" />
+      <SolidColorBrush x:Key="EditorSubtleHoverBrush" Color="{DynamicResource EditorSubtleHoverColor}" />
+      <SolidColorBrush x:Key="EditorArtboardBrush" Color="{DynamicResource EditorArtboardColor}" />
+      <SolidColorBrush x:Key="ThemeAccentBrush" Color="{DynamicResource EditorAccentColor}" />
+      <SolidColorBrush x:Key="SystemAccentColorBrush" Color="{DynamicResource EditorAccentColor}" />
+      <SolidColorBrush x:Key="SystemControlBackgroundAltHighBrush" Color="{DynamicResource EditorWindowColor}" />
+    </ResourceDictionary>
+  </Styles.Resources>
+
+  <Style Selector="Window">
+    <Setter Property="Background" Value="{DynamicResource EditorWindowBrush}" />
+    <Setter Property="Foreground" Value="{DynamicResource EditorTextBrush}" />
+    <Setter Property="FontSize" Value="13" />
+  </Style>
+
+  <Style Selector="TextBlock">
+    <Setter Property="Foreground" Value="{DynamicResource EditorTextBrush}" />
+  </Style>
+
+  <Style Selector="TextBlock.section">
+    <Setter Property="Foreground" Value="{DynamicResource EditorMutedTextBrush}" />
+    <Setter Property="FontSize" Value="11" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="LetterSpacing" Value="0.8" />
+  </Style>
+
+  <Style Selector="TextBlock.muted">
+    <Setter Property="Foreground" Value="{DynamicResource EditorMutedTextBrush}" />
+  </Style>
+
+  <Style Selector="TextBlock.mono">
+    <Setter Property="FontFamily" Value="Cascadia Mono,Consolas,DejaVu Sans Mono,monospace" />
+    <Setter Property="FontSize" Value="12" />
+  </Style>
+
+  <!-- Menu -->
+  <Style Selector="Menu">
+    <Setter Property="Background" Value="{DynamicResource EditorPanelBrush}" />
+    <Setter Property="Padding" Value="4,2" />
+  </Style>
+  <Style Selector="Menu > MenuItem">
+    <Setter Property="Padding" Value="10,5" />
+    <Setter Property="CornerRadius" Value="4" />
+    <Setter Property="Foreground" Value="{DynamicResource EditorTextBrush}" />
+  </Style>
+  <Style Selector="Menu > MenuItem:pointerover">
+    <Setter Property="Background" Value="{DynamicResource EditorHoverBrush}" />
+  </Style>
+
+  <!-- Buttons -->
+  <Style Selector="Button">
+    <Setter Property="Background" Value="{DynamicResource EditorElevatedBrush}" />
+    <Setter Property="Foreground" Value="{DynamicResource EditorTextBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource EditorBorderBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="6" />
+    <Setter Property="Padding" Value="12,6" />
+  </Style>
+  <Style Selector="Button:pointerover /template/ ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource EditorHoverBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource EditorBorderBrush}" />
+    <Setter Property="TextElement.Foreground" Value="{DynamicResource EditorTextBrush}" />
+  </Style>
+  <Style Selector="Button:pressed /template/ ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource EditorPanelBrush}" />
+    <Setter Property="TextElement.Foreground" Value="{DynamicResource EditorTextBrush}" />
+  </Style>
+
+  <!-- Toolbar toggle buttons -->
+  <Style Selector="ToggleButton">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Foreground" Value="{DynamicResource EditorMutedTextBrush}" />
+    <Setter Property="BorderBrush" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="6" />
+    <Setter Property="Padding" Value="12,6" />
+    <Setter Property="FontWeight" Value="Medium" />
+  </Style>
+  <Style Selector="ToggleButton:pointerover /template/ ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource EditorHoverBrush}" />
+    <Setter Property="BorderBrush" Value="Transparent" />
+    <Setter Property="TextElement.Foreground" Value="{DynamicResource EditorTextBrush}" />
+  </Style>
+  <Style Selector="ToggleButton:checked /template/ ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource EditorAccentBrush}" />
+    <Setter Property="BorderBrush" Value="Transparent" />
+    <Setter Property="TextElement.Foreground" Value="White" />
+  </Style>
+  <Style Selector="ToggleButton:checked:pointerover /template/ ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource EditorAccentHoverBrush}" />
+    <Setter Property="TextElement.Foreground" Value="White" />
+  </Style>
+
+  <Style Selector="Button.accent">
+    <Setter Property="Background" Value="{DynamicResource EditorAccentBrush}" />
+    <Setter Property="BorderBrush" Value="Transparent" />
+    <Setter Property="Foreground" Value="White" />
+  </Style>
+  <Style Selector="Button.accent:pointerover /template/ ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource EditorAccentHoverBrush}" />
+    <Setter Property="BorderBrush" Value="Transparent" />
+    <Setter Property="TextElement.Foreground" Value="White" />
+  </Style>
+
+  <!-- Text inputs -->
+  <Style Selector="TextBox">
+    <Setter Property="Background" Value="{DynamicResource EditorWindowBrush}" />
+    <Setter Property="Foreground" Value="{DynamicResource EditorTextBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource EditorBorderBrush}" />
+    <Setter Property="CornerRadius" Value="5" />
+    <Setter Property="Padding" Value="7,4" />
+    <Setter Property="MinHeight" Value="0" />
+  </Style>
+
+  <Style Selector="ComboBox">
+    <Setter Property="Background" Value="{DynamicResource EditorElevatedBrush}" />
+    <Setter Property="Foreground" Value="{DynamicResource EditorTextBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource EditorBorderBrush}" />
+    <Setter Property="CornerRadius" Value="5" />
+    <Setter Property="Padding" Value="9,5" />
+    <Setter Property="MinHeight" Value="0" />
+  </Style>
+
+  <!-- Panels and separators -->
+  <Style Selector="Border.panel">
+    <Setter Property="Background" Value="{DynamicResource EditorPanelBrush}" />
+  </Style>
+  <Style Selector="Border.chrome">
+    <Setter Property="Background" Value="{DynamicResource EditorPanelBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource EditorBorderBrush}" />
+  </Style>
+  <Style Selector="Border.sunken">
+    <Setter Property="Background" Value="{DynamicResource EditorArtboardBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource EditorBorderBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="6" />
+  </Style>
+
+  <!-- Grouped list / readout card -->
+  <Style Selector="Border.card">
+    <Setter Property="Background" Value="{DynamicResource EditorPanelBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource EditorBorderBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="6" />
+    <Setter Property="ClipToBounds" Value="True" />
+  </Style>
+
+  <!-- Layer rows: hairline-separated, last row drops the divider. -->
+  <Style Selector="Border.row">
+    <Setter Property="BorderBrush" Value="{DynamicResource EditorBorderBrush}" />
+    <Setter Property="BorderThickness" Value="0,0,0,1" />
+  </Style>
+  <Style Selector="Border.row.last">
+    <Setter Property="BorderThickness" Value="0" />
+  </Style>
+  <!-- Padding lives on the inner grid so the hover fill covers the whole row. -->
+  <Style Selector="Border.row > Grid">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="MinHeight" Value="30" />
+  </Style>
+  <Style Selector="Border.row:pointerover > Grid">
+    <Setter Property="Background" Value="{DynamicResource EditorSubtleHoverBrush}" />
+  </Style>
+  <Style Selector="Border.row > Grid > TextBlock">
+    <Setter Property="Margin" Value="10,0,0,0" />
+  </Style>
+  <Style Selector="Border.row > Grid > CheckBox">
+    <Setter Property="Margin" Value="0,0,10,0" />
+  </Style>
+
+  <Style Selector="GridSplitter">
+    <Setter Property="Background" Value="{DynamicResource EditorBorderBrush}" />
+  </Style>
+
+  <Style Selector="ScrollBar">
+    <Setter Property="Background" Value="Transparent" />
+  </Style>
+  <!-- Slim translucent overlay scrollbar for the sprite palette. -->
+  <Style Selector="ScrollBar.overlay">
+    <Setter Property="Width" Value="8" />
+    <Setter Property="MinWidth" Value="8" />
+    <Setter Property="Opacity" Value="0.5" />
+    <Setter Property="Background" Value="Transparent" />
+  </Style>
+  <Style Selector="ScrollBar.overlay:pointerover">
+    <Setter Property="Opacity" Value="1" />
+  </Style>
+  <Style Selector="ScrollBar.overlay /template/ Border#TrackRect">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+  </Style>
+  <Style Selector="ScrollBar.overlay /template/ RepeatButton">
+    <Setter Property="IsVisible" Value="False" />
+  </Style>
+  <Style Selector="ScrollBar.overlay /template/ Thumb">
+    <Setter Property="Background" Value="{DynamicResource EditorMutedTextBrush}" />
+    <Setter Property="CornerRadius" Value="4" />
+    <Setter Property="MinWidth" Value="8" />
+  </Style>
+</Styles>

@@ -4,12 +4,12 @@
         CanResize="False"
         SizeToContent="WidthAndHeight"
         WindowStartupLocation="CenterOwner">
-    <StackPanel Margin="12" Spacing="12" MinWidth="300">
+    <StackPanel Margin="18" Spacing="16" MinWidth="320">
         <TextBlock Name="MessageText" TextWrapping="Wrap"/>
         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
-            <Button Name="PrimaryButton" MinWidth="80" IsDefault="True"/>
-            <Button Name="SecondaryButton" MinWidth="80"/>
-            <Button Name="TertiaryButton" MinWidth="80" IsCancel="True"/>
+            <Button Name="PrimaryButton" Classes="accent" MinWidth="84" IsDefault="True"/>
+            <Button Name="SecondaryButton" MinWidth="84"/>
+            <Button Name="TertiaryButton" MinWidth="84" IsCancel="True"/>
         </StackPanel>
     </StackPanel>
 </Window>

@@ -235,6 +235,7 @@ internal sealed class SpritePaletteControl : Control, ICustomHitTest
 
         bar.ViewportSize = ViewportHeight;
         bar.Maximum = Math.Max(0, ExtentHeight - ViewportHeight);
+        bar.IsVisible = bar.Maximum > 0;
         if (bar.Value != _offset)
         {
             bar.Value = _offset;
