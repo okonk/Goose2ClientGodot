@@ -553,10 +553,10 @@ public class MapCanvasTests
         Assert.Equal(
             new[] { new Rect(32, 0, 32, 32), new Rect(0, 0, 32, 32) },
             allVisible.Images.Select(image => image.Source).ToArray());
-        Assert.All(allVisible.Images, image => Assert.Equal(new Rect(0, 0, 32, 32), image.Destination));
+        Assert.All(allVisible.Images, image => Assert.Equal(new Rect(0, 0, Cell, Cell), image.Destination));
 
         Assert.Single(layer0Hidden.Images);
         Assert.Equal(new Rect(0, 0, 32, 32), layer0Hidden.Images[0].Source);
-        Assert.Equal(new Rect(0, 0, 32, 32), layer0Hidden.Images[0].Destination);
+        Assert.Equal(new Rect(0, 0, Cell, Cell), layer0Hidden.Images[0].Destination);
     }
 }
