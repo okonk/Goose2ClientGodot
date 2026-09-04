@@ -192,7 +192,7 @@ internal partial class MainWindow : Window
                 e.Handled = true;
                 break;
             case Key.X:
-                _viewModel.ActiveTool = MapEditTool.BlockedToggle;
+                _viewModel.ActiveTool = MapEditTool.Blocked;
                 e.Handled = true;
                 break;
             case Key.V:
@@ -569,7 +569,7 @@ internal partial class MainWindow : Window
         PencilTool.IsChecked = _viewModel.ActiveTool == MapEditTool.Pencil;
         EraserTool.IsChecked = _viewModel.ActiveTool == MapEditTool.Eraser;
         EyedropperTool.IsChecked = _viewModel.ActiveTool == MapEditTool.Eyedropper;
-        BlockedTool.IsChecked = _viewModel.ActiveTool == MapEditTool.BlockedToggle;
+        BlockedTool.IsChecked = _viewModel.ActiveTool == MapEditTool.Blocked;
         SelectTool.IsChecked = _viewModel.ActiveTool == MapEditTool.Select;
         MultiSelectTool.IsChecked = _viewModel.ActiveTool == MapEditTool.MultiSelect;
         FloodFillTool.IsChecked = _viewModel.ActiveTool == MapEditTool.FloodFill;

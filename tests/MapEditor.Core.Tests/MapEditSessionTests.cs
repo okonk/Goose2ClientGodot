@@ -214,7 +214,7 @@ public class MapEditSessionTests
     }
 
     [Fact]
-    public void BlockedToggle_XorsOnlyBlockedBitAndPreservesUnknownBits()
+    public void ApplyBlockedPatch_LeavesLayersUntouchedAndPreservesUnknownBits()
     {
         int before = int.MinValue | 1;
         var doc = MapDocument.Create(8, 8);
@@ -222,11 +222,10 @@ public class MapEditSessionTests
         doc.SetLayer(2, 3, 1, new MapTileLayer(9, 9));
         var session = new MapEditSession(doc);
 
-        session.BeginStroke(MapEditTool.BlockedToggle, 2, 3);
-        Assert.True(session.CompleteStroke());
+        Assert.True(session.ApplyBlockedPatch(new MapTileRectangle(2, 3, 1, 1), blocked: true));
 
         var tile = doc[2, 3];
-        Assert.Equal(before ^ MapDocument.BlockedFlag, tile.Flags);
+        Assert.Equal(before | MapDocument.BlockedFlag, tile.Flags);
         Assert.Equal(new MapTileLayer(9, 9), tile.GetLayer(1));
         for (var layer = 0; layer < MapDocument.LayerCount; layer++)
         {
@@ -235,6 +234,45 @@ public class MapEditSessionTests
                 Assert.Equal(new MapTileLayer(0, 0), tile.GetLayer(layer));
             }
         }
+    }
+
+    [Fact]
+    public void ApplyBlockedPatch_PreservesUnknownFlagBits()
+    {
+        var session = CreateSession(4, 4);
+        int noisy = unchecked((int)0xFFFFFFFD);
+        session.Document.SetFlags(1, 1, noisy);
+
+        Assert.True(session.ApplyBlockedPatch(new MapTileRectangle(0, 0, 3, 3), blocked: true));
+        Assert.Equal(noisy | MapDocument.BlockedFlag, session.Document[1, 1].Flags);
+
+        Assert.True(session.ApplyBlockedPatch(new MapTileRectangle(0, 0, 3, 3), blocked: false));
+        Assert.Equal(noisy & ~MapDocument.BlockedFlag, session.Document[1, 1].Flags);
+    }
+
+    [Fact]
+    public void ApplyBlockedPatch_AlreadyInTargetState_IsNoOp()
+    {
+        var session = CreateSession(4, 4);
+        Assert.False(session.ApplyBlockedPatch(new MapTileRectangle(0, 0, 4, 4), blocked: false));
+        Assert.False(session.CanUndo);
+    }
+
+    [Fact]
+    public void ApplyBlockedPatch_RectOutsideTheMap_Throws()
+    {
+        var session = CreateSession(4, 4);
+        Assert.Throws<ArgumentOutOfRangeException>(
+            () => session.ApplyBlockedPatch(new MapTileRectangle(2, 2, 5, 5), blocked: true));
+        Assert.False(session.CanUndo);
+    }
+
+    [Fact]
+    public void BeginStroke_WithBlockedTool_Throws()
+    {
+        var session = CreateSession(4, 4);
+        Assert.Throws<ArgumentOutOfRangeException>(
+            () => session.BeginStroke(MapEditTool.Blocked, 0, 0));
     }
 
     [Fact]

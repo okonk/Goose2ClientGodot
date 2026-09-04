@@ -142,7 +142,7 @@ public class MapCanvasTests
         Harness harness = await CreateSmallMapAsync();
         MapEditSession session = harness.ViewModel.Session;
         MapDocument document = session.Document;
-        harness.ViewModel.ActiveTool = MapEditTool.BlockedToggle;
+        harness.ViewModel.ActiveTool = MapEditTool.Blocked;
 
         harness.Window.MouseDown(new Point(Cell / 2, Cell / 2), MouseButton.Left, RawInputModifiers.None);
         harness.Window.MouseMove(new Point(2 * Cell - Cell / 2, Cell / 2), RawInputModifiers.None);

@@ -13,10 +13,9 @@ public class MapEditHistoryTests
         Assert.True(session.CompleteStroke());
     }
 
-    private static void ToggleBlockedCell(MapEditSession session, int x, int y)
+    private static void BlockCell(MapEditSession session, int x, int y)
     {
-        session.BeginStroke(MapEditTool.BlockedToggle, x, y);
-        Assert.True(session.CompleteStroke());
+        Assert.True(session.ApplyBlockedPatch(new MapTileRectangle(x, y, 1, 1), blocked: true));
     }
 
     private static void PaintLine(MapEditSession session, int cells)
@@ -66,8 +65,7 @@ public class MapEditHistoryTests
     {
         var session = new MapEditSession(MapDocument.Create(4, 4));
 
-        ToggleBlockedCell(session, 0, 0);
-
+        BlockCell(session, 0, 0);
         Assert.Equal(64 + 32 + 4 * 24, session.RetainedHistoryUsedBytes);
     }
 
@@ -79,13 +77,7 @@ public class MapEditHistoryTests
         Assert.Equal(64 + 2 * 32 + 12 * 32, layerSession.RetainedHistoryUsedBytes);
 
         var flagsSession = new MapEditSession(MapDocument.Create(10, 10));
-        flagsSession.BeginStroke(MapEditTool.BlockedToggle, 0, 0);
-        for (var x = 1; x < 5; x++)
-        {
-            flagsSession.ContinueStroke(x, 0);
-        }
-
-        Assert.True(flagsSession.CompleteStroke());
+        Assert.True(flagsSession.ApplyBlockedPatch(new MapTileRectangle(0, 0, 5, 1), blocked: true));
         Assert.Equal(64 + 2 * 32 + 12 * 24, flagsSession.RetainedHistoryUsedBytes);
     }
 
@@ -306,7 +298,7 @@ public class MapEditHistoryTests
             {
                 if (i % 2 == 0)
                 {
-                    ToggleBlockedCell(session, i, 0);
+                    BlockCell(session, i, 0);
                 }
                 else
                 {

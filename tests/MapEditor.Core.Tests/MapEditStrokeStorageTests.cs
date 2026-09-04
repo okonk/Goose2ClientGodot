@@ -29,7 +29,6 @@ public class MapEditStrokeStorageTests
         var stroke = session.ActiveStroke!;
         Assert.Null(stroke.Visited);
         Assert.Null(stroke.LayerChanges);
-        Assert.Null(stroke.FlagsChanges);
         session.CancelStroke();
     }
 
@@ -103,21 +102,12 @@ public class MapEditStrokeStorageTests
     }
 
     [Fact]
-    public void MaximumToggleStroke_WithLoopsNeverExceedsTileCountDeltasOrBitmapBound()
+    public void MaximumBlockedPatch_NeverExceedsTileCountDeltasOrSlotBound()
     {
         var doc = MapDocument.Create(1000, 1000);
         var session = new MapEditSession(doc);
 
-        DrawSerpentine(session, 1000, 1000, MapEditTool.BlockedToggle);
-        session.ContinueStroke(0, 0);
-        session.ContinueStroke(999, 0);
-        session.ContinueStroke(999, 999);
-        session.ContinueStroke(0, 999);
-        session.ContinueStroke(0, 0);
-
-        var stroke = session.ActiveStroke!;
-        Assert.Equal(15_625, stroke.Visited!.WordCount);
-        Assert.True(session.CompleteStroke());
+        Assert.True(session.ApplyBlockedPatch(new MapTileRectangle(0, 0, 1000, 1000), blocked: true));
 
         var buffer = ((MapFlagsChangesCommand)session.History.PeekUndo()!).Changes;
         Assert.Equal(1_000_000, buffer.Count);

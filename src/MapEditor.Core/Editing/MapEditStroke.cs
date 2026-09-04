@@ -11,7 +11,6 @@ internal sealed class MapEditStroke
     private MapCoordinate _sample;
     private StrokeVisitBitmap? _visited;
     private MapEditChangeBuffer<MapLayerChange>? _layerChanges;
-    private MapEditChangeBuffer<MapFlagsChange>? _flagsChanges;
 
     internal MapEditStroke(MapEditTool tool, int layerIndex, MapTileLayer brush, MapTileLayer previousBrush, int tileCount)
     {
@@ -22,14 +21,7 @@ internal sealed class MapEditStroke
         if (tool != MapEditTool.Eyedropper)
         {
             _visited = new StrokeVisitBitmap(tileCount);
-            if (tool == MapEditTool.BlockedToggle)
-            {
-                _flagsChanges = new MapEditChangeBuffer<MapFlagsChange>();
-            }
-            else
-            {
-                _layerChanges = new MapEditChangeBuffer<MapLayerChange>();
-            }
+            _layerChanges = new MapEditChangeBuffer<MapLayerChange>();
         }
     }
 
@@ -47,9 +39,7 @@ internal sealed class MapEditStroke
 
     internal MapEditChangeBuffer<MapLayerChange>? LayerChanges => _layerChanges;
 
-    internal MapEditChangeBuffer<MapFlagsChange>? FlagsChanges => _flagsChanges;
-
-    internal bool HasDeltas => (_layerChanges?.Count ?? 0) + (_flagsChanges?.Count ?? 0) > 0;
+    internal bool HasDeltas => _layerChanges is { Count: > 0 };
 
     internal void ApplyFirstSample(int x, int y, MapDocument document)
     {
@@ -74,12 +64,6 @@ internal sealed class MapEditStroke
                 case MapEditTool.Eraser:
                     ApplyLayer(point, new MapTileLayer(0, 0), document);
                     break;
-                case MapEditTool.BlockedToggle:
-                    int oldFlags = document[point.X, point.Y].Flags;
-                    int newFlags = oldFlags ^ MapDocument.BlockedFlag;
-                    _flagsChanges!.Append(new MapFlagsChange(point.X, point.Y, oldFlags, newFlags));
-                    document.SetFlags(point.X, point.Y, newFlags);
-                    break;
             }
         }
 
@@ -100,6 +84,5 @@ internal sealed class MapEditStroke
     {
         _visited = null;
         _layerChanges = null;
-        _flagsChanges = null;
     }
 }

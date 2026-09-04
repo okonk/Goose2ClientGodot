@@ -139,18 +139,7 @@ public sealed class MapEditSession
             return false;
         }
 
-        if (stroke.LayerChanges is { } layerChanges)
-        {
-            PushLayerCommand(layerChanges);
-        }
-        else
-        {
-            int beforeStateId = _currentStateId;
-            int afterStateId = _nextStateId++;
-            _currentStateId = afterStateId;
-            _history.PushUndo(new MapFlagsChangesCommand(stroke.FlagsChanges!, beforeStateId, afterStateId));
-        }
-
+        PushLayerCommand(stroke.LayerChanges!);
         stroke.Release();
         return true;
     }
@@ -287,6 +276,48 @@ public sealed class MapEditSession
         return true;
     }
 
+    public bool ApplyBlockedPatch(MapTileRectangle rect, bool blocked)
+    {
+        if (_stroke != null)
+        {
+            throw new InvalidOperationException();
+        }
+
+        if (rect.Width <= 0 || rect.Height <= 0 || rect.X < 0 || rect.Y < 0 ||
+            rect.Width > _document.Width - rect.X || rect.Height > _document.Height - rect.Y)
+        {
+            throw new ArgumentOutOfRangeException();
+        }
+
+        var changes = new MapEditChangeBuffer<MapFlagsChange>();
+        for (int row = 0; row < rect.Height; row++)
+        {
+            for (int col = 0; col < rect.Width; col++)
+            {
+                int x = rect.X + col;
+                int y = rect.Y + row;
+                int oldFlags = _document[x, y].Flags;
+                int newFlags = blocked ? oldFlags | MapDocument.BlockedFlag : oldFlags & ~MapDocument.BlockedFlag;
+                if (newFlags != oldFlags)
+                {
+                    changes.Append(new MapFlagsChange(x, y, oldFlags, newFlags));
+                    _document.SetFlags(x, y, newFlags);
+                }
+            }
+        }
+
+        if (changes.Count == 0)
+        {
+            return false;
+        }
+
+        int beforeStateId = _currentStateId;
+        int afterStateId = _nextStateId++;
+        _currentStateId = afterStateId;
+        _history.PushUndo(new MapFlagsChangesCommand(changes, beforeStateId, afterStateId));
+        return true;
+    }
+
     public bool ApplyResize(MapTileRectangle window)
     {
         if (_stroke != null)
@@ -349,10 +380,6 @@ public sealed class MapEditSession
         if (stroke.LayerChanges is { } layerChanges)
         {
             new MapLayerChangesCommand(layerChanges, 0, 0).Replay(_document, reverse: true, before: true);
-        }
-        else if (stroke.FlagsChanges is { } flagsChanges)
-        {
-            new MapFlagsChangesCommand(flagsChanges, 0, 0).Replay(_document, reverse: true, before: true);
         }
 
         if (stroke.Tool == MapEditTool.Eyedropper)
@@ -452,7 +479,7 @@ public sealed class MapEditSession
 
     private static void ValidateTool(MapEditTool tool)
     {
-        if (tool < MapEditTool.Pencil || tool > MapEditTool.BlockedToggle)
+        if (tool < MapEditTool.Pencil || tool > MapEditTool.Eyedropper)
         {
             throw new ArgumentOutOfRangeException(nameof(tool));
         }

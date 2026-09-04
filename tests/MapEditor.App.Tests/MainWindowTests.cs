@@ -315,7 +315,7 @@ public class MainWindowTests : IDisposable
 
         Assert.Equal("L2 0/0", Find<TextBlock>("Layer2Ref").Text);
 
-        ViewModel.ActiveTool = MapEditTool.BlockedToggle;
+        ViewModel.ActiveTool = MapEditTool.Blocked;
         Window.MouseDown(tileCenter, MouseButton.Left, RawInputModifiers.None);
         Window.MouseUp(tileCenter, MouseButton.Left, RawInputModifiers.None);
         Assert.Equal("blocked: yes", Find<TextBlock>("BlockedText").Text);
@@ -502,7 +502,7 @@ public class MainWindowTests : IDisposable
         Assert.True(Find<ToggleButton>("FloodFillTool").IsChecked);
 
         Window.KeyPressQwerty(PhysicalKey.X, RawInputModifiers.None);
-        Assert.Equal(MapEditTool.BlockedToggle, ViewModel.ActiveTool);
+        Assert.Equal(MapEditTool.Blocked, ViewModel.ActiveTool);
         Assert.True(Find<ToggleButton>("BlockedTool").IsChecked);
     }
 

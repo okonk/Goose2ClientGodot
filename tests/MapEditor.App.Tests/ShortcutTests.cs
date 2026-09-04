@@ -124,7 +124,7 @@ public class ShortcutTests
         Assert.Equal(MapEditTool.Eyedropper, harness.ViewModel.ActiveTool);
 
         window.KeyPressQwerty(PhysicalKey.X, RawInputModifiers.None);
-        Assert.Equal(MapEditTool.BlockedToggle, harness.ViewModel.ActiveTool);
+        Assert.Equal(MapEditTool.Blocked, harness.ViewModel.ActiveTool);
 
         window.KeyPressQwerty(PhysicalKey.P, RawInputModifiers.None);
         Assert.Equal(MapEditTool.Pencil, harness.ViewModel.ActiveTool);
