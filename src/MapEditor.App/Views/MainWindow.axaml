@@ -41,7 +41,14 @@
         <TextBlock x:Name="SizeText" Text="100 × 100" />
       </StackPanel>
     </Border>
-    <Grid x:Name="Body" ColumnDefinitions="260,*,260">
+    <Grid x:Name="Body">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition MinWidth="140" />
+        <ColumnDefinition Width="Auto" />
+        <ColumnDefinition Width="*" />
+        <ColumnDefinition Width="260" />
+      </Grid.ColumnDefinitions>
+      <GridSplitter x:Name="LeftSplitter" Grid.Column="1" Width="4" Background="#FFCCCCCC" />
       <DockPanel x:Name="LeftPanel" Grid.Column="0">
         <StackPanel DockPanel.Dock="Top" Spacing="6" Margin="8">
           <Button x:Name="LoadAssetsButton" Content="Load assets…" Click="OnLoadAssets" />
@@ -60,8 +67,8 @@
           <ScrollBar x:Name="PaletteBar" Grid.Column="1" Orientation="Vertical" />
         </Grid>
       </DockPanel>
-      <Border x:Name="CanvasHost" Grid.Column="1" Margin="8" BorderBrush="#FF888888" BorderThickness="1" />
-      <StackPanel x:Name="RightPanel" Grid.Column="2" Spacing="4" Margin="8">
+      <Border x:Name="CanvasHost" Grid.Column="2" Margin="8" BorderBrush="#FF888888" BorderThickness="1" />
+      <StackPanel x:Name="RightPanel" Grid.Column="3" Spacing="4" Margin="8">
         <TextBlock Text="Layers" FontWeight="SemiBold" />
         <Border x:Name="Layer0Row" Tag="0" Background="Transparent" PointerPressed="OnLayerRowPressed">
           <Grid ColumnDefinitions="*,Auto">

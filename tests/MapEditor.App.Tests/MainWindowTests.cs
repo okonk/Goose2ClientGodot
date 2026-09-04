@@ -120,7 +120,7 @@ public class MainWindowTests : IDisposable
     private string WriteManyFrameAssetDirectory()
     {
         var frames = new StringBuilder();
-        for (int i = 0; i < 100; i++)
+        for (int i = 0; i < 300; i++)
         {
             if (i > 0)
             {
@@ -337,11 +337,13 @@ public class MainWindowTests : IDisposable
         Assert.Equal(Math.Max(0, palette.ExtentHeight - palette.ViewportHeight), bar.Maximum);
         Assert.True(bar.Maximum > 0);
 
-        bar.Value = 100;
-        Assert.Equal(100, palette.Offset);
+        double barTarget = Math.Min(100, bar.Maximum);
+        bar.Value = barTarget;
+        Assert.Equal(barTarget, palette.Offset);
 
-        palette.Offset = 50;
-        Assert.Equal(50, bar.Value);
+        double offsetTarget = Math.Min(50, bar.Maximum);
+        palette.Offset = offsetTarget;
+        Assert.Equal(offsetTarget, bar.Value);
     }
 
     [AvaloniaFact]

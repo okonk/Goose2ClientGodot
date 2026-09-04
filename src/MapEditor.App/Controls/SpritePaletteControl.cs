@@ -17,12 +17,14 @@ namespace MapEditor.App.Controls;
 
 internal sealed class SpritePaletteControl : Control, ICustomHitTest
 {
-    internal const double CellSize = 48;
+    internal const double CellSize = 36;
     private const double ThumbnailSize = 32;
     private const double WheelStep = CellSize * 3;
 
     private static readonly Brush PlaceholderFill = new SolidColorBrush(Color.FromArgb(0xFF, 0x00, 0xFF, 0xCC));
     private static readonly Pen PlaceholderStroke = new(new SolidColorBrush(Color.FromArgb(0xFF, 0xFF, 0x00, 0xFF)), 1.0);
+    private static readonly Brush TransparentFill = new SolidColorBrush(Color.FromArgb(0x00, 0x00, 0x00, 0x00));
+    private static readonly Pen SelectionStroke = new(new SolidColorBrush(Color.FromArgb(0xFF, 0x33, 0x99, 0xFF)), 2.0);
 
     private readonly MainWindowViewModel _viewModel;
     private readonly AssetContextController _assets;
@@ -121,6 +123,34 @@ internal sealed class SpritePaletteControl : Control, ICustomHitTest
                 DrawFrame(target, frames[index], column * CellSize, y);
             }
         }
+
+        MapTileLayer brush = _viewModel.Brush;
+        if (brush.Sheet != _viewModel.SelectedSheet)
+        {
+            return;
+        }
+
+        for (int row = firstRow; row <= lastRow; row++)
+        {
+            for (int column = 0; column < columns; column++)
+            {
+                int index = row * columns + column;
+                if (index >= frames.Count)
+                {
+                    break;
+                }
+
+                if (frames[index].Reference.Graphic != brush.Graphic)
+                {
+                    continue;
+                }
+
+                double x = column * CellSize;
+                double y = row * CellSize - _offset;
+                target.DrawRectangle(TransparentFill, SelectionStroke, new Rect(x + 1, y + 1, CellSize - 2, CellSize - 2));
+                return;
+            }
+        }
     }
 
     public override void Render(DrawingContext context)
@@ -175,9 +205,14 @@ internal sealed class SpritePaletteControl : Control, ICustomHitTest
 
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(MainWindowViewModel.SelectedSheet))
+        switch (e.PropertyName)
         {
-            OnPaletteInvalidated();
+            case nameof(MainWindowViewModel.SelectedSheet):
+                OnPaletteInvalidated();
+                break;
+            case nameof(MainWindowViewModel.Brush):
+                InvalidateVisual();
+                break;
         }
     }
 

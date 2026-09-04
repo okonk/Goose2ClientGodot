@@ -20,6 +20,10 @@ namespace MapEditor.App;
 
 internal partial class MainWindow : Window
 {
+    private const int DefaultPaletteColumns = 10;
+    // PaletteHost margin (16) + scrollbar (16) + palette border (2).
+    private const double PaletteChromeWidth = 34;
+
     private static readonly IBrush FieldErrorBrush = new SolidColorBrush(Color.FromRgb(0xCC, 0x00, 0x00));
     private static readonly IBrush SelectedRowBrush = new SolidColorBrush(Color.FromRgb(0x33, 0x99, 0xFF));
 
@@ -45,6 +49,8 @@ internal partial class MainWindow : Window
         _viewModel = viewModel ?? throw new ArgumentNullException(nameof(viewModel));
         _assets = assets ?? throw new ArgumentNullException(nameof(assets));
         InitializeComponent();
+        Body.ColumnDefinitions[0].Width = new GridLength(
+            DefaultPaletteColumns * SpritePaletteControl.CellSize + PaletteChromeWidth, GridUnitType.Pixel);
         _canvas = new MapCanvas(_viewModel, _assets);
         _palette = new SpritePaletteControl(_viewModel, _assets);
         _layerRefs = new[] { Layer0Ref, Layer1Ref, Layer2Ref, Layer3Ref, Layer4Ref };

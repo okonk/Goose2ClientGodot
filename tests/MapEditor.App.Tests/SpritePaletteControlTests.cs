@@ -57,16 +57,16 @@ public class SpritePaletteControlTests : IDisposable
 
         harness.Palette.RenderPalette(target);
 
-        Assert.Equal(Enumerable.Range(100, 30).Select(g => new SpriteReference(1, g)), harness.Resolved);
-        Assert.Equal(30, target.Rectangles.Count);
-        Assert.Equal(60, target.Lines.Count);
+        Assert.Equal(Enumerable.Range(100, 48).Select(g => new SpriteReference(1, g)), harness.Resolved);
+        Assert.Equal(48, target.Rectangles.Count);
+        Assert.Equal(96, target.Lines.Count);
         Assert.Empty(target.Images);
 
         harness.Palette.Offset = 280;
         harness.Resolved.Clear();
         harness.Palette.RenderPalette(target);
 
-        Assert.Equal(Enumerable.Range(130, 30).Select(g => new SpriteReference(1, g)), harness.Resolved);
+        Assert.Equal(Enumerable.Range(116, 44).Select(g => new SpriteReference(1, g)), harness.Resolved);
     }
 
     [AvaloniaFact]
@@ -92,11 +92,11 @@ public class SpritePaletteControlTests : IDisposable
     {
         Harness harness = await CreateAsync(Manifest((1, 60, 100)));
         byte[] before = MapCodec.Encode(harness.ViewModel.Session.Document);
-        harness.Palette.Offset = 240;
+        harness.Palette.Offset = 88;
 
         harness.Window.MouseDown(new Point(24, 24), MouseButton.Left, RawInputModifiers.None);
 
-        Assert.Equal(new MapTileLayer(1, 130), harness.ViewModel.Brush);
+        Assert.Equal(new MapTileLayer(1, 124), harness.ViewModel.Brush);
         Assert.Equal(before, MapCodec.Encode(harness.ViewModel.Session.Document));
         Assert.False(harness.ViewModel.Session.CanUndo);
     }
@@ -106,9 +106,9 @@ public class SpritePaletteControlTests : IDisposable
     {
         Harness harness = await CreateAsync(Manifest((1, 61, 100)));
         harness.ViewModel.Brush = new MapTileLayer(1, 100);
-        harness.Palette.Offset = 328;
+        harness.Palette.Offset = 88;
 
-        harness.Window.MouseDown(new Point(72, 160), MouseButton.Left, RawInputModifiers.None);
+        harness.Window.MouseDown(new Point(180, 168), MouseButton.Left, RawInputModifiers.None);
 
         Assert.Equal(new MapTileLayer(1, 100), harness.ViewModel.Brush);
     }
@@ -116,24 +116,24 @@ public class SpritePaletteControlTests : IDisposable
     [AvaloniaFact]
     public async Task WheelScrollsAndClampsAtBothEnds()
     {
-        Harness harness = await CreateAsync(Manifest((1, 60, 100)));
-        harness.Palette.Offset = 280;
+        Harness harness = await CreateAsync(Manifest((1, 120, 100)));
+        harness.Palette.Offset = 340;
 
-        Assert.Equal(280, harness.Bar.Value);
-        Assert.Equal(280, harness.Bar.Maximum);
+        Assert.Equal(340, harness.Bar.Value);
+        Assert.Equal(340, harness.Bar.Maximum);
         Assert.Equal(200, harness.Bar.ViewportSize);
 
         harness.Window.MouseWheel(new Point(24, 24), new Vector(0, 1), RawInputModifiers.None);
-        Assert.Equal(136, harness.Palette.Offset);
-        Assert.Equal(136, harness.Bar.Value);
+        Assert.Equal(232, harness.Palette.Offset);
+        Assert.Equal(232, harness.Bar.Value);
 
         for (int i = 0; i < 5; i++)
         {
             harness.Window.MouseWheel(new Point(24, 24), new Vector(0, -1), RawInputModifiers.None);
         }
 
-        Assert.Equal(280, harness.Palette.Offset);
-        Assert.Equal(280, harness.Bar.Value);
+        Assert.Equal(340, harness.Palette.Offset);
+        Assert.Equal(340, harness.Bar.Value);
 
         for (int i = 0; i < 10; i++)
         {
@@ -163,7 +163,7 @@ public class SpritePaletteControlTests : IDisposable
         harness.ViewModel.SelectedSheet = 2;
 
         Assert.Equal(0, harness.Palette.Offset);
-        Assert.Equal(96, harness.Palette.ExtentHeight);
+        Assert.Equal(72, harness.Palette.ExtentHeight);
         Assert.Equal(12, harness.Palette.FrameCount);
     }
 
@@ -175,13 +175,13 @@ public class SpritePaletteControlTests : IDisposable
 
         harness.Palette.Height = 240;
         Dispatcher.UIThread.RunJobs();
-        Assert.Equal(240, harness.Palette.Offset);
+        Assert.Equal(48, harness.Palette.Offset);
 
         harness.Palette.Width = 100;
         Dispatcher.UIThread.RunJobs();
         Assert.Equal(2, harness.Palette.Columns);
-        Assert.Equal(1440, harness.Palette.ExtentHeight);
-        Assert.Equal(240, harness.Palette.Offset);
+        Assert.Equal(1080, harness.Palette.ExtentHeight);
+        Assert.Equal(48, harness.Palette.Offset);
     }
 
     [AvaloniaFact]
@@ -233,8 +233,8 @@ public class SpritePaletteControlTests : IDisposable
         harness.Palette.RenderPalette(target);
 
         Assert.Equal(2, target.Rectangles.Count);
-        Assert.Equal(new Rect(8, 8, 32, 32), target.Rectangles[0].Bounds);
-        Assert.Equal(new Rect(56, 8, 32, 32), target.Rectangles[1].Bounds);
+        Assert.Equal(new Rect(2, 2, 32, 32), target.Rectangles[0].Bounds);
+        Assert.Equal(new Rect(38, 2, 32, 32), target.Rectangles[1].Bounds);
         foreach (RecordingMapDrawTarget.RectangleDraw rectangle in target.Rectangles)
         {
             Assert.Equal(Color.FromArgb(0xFF, 0x00, 0xFF, 0xCC), Assert.IsType<SolidColorBrush>(rectangle.Fill).Color);
@@ -244,10 +244,10 @@ public class SpritePaletteControlTests : IDisposable
         }
 
         Assert.Equal(4, target.Lines.Count);
-        Assert.Equal(new Point(8, 8), target.Lines[0].Start);
-        Assert.Equal(new Point(40, 40), target.Lines[0].End);
-        Assert.Equal(new Point(40, 8), target.Lines[1].Start);
-        Assert.Equal(new Point(8, 40), target.Lines[1].End);
+        Assert.Equal(new Point(2, 2), target.Lines[0].Start);
+        Assert.Equal(new Point(34, 34), target.Lines[0].End);
+        Assert.Equal(new Point(34, 2), target.Lines[1].Start);
+        Assert.Equal(new Point(2, 34), target.Lines[1].End);
         Assert.Empty(target.Images);
     }
 
@@ -273,8 +273,39 @@ public class SpritePaletteControlTests : IDisposable
         Assert.Single(target.Images);
         RecordingMapDrawTarget.ImageDraw image = target.Images[0];
         Assert.Equal(new Rect(16, 8, 32, 32), image.Source);
-        Assert.Equal(new Rect(8, 8, 32, 32), image.Destination);
+        Assert.Equal(new Rect(2, 2, 32, 32), image.Destination);
         Assert.Equal(BitmapInterpolationMode.None, RenderOptions.GetBitmapInterpolationMode(harness.Palette));
+    }
+
+    [AvaloniaFact]
+    public async Task Render_DrawsSelectionBoxAroundBrushFrame()
+    {
+        Harness harness = await CreateAsync(Manifest((1, 60, 100)));
+        harness.ViewModel.Brush = new MapTileLayer(1, 105);
+        RecordingMapDrawTarget target = new();
+
+        harness.Palette.RenderPalette(target);
+
+        RecordingMapDrawTarget.RectangleDraw selection = target.Rectangles[^1];
+        Assert.Equal(new Rect(181, 1, 34, 34), selection.Bounds);
+        SolidColorBrush fill = Assert.IsType<SolidColorBrush>(selection.Fill);
+        Assert.Equal(0x00, fill.Color.A);
+        Pen stroke = Assert.IsType<Pen>(selection.Stroke);
+        Assert.Equal(2.0, stroke.Thickness);
+        Assert.Equal(Color.FromArgb(0xFF, 0x33, 0x99, 0xFF), Assert.IsType<SolidColorBrush>(stroke.Brush).Color);
+    }
+
+    [AvaloniaFact]
+    public async Task Render_OmitsSelectionBoxWhenBrushIsOnAnotherSheet()
+    {
+        Harness harness = await CreateAsync(Manifest((1, 60, 100), (2, 1, 99)));
+        harness.ViewModel.Brush = new MapTileLayer(2, 99);
+        RecordingMapDrawTarget target = new();
+
+        harness.Palette.RenderPalette(target);
+
+        Assert.Equal(48, target.Rectangles.Count);
+        Assert.All(target.Rectangles, rectangle => Assert.NotNull(rectangle.Fill));
     }
 
     [AvaloniaFact]
