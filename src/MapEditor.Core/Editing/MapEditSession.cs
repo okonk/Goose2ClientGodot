@@ -72,6 +72,8 @@ public sealed class MapEditSession
 
     public bool HasActiveStroke => _stroke != null;
 
+    public event Action<MapResizeTransform>? Resized;
+
     public bool CanUndo => _stroke == null && _history.UndoCount > 0;
 
     public bool CanRedo => _stroke == null && _history.RedoCount > 0;
@@ -284,6 +286,62 @@ public sealed class MapEditSession
         PushLayerCommand(changes);
         return true;
     }
+
+    public bool ApplyResize(MapTileRectangle window)
+    {
+        if (_stroke != null)
+        {
+            throw new InvalidOperationException();
+        }
+
+        long width = window.Width;
+        long height = window.Height;
+        long x = window.X;
+        long y = window.Y;
+        if (width < MapDocument.MinDimension || width > MapDocument.MaxDimension ||
+            height < MapDocument.MinDimension || height > MapDocument.MaxDimension ||
+            x < -MapDocument.MaxDimension || x > MapDocument.MaxDimension ||
+            y < -MapDocument.MaxDimension || y > MapDocument.MaxDimension)
+        {
+            throw new ArgumentOutOfRangeException(nameof(window));
+        }
+
+        int oldWidth = _document.Width;
+        int oldHeight = _document.Height;
+        if (window.X == 0 && window.Y == 0 && window.Width == oldWidth && window.Height == oldHeight)
+        {
+            return false;
+        }
+
+        int beforeStateId = _currentStateId;
+        int afterStateId = _nextStateId++;
+        var command = new MapResizeCommand(window, oldWidth, oldHeight, beforeStateId, afterStateId);
+
+        for (int tileY = 0; tileY < oldHeight; tileY++)
+        {
+            for (int tileX = 0; tileX < oldWidth; tileX++)
+            {
+                if (tileX >= window.X && tileX < window.X + window.Width &&
+                    tileY >= window.Y && tileY < window.Y + window.Height)
+                {
+                    continue;
+                }
+
+                MapTile tile = _document[tileX, tileY];
+                if (!tile.IsEmpty)
+                {
+                    command.AppendSnapshot(new MapTileSnapshot(tileX, tileY, tile));
+                }
+            }
+        }
+
+        _document.ResizeTo(window);
+        _currentStateId = afterStateId;
+        _history.PushUndo(command);
+        Resized?.Invoke(command.TransformFor(reverse: false));
+        return true;
+    }
+
     public void CancelStroke()
     {
         MapEditStroke stroke = _stroke ?? throw new InvalidOperationException();
@@ -321,6 +379,10 @@ public sealed class MapEditSession
         command.Replay(_document, reverse: true, before: true);
         _currentStateId = command.BeforeStateId;
         _history.MoveUndoToRedo(command);
+        if (command is MapResizeCommand resize)
+        {
+            Resized?.Invoke(resize.TransformFor(reverse: true));
+        }
         return true;
     }
 
@@ -340,6 +402,10 @@ public sealed class MapEditSession
         command.Replay(_document, reverse: false, before: false);
         _currentStateId = command.AfterStateId;
         _history.MoveRedoToUndo(command);
+        if (command is MapResizeCommand resize)
+        {
+            Resized?.Invoke(resize.TransformFor(reverse: false));
+        }
         return true;
     }
 

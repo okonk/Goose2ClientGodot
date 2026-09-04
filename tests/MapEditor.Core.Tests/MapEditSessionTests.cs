@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using MapEditor.Core;
 using Xunit;
 
@@ -819,6 +820,176 @@ public class MapEditSessionTests
     public void ClipTo_NoOverlapOrEmpty_ReturnsNull(int x, int y, int w, int h, int bw, int bh)
     {
         Assert.Null(new MapTileRectangle(x, y, w, h).ClipTo(bw, bh));
+    }
+
+    [Fact]
+    public void ApplyResize_CropThenUndo_RestoresDiscardedTilesExactly()
+    {
+        var session = CreateSession(4, 4);
+        session.Document.SetLayer(3, 3, 0, new MapTileLayer(7, 8));
+        session.Document.SetLayer(2, 0, 0, new MapTileLayer(5, 5));
+        session.Document.SetLayer(0, 2, 0, new MapTileLayer(6, 6));
+        session.Document.SetFlags(3, 0, MapDocument.BlockedFlag);
+
+        Assert.True(session.ApplyResize(new MapTileRectangle(0, 0, 2, 2)));
+        Assert.Equal(2, session.Document.Width);
+
+        Assert.True(session.Undo());
+        Assert.Equal(4, session.Document.Width);
+        Assert.Equal(new MapTileLayer(7, 8), session.Document[3, 3].GetLayer(0));
+        Assert.Equal(new MapTileLayer(5, 5), session.Document[2, 0].GetLayer(0));
+        Assert.Equal(new MapTileLayer(6, 6), session.Document[0, 2].GetLayer(0));
+        Assert.True(session.Document[3, 0].IsBlocked);
+    }
+
+    [Fact]
+    public void ApplyResize_GrowThenUndo_AllocatesNoSnapshotBuffer()
+    {
+        var session = CreateSession(4, 4);
+        long before = session.RetainedHistoryUsedBytes;
+
+        Assert.True(session.ApplyResize(new MapTileRectangle(0, 0, 8, 8)));
+
+        Assert.Equal(MapEditCommand.BaseCommandBytes, session.RetainedHistoryUsedBytes - before);
+        Assert.True(session.Undo());
+        Assert.Equal(4, session.Document.Width);
+    }
+
+    [Fact]
+    public void ApplyResize_IdentityWindow_IsNoOp()
+    {
+        var session = CreateSession(4, 4);
+        Assert.False(session.ApplyResize(new MapTileRectangle(0, 0, 4, 4)));
+        Assert.False(session.CanUndo);
+    }
+
+    [Fact]
+    public void PaintResizePaint_UndoesBackThroughTheResizeInOrder()
+    {
+        var session = CreateSession(4, 4);
+        session.SelectedTileLayer = new MapTileLayer(1, 1);
+        session.BeginStroke(MapEditTool.Pencil, 0, 0);
+        session.CompleteStroke();
+
+        Assert.True(session.ApplyResize(new MapTileRectangle(0, 0, 6, 6)));
+
+        session.SelectedTileLayer = new MapTileLayer(2, 2);
+        session.BeginStroke(MapEditTool.Pencil, 5, 5);
+        session.CompleteStroke();
+
+        Assert.True(session.Undo());
+        Assert.Equal(new MapTileLayer(0, 0), session.Document[5, 5].GetLayer(0));
+        Assert.Equal(6, session.Document.Width);
+
+        Assert.True(session.Undo());
+        Assert.Equal(4, session.Document.Width);
+        Assert.Equal(new MapTileLayer(1, 1), session.Document[0, 0].GetLayer(0));
+
+        Assert.True(session.Undo());
+        Assert.Equal(new MapTileLayer(0, 0), session.Document[0, 0].GetLayer(0));
+        Assert.False(session.CanUndo);
+    }
+
+    [Fact]
+    public void ApplyResize_WithActiveStroke_Throws()
+    {
+        var session = CreateSession(4, 4);
+        session.BeginStroke(MapEditTool.Pencil, 0, 0);
+        Assert.Throws<InvalidOperationException>(
+            () => session.ApplyResize(new MapTileRectangle(0, 0, 2, 2)));
+    }
+
+    [Fact]
+    public void ApplyResize_CropUndoRedo_RestoresThenRecropsDimensionsAndContent()
+    {
+        var session = CreateSession(4, 4);
+        session.Document.SetLayer(3, 3, 0, new MapTileLayer(7, 8));
+
+        Assert.True(session.ApplyResize(new MapTileRectangle(0, 0, 2, 2)));
+        Assert.Equal(2, session.Document.Width);
+        Assert.Equal(2, session.Document.Height);
+
+        Assert.True(session.Undo());
+        Assert.Equal(4, session.Document.Width);
+        Assert.Equal(4, session.Document.Height);
+        Assert.Equal(new MapTileLayer(7, 8), session.Document[3, 3].GetLayer(0));
+
+        Assert.True(session.Redo());
+        Assert.Equal(2, session.Document.Width);
+        Assert.Equal(2, session.Document.Height);
+        Assert.Equal(new MapTileLayer(0, 0), session.Document[1, 1].GetLayer(0));
+        Assert.False(session.CanRedo);
+    }
+
+    [Fact]
+    public void ApplyResize_EmptyBorderCrop_AllocatesNoSnapshotBuffer()
+    {
+        var session = CreateSession(4, 4);
+        session.Document.SetLayer(0, 0, 0, new MapTileLayer(1, 2));
+        long before = session.RetainedHistoryUsedBytes;
+
+        Assert.True(session.ApplyResize(new MapTileRectangle(0, 0, 2, 2)));
+
+        Assert.Equal(MapEditCommand.BaseCommandBytes, session.RetainedHistoryUsedBytes - before);
+    }
+
+    [Fact]
+    public void ApplyResize_Rejected_LeavesDocumentHistoryStateIdAndDirtyUnchanged()
+    {
+        var session = CreateSession(4, 4);
+        session.SelectedTileLayer = new MapTileLayer(1, 1);
+        session.BeginStroke(MapEditTool.Pencil, 0, 0);
+        session.CompleteStroke();
+        session.MarkSaved();
+
+        long usedBytes = session.RetainedHistoryUsedBytes;
+        bool canUndo = session.CanUndo;
+        bool canRedo = session.CanRedo;
+        bool isDirty = session.IsDirty;
+        int stateId = session.CurrentStateId;
+        MapTileLayer painted = session.Document[0, 0].GetLayer(0);
+
+        Assert.Throws<ArgumentOutOfRangeException>(
+            () => session.ApplyResize(new MapTileRectangle(0, 0, 1001, 4)));
+        Assert.Throws<ArgumentOutOfRangeException>(
+            () => session.ApplyResize(new MapTileRectangle(int.MinValue, 0, 4, 4)));
+
+        Assert.Equal(usedBytes, session.RetainedHistoryUsedBytes);
+        Assert.Equal(canUndo, session.CanUndo);
+        Assert.Equal(canRedo, session.CanRedo);
+        Assert.Equal(isDirty, session.IsDirty);
+        Assert.Equal(stateId, session.CurrentStateId);
+        Assert.Equal(painted, session.Document[0, 0].GetLayer(0));
+    }
+
+    [Fact]
+    public void Undo_OfAResize_RaisesResizedWithTheInverseOffset()
+    {
+        var session = CreateSession(4, 4);
+        List<MapResizeTransform> raised = new();
+        session.Resized += transform => raised.Add(transform);
+
+        Assert.True(session.ApplyResize(new MapTileRectangle(-2, -1, 6, 5)));
+        Assert.Equal(new MapResizeTransform(2, 1, 6, 5), raised[^1]);
+
+        Assert.True(session.Undo());
+        Assert.Equal(4, session.Document.Width);
+        Assert.Equal(4, session.Document.Height);
+        Assert.Equal(new MapResizeTransform(-2, -1, 4, 4), raised[^1]);
+    }
+
+    [Fact]
+    public void ApplyResize_IdentityOrRejected_RaisesNoResizedEvent()
+    {
+        var session = CreateSession(4, 4);
+        int raised = 0;
+        session.Resized += _ => raised++;
+
+        Assert.False(session.ApplyResize(new MapTileRectangle(0, 0, 4, 4)));
+        Assert.Throws<ArgumentOutOfRangeException>(
+            () => session.ApplyResize(new MapTileRectangle(0, 0, 1001, 4)));
+
+        Assert.Equal(0, raised);
     }
 
     private static MapEditSession CreateSession(int width = 4, int height = 4) => new(MapDocument.Create(width, height));

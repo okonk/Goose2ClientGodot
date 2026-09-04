@@ -6,6 +6,7 @@ internal abstract class MapEditCommand
     internal const long SegmentBytes = 32;
     internal const long LayerSlotBytes = 32;
     internal const long FlagsSlotBytes = 24;
+    internal const long ResizeSlotBytes = 56;
 
     protected MapEditCommand(int beforeStateId, int afterStateId)
     {
@@ -80,5 +81,72 @@ internal sealed class MapFlagsChangesCommand : MapDeltaCommand<MapFlagsChange>
     protected override void Apply(MapDocument document, in MapFlagsChange change, bool before)
     {
         document.SetFlags(change.X, change.Y, before ? change.BeforeFlags : change.AfterFlags);
+    }
+}
+
+public readonly record struct MapResizeTransform(int OffsetX, int OffsetY, int Width, int Height);
+
+internal sealed class MapResizeCommand : MapEditCommand
+{
+    private readonly MapTileRectangle _window;
+    private readonly int _oldWidth;
+    private readonly int _oldHeight;
+    private readonly int _newWidth;
+    private readonly int _newHeight;
+    private MapEditChangeBuffer<MapTileSnapshot>? _snapshots;
+
+    public MapResizeCommand(MapTileRectangle window, int oldWidth, int oldHeight, int beforeStateId, int afterStateId)
+        : base(beforeStateId, afterStateId)
+    {
+        _window = window;
+        _oldWidth = oldWidth;
+        _oldHeight = oldHeight;
+        _newWidth = window.Width;
+        _newHeight = window.Height;
+    }
+
+    internal void AppendSnapshot(in MapTileSnapshot snapshot)
+    {
+        MapEditChangeBuffer<MapTileSnapshot> snapshots = _snapshots ??= new MapEditChangeBuffer<MapTileSnapshot>();
+        snapshots.Append(snapshot);
+    }
+
+    internal MapResizeTransform TransformFor(bool reverse)
+        => reverse
+            ? new MapResizeTransform(_window.X, _window.Y, _oldWidth, _oldHeight)
+            : new MapResizeTransform(-_window.X, -_window.Y, _newWidth, _newHeight);
+
+    internal override long AccountedSizeBytes
+        => _snapshots is { } snapshots
+            ? checked(BaseCommandBytes + snapshots.SegmentCount * SegmentBytes + snapshots.AllocatedSlotCount * ResizeSlotBytes)
+            : BaseCommandBytes;
+
+    internal override void Replay(MapDocument document, bool reverse, bool before)
+    {
+        if (reverse)
+        {
+            document.ResizeTo(new MapTileRectangle(-_window.X, -_window.Y, _oldWidth, _oldHeight));
+            if (_snapshots is { } snapshots)
+            {
+                for (int s = snapshots.SegmentCount - 1; s >= 0; s--)
+                {
+                    MapTileSnapshot[] segment = snapshots.GetSegment(s);
+                    int length = snapshots.GetSegmentLength(s);
+                    for (int i = length - 1; i >= 0; i--)
+                    {
+                        MapTileSnapshot snapshot = segment[i];
+                        document.SetFlags(snapshot.X, snapshot.Y, snapshot.Tile.Flags);
+                        for (int layer = 0; layer < MapDocument.LayerCount; layer++)
+                        {
+                            document.SetLayer(snapshot.X, snapshot.Y, layer, snapshot.Tile.GetLayer(layer));
+                        }
+                    }
+                }
+            }
+        }
+        else
+        {
+            document.ResizeTo(_window);
+        }
     }
 }
