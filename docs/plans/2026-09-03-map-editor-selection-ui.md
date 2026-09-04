@@ -441,6 +441,7 @@ Expected: compile failure (`LayerSelection` missing) + layout test failures (rad
 
 ```csharp
 using System;
+using MapEditor.Core;
 
 namespace MapEditor.App;
 

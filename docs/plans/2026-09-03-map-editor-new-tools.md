@@ -1090,7 +1090,19 @@ git commit -m "feat: tile clipboard and paste mode in editor view model"
   5. `OnPointerReleased` while `_multiSelecting`: if no move occurred, set a 1×1 rectangle at the pressed tile; clear `_multiSelecting`; `Invalidate()`
   6. `OnKeyDown` Escape (`:268`): existing `FinishInteraction(commit: false)` plus `_viewModel.CancelPasteMode()`
   7. `FinishInteraction`: add `_viewModel.CancelPasteMode()`, and clear `_multiSelecting`/`_rectDragStart` + release the captured pointer via `_capturedPointer?.Capture(null); _capturedPointer = null;` (Avalonia 11.3.20 has no `ReleaseCapture()` — the codebase pattern is `Pointer.Capture(null)`, see `MapCanvas.cs:224`) — a menu command or Escape mid-drag must not leave the canvas permanently gesture-active (`FinishInteraction` currently clears only `_stroking`/`_panning`)
-  8. `MainWindow.OnKeyDown`: add `case Key.Escape:` → `Canvas.FinishInteraction(commit: false); _viewModel.CancelPasteMode();` — window-level so Esc cancels paste regardless of focus (the canvas's own Escape handler sets `e.Handled` and wins when the canvas is focused; both paths reach the same state). The paste-Escape test must therefore not require canvas focus
+  8. `MainWindow.OnKeyDown`: handle Escape **before** the existing `if (e.Source is TextBox) return;` guard (that guard sits after the `modifiers != KeyModifiers.None` check and would swallow Escape while a brush field is focused). Add, immediately after the `if (modifiers != KeyModifiers.None) return;` line and before the TextBox guard:
+
+  ```csharp
+  if (e.Key == Key.Escape)
+  {
+      _canvas.FinishInteraction(commit: false);
+      _viewModel.CancelPasteMode();
+      e.Handled = true;
+      return;
+  }
+  ```
+
+  Window-level so Esc cancels paste regardless of focus, including a focused brush field (the canvas's own Escape handler sets `e.Handled` and wins when the canvas is focused; both paths reach the same state). The paste-Escape tests must therefore not require canvas focus, and one must focus `BrushGraphic` to cover the guard
   9. `BuildRenderRequest` (`:344`): pass `SelectionRectangle: _viewModel.SelectionRectangle, PasteGhost: _viewModel.PasteGhost`
 - Invariants to preserve:
   - Select and FloodFill never leave `session.HasActiveStroke` true
@@ -1224,6 +1236,23 @@ public async Task PasteMode_EscapeCancelsWithoutPasting()
 }
 
 [AvaloniaFact]
+public async Task PasteMode_EscapeWithBrushFieldFocused_Cancels()
+{
+    Harness harness = await CreateSmallMapAsync();
+    MapDocument document = harness.ViewModel.Session.Document;
+    document.SetLayer(0, 0, 0, new MapTileLayer(7, 7));
+    harness.ViewModel.SelectionRectangle = new MapTileRectangle(0, 0, 1, 1);
+    harness.ViewModel.CopySelection();
+    harness.ViewModel.BeginPasteMode();
+
+    harness.Window.FindControl<TextBox>("BrushGraphic").Focus();
+    harness.Window.KeyPressQwerty(PhysicalKey.Escape, RawInputModifiers.None);
+
+    Assert.False(harness.ViewModel.PasteMode);
+    Assert.False(harness.ViewModel.Session.CanUndo);
+}
+
+[AvaloniaFact]
 public async Task PasteMode_ClickOutsideMapCancelsWithoutPasting()
 {
     Harness harness = await CreateSmallMapAsync();
@@ -1258,7 +1287,7 @@ public async Task PasteMode_UndoMenuCancelsBeforeNextClick()
     harness.ViewModel.CopySelection();
     harness.ViewModel.BeginPasteMode();
 
-    harness.Window.Find<MenuItem>("UndoCommand").RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+    harness.Window.FindControl<MenuItem>("UndoCommand").RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
     Assert.False(harness.ViewModel.PasteMode);
     Assert.Equal(new MapTileLayer(0, 0), document[0, 0].GetLayer(0));
 
@@ -1283,11 +1312,31 @@ public async Task PasteMode_ClickOnNonCanvasControl_CancelsWithoutPasting()
     harness.ViewModel.BeginPasteMode();
 
     // the status bar is a plain control with no other side effects
-    Point status = harness.Window.Find<Border>("StatusBar").TranslatePoint(new Point(5, 5), harness.Window).Value;
+    Point status = harness.Window.FindControl<Border>("StatusBar").TranslatePoint(new Point(5, 5), harness.Window).Value;
     harness.Window.MouseDown(status, MouseButton.Left, RawInputModifiers.None);
     harness.Window.MouseUp(status, MouseButton.Left, RawInputModifiers.None);
 
     Assert.False(harness.ViewModel.PasteMode);
+    Assert.False(harness.ViewModel.Session.CanUndo);
+}
+
+[AvaloniaFact]
+public async Task PasteMode_ClickOnToolToggle_CancelsWithoutPasting()
+{
+    Harness harness = await CreateSmallMapAsync();
+    MapDocument document = harness.ViewModel.Session.Document;
+    document.SetLayer(0, 0, 0, new MapTileLayer(7, 7));
+    harness.ViewModel.SelectionRectangle = new MapTileRectangle(0, 0, 1, 1);
+    harness.ViewModel.CopySelection();
+    harness.ViewModel.BeginPasteMode();
+
+    // ToggleButton marks PointerPressed handled, so only the tunneling window handler sees this press
+    Point eraser = harness.Window.FindControl<Control>("EraserTool").TranslatePoint(new Point(5, 5), harness.Window).Value;
+    harness.Window.MouseDown(eraser, MouseButton.Left, RawInputModifiers.None);
+    harness.Window.MouseUp(eraser, MouseButton.Left, RawInputModifiers.None);
+
+    Assert.False(harness.ViewModel.PasteMode);
+    Assert.Equal(MapEditTool.Eraser, harness.ViewModel.ActiveTool);
     Assert.False(harness.ViewModel.Session.CanUndo);
 }
 ```
@@ -1325,7 +1374,7 @@ public void CtrlC_WithBrushFieldFocused_KeepsNativeBehavior()
 {
     using MainWindowHarness harness = MainWindowHarness.Create();
     harness.ViewModel.SelectionRectangle = new MapTileRectangle(0, 0, 1, 1);
-    harness.Window.Find<TextBox>("BrushGraphic").Focus();
+    harness.Window.FindControl<TextBox>("BrushGraphic").Focus();
 
     harness.Window.KeyPressQwerty(PhysicalKey.C, RawInputModifiers.Control);
     Assert.Null(harness.ViewModel.Clipboard);
@@ -1365,6 +1414,10 @@ Expected: new tests fail (tools not wired, toggles missing).
 - Window-level paste cancellation (any press not originating from the canvas cancels paste mode — clicks on the toolbar, right panel, or menus never reach `MapCanvas`): subscribe in the constructor and add:
 
 ```csharp
+AddHandler(InputElement.PointerPressedEvent, OnWindowPointerPressed, RoutingStrategies.Tunnel);
+```
+
+```csharp
 private void OnWindowPointerPressed(object? sender, PointerPressedEventArgs e)
 {
     if (_viewModel.PasteMode && e.Source is not MapCanvas)
@@ -1374,7 +1427,7 @@ private void OnWindowPointerPressed(object? sender, PointerPressedEventArgs e)
 }
 ```
 
-(`PointerPressed` bubbles from the pressed control, so the window sees every press; `e.Source` is the canvas for canvas clicks, which the canvas handles itself — inside the map applies, outside cancels.)
+**Tunneling is required, not bubbling (probe-verified):** `ToggleButton`, `Button`, and `CheckBox` all mark `PointerPressed` handled, so a plain bubbling `PointerPressed +=` subscription on the window never fires for presses on tool toggles, visibility checkboxes, or menu items — a headless probe confirmed the bubbling handler saw only a press on empty area. `RoutingStrategies.Tunnel` runs the handler top-down before the target control can mark the event handled, so the window sees every press; `e.Source` is the innermost hit control (the canvas itself for canvas clicks, which the canvas handles — inside the map applies, outside cancels). `MapCanvas` is a childless custom-drawn `Control`, so canvas presses report `e.Source` as the canvas.
 - `OnKeyDown` unmodified-letter switch: add `Key.V` → `Select`, `Key.M` → `MultiSelect`, `Key.B` → `FloodFill` (the `Key.X` → `BlockedToggle` case exists from Part 1; `case Key.B` currently at `:158` was moved to X by Part 1).
 - `OnKeyDown` primary-modifier switch: add, with a TextBox guard so brush fields keep native copy/paste:
 
@@ -1419,9 +1472,11 @@ git commit -m "feat: select, multi-select copy/paste, and flood fill tools in th
 | Drag outside the map clamps the rectangle to map bounds (adversarial) | `MultiSelectTool_DragOutsideMap_ClampsToMapBounds` |
 | Paste applies exactly once; second click runs the active tool (adversarial) | `PasteMode_IsOneShot_SecondClickRunsActiveTool` |
 | Escape cancels paste mode without pasting | `PasteMode_EscapeCancelsWithoutPasting` |
+| Escape cancels paste mode while a brush field is focused (adversarial: TextBox guard) | `PasteMode_EscapeWithBrushFieldFocused_Cancels` |
 | Click outside the map cancels paste mode without pasting | `PasteMode_ClickOutsideMapCancelsWithoutPasting` |
 | Menu/close path cancels paste mode before the next click (adversarial) | `PasteMode_UndoMenuCancelsBeforeNextClick` (raises the real Undo menu item) |
 | Click on a non-canvas control cancels paste mode without pasting | `PasteMode_ClickOnNonCanvasControl_CancelsWithoutPasting` |
+| Click on a handled control (tool toggle) cancels paste mode (adversarial: bubbling handler would miss it) | `PasteMode_ClickOnToolToggle_CancelsWithoutPasting` |
 | Toolbar shows all seven tools in the design order; hotkeys V/M/B/X route correctly | extended `MainWindowTests` toolbar + hotkey tests |
 | Ctrl+C populates clipboard, Ctrl+V enters paste mode; no-selection Ctrl+C is a no-op | `CtrlC_PopulatesClipboardAndCtrlV_EntersPasteMode`, `CtrlC_WithoutSelectionRectangle_DoesNothing` |
 | Ctrl+C guarded against TextBox focus | `CtrlC_WithBrushFieldFocused_KeepsNativeBehavior` |
