@@ -97,7 +97,7 @@ public class MapEditStrokeTests
         session.ContinueStroke(5, 0);
         Assert.True(session.CompleteStroke());
 
-        Assert.Equal(6, session.History.PeekUndo()!.LayerChanges!.Count);
+        Assert.Equal(6, ((MapLayerChangesCommand)session.History.PeekUndo()!).Changes.Count);
         for (var x = 0; x <= 5; x++)
         {
             Assert.Equal(new MapTileLayer(2, 2), doc[x, 0].GetLayer(0));
@@ -116,7 +116,7 @@ public class MapEditStrokeTests
         session.ContinueStroke(0, 9);
         session.ContinueStroke(0, 0);
         Assert.True(session.CompleteStroke());
-        Assert.Equal(36, session.History.PeekUndo()!.FlagsChanges!.Count);
+        Assert.Equal(36, ((MapFlagsChangesCommand)session.History.PeekUndo()!).Changes.Count);
 
         for (var y = 0; y < 10; y++)
         {
@@ -191,7 +191,7 @@ public class MapEditStrokeTests
             Assert.Equal(new MapTileLayer(4, 4), doc[x, 0].GetLayer(0));
         }
         Assert.Equal(new MapTileLayer(0, 0), doc[0, 1].GetLayer(0));
-        Assert.Equal(5, session.History.PeekUndo()!.LayerChanges!.Count);
+        Assert.Equal(5, ((MapLayerChangesCommand)session.History.PeekUndo()!).Changes.Count);
     }
 
     [Fact]

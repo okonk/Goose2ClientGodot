@@ -146,7 +146,7 @@ public sealed class MapEditSession
             int beforeStateId = _currentStateId;
             int afterStateId = _nextStateId++;
             _currentStateId = afterStateId;
-            _history.PushUndo(MapEditCommand.ForFlagsChanges(stroke.FlagsChanges!, beforeStateId, afterStateId));
+            _history.PushUndo(new MapFlagsChangesCommand(stroke.FlagsChanges!, beforeStateId, afterStateId));
         }
 
         stroke.Release();
@@ -290,11 +290,11 @@ public sealed class MapEditSession
         _stroke = null;
         if (stroke.LayerChanges is { } layerChanges)
         {
-            ReplayLayerChanges(layerChanges, _document, reverse: true, before: true);
+            new MapLayerChangesCommand(layerChanges, 0, 0).Replay(_document, reverse: true, before: true);
         }
         else if (stroke.FlagsChanges is { } flagsChanges)
         {
-            ReplayFlagsChanges(flagsChanges, _document, reverse: true, before: true);
+            new MapFlagsChangesCommand(flagsChanges, 0, 0).Replay(_document, reverse: true, before: true);
         }
 
         if (stroke.Tool == MapEditTool.Eyedropper)
@@ -318,7 +318,7 @@ public sealed class MapEditSession
             return false;
         }
 
-        ReplayCommand(command, reverse: true, before: true);
+        command.Replay(_document, reverse: true, before: true);
         _currentStateId = command.BeforeStateId;
         _history.MoveUndoToRedo(command);
         return true;
@@ -337,7 +337,7 @@ public sealed class MapEditSession
             return false;
         }
 
-        ReplayCommand(command, reverse: false, before: false);
+        command.Replay(_document, reverse: false, before: false);
         _currentStateId = command.AfterStateId;
         _history.MoveRedoToUndo(command);
         return true;
@@ -376,52 +376,12 @@ public sealed class MapEditSession
 
     internal int? SavedStateId => _savedStateId;
 
-    private void ReplayCommand(MapEditCommand command, bool reverse, bool before)
-    {
-        if (command.LayerChanges is { } layerChanges)
-        {
-            ReplayLayerChanges(layerChanges, _document, reverse, before);
-        }
-        else
-        {
-            ReplayFlagsChanges(command.FlagsChanges!, _document, reverse, before);
-        }
-    }
-
     private void PushLayerCommand(MapEditChangeBuffer<MapLayerChange> changes)
     {
         int beforeStateId = _currentStateId;
         int afterStateId = _nextStateId++;
         _currentStateId = afterStateId;
-        _history.PushUndo(MapEditCommand.ForLayerChanges(changes, beforeStateId, afterStateId));
-    }
-
-    private static void ReplayLayerChanges(MapEditChangeBuffer<MapLayerChange> buffer, MapDocument document, bool reverse, bool before)
-    {
-        for (int s = reverse ? buffer.SegmentCount - 1 : 0; reverse ? s >= 0 : s < buffer.SegmentCount; s += reverse ? -1 : 1)
-        {
-            MapLayerChange[] segment = buffer.GetSegment(s);
-            int length = buffer.GetSegmentLength(s);
-            for (int i = reverse ? length - 1 : 0; reverse ? i >= 0 : i < length; i += reverse ? -1 : 1)
-            {
-                MapLayerChange change = segment[i];
-                document.SetLayer(change.X, change.Y, change.LayerIndex, before ? change.Before : change.After);
-            }
-        }
-    }
-
-    private static void ReplayFlagsChanges(MapEditChangeBuffer<MapFlagsChange> buffer, MapDocument document, bool reverse, bool before)
-    {
-        for (int s = reverse ? buffer.SegmentCount - 1 : 0; reverse ? s >= 0 : s < buffer.SegmentCount; s += reverse ? -1 : 1)
-        {
-            MapFlagsChange[] segment = buffer.GetSegment(s);
-            int length = buffer.GetSegmentLength(s);
-            for (int i = reverse ? length - 1 : 0; reverse ? i >= 0 : i < length; i += reverse ? -1 : 1)
-            {
-                MapFlagsChange change = segment[i];
-                document.SetFlags(change.X, change.Y, before ? change.BeforeFlags : change.AfterFlags);
-            }
-        }
+        _history.PushUndo(new MapLayerChangesCommand(changes, beforeStateId, afterStateId));
     }
 
     private static void ValidateTool(MapEditTool tool)

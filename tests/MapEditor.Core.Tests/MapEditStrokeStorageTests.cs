@@ -95,7 +95,7 @@ public class MapEditStrokeStorageTests
         Assert.Equal(15_625, stroke.Visited!.WordCount);
         Assert.True(session.CompleteStroke());
 
-        var buffer = session.History.PeekUndo()!.LayerChanges!;
+        var buffer = ((MapLayerChangesCommand)session.History.PeekUndo()!).Changes;
         Assert.Equal(1_000_000, buffer.Count);
         Assert.True(buffer.Count <= doc.TileCount);
         Assert.InRange(buffer.AllocatedSlotCount, 0, 1_003_516);
@@ -119,7 +119,7 @@ public class MapEditStrokeStorageTests
         Assert.Equal(15_625, stroke.Visited!.WordCount);
         Assert.True(session.CompleteStroke());
 
-        var buffer = session.History.PeekUndo()!.FlagsChanges!;
+        var buffer = ((MapFlagsChangesCommand)session.History.PeekUndo()!).Changes;
         Assert.Equal(1_000_000, buffer.Count);
         Assert.True(buffer.Count <= doc.TileCount);
         Assert.InRange(buffer.AllocatedSlotCount, 0, 1_003_516);
@@ -148,14 +148,14 @@ public class MapEditStrokeStorageTests
 
         Assert.True(session.CompleteStroke());
 
-        var command = session.History.PeekUndo()!;
-        Assert.Same(buffer, command.LayerChanges);
-        Assert.Equal(count, command.LayerChanges!.Count);
-        Assert.Equal(segmentCount, command.LayerChanges.SegmentCount);
+        var command = (MapLayerChangesCommand)session.History.PeekUndo()!;
+        Assert.Same(buffer, command.Changes);
+        Assert.Equal(count, command.Changes.Count);
+        Assert.Equal(segmentCount, command.Changes.SegmentCount);
         for (int s = 0; s < segmentCount; s++)
         {
-            Assert.Same(segmentRefs[s], command.LayerChanges.GetSegment(s));
-            Assert.Equal(capacities[s], command.LayerChanges.GetSegmentCapacity(s));
+            Assert.Same(segmentRefs[s], command.Changes.GetSegment(s));
+            Assert.Equal(capacities[s], command.Changes.GetSegmentCapacity(s));
         }
         Assert.Null(session.ActiveStroke);
     }
