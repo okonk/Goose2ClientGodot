@@ -168,8 +168,15 @@ public sealed class MapRenderer
 
         if (options.PasteGhost is { } ghost)
         {
-            DrawRectangleFill(document, viewport, ghost, MapRenderPalette.PasteGhostFill, sink);
+            DrawRectangleFill(document, viewport, ghost, MapRenderPalette.PasteGhostFill, CellOverlayKind.PasteGhost, sink);
             DrawRectangleOutline(document, viewport, ghost, MapRenderPalette.PasteGhostStroke, sink);
+        }
+
+        if (options.BlockPreview is { } preview)
+        {
+            DrawRectangleFill(document, viewport, preview.Rectangle,
+                preview.Blocked ? MapRenderPalette.BlockPreviewFill : MapRenderPalette.UnblockPreviewFill,
+                CellOverlayKind.BlockPreview, sink);
         }
     }
 
@@ -303,6 +310,7 @@ public sealed class MapRenderer
         ViewportTransform viewport,
         MapTileRectangle rectangle,
         RenderColor fill,
+        CellOverlayKind kind,
         IMapDrawSink sink)
     {
         if (rectangle.ClipTo(document.Width, document.Height) is not { } rect)
@@ -322,7 +330,7 @@ public sealed class MapRenderer
                 }
 
                 sink.DrawCellOverlay(new CellOverlayDrawOperation(
-                    CellOverlayKind.PasteGhost,
+                    kind,
                     new MapTileCoordinate(x, y),
                     viewport.WorldToScreen(cell),
                     fill,
@@ -349,5 +357,7 @@ public sealed class MapRenderer
         public static readonly RenderColor SelectionStroke = new(0xFF, 0xFF, 0xFF, 0xFF);
         public static readonly RenderColor PasteGhostFill = new(0xFF, 0xFF, 0xFF, 0x60);
         public static readonly RenderColor PasteGhostStroke = new(0xFF, 0xBF, 0xBF, 0xBF);
+        public static readonly RenderColor BlockPreviewFill = new(0xFF, 0x00, 0x00, 0x60);
+        public static readonly RenderColor UnblockPreviewFill = new(0x00, 0xFF, 0x00, 0x60);
     }
 }

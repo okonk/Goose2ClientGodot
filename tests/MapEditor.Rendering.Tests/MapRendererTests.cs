@@ -1063,6 +1063,51 @@ public class MapRendererTests
             .Count(op => op.Kind == CellOverlayKind.PasteGhost));
     }
 
+    [Fact]
+    public void Render_BlockPreview_FillsEachCellClippedToTheMap()
+    {
+        string manifest = ManifestJson((1, 1, 0, 0, 32, 32));
+        MapRenderer renderer = new(CreateCache(new FakeSpriteSheetLoader(), manifest));
+        var document = MapDocument.Create(4, 4);
+        var options = MapRenderOptions.Default with
+        {
+            BlockPreview = new BlockPreview(new MapTileRectangle(2, 2, 4, 4), Blocked: true)
+        };
+        var sink = new RecordingMapDrawSink();
+        renderer.Render(Request(document, Viewport(4 * 32, 4 * 32), options), sink);
+
+        var overlays = sink.Calls.OfType<CellOverlayDrawOperation>()
+            .Where(op => op.Kind == CellOverlayKind.BlockPreview)
+            .ToList();
+        Assert.Equal(4, overlays.Count);
+        Assert.All(overlays, op => Assert.Equal(MapRenderer.MapRenderPalette.BlockPreviewFill, op.FillColor));
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void Render_BlockPreview_UsesRedToBlockAndGreenToClear(bool blocked)
+    {
+        string manifest = ManifestJson((1, 1, 0, 0, 32, 32));
+        MapRenderer renderer = new(CreateCache(new FakeSpriteSheetLoader(), manifest));
+        var document = MapDocument.Create(4, 4);
+        var options = MapRenderOptions.Default with
+        {
+            BlockPreview = new BlockPreview(new MapTileRectangle(0, 0, 1, 1), Blocked: blocked)
+        };
+        var sink = new RecordingMapDrawSink();
+        renderer.Render(Request(document, Viewport(4 * 32, 4 * 32), options), sink);
+
+        var overlays = sink.Calls.OfType<CellOverlayDrawOperation>()
+            .Where(op => op.Kind == CellOverlayKind.BlockPreview)
+            .ToList();
+        Assert.Single(overlays);
+        Assert.Equal(blocked
+            ? MapRenderer.MapRenderPalette.BlockPreviewFill
+            : MapRenderer.MapRenderPalette.UnblockPreviewFill,
+            overlays[0].FillColor);
+    }
+
     private static SpriteAssetCache CreateCache(FakeSpriteSheetLoader loader, string manifestJson)
         => new(AssetDirectory, SpriteManifest.Parse(manifestJson), loader);
 
