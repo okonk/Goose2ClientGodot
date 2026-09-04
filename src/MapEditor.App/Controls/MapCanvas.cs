@@ -199,7 +199,7 @@ internal sealed class MapCanvas : Control, ICustomHitTest
             MapTileCoordinate current = _viewport.ScreenToTile(new RenderPoint(position.X, position.Y));
             int x = Math.Clamp(current.X, 0, session.Document.Width - 1);
             int y = Math.Clamp(current.Y, 0, session.Document.Height - 1);
-            MapTileCoordinate origin = _rectDragStart.Value;
+            MapTileCoordinate origin = _rectDragStart!.Value;
             _viewModel.SelectionRectangle = new MapTileRectangle(
                 Math.Min(origin.X, x),
                 Math.Min(origin.Y, y),

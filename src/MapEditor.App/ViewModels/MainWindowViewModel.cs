@@ -276,7 +276,7 @@ internal sealed class MainWindowViewModel : ViewModelBase
 
     public void ApplyPasteAt(int x, int y)
     {
-        TileClipboard clip = _clipboard;
+        TileClipboard? clip = _clipboard;
         if (clip is null)
         {
             return;
