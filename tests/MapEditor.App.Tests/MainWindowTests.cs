@@ -101,8 +101,12 @@ public class MainWindowTests : IDisposable
 
     private MainWindowViewModel ViewModel => _harness.ViewModel;
 
-    private T? Find<T>(string name) where T : Control
+    private T? TryFind<T>(string name) where T : Control
         => Window.FindControl<T>(name);
+
+    private T Find<T>(string name) where T : Control
+        => TryFind<T>(name)
+           ?? throw new InvalidOperationException($"missing named region {name}");
 
     private string WriteAssetDirectory(string name, string manifestJson)
     {
@@ -168,7 +172,7 @@ public class MainWindowTests : IDisposable
 
         foreach (string name in new[] { "NewButton", "OpenButton", "SaveButton", "UndoButton", "RedoButton", "ZoomInButton", "ZoomOutButton" })
         {
-            Assert.Null(Find<Button>(name));
+            Assert.Null(TryFind<Button>(name));
         }
 
         Assert.NotNull(Find<MenuItem>("ViewMenu"));
@@ -395,6 +399,23 @@ public class MainWindowTests : IDisposable
         Assert.Equal("—", Find<TextBlock>("SelectedText").Text);
         Assert.True(Window.Canvas.InvalidationCount > invalidationsBefore);
         Assert.Equal("Goose2 Map Editor — Untitled", Window.Title);
+    }
+
+    [AvaloniaFact]
+    public void DocumentReplacement_ResetsLayerAnchorToTopmostSelectedLayer()
+    {
+        Point row3 = Find<Border>("Layer3Row").TranslatePoint(new Point(10, 5), Window).Value;
+        Window.MouseDown(row3, MouseButton.Left, RawInputModifiers.None);
+        Window.MouseUp(row3, MouseButton.Left, RawInputModifiers.None);
+        Assert.Equal(3, Window.LayerAnchor);
+
+        _harness.Dialogs.DirtyResult = DirtyChoice.Discard;
+        _harness.Dialogs.NewMapResult = new NewMapRequest(4, 4);
+        Find<MenuItem>("NewCommand").RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Equal((byte)1, ViewModel.SelectedLayers);
+        Assert.Equal(0, Window.LayerAnchor);
     }
 
     [AvaloniaFact]

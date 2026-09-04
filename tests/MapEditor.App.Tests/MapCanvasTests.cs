@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
@@ -16,6 +17,7 @@ using MapEditor.App.Documents;
 using MapEditor.App.Rendering;
 using MapEditor.App.Settings;
 using MapEditor.App.Tests.Fakes;
+using MapEditor.App.Tests.Fixtures;
 using MapEditor.App.ViewModels;
 using MapEditor.Core;
 using MapEditor.Rendering;
@@ -30,7 +32,7 @@ public class MapCanvasTests
     private const int MapSize = 4;
     private const int Cell = 32;
 
-    private sealed record Harness(MapCanvas Canvas, MainWindowViewModel ViewModel, FakeEditorDialogs Dialogs, Window Window);
+    private sealed record Harness(MapCanvas Canvas, MainWindowViewModel ViewModel, FakeEditorDialogs Dialogs, Window Window, AssetContextController Assets);
 
     [AvaloniaFact]
     public async Task LeftPressRelease_PaintsOneCellAsSingleUndoEntry()
@@ -521,6 +523,40 @@ public class MapCanvasTests
         dialogs.DirtyResult = DirtyChoice.Discard;
         await viewModel.NewAsync();
         Dispatcher.UIThread.RunJobs();
-        return new Harness(canvas, viewModel, dialogs, window);
+        return new Harness(canvas, viewModel, dialogs, window, assets);
+    }
+
+    [AvaloniaFact]
+    public async Task RenderMap_HonorsLayerVisibilityMask()
+    {
+        Harness harness = await CreateSmallMapAsync();
+        using AssetFixture fixture = new();
+        const string json = """
+            { "tileSize": 32, "sheets": { "1": { "10": [0, 0, 32, 32], "11": [32, 0, 32, 32] } } }
+            """;
+        fixture.WriteManifest(json);
+        fixture.WriteSheet(1, 64, 32);
+        Assert.True(harness.Assets.TryOpen(fixture.AssetDirectory));
+
+        MapDocument document = harness.ViewModel.Session.Document;
+        document.SetLayer(0, 0, 0, new MapTileLayer(1, 11));
+        document.SetLayer(0, 0, 3, new MapTileLayer(1, 10));
+
+        harness.ViewModel.LayerVisibility = (byte)0b11111;
+        RecordingMapDrawTarget allVisible = new();
+        harness.Canvas.RenderMap(allVisible);
+
+        harness.ViewModel.LayerVisibility = (byte)0b11110;
+        RecordingMapDrawTarget layer0Hidden = new();
+        harness.Canvas.RenderMap(layer0Hidden);
+
+        Assert.Equal(
+            new[] { new Rect(32, 0, 32, 32), new Rect(0, 0, 32, 32) },
+            allVisible.Images.Select(image => image.Source).ToArray());
+        Assert.All(allVisible.Images, image => Assert.Equal(new Rect(0, 0, 32, 32), image.Destination));
+
+        Assert.Single(layer0Hidden.Images);
+        Assert.Equal(new Rect(0, 0, 32, 32), layer0Hidden.Images[0].Source);
+        Assert.Equal(new Rect(0, 0, 32, 32), layer0Hidden.Images[0].Destination);
     }
 }

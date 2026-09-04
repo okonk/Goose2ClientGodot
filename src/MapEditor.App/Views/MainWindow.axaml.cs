@@ -87,6 +87,8 @@ internal partial class MainWindow : Window
 
     internal SpritePaletteControl Palette => _palette;
 
+    internal int LayerAnchor => _layerAnchor;
+
     internal static KeyGesture BuildShortcut(Key key, KeyModifiers extra, bool isMacOs)
         => new(key, extra | (isMacOs ? KeyModifiers.Meta : KeyModifiers.Control));
 
@@ -446,6 +448,12 @@ internal partial class MainWindow : Window
                 SyncToolButtons();
                 break;
             case nameof(MainWindowViewModel.SelectedLayers):
+                if ((_viewModel.SelectedLayers & (1 << _layerAnchor)) == 0)
+                {
+                    _layerAnchor = _viewModel.TopLayer;
+                }
+                SyncLayerRows();
+                break;
             case nameof(MainWindowViewModel.LayerVisibility):
                 SyncLayerRows();
                 break;

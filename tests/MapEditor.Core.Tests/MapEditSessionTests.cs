@@ -237,7 +237,7 @@ public class MapEditSessionTests
     }
 
     [Fact]
-    public void Eyedropper_CopiesExactActiveLayerWithoutDocumentOrHistoryChange()
+    public void Eyedropper_CopiesExactTopLayerWithoutDocumentOrHistoryChange()
     {
         var doc = MapDocument.Create(8, 8);
         doc.SetFlags(2, 3, 1);
