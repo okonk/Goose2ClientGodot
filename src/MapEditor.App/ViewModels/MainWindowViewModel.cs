@@ -35,6 +35,9 @@ internal sealed class MainWindowViewModel : ViewModelBase
     private int? _hoverY;
     private int? _selectedX;
     private int? _selectedY;
+    private TileClipboard? _clipboard;
+    private bool _pasteMode;
+    private MapTileRectangle? _selectionRectangle;
     private int _zoomPercent = 100;
     private int _mapWidth;
     private int _mapHeight;
@@ -65,7 +68,7 @@ internal sealed class MainWindowViewModel : ViewModelBase
         get => _activeTool;
         set
         {
-            if (value < MapEditTool.Pencil || value > MapEditTool.BlockedToggle)
+            if (value < MapEditTool.Pencil || value > MapEditTool.FloodFill)
             {
                 throw new ArgumentOutOfRangeException(nameof(value));
             }
@@ -83,6 +86,7 @@ internal sealed class MainWindowViewModel : ViewModelBase
             {
                 _session.SelectedLayers = value;
                 OnPropertyChanged();
+                CancelPasteMode();
             }
         }
     }
@@ -215,6 +219,99 @@ internal sealed class MainWindowViewModel : ViewModelBase
 
     public bool CanSave => _canSave;
 
+    public TileClipboard? Clipboard => _clipboard;
+
+    public bool PasteMode
+    {
+        get => _pasteMode;
+        private set => SetField(ref _pasteMode, value);
+    }
+
+    public MapTileRectangle? SelectionRectangle
+    {
+        get => _selectionRectangle;
+        set => SetField(ref _selectionRectangle, value);
+    }
+
+    public MapTileRectangle? PasteGhost
+    {
+        get
+        {
+            if (!_pasteMode || _clipboard is not { } clip || HoverX is not { } x || HoverY is not { } y)
+            {
+                return null;
+            }
+
+            return new MapTileRectangle(x, y, clip.Width, clip.Height);
+        }
+    }
+
+    public void CopySelection()
+    {
+        if (SelectionRectangle is not { } rect)
+        {
+            return;
+        }
+
+        _clipboard = TileClipboard.Capture(_session.Document, _session.SelectedLayers, rect);
+    }
+
+    public void BeginPasteMode()
+    {
+        if (_clipboard is not null)
+        {
+            PasteMode = true;
+            Refresh(EditorRefresh.Canvas);
+        }
+    }
+
+    public void CancelPasteMode()
+    {
+        if (_pasteMode)
+        {
+            PasteMode = false;
+            Refresh(EditorRefresh.Canvas);
+        }
+    }
+
+    public void ApplyPasteAt(int x, int y)
+    {
+        TileClipboard clip = _clipboard;
+        if (clip is null)
+        {
+            return;
+        }
+
+        MapTileRectangle? dest = new MapTileRectangle(x, y, clip.Width, clip.Height)
+            .ClipTo(_session.Document.Width, _session.Document.Height);
+        if (dest is { } d)
+        {
+            int sourceX = d.X - x;
+            int sourceY = d.Y - y;
+            var sub = new MapTileLayer[MapDocument.LayerCount][];
+            for (int layer = 0; layer < MapDocument.LayerCount; layer++)
+            {
+                if (clip.Layers[layer] is not { } data)
+                {
+                    continue;
+                }
+
+                var slice = new MapTileLayer[d.Width * d.Height];
+                for (int row = 0; row < d.Height; row++)
+                {
+                    Array.Copy(data, (sourceY + row) * clip.Width + sourceX, slice, row * d.Width, d.Width);
+                }
+
+                sub[layer] = slice;
+            }
+
+            _session.ApplyLayerPatch(d.X, d.Y, d.Width, d.Height, sub);
+        }
+
+        CancelPasteMode();
+        Refresh(EditorRefresh.Canvas | EditorRefresh.Commands | EditorRefresh.Title);
+    }
+
     public Task NewAsync() => _controller.NewAsync();
 
     public Task OpenAsync() => _controller.OpenAsync();
@@ -263,6 +360,9 @@ internal sealed class MainWindowViewModel : ViewModelBase
                 HoverY = null;
                 SelectedX = null;
                 SelectedY = null;
+                _clipboard = null;
+                CancelPasteMode();
+                SelectionRectangle = null;
                 OnPropertyChanged(nameof(SelectedLayers));
                 OnPropertyChanged(nameof(Brush));
             }
