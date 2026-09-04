@@ -7,7 +7,9 @@ public sealed record MapRenderOptions(
     bool ShowGrid,
     bool ShowBlocked,
     MapTileCoordinate? HoveredTile,
-    MapTileCoordinate? SelectedTile)
+    MapTileCoordinate? SelectedTile,
+    MapTileRectangle? SelectionRectangle = null,
+    MapTileRectangle? PasteGhost = null)
 {
     public static MapRenderOptions Default { get; } = new(MapLayerVisibility.All, false, false, null, null);
 }

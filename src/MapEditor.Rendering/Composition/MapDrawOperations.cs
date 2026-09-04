@@ -11,7 +11,8 @@ public enum CellOverlayKind
 {
     Blocked,
     Selected,
-    Hovered
+    Hovered,
+    PasteGhost
 }
 
 public readonly record struct SpriteDrawOperation(

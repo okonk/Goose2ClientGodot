@@ -975,6 +975,94 @@ public class MapRendererTests
         Assert.Equal(before, MapCodec.Encode(document));
     }
 
+    [Fact]
+    public void SelectionRectangle_DrawsFourOutlineLinesWithSelectionStroke()
+    {
+        string manifest = ManifestJson((1, 1, 0, 0, 32, 32));
+        MapRenderer renderer = new(CreateCache(new FakeSpriteSheetLoader(), manifest));
+        var document = MapDocument.Create(5, 5);
+        var options = new MapRenderOptions(MapLayerVisibility.All, false, false, null, null,
+            SelectionRectangle: new MapTileRectangle(1, 1, 3, 2));
+        var sink = new RecordingMapDrawSink();
+        renderer.Render(Request(document, Viewport(5 * 32, 5 * 32), options), sink);
+
+        var lines = sink.Calls.OfType<GridLineDrawOperation>()
+            .Where(op => op.Color == MapRenderer.MapRenderPalette.SelectionStroke)
+            .ToList();
+        Assert.Equal(4, lines.Count);
+    }
+
+    [Fact]
+    public void PasteGhost_StraddlingEdge_ClipsFillToDocumentBounds()
+    {
+        string manifest = ManifestJson((1, 1, 0, 0, 32, 32));
+        MapRenderer renderer = new(CreateCache(new FakeSpriteSheetLoader(), manifest));
+        var document = MapDocument.Create(5, 5);
+        var options = new MapRenderOptions(MapLayerVisibility.All, false, false, null, null,
+            PasteGhost: new MapTileRectangle(3, 3, 4, 4));
+        var sink = new RecordingMapDrawSink();
+        renderer.Render(Request(document, Viewport(5 * 32, 5 * 32), options), sink);
+
+        var fills = sink.Calls.OfType<CellOverlayDrawOperation>()
+            .Where(op => op.Kind == CellOverlayKind.PasteGhost)
+            .ToList();
+        Assert.Equal(4, fills.Count);
+    }
+
+    [Fact]
+    public void PasteGhost_FullyInBounds_DrawsFillAndOutline()
+    {
+        string manifest = ManifestJson((1, 1, 0, 0, 32, 32));
+        MapRenderer renderer = new(CreateCache(new FakeSpriteSheetLoader(), manifest));
+        var document = MapDocument.Create(5, 5);
+        var options = new MapRenderOptions(MapLayerVisibility.All, false, false, null, null,
+            PasteGhost: new MapTileRectangle(1, 1, 2, 2));
+        var sink = new RecordingMapDrawSink();
+        renderer.Render(Request(document, Viewport(5 * 32, 5 * 32), options), sink);
+
+        Assert.Equal(4, sink.Calls.OfType<CellOverlayDrawOperation>()
+            .Count(op => op.Kind == CellOverlayKind.PasteGhost));
+        Assert.Equal(4, sink.Calls.OfType<GridLineDrawOperation>()
+            .Count(op => op.Color == MapRenderer.MapRenderPalette.PasteGhostStroke));
+    }
+
+    [Fact]
+    public void RectangleOverlays_FullyOutOfBounds_DrawNothing()
+    {
+        string manifest = ManifestJson((1, 1, 0, 0, 32, 32));
+        MapRenderer renderer = new(CreateCache(new FakeSpriteSheetLoader(), manifest));
+        var document = MapDocument.Create(5, 5);
+        var options = new MapRenderOptions(MapLayerVisibility.All, false, false, null, null,
+            SelectionRectangle: new MapTileRectangle(5, 5, 2, 2),
+            PasteGhost: new MapTileRectangle(5, 5, 2, 2));
+        var sink = new RecordingMapDrawSink();
+        renderer.Render(Request(document, Viewport(5 * 32, 5 * 32), options), sink);
+
+        Assert.Empty(sink.Calls.OfType<GridLineDrawOperation>()
+            .Where(op => op.Color == MapRenderer.MapRenderPalette.SelectionStroke));
+        Assert.Empty(sink.Calls.OfType<CellOverlayDrawOperation>()
+            .Where(op => op.Kind == CellOverlayKind.PasteGhost));
+    }
+
+    [Fact]
+    public void RectangleOverlays_PartiallyOutOfBounds_ClipsToDocument()
+    {
+        string manifest = ManifestJson((1, 1, 0, 0, 32, 32));
+        MapRenderer renderer = new(CreateCache(new FakeSpriteSheetLoader(), manifest));
+        var document = MapDocument.Create(5, 5);
+        var options = new MapRenderOptions(MapLayerVisibility.All, false, false, null, null,
+            SelectionRectangle: new MapTileRectangle(-3, -3, 4, 4),
+            PasteGhost: new MapTileRectangle(-3, -3, 4, 4));
+        var sink = new RecordingMapDrawSink();
+        renderer.Render(Request(document, Viewport(5 * 32, 5 * 32), options), sink);
+
+        // both rectangles clip to the single cell (0,0)
+        Assert.Equal(4, sink.Calls.OfType<GridLineDrawOperation>()
+            .Count(op => op.Color == MapRenderer.MapRenderPalette.SelectionStroke));
+        Assert.Equal(1, sink.Calls.OfType<CellOverlayDrawOperation>()
+            .Count(op => op.Kind == CellOverlayKind.PasteGhost));
+    }
+
     private static SpriteAssetCache CreateCache(FakeSpriteSheetLoader loader, string manifestJson)
         => new(AssetDirectory, SpriteManifest.Parse(manifestJson), loader);
 

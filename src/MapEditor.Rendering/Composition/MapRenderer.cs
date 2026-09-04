@@ -160,6 +160,17 @@ public sealed class MapRenderer
         {
             DrawTarget(document, viewport, hovered, CellOverlayKind.Hovered, MapRenderPalette.HoveredStroke, sink);
         }
+
+        if (options.SelectionRectangle is { } selection)
+        {
+            DrawRectangleOutline(document, viewport, selection, MapRenderPalette.SelectionStroke, sink);
+        }
+
+        if (options.PasteGhost is { } ghost)
+        {
+            DrawRectangleFill(document, viewport, ghost, MapRenderPalette.PasteGhostFill, sink);
+            DrawRectangleOutline(document, viewport, ghost, MapRenderPalette.PasteGhostStroke, sink);
+        }
     }
 
     private static void DrawGrid(MapDocument document, ViewportTransform viewport, ViewportTileRanges ranges, IMapDrawSink sink)
@@ -231,6 +242,95 @@ public sealed class MapRenderer
         sink.DrawCellOverlay(new CellOverlayDrawOperation(kind, tile, viewport.WorldToScreen(cell), MapRenderPalette.Transparent, stroke));
     }
 
+    private static void DrawRectangleOutline(
+        MapDocument document,
+        ViewportTransform viewport,
+        MapTileRectangle rectangle,
+        RenderColor color,
+        IMapDrawSink sink)
+    {
+        if (rectangle.ClipTo(document.Width, document.Height) is not { } rect)
+        {
+            return;
+        }
+
+        RenderRect visible = viewport.VisibleWorldRect;
+        double left = Math.Max(visible.X, 0.0);
+        double top = Math.Max(visible.Y, 0.0);
+        double right = Math.Min(visible.X + visible.Width, document.Width * (double)ViewportCulling.TileSize);
+        double bottom = Math.Min(visible.Y + visible.Height, document.Height * (double)ViewportCulling.TileSize);
+
+        double x0 = rect.X * (double)ViewportCulling.TileSize;
+        double y0 = rect.Y * (double)ViewportCulling.TileSize;
+        double x1 = (rect.X + rect.Width) * (double)ViewportCulling.TileSize;
+        double y1 = (rect.Y + rect.Height) * (double)ViewportCulling.TileSize;
+
+        if (x0 >= left && x0 <= right)
+        {
+            sink.DrawGridLine(new GridLineDrawOperation(
+                viewport.WorldToScreen(new RenderPoint(x0, y0)),
+                viewport.WorldToScreen(new RenderPoint(x0, y1)),
+                color));
+        }
+
+        if (x1 >= left && x1 <= right)
+        {
+            sink.DrawGridLine(new GridLineDrawOperation(
+                viewport.WorldToScreen(new RenderPoint(x1, y0)),
+                viewport.WorldToScreen(new RenderPoint(x1, y1)),
+                color));
+        }
+
+        if (y0 >= top && y0 <= bottom)
+        {
+            sink.DrawGridLine(new GridLineDrawOperation(
+                viewport.WorldToScreen(new RenderPoint(x0, y0)),
+                viewport.WorldToScreen(new RenderPoint(x1, y0)),
+                color));
+        }
+
+        if (y1 >= top && y1 <= bottom)
+        {
+            sink.DrawGridLine(new GridLineDrawOperation(
+                viewport.WorldToScreen(new RenderPoint(x0, y1)),
+                viewport.WorldToScreen(new RenderPoint(x1, y1)),
+                color));
+        }
+    }
+
+    private static void DrawRectangleFill(
+        MapDocument document,
+        ViewportTransform viewport,
+        MapTileRectangle rectangle,
+        RenderColor fill,
+        IMapDrawSink sink)
+    {
+        if (rectangle.ClipTo(document.Width, document.Height) is not { } rect)
+        {
+            return;
+        }
+
+        RenderRect visible = viewport.VisibleWorldRect;
+        for (int y = rect.Y; y < rect.Y + rect.Height; y++)
+        {
+            for (int x = rect.X; x < rect.X + rect.Width; x++)
+            {
+                RenderRect cell = CellRect(x, y);
+                if (!Intersects(cell, visible))
+                {
+                    continue;
+                }
+
+                sink.DrawCellOverlay(new CellOverlayDrawOperation(
+                    CellOverlayKind.PasteGhost,
+                    new MapTileCoordinate(x, y),
+                    viewport.WorldToScreen(cell),
+                    fill,
+                    MapRenderPalette.Transparent));
+            }
+        }
+    }
+
     private static RenderRect CellRect(int x, int y)
         => new(x * ViewportCulling.TileSize, y * ViewportCulling.TileSize, ViewportCulling.TileSize, ViewportCulling.TileSize);
 
@@ -246,5 +346,8 @@ public sealed class MapRenderer
         public static readonly RenderColor Grid = new(0xFF, 0xFF, 0xFF, 0x30);
         public static readonly RenderColor SelectedStroke = new(0x00, 0xFF, 0xFF, 0xFF);
         public static readonly RenderColor HoveredStroke = new(0xFF, 0x00, 0xFF, 0xFF);
+        public static readonly RenderColor SelectionStroke = new(0xFF, 0xFF, 0xFF, 0xFF);
+        public static readonly RenderColor PasteGhostFill = new(0xFF, 0xFF, 0xFF, 0x60);
+        public static readonly RenderColor PasteGhostStroke = new(0xFF, 0xBF, 0xBF, 0xBF);
     }
 }
