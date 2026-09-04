@@ -21,6 +21,7 @@ namespace MapEditor.App;
 internal partial class MainWindow : Window
 {
     private static readonly IBrush FieldErrorBrush = new SolidColorBrush(Color.FromRgb(0xCC, 0x00, 0x00));
+    private static readonly IBrush SelectedRowBrush = new SolidColorBrush(Color.FromRgb(0x33, 0x99, 0xFF));
 
     private readonly IEditorDialogs _dialogs;
     private readonly AppSettingsStore _settings;
@@ -29,6 +30,9 @@ internal partial class MainWindow : Window
     private readonly MapCanvas _canvas;
     private readonly SpritePaletteControl _palette;
     private readonly TextBlock[] _layerRefs;
+    private Border[] _layerRows;
+    private CheckBox[] _layerVisibleChecks;
+    private int _layerAnchor;
     private bool _closeGuardRunning;
     private bool _closeApproved;
     // Picker/settings continuations can resume after Closed; publishing then leaks an undisposed context.
@@ -44,6 +48,8 @@ internal partial class MainWindow : Window
         _canvas = new MapCanvas(_viewModel, _assets);
         _palette = new SpritePaletteControl(_viewModel, _assets);
         _layerRefs = new[] { Layer0Ref, Layer1Ref, Layer2Ref, Layer3Ref, Layer4Ref };
+        _layerRows = new[] { Layer0Row, Layer1Row, Layer2Row, Layer3Row, Layer4Row };
+        _layerVisibleChecks = new[] { Layer0VisibleCheck, Layer1VisibleCheck, Layer2VisibleCheck, Layer3VisibleCheck, Layer4VisibleCheck };
         CanvasHost.Child = _canvas;
         PaletteBorder.Child = _palette;
         _palette.BindScrollBar(PaletteBar);
@@ -56,7 +62,7 @@ internal partial class MainWindow : Window
         _viewModel.PropertyChanged += OnViewModelPropertyChanged;
         _viewModel.CanvasInvalidated += SyncReadouts;
         SyncToolButtons();
-        SyncLayerRadios();
+        SyncLayerRows();
         SyncBrushFields();
         SyncReadouts();
         SyncAssetDirectory();
@@ -155,7 +161,7 @@ internal partial class MainWindow : Window
                 _viewModel.ActiveTool = MapEditTool.Eyedropper;
                 e.Handled = true;
                 break;
-            case Key.B:
+            case Key.X:
                 _viewModel.ActiveTool = MapEditTool.BlockedToggle;
                 e.Handled = true;
                 break;
@@ -222,15 +228,51 @@ internal partial class MainWindow : Window
         }
     }
 
-    private void OnZoomIn(object? sender, RoutedEventArgs e) => _canvas.ZoomStep(zoomIn: true);
-
-    private void OnZoomOut(object? sender, RoutedEventArgs e) => _canvas.ZoomStep(zoomIn: false);
-
-    private void OnLayerSelected(object? sender, RoutedEventArgs e)
+    private void OnToolUnchecked(object? sender, RoutedEventArgs e)
     {
-        if (sender is RadioButton { Tag: string tag } && int.TryParse(tag, out int layer))
+        if (sender is ToggleButton { Tag: string tag } &&
+            Enum.TryParse<MapEditTool>(tag, out MapEditTool tool) &&
+            tool == _viewModel.ActiveTool)
         {
-            _viewModel.ActiveLayer = layer;
+            ((ToggleButton)sender).IsChecked = true;
+        }
+    }
+
+    private void OnLayerRowPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (sender is not Border { Tag: string tag } || !int.TryParse(tag, out int layer))
+        {
+            return;
+        }
+
+        if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
+        {
+            return;
+        }
+
+        KeyModifiers modifiers = e.KeyModifiers;
+        LayerClickMode mode = modifiers.HasFlag(KeyModifiers.Control)
+            ? LayerClickMode.Toggle
+            : modifiers.HasFlag(KeyModifiers.Shift)
+                ? LayerClickMode.Range
+                : LayerClickMode.Plain;
+
+        (_viewModel.SelectedLayers, _layerAnchor) = LayerSelection.Apply(_viewModel.SelectedLayers, _layerAnchor, layer, mode);
+        e.Handled = true;
+    }
+
+    private void OnLayerVisibilityChanged(object? sender, RoutedEventArgs e)
+    {
+        if (sender is CheckBox { Tag: string tag } && int.TryParse(tag, out int layer))
+        {
+            byte mask = _viewModel.LayerVisibility;
+            mask = (byte)(mask & ~(1 << layer));
+            if (sender is CheckBox { IsChecked: true })
+            {
+                mask |= (byte)(1 << layer);
+            }
+
+            _viewModel.LayerVisibility = mask;
         }
     }
 
@@ -403,8 +445,9 @@ internal partial class MainWindow : Window
             case nameof(MainWindowViewModel.ActiveTool):
                 SyncToolButtons();
                 break;
-            case nameof(MainWindowViewModel.ActiveLayer):
-                SyncLayerRadios();
+            case nameof(MainWindowViewModel.SelectedLayers):
+            case nameof(MainWindowViewModel.LayerVisibility):
+                SyncLayerRows();
                 break;
             case nameof(MainWindowViewModel.Brush):
                 SyncBrushFields();
@@ -429,13 +472,15 @@ internal partial class MainWindow : Window
         BlockedTool.IsChecked = _viewModel.ActiveTool == MapEditTool.BlockedToggle;
     }
 
-    private void SyncLayerRadios()
+    private void SyncLayerRows()
     {
-        Layer0Radio.IsChecked = _viewModel.ActiveLayer == 0;
-        Layer1Radio.IsChecked = _viewModel.ActiveLayer == 1;
-        Layer2Radio.IsChecked = _viewModel.ActiveLayer == 2;
-        Layer3Radio.IsChecked = _viewModel.ActiveLayer == 3;
-        Layer4Radio.IsChecked = _viewModel.ActiveLayer == 4;
+        byte selection = _viewModel.SelectedLayers;
+        byte visibility = _viewModel.LayerVisibility;
+        for (int layer = 0; layer < MapDocument.LayerCount; layer++)
+        {
+            _layerRows[layer].Background = (selection & (1 << layer)) != 0 ? SelectedRowBrush : Brushes.Transparent;
+            _layerVisibleChecks[layer].IsChecked = (visibility & (1 << layer)) != 0;
+        }
     }
 
     private void SyncBrushFields()

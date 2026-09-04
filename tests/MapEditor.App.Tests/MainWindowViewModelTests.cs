@@ -52,15 +52,11 @@ public class MainWindowViewModelTests : IDisposable
         Assert.Equal("Goose2 Map Editor — Untitled", _viewModel.Title);
         Assert.Same(_controller.Document.Session, _viewModel.Session);
         Assert.Equal(MapEditTool.Pencil, _viewModel.ActiveTool);
-        Assert.Equal(0, _viewModel.ActiveLayer);
+        Assert.Equal((byte)1, _viewModel.SelectedLayers);
         Assert.Equal(new MapTileLayer(0, 0), _viewModel.Brush);
         Assert.Empty(_viewModel.SheetIds);
         Assert.Equal(0, _viewModel.SelectedSheet);
-        Assert.True(_viewModel.Layer0Visible);
-        Assert.True(_viewModel.Layer1Visible);
-        Assert.True(_viewModel.Layer2Visible);
-        Assert.True(_viewModel.Layer3Visible);
-        Assert.True(_viewModel.Layer4Visible);
+        Assert.Equal((byte)0b11111, _viewModel.LayerVisibility);
         Assert.True(_viewModel.ShowGrid);
         Assert.False(_viewModel.ShowBlocked);
         Assert.Null(_viewModel.HoverX);
@@ -97,21 +93,21 @@ public class MainWindowViewModelTests : IDisposable
     }
 
     [Fact]
-    public void ActiveLayer_ValidValue_WritesToSessionAndRaisesOnlyActiveLayer()
+    public void SelectedLayers_ValidValue_WritesToSessionAndRaisesOnlySelectedLayers()
     {
-        var raised = RaisedProperties(() => _viewModel.ActiveLayer = 3);
+        var raised = RaisedProperties(() => _viewModel.SelectedLayers = (byte)0b01000);
 
-        Assert.Equal(3, _controller.Document.Session.ActiveLayer);
-        Assert.Equal(new[] { nameof(MainWindowViewModel.ActiveLayer) }, raised);
+        Assert.Equal((byte)0b01000, _controller.Document.Session.SelectedLayers);
+        Assert.Equal(new[] { nameof(MainWindowViewModel.SelectedLayers) }, raised);
     }
 
     [Theory]
-    [InlineData(-1)]
-    [InlineData(5)]
-    public void ActiveLayer_OutOfRange_ThrowsWithoutMutatingSession(int layer)
+    [InlineData(0)]
+    [InlineData(32)]
+    public void SelectedLayers_OutOfRange_ThrowsWithoutMutatingSession(int value)
     {
-        Assert.Throws<ArgumentOutOfRangeException>(() => _viewModel.ActiveLayer = layer);
-        Assert.Equal(0, _controller.Document.Session.ActiveLayer);
+        Assert.Throws<ArgumentOutOfRangeException>(() => _viewModel.SelectedLayers = (byte)value);
+        Assert.Equal((byte)1, _controller.Document.Session.SelectedLayers);
     }
 
     [Fact]
@@ -144,10 +140,22 @@ public class MainWindowViewModelTests : IDisposable
     [Fact]
     public void LayerVisibility_RaisesOnlyChangedProperty()
     {
-        var raised = RaisedProperties(() => _viewModel.Layer2Visible = false);
+        var raised = RaisedProperties(() => _viewModel.LayerVisibility = (byte)0b11011);
 
-        Assert.False(_viewModel.Layer2Visible);
-        Assert.Equal(new[] { nameof(MainWindowViewModel.Layer2Visible) }, raised);
+        Assert.Equal((byte)0b11011, _viewModel.LayerVisibility);
+        Assert.Equal(new[] { nameof(MainWindowViewModel.LayerVisibility) }, raised);
+    }
+
+    [Fact]
+    public void LayerVisibility_OutOfRange_Throws()
+    {
+        int canvasInvalidations = 0;
+        _viewModel.CanvasInvalidated += () => canvasInvalidations++;
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => _viewModel.LayerVisibility = (byte)0b100000);
+
+        Assert.Equal((byte)0b11111, _viewModel.LayerVisibility);
+        Assert.Equal(0, canvasInvalidations);
     }
 
     [Fact]
@@ -260,10 +268,10 @@ public class MainWindowViewModelTests : IDisposable
         int canvasInvalidations = 0;
         _viewModel.CanvasInvalidated += () => canvasInvalidations++;
 
-        _viewModel.Layer0Visible = false;
+        _viewModel.LayerVisibility = (byte)0b11110;
         Assert.Equal(1, canvasInvalidations);
 
-        _viewModel.Layer0Visible = false;
+        _viewModel.LayerVisibility = (byte)0b11110;
         Assert.Equal(1, canvasInvalidations);
 
         _viewModel.ShowGrid = false;
@@ -321,9 +329,9 @@ public class MainWindowViewModelTests : IDisposable
     }
 
     [Fact]
-    public async Task New_ReplacesDocument_RaisesBrushAndActiveLayerWithSessionResetValues()
+    public async Task New_ReplacesDocument_RaisesBrushAndSelectedLayersWithSessionResetValues()
     {
-        _viewModel.ActiveLayer = 2;
+        _viewModel.SelectedLayers = (byte)(1 << 2);
         _viewModel.Brush = new MapTileLayer(9, 9);
 
         _dialogs.NewMapResult = new NewMapRequest(10, 10);
@@ -334,9 +342,9 @@ public class MainWindowViewModelTests : IDisposable
 
         await _viewModel.NewAsync();
 
-        Assert.Contains(nameof(MainWindowViewModel.ActiveLayer), raised);
+        Assert.Contains(nameof(MainWindowViewModel.SelectedLayers), raised);
         Assert.Contains(nameof(MainWindowViewModel.Brush), raised);
-        Assert.Equal(0, _viewModel.ActiveLayer);
+        Assert.Equal((byte)1, _viewModel.SelectedLayers);
         Assert.Equal(new MapTileLayer(0, 0), _viewModel.Brush);
     }
 

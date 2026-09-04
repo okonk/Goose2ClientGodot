@@ -28,11 +28,7 @@ internal sealed class MainWindowViewModel : ViewModelBase
     private MapEditTool _activeTool = MapEditTool.Pencil;
     private IReadOnlyList<int> _sheetIds = Array.Empty<int>();
     private int _selectedSheet;
-    private bool _layer0Visible = true;
-    private bool _layer1Visible = true;
-    private bool _layer2Visible = true;
-    private bool _layer3Visible = true;
-    private bool _layer4Visible = true;
+    private byte _layerVisibility = 0b11111;
     private bool _showGrid = true;
     private bool _showBlocked;
     private int? _hoverX;
@@ -78,23 +74,20 @@ internal sealed class MainWindowViewModel : ViewModelBase
         }
     }
 
-    public int ActiveLayer
+    public byte SelectedLayers
     {
-        get => _session.ActiveLayer;
+        get => _session.SelectedLayers;
         set
         {
-            if (value < 0 || value >= MapDocument.LayerCount)
+            if (_session.SelectedLayers != value)
             {
-                throw new ArgumentOutOfRangeException(nameof(value));
-            }
-
-            if (_session.ActiveLayer != value)
-            {
-                _session.ActiveLayer = value;
+                _session.SelectedLayers = value;
                 OnPropertyChanged();
             }
         }
     }
+
+    public int TopLayer => _session.TopLayer;
 
     public MapTileLayer Brush
     {
@@ -131,60 +124,17 @@ internal sealed class MainWindowViewModel : ViewModelBase
         }
     }
 
-    public bool Layer0Visible
+    public byte LayerVisibility
     {
-        get => _layer0Visible;
+        get => _layerVisibility;
         set
         {
-            if (SetField(ref _layer0Visible, value))
+            if (value > 0b11111)
             {
-                Refresh(EditorRefresh.Canvas);
+                throw new ArgumentOutOfRangeException(nameof(value));
             }
-        }
-    }
 
-    public bool Layer1Visible
-    {
-        get => _layer1Visible;
-        set
-        {
-            if (SetField(ref _layer1Visible, value))
-            {
-                Refresh(EditorRefresh.Canvas);
-            }
-        }
-    }
-
-    public bool Layer2Visible
-    {
-        get => _layer2Visible;
-        set
-        {
-            if (SetField(ref _layer2Visible, value))
-            {
-                Refresh(EditorRefresh.Canvas);
-            }
-        }
-    }
-
-    public bool Layer3Visible
-    {
-        get => _layer3Visible;
-        set
-        {
-            if (SetField(ref _layer3Visible, value))
-            {
-                Refresh(EditorRefresh.Canvas);
-            }
-        }
-    }
-
-    public bool Layer4Visible
-    {
-        get => _layer4Visible;
-        set
-        {
-            if (SetField(ref _layer4Visible, value))
+            if (SetField(ref _layerVisibility, value))
             {
                 Refresh(EditorRefresh.Canvas);
             }
@@ -313,7 +263,7 @@ internal sealed class MainWindowViewModel : ViewModelBase
                 HoverY = null;
                 SelectedX = null;
                 SelectedY = null;
-                OnPropertyChanged(nameof(ActiveLayer));
+                OnPropertyChanged(nameof(SelectedLayers));
                 OnPropertyChanged(nameof(Brush));
             }
         }

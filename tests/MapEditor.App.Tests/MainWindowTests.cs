@@ -10,6 +10,7 @@ using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.Media;
 using Avalonia.Threading;
 using MapEditor.App.Controls;
 using MapEditor.App.Dialogs;
@@ -72,7 +73,7 @@ internal sealed class MainWindowHarness : IDisposable
     }
 }
 
-public class MainWindowTests
+public class MainWindowTests : IDisposable
 {
     private const string TwoSheetJson = """
         { "tileSize": 32, "sheets": {
@@ -100,9 +101,8 @@ public class MainWindowTests
 
     private MainWindowViewModel ViewModel => _harness.ViewModel;
 
-    private T Find<T>(string name) where T : Control
-        => Window.FindControl<T>(name)
-           ?? throw new InvalidOperationException($"missing named region {name}");
+    private T? Find<T>(string name) where T : Control
+        => Window.FindControl<T>(name);
 
     private string WriteAssetDirectory(string name, string manifestJson)
     {
@@ -166,10 +166,14 @@ public class MainWindowTests
             Assert.NotNull(Find<MenuItem>(name));
         }
 
-        foreach (string name in new[] { "NewButton", "OpenButton", "SaveButton", "UndoButton", "RedoButton" })
+        foreach (string name in new[] { "NewButton", "OpenButton", "SaveButton", "UndoButton", "RedoButton", "ZoomInButton", "ZoomOutButton" })
         {
-            Assert.NotNull(Find<Button>(name));
+            Assert.Null(Find<Button>(name));
         }
+
+        Assert.NotNull(Find<MenuItem>("ViewMenu"));
+        Assert.NotNull(Find<MenuItem>("GridMenuItem"));
+        Assert.NotNull(Find<MenuItem>("BlockedMenuItem"));
     }
 
     [AvaloniaFact]
@@ -188,26 +192,58 @@ public class MainWindowTests
     }
 
     [AvaloniaFact]
-    public void Layout_ContainsFiveLayerRadiosFiveVisibilityChecksAndOverlays()
+    public void Layout_ContainsNamedLayerListAndViewToggles()
     {
+        string[] names = { "Ground", "Below Entities", "Entities", "Above Entities", "Roof" };
         for (int layer = 0; layer < MapDocument.LayerCount; layer++)
         {
-            RadioButton radio = Find<RadioButton>($"Layer{layer}Radio");
-            CheckBox visible = Find<CheckBox>($"Layer{layer}Visible");
-            Assert.Equal(layer == 0, radio.IsChecked);
-            Assert.True(visible.IsChecked);
+            Assert.NotNull(Find<Border>($"Layer{layer}Row"));
+            Assert.True(Find<CheckBox>($"Layer{layer}VisibleCheck").IsChecked == true);
+            Assert.Equal($"{layer} — {names[layer]}", Find<TextBlock>($"Layer{layer}Label").Text);
         }
 
-        Find<RadioButton>("Layer3Radio").IsChecked = true;
-        Assert.Equal(3, ViewModel.ActiveLayer);
-        Assert.True(Find<RadioButton>("Layer3Radio").IsChecked);
+        Assert.Equal((byte)1, ViewModel.SelectedLayers);
+        Assert.NotEqual(Brushes.Transparent, Find<Border>("Layer0Row").Background);
+        Assert.Equal(Brushes.Transparent, Find<Border>("Layer3Row").Background);
 
-        Find<CheckBox>("Layer2Visible").IsChecked = false;
-        Assert.False(ViewModel.Layer2Visible);
+        Point row3 = Find<Border>("Layer3Row").TranslatePoint(new Point(10, 5), Window).Value;
+        Window.MouseDown(row3, MouseButton.Left, RawInputModifiers.None);
+        Window.MouseUp(row3, MouseButton.Left, RawInputModifiers.None);
+        Assert.Equal((byte)0b01000, ViewModel.SelectedLayers);
+        Assert.NotEqual(Brushes.Transparent, Find<Border>("Layer3Row").Background);
+        Assert.Equal(Brushes.Transparent, Find<Border>("Layer0Row").Background);
 
-        Assert.True(Find<CheckBox>("ShowGridCheck").IsChecked);
-        Assert.False(Find<CheckBox>("ShowBlockedCheck").IsChecked);
-        Find<CheckBox>("ShowBlockedCheck").IsChecked = true;
+        Point row1 = Find<Border>("Layer1Row").TranslatePoint(new Point(10, 5), Window).Value;
+        Window.MouseDown(row1, MouseButton.Left, RawInputModifiers.None);
+        Window.MouseUp(row1, MouseButton.Left, RawInputModifiers.None);
+        Assert.Equal((byte)0b00010, ViewModel.SelectedLayers);
+
+        Find<CheckBox>("Layer2VisibleCheck").IsChecked = false;
+        Assert.Equal((byte)0b11011, ViewModel.LayerVisibility);
+
+        Point check2 = Find<CheckBox>("Layer2VisibleCheck").TranslatePoint(new Point(5, 5), Window).Value;
+        Window.MouseDown(check2, MouseButton.Left, RawInputModifiers.None);
+        Window.MouseUp(check2, MouseButton.Left, RawInputModifiers.None);
+        Assert.True(Find<CheckBox>("Layer2VisibleCheck").IsChecked == true);
+        Assert.Equal((byte)0b11111, ViewModel.LayerVisibility);
+        Assert.Equal((byte)0b00010, ViewModel.SelectedLayers);
+
+        Find<MenuItem>("ViewMenu").IsSubMenuOpen = true;
+        Dispatcher.UIThread.RunJobs();
+        Point gridPoint = Find<MenuItem>("GridMenuItem").TranslatePoint(new Point(5, 5), Window).Value;
+        Window.MouseDown(gridPoint, MouseButton.Left, RawInputModifiers.None);
+        Window.MouseUp(gridPoint, MouseButton.Left, RawInputModifiers.None);
+        Dispatcher.UIThread.RunJobs();
+        Assert.False(Find<MenuItem>("GridMenuItem").IsChecked == true);
+        Assert.False(ViewModel.ShowGrid);
+
+        Find<MenuItem>("ViewMenu").IsSubMenuOpen = true;
+        Dispatcher.UIThread.RunJobs();
+        Point blockedPoint = Find<MenuItem>("BlockedMenuItem").TranslatePoint(new Point(5, 5), Window).Value;
+        Window.MouseDown(blockedPoint, MouseButton.Left, RawInputModifiers.None);
+        Window.MouseUp(blockedPoint, MouseButton.Left, RawInputModifiers.None);
+        Dispatcher.UIThread.RunJobs();
+        Assert.True(Find<MenuItem>("BlockedMenuItem").IsChecked == true);
         Assert.True(ViewModel.ShowBlocked);
     }
 
@@ -237,7 +273,7 @@ public class MainWindowTests
         }
 
         ViewModel.Brush = new MapTileLayer(7, 42);
-        ViewModel.ActiveLayer = 2;
+        ViewModel.SelectedLayers = 1 << 2;
         Point tileCenter = TileCenter(1, 1);
         Window.MouseDown(tileCenter, MouseButton.Left, RawInputModifiers.None);
         Window.MouseUp(tileCenter, MouseButton.Left, RawInputModifiers.None);
@@ -286,8 +322,6 @@ public class MainWindowTests
         MenuItem undo = Find<MenuItem>("UndoCommand");
         MenuItem redo = Find<MenuItem>("RedoCommand");
         MenuItem save = Find<MenuItem>("SaveCommand");
-        Button undoButton = Find<Button>("UndoButton");
-        Button saveButton = Find<Button>("SaveButton");
 
         Assert.False(undo.IsEnabled);
         Assert.False(redo.IsEnabled);
@@ -299,7 +333,6 @@ public class MainWindowTests
         Window.MouseUp(tileCenter, MouseButton.Left, RawInputModifiers.None);
 
         Assert.True(undo.IsEnabled);
-        Assert.True(undoButton.IsEnabled);
         Assert.True(save.IsEnabled);
         Assert.False(redo.IsEnabled);
 
@@ -312,7 +345,6 @@ public class MainWindowTests
         await ViewModel.SaveAsync();
 
         Assert.False(save.IsEnabled);
-        Assert.False(saveButton.IsEnabled);
     }
 
     [AvaloniaFact]
@@ -347,7 +379,7 @@ public class MainWindowTests
 
         _harness.Dialogs.DirtyResult = DirtyChoice.Discard;
         _harness.Dialogs.NewMapResult = new NewMapRequest(4, 4);
-        Find<Button>("NewButton").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        Find<MenuItem>("NewCommand").RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
         Dispatcher.UIThread.RunJobs();
 
         Assert.Empty(_harness.Dialogs.Errors);
@@ -367,7 +399,7 @@ public class MainWindowTests
         _harness.Dialogs.PickOpenException = new InvalidOperationException("pick failed");
         _harness.Dialogs.ShowErrorException = new IOException("dialog down");
 
-        Find<Button>("OpenButton").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        Find<MenuItem>("OpenCommand").RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
         Dispatcher.UIThread.RunJobs();
 
         ErrorPresentation lastResort = Assert.Single(_harness.Dialogs.Errors, error => error.Title == "Error");
@@ -378,21 +410,17 @@ public class MainWindowTests
     }
 
     [AvaloniaFact]
-    public void ToolbarZoomButtons_ExistAndZoomAroundCanvasCenter()
+    public void PlusMinusKeys_ZoomAroundCanvasCenter()
     {
-        Border toolbar = Find<Border>("Toolbar");
-        Button zoomIn = toolbar.FindControl<Button>("ZoomInButton") ?? throw new InvalidOperationException("missing ZoomInButton");
-        Button zoomOut = toolbar.FindControl<Button>("ZoomOutButton") ?? throw new InvalidOperationException("missing ZoomOutButton");
-
         MapCanvas canvas = Window.Canvas;
         Point center = new(canvas.Bounds.Width / 2, canvas.Bounds.Height / 2);
         RenderPoint worldBefore = canvas.Viewport.ScreenToWorld(new RenderPoint(center.X, center.Y));
 
-        zoomIn.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        Window.KeyPressQwerty(PhysicalKey.Equal, RawInputModifiers.None);
         Assert.Equal(200, ViewModel.ZoomPercent);
         Assert.Equal(worldBefore, canvas.Viewport.ScreenToWorld(new RenderPoint(center.X, center.Y)));
 
-        zoomOut.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        Window.KeyPressQwerty(PhysicalKey.Minus, RawInputModifiers.None);
         Assert.Equal(100, ViewModel.ZoomPercent);
     }
 

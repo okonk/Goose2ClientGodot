@@ -344,31 +344,7 @@ internal sealed class MapCanvas : Control, ICustomHitTest
     private MapRenderRequest BuildRenderRequest()
     {
         MapEditSession session = _viewModel.Session;
-        byte mask = 0;
-        if (_viewModel.Layer0Visible)
-        {
-            mask |= 1;
-        }
-
-        if (_viewModel.Layer1Visible)
-        {
-            mask |= 1 << 1;
-        }
-
-        if (_viewModel.Layer2Visible)
-        {
-            mask |= 1 << 2;
-        }
-
-        if (_viewModel.Layer3Visible)
-        {
-            mask |= 1 << 3;
-        }
-
-        if (_viewModel.Layer4Visible)
-        {
-            mask |= 1 << 4;
-        }
+        byte mask = _viewModel.LayerVisibility;
 
         MapTileCoordinate? hovered = _viewModel.HoverX is { } hoverX && _viewModel.HoverY is { } hoverY
             ? new MapTileCoordinate(hoverX, hoverY)

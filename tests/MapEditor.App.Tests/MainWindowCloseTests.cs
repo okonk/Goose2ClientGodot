@@ -33,7 +33,7 @@ public class MainWindowCloseTests
         new MapFileStore().Save(mapPath, MapDocument.Create(10, 10));
         harness.Dialogs.OpenPickResult = mapPath;
         harness.Dialogs.DirtyResult = DirtyChoice.Discard;
-        harness.Window.FindControl<Avalonia.Controls.Button>("OpenButton")!.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Avalonia.Controls.Button.ClickEvent));
+        harness.Window.FindControl<Avalonia.Controls.MenuItem>("OpenCommand")!.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Avalonia.Controls.MenuItem.ClickEvent));
         Dispatcher.UIThread.RunJobs();
         Assert.False(harness.ViewModel.Session.IsDirty);
 
