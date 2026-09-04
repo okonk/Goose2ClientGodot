@@ -9,7 +9,7 @@ public sealed class MapEditSession
     private readonly MapDocument _document;
     private readonly MapEditHistory _history;
     private MapEditStroke? _stroke;
-    private int _activeLayer;
+    private byte _selectedLayers = 1;
     private MapTileLayer _selectedTileLayer;
     private int _currentStateId;
     private int? _savedStateId;
@@ -33,17 +33,33 @@ public sealed class MapEditSession
 
     public long RetainedHistoryUsedBytes => _history.UsedBytes;
 
-    public int ActiveLayer
+    public byte SelectedLayers
     {
-        get => _activeLayer;
+        get => _selectedLayers;
         set
         {
-            if (value < 0 || value >= MapDocument.LayerCount)
+            if (value == 0 || value >= 1 << MapDocument.LayerCount)
             {
                 throw new ArgumentOutOfRangeException(nameof(value));
             }
 
-            _activeLayer = value;
+            _selectedLayers = value;
+        }
+    }
+
+    public int TopLayer
+    {
+        get
+        {
+            for (int layer = MapDocument.LayerCount - 1; layer >= 0; layer--)
+            {
+                if ((_selectedLayers & (1 << layer)) != 0)
+                {
+                    return layer;
+                }
+            }
+
+            return -1;
         }
     }
 
@@ -86,10 +102,10 @@ public sealed class MapEditSession
             throw new InvalidOperationException();
         }
 
-        _stroke = new MapEditStroke(tool, _activeLayer, _selectedTileLayer, _selectedTileLayer, _document.TileCount);
+        _stroke = new MapEditStroke(tool, TopLayer, _selectedTileLayer, _selectedTileLayer, _document.TileCount);
         if (tool == MapEditTool.Eyedropper)
         {
-            _selectedTileLayer = _document[x, y].GetLayer(_activeLayer);
+            _selectedTileLayer = _document[x, y].GetLayer(TopLayer);
         }
         else
         {

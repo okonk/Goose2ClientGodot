@@ -13,7 +13,8 @@ public class MapEditSessionTests
         var session = new MapEditSession(doc);
 
         Assert.Same(doc, session.Document);
-        Assert.Equal(0, session.ActiveLayer);
+        Assert.Equal((byte)1, session.SelectedLayers);
+        Assert.Equal(0, session.TopLayer);
         Assert.Equal(new MapTileLayer(0, 0), session.SelectedTileLayer);
         Assert.False(session.HasActiveStroke);
         Assert.False(session.CanUndo);
@@ -40,15 +41,61 @@ public class MapEditSessionTests
     }
 
     [Fact]
-    public void ActiveLayer_RejectsMinusOneAndLayerCountWithoutChangingSelection()
+    public void SelectedLayers_DefaultsToLayer0Only()
     {
-        var session = new MapEditSession(MapDocument.Create(4, 4));
+        var session = CreateSession();
+        Assert.Equal((byte)1, session.SelectedLayers);
+        Assert.Equal(0, session.TopLayer);
+    }
 
-        Assert.Throws<ArgumentOutOfRangeException>(() => session.ActiveLayer = -1);
-        Assert.Throws<ArgumentOutOfRangeException>(() => session.ActiveLayer = MapDocument.LayerCount);
+    [Theory]
+    [InlineData(0b00001, 0)]
+    [InlineData(0b00101, 2)]
+    [InlineData(0b11111, 4)]
+    public void SelectedLayers_Mask_TopLayerIsHighestSetBit(byte mask, int expectedTop)
+    {
+        var session = CreateSession();
+        session.SelectedLayers = mask;
+        Assert.Equal(expectedTop, session.TopLayer);
+    }
 
-        Assert.Equal(0, session.ActiveLayer);
-        Assert.Equal(new MapTileLayer(0, 0), session.SelectedTileLayer);
+    [Theory]
+    [InlineData((byte)0)]
+    [InlineData((byte)32)]
+    [InlineData((byte)0b111111)]
+    public void SelectedLayers_InvalidMask_ThrowsWithoutChangingSelection(byte mask)
+    {
+        var session = CreateSession();
+        session.SelectedLayers = 0b00101;
+        Assert.Throws<ArgumentOutOfRangeException>(() => session.SelectedLayers = mask);
+        Assert.Equal((byte)0b00101, session.SelectedLayers);
+    }
+
+    [Fact]
+    public void Pencil_WithMultiLayerSelection_EditsOnlyTopmostLayer()
+    {
+        var session = CreateSession();
+        session.SelectedLayers = 0b01001;
+        session.SelectedTileLayer = new MapTileLayer(7, 42);
+        session.BeginStroke(MapEditTool.Pencil, 0, 0);
+        Assert.True(session.CompleteStroke());
+
+        Assert.Equal(new MapTileLayer(7, 42), session.Document[0, 0].GetLayer(3));
+        Assert.Equal(new MapTileLayer(0, 0), session.Document[0, 0].GetLayer(0));
+    }
+
+    [Fact]
+    public void Eyedropper_WithMultiLayerSelection_SamplesTopmostLayer()
+    {
+        var session = CreateSession();
+        session.Document.SetLayer(0, 0, 0, new MapTileLayer(1, 1));
+        session.Document.SetLayer(0, 0, 3, new MapTileLayer(2, 2));
+        session.SelectedLayers = 0b01001;
+
+        session.BeginStroke(MapEditTool.Eyedropper, 0, 0);
+        session.CompleteStroke();
+
+        Assert.Equal(new MapTileLayer(2, 2), session.SelectedTileLayer);
     }
 
     [Fact]
@@ -58,10 +105,11 @@ public class MapEditSessionTests
         doc.SetLayer(1, 2, 3, new MapTileLayer(5, 6));
         var session = new MapEditSession(doc);
 
-        session.ActiveLayer = 4;
+        session.SelectedLayers = 1 << 4;
         session.SelectedTileLayer = new MapTileLayer(-7, 8);
 
-        Assert.Equal(4, session.ActiveLayer);
+        Assert.Equal((byte)(1 << 4), session.SelectedLayers);
+        Assert.Equal(4, session.TopLayer);
         Assert.Equal(new MapTileLayer(-7, 8), session.SelectedTileLayer);
         Assert.Equal(new MapTileLayer(5, 6), doc[1, 2].GetLayer(3));
         Assert.Equal(0, session.History.UndoCount);
@@ -82,7 +130,7 @@ public class MapEditSessionTests
         doc.SetLayer(4, 4, 0, new MapTileLayer(70, 71));
         doc.SetLayer(4, 4, 3, new MapTileLayer(60, 61));
         var session = new MapEditSession(doc);
-        session.ActiveLayer = 3;
+        session.SelectedLayers = 1 << 3;
         session.SelectedTileLayer = new MapTileLayer(-123456, 789);
 
         session.BeginStroke(MapEditTool.Pencil, 3, 4);
@@ -136,7 +184,7 @@ public class MapEditSessionTests
         doc.SetLayer(1, 1, 3, new MapTileLayer(4, 4));
         doc.SetLayer(1, 1, 4, new MapTileLayer(5, 5));
         var session = new MapEditSession(doc);
-        session.ActiveLayer = 2;
+        session.SelectedLayers = 1 << 2;
 
         session.BeginStroke(MapEditTool.Eraser, 1, 1);
         Assert.True(session.CompleteStroke());
@@ -155,7 +203,7 @@ public class MapEditSessionTests
     {
         var doc = MapDocument.Create(8, 8);
         var session = new MapEditSession(doc);
-        session.ActiveLayer = 4;
+        session.SelectedLayers = 1 << 4;
 
         session.BeginStroke(MapEditTool.Eraser, 0, 0);
         Assert.False(session.CompleteStroke());
@@ -195,7 +243,7 @@ public class MapEditSessionTests
         doc.SetFlags(2, 3, 1);
         doc.SetLayer(2, 3, 2, new MapTileLayer(33, 44));
         var session = new MapEditSession(doc);
-        session.ActiveLayer = 2;
+        session.SelectedLayers = 1 << 2;
         session.SelectedTileLayer = new MapTileLayer(0, 0);
 
         session.BeginStroke(MapEditTool.Eyedropper, 2, 3);
@@ -218,7 +266,7 @@ public class MapEditSessionTests
         var doc = MapDocument.Create(8, 8);
         doc.SetLayer(0, 0, 1, new MapTileLayer(3, 4));
         var session = new MapEditSession(doc);
-        session.ActiveLayer = 1;
+        session.SelectedLayers = 1 << 1;
         session.SelectedTileLayer = new MapTileLayer(7, 8);
 
         session.BeginStroke(MapEditTool.Eyedropper, 0, 0);
@@ -259,11 +307,11 @@ public class MapEditSessionTests
     {
         var doc = MapDocument.Create(8, 8);
         var session = new MapEditSession(doc);
-        session.ActiveLayer = 0;
+        session.SelectedLayers = 1 << 0;
         session.SelectedTileLayer = new MapTileLayer(5, 6);
 
         session.BeginStroke(MapEditTool.Pencil, 0, 0);
-        session.ActiveLayer = 2;
+        session.SelectedLayers = 1 << 2;
         session.SelectedTileLayer = new MapTileLayer(9, 9);
         session.ContinueStroke(1, 0);
         Assert.True(session.CompleteStroke());
@@ -295,7 +343,7 @@ public class MapEditSessionTests
         Assert.False(session.CompleteStroke());
 
         doc.SetLayer(2, 2, 1, new MapTileLayer(4, 5));
-        session.ActiveLayer = 1;
+        session.SelectedLayers = 1 << 1;
         session.BeginStroke(MapEditTool.Eyedropper, 2, 2);
         Assert.False(session.CompleteStroke());
     }
@@ -306,7 +354,7 @@ public class MapEditSessionTests
         var doc = MapDocument.Create(3, 3);
         doc.SetFlags(1, 0, 1);
         var session = new MapEditSession(doc);
-        session.ActiveLayer = 1;
+        session.SelectedLayers = 1 << 1;
         session.SelectedTileLayer = new MapTileLayer(9, 9);
 
         session.BeginStroke(MapEditTool.Pencil, 0, 0);
@@ -380,7 +428,7 @@ public class MapEditSessionTests
         Assert.True(session.CanRedo);
 
         doc.SetLayer(3, 3, 2, new MapTileLayer(2, 2));
-        session.ActiveLayer = 2;
+        session.SelectedLayers = 1 << 2;
         session.BeginStroke(MapEditTool.Eyedropper, 3, 3);
         Assert.False(session.CompleteStroke());
         Assert.True(session.CanRedo);
@@ -538,4 +586,6 @@ public class MapEditSessionTests
         Assert.Equal(editId, session.CurrentStateId);
         Assert.False(session.IsDirty);
     }
+
+    private static MapEditSession CreateSession(int width = 4, int height = 4) => new(MapDocument.Create(width, height));
 }

@@ -286,7 +286,7 @@ public class MapRendererTests
         renderer.Render(Request(document, Viewport(32, 32)), emptySink);
         Assert.Equal(0, emptySink.CallCount);
 
-        session.ActiveLayer = 2;
+        session.SelectedLayers = 1 << 2;
         session.SelectedTileLayer = new MapTileLayer(1, 1);
         session.BeginStroke(MapEditTool.Pencil, 0, 0);
         Assert.True(session.CompleteStroke());
