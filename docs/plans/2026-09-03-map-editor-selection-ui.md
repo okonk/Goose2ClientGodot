@@ -188,7 +188,7 @@ git commit -m "feat: multi-layer selection mask in MapEditSession"
 - Modify: `src/MapEditor.App/Controls/MapCanvas.cs:344-371` (`BuildRenderRequest` mask composition)
 - Test: `tests/MapEditor.App.Tests/MainWindowViewModelTests.cs` (includes `New_ReplacesDocument_RaisesBrushAndActiveLayerWithSessionResetValues` at `:324-340`)
 - Test: `tests/MapEditor.App.Tests/MapCanvasTests.cs` (lines 165, 297, 371-380)
-- Test: `tests/MapEditor.App.Tests/MainWindowTests.cs` — **no `ActiveLayer` references exist in this file**; layout tests rewritten in Task 3, nothing mechanical here
+- Test: `tests/MapEditor.App.Tests/MainWindowTests.cs` — `ActiveLayer` references exist at `:202` (`Assert.Equal(3, ViewModel.ActiveLayer)`) and `:240` (`ViewModel.ActiveLayer = 2`); rewrite them to the mask API in Task 3 along with the layout tests
 
 **Mutation impact:**
 - Source of truth changed: `MainWindowViewModel._layer0Visible`…`_layer4Visible` (`src/MapEditor.App/ViewModels/MainWindowViewModel.cs:134-182`) → single `_layerVisibility` byte; `ActiveLayer` property (`:81`) → `SelectedLayers`/`TopLayer`
@@ -370,8 +370,8 @@ public class LayerSelectionTests
 ```
 
 `tests/MapEditor.App.Tests/MainWindowTests.cs`:
-- Rewrite `Layout_ContainsFileEditToolbarCommands` (`:157`): drop the `NewButton`/`OpenButton`/`SaveButton`/`UndoButton`/`RedoButton` asserts; keep the menu-item asserts; add `Assert.NotNull(Find<MenuItem>("ViewMenu"))`, `GridMenuItem`, `BlockedMenuItem`.
-- Rewrite `Layout_ContainsFiveLayerRadiosFiveVisibilityChecksAndOverlays` (`:195`) as `Layout_ContainsNamedLayerListAndViewToggles`:
+- Rewrite `Layout_ContainsFileEditToolbarCommands` (`:157`): drop the `NewButton`/`OpenButton`/`SaveButton`/`UndoButton`/`RedoButton` asserts and assert all seven removed controls are absent (`Assert.Null(Find<Button>("NewButton"))`, same for `OpenButton`, `SaveButton`, `UndoButton`, `RedoButton`, `ZoomInButton`, `ZoomOutButton`); keep the menu-item asserts; add `Assert.NotNull(Find<MenuItem>("ViewMenu"))`, `GridMenuItem`, `BlockedMenuItem`.
+- Rewrite `Layout_ContainsFiveLayerRadiosFiveVisibilityChecksAndOverlays` (`:195`) as `Layout_ContainsNamedLayerListAndViewToggles` (add `using Avalonia.Media;` to the test file for `Brushes`):
 
 ```csharp
 [AvaloniaFact]
@@ -386,11 +386,15 @@ public void Layout_ContainsNamedLayerListAndViewToggles()
     }
 
     Assert.Equal((byte)1, ViewModel.SelectedLayers);
+    Assert.NotEqual(Brushes.Transparent, Find<Border>("Layer0Row").Background);
+    Assert.Equal(Brushes.Transparent, Find<Border>("Layer3Row").Background);
 
     Point row3 = Find<Border>("Layer3Row").TranslatePoint(new Point(10, 5), Window).Value;
     Window.MouseDown(row3, MouseButton.Left, RawInputModifiers.None);
     Window.MouseUp(row3, MouseButton.Left, RawInputModifiers.None);
     Assert.Equal((byte)0b01000, ViewModel.SelectedLayers);
+    Assert.NotEqual(Brushes.Transparent, Find<Border>("Layer3Row").Background);
+    Assert.Equal(Brushes.Transparent, Find<Border>("Layer0Row").Background);
 
     Point row1 = Find<Border>("Layer1Row").TranslatePoint(new Point(10, 5), Window).Value;
     Window.MouseDown(row1, MouseButton.Left, RawInputModifiers.None);
@@ -630,11 +634,12 @@ git commit -m "feat: named multi-select layer list, View menu, tool-only toolbar
 | Invariant | Proved by |
 |-----------|-----------|
 | Plain click single-selects (window level) | `Layout_ContainsNamedLayerListAndViewToggles` |
+| Selected row is highlighted; deselected rows are not | `Layout_ContainsNamedLayerListAndViewToggles` (row `Background` assertions) |
 | Ctrl toggles; Shift ranges from anchor (logic level; headless cannot simulate modifiers) | `LayerSelectionTests` |
 | Selection never empties via Ctrl toggle (adversarial) | `Toggle_OffLastSelectedLayer_SingleSelectsIt` |
 | Visibility checkbox drives `LayerVisibility` mask without touching selection | `Layout_ContainsNamedLayerListAndViewToggles` (checkbox uncheck leaves `SelectedLayers` unchanged) |
 | Grid/Blocked toggled from View menu, defaults on/off | `Layout_ContainsNamedLayerListAndViewToggles` |
-| File/zoom toolbar buttons gone; menu items remain | rewritten `Layout_ContainsFileEditToolbarCommands` |
+| File/zoom toolbar buttons gone (asserted absent); menu items remain | rewritten `Layout_ContainsFileEditToolbarCommands` |
 | Zoom still works via +/- keys after button removal | rewritten zoom test |
 
 ---

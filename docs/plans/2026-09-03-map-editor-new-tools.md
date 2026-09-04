@@ -17,10 +17,10 @@
 - `MapLayerChange` record — `src/MapEditor.Core/Editing/MapEditChange.cs:3`
 - `StrokeVisitBitmap.TryMark` — `src/MapEditor.Core/Editing/StrokeVisitBitmap.cs:19`
 - `MapDocument.Width/Height/TileCount/SetLayer` — `src/MapEditor.Core/MapDocument.cs:83,85,87,142`; `MapTile.GetLayer` `:32`
-- `MapEditSessionTests` has no `CreateSession` helper — tests build `new MapEditSession(MapDocument.Create(w, h))` inline (e.g. `:13, :45`); Task 1 adds one
+- `MapEditSessionTests` has no `CreateSession` helper at the branch point — tests build `new MapEditSession(MapDocument.Create(w, h))` inline (e.g. `:13, :45`); Part 1 adds `CreateSession(int width = 4, int height = 4)`, which Part 2 reuses
 - `MapTileCoordinate` — `src/MapEditor.Rendering/Geometry/RenderGeometry.cs:13`; `RenderColor(byte R, byte G, byte B, byte A)` — `:11` (**RGBA order — alpha is the last argument**)
-- `MapRenderOptions` — `src/MapEditor.Rendering/Composition/MapRenderOptions.cs:4` (positional record; `Default` at `:11`)
-- `CellOverlayKind` — `src/MapEditor.Rendering/Composition/MapDrawOperations.cs:10`; `GridLineDrawOperation(Start, End, Color)` `:37`
+- `MapRenderOptions` — `src/MapEditor.Rendering/Composition/MapRenderOptions.cs:5` (positional record; `Default` at `:11`)
+- `CellOverlayKind` — `src/MapEditor.Rendering/Composition/MapDrawOperations.cs:10`; `GridLineDrawOperation(Start, End, Color)` `:43`
 - `IMapDrawSink` — `src/MapEditor.Rendering/Composition/IMapDrawSink.cs:3`
 - `MapRenderer` overlay section — `src/MapEditor.Rendering/Composition/MapRenderer.cs:154-162`; `DrawTarget` `:212`; `MapRenderPalette` `:240` (internal — see Task 2 prerequisite)
 - `RecordingMapDrawSink` — `tests/MapEditor.Rendering.Tests/Fakes/RecordingMapDrawSink.cs`: public `Calls` (`IReadOnlyList<object>`) and `CallCount`
@@ -49,7 +49,7 @@
 - Derived/cached state affected: undo history (new commands via the existing `MapEditHistory`), dirty tracking (`IsDirty` via `_currentStateId`) — both work unchanged because the new entry points use the same state-id bookkeeping as `CompleteStroke`
 - Required propagation sequence: each new entry point appends to a `MapEditChangeBuffer<MapLayerChange>`, mutates the document via `MapDocument.SetLayer`, then pushes one `MapEditCommand.ForLayerChanges` with fresh before/after state ids
 - Invariants to preserve:
-  - no active stroke may exist when a new entry point is called (throw `InvalidOperationException`, same as `Undo`/`Redo` at `MapEditSession.cs:190,208`)
+  - no active stroke may exist when a new entry point is called (throw `InvalidOperationException`, same as `Undo`/`Redo` at `MapEditSession.cs:157,176`)
   - no-op operations (flood fill target == start value; patch with zero differing cells) return `false` and push no history entry
   - flood fill is 4-directional and stops at any cell whose layer value differs from the start cell's value
   - flood fill and patch apply to `TopLayer` / the explicitly passed layers only
@@ -57,7 +57,7 @@
 
 **Step 1: Write the failing tests**
 
-In `tests/MapEditor.Core.Tests/MapEditSessionTests.cs` (the file has no session helper — add `private static MapEditSession CreateSession(int width, int height) => new(MapDocument.Create(width, height));` and use it; match the file's existing fixture style):
+In `tests/MapEditor.Core.Tests/MapEditSessionTests.cs` (reuse the `CreateSession(int width = 4, int height = 4)` helper added in Part 1 — do not add a second one; the signatures are identical and a duplicate would not compile):
 
 ```csharp
 [Fact]
@@ -117,6 +117,31 @@ public void FloodFill_DiagonalOnlyConnection_DoesNotFill()
     // an 8-directional fill would reach (1,1) and then (2,2) through the diagonal
     Assert.Equal(new MapTileLayer(0, 0), session.Document[1, 1].GetLayer(0));
     Assert.Equal(new MapTileLayer(0, 0), session.Document[2, 2].GetLayer(0));
+}
+
+[Fact]
+public void FloodFill_DiagonalBlocker_DoesNotSealRegion()
+{
+    var session = CreateSession(4, 4);
+    session.Document.SetLayer(1, 1, 0, new MapTileLayer(1, 1));
+
+    session.SelectedTileLayer = new MapTileLayer(3, 3);
+    Assert.True(session.ApplyFloodFill(0, 0));
+
+    // the blocker touches the start cell only diagonally, so the fill flows around it
+    int filled = 0;
+    for (int y = 0; y < 4; y++)
+    {
+        for (int x = 0; x < 4; x++)
+        {
+            if (session.Document[x, y].GetLayer(0) == new MapTileLayer(3, 3))
+            {
+                filled++;
+            }
+        }
+    }
+
+    Assert.Equal(15, filled);
 }
 
 [Fact]
@@ -266,17 +291,21 @@ public enum MapEditTool
 `src/MapEditor.Core/MapTileRectangle.cs` (new):
 
 ```csharp
+using System;
+
 namespace MapEditor.Core;
 
 public readonly record struct MapTileRectangle(int X, int Y, int Width, int Height)
 {
     public MapTileRectangle? ClipTo(int boundsWidth, int boundsHeight)
     {
-        int x = Math.Max(0, X);
-        int y = Math.Max(0, Y);
-        int width = Math.Min(Width, boundsWidth - x);
-        int height = Math.Min(Height, boundsHeight - y);
-        return width > 0 && height > 0 ? new MapTileRectangle(x, y, width, height) : null;
+        long left = Math.Max(0, X);
+        long right = Math.Min((long)boundsWidth, X + (long)Width);
+        long top = Math.Max(0, Y);
+        long bottom = Math.Min((long)boundsHeight, Y + (long)Height);
+        int width = (int)(right - left);
+        int height = (int)(bottom - top);
+        return width > 0 && height > 0 ? new MapTileRectangle((int)left, (int)top, width, height) : null;
     }
 }
 ```
@@ -471,7 +500,7 @@ git commit -m "feat: flood fill and layer patch entry points in MapEditSession"
 |-----------|-----------|
 | Empty-region fill covers the map, one undo restores (happy path) | `FloodFill_EmptyRegion_FillsWholeMapAsOneUndoableCommand` |
 | Fill bounded by a square of other tiles (adversarial) | `FloodFill_SquareBoundary_FillsOnlyInterior` |
-| 4-directional: diagonal-only connection does not fill (adversarial) | `FloodFill_DiagonalOnlyConnection_DoesNotFill` |
+| Diagonal-only connection does not fill; diagonal blocker does not seal (adversarial) | `FloodFill_DiagonalOnlyConnection_DoesNotFill`, `FloodFill_DiagonalBlocker_DoesNotSealRegion` |
 | No-op fill pushes no history (adversarial) | `FloodFill_TargetEqualsStartValue_ReturnsFalseWithoutHistory` |
 | Fill targets topmost of a multi-selection | `FloodFill_WithMultiLayerSelection_FillsOnlyTopmostLayer` |
 | Patch writes corresponding layers only, one undo/redo round-trips | `LayerPatch_WritesCorrespondingLayersAsOneUndoableCommand` |
@@ -495,7 +524,7 @@ git commit -m "feat: flood fill and layer patch entry points in MapEditSession"
 - Test: `tests/MapEditor.Rendering.Tests/MapRendererTests.cs`
 
 **Mutation impact:**
-- Source of truth changed: `MapRenderOptions` record shape (`src/MapEditor.Rendering/Composition/MapRenderOptions.cs:4`) — two optional positional parameters appended; existing call sites (`MapCanvas.BuildRenderRequest`, `MapRenderOptions.Default`, all renderer tests) keep compiling
+- Source of truth changed: `MapRenderOptions` record shape (`src/MapEditor.Rendering/Composition/MapRenderOptions.cs:5`) — two optional positional parameters appended; existing call sites (`MapCanvas.BuildRenderRequest`, `MapRenderOptions.Default`, all renderer tests) keep compiling
 - Important readers: `MapRenderer.Render` (`:17`); `MapCanvas.BuildRenderRequest` (`src/MapEditor.App/Controls/MapCanvas.cs:344`, updated in Task 4)
 - Derived/cached state affected: none — options are rebuilt per render; `MaximumTileReadsPerRender` accounting (`MapRenderer.cs:40-57`) intentionally excludes overlay work (grid/blocked overlays already draw outside the read budget; the ghost fill adds per-cell overlay draws bounded by the viewport)
 - Invariants to preserve:
@@ -795,12 +824,22 @@ public void ApplyPasteAt_EdgeOrigin_ClipsToDocumentBounds()
 [Fact]
 public void ApplyPasteAt_NegativeOrigin_ClipsSourceAndDestination()
 {
-    SeedClipboard();
+    // distinct values per source cell so the assertion proves which source cell landed
+    for (int y = 0; y < 3; y++)
+    {
+        for (int x = 0; x < 3; x++)
+        {
+            _viewModel.Session.Document.SetLayer(x, y, 0, new MapTileLayer(x + 1, y + 1));
+        }
+    }
+
+    _viewModel.SelectedLayers = 0b00001;
+    _viewModel.SelectionRectangle = new MapTileRectangle(0, 0, 3, 3);
+    _viewModel.CopySelection();
     _viewModel.BeginPasteMode();
     _viewModel.ApplyPasteAt(-2, -2);
 
-    // only the bottom-right 1x1 of the 3x3 clipboard lands, at (0,0)
-    Assert.Equal(new MapTileLayer(7, 7), _viewModel.Session.Document[0, 0].GetLayer(0));
+    Assert.Equal(new MapTileLayer(3, 3), _viewModel.Session.Document[0, 0].GetLayer(0));
     Assert.False(_viewModel.PasteMode);
     Assert.True(_viewModel.CanUndo);
 }
@@ -1042,12 +1081,12 @@ git commit -m "feat: tile clipboard and paste mode in editor view model"
 **Mutation impact:**
 - Source of truth changed: left-click pointer flow in `MapCanvas` (`OnPointerPressed` `:102`, local `BeginStroke` `:293`) — currently every left press starts a session stroke; now it routes by tool and by paste mode
 - Important readers: `MapCanvas.OnPointerMoved/OnPointerReleased/OnPointerCaptureLost` (`:229` for capture-lost) finalize strokes; `FinishInteraction` (`:42`) is called by every menu command and close
-- Derived/cached state affected: paste mode must be cancelled by `FinishInteraction` (menu commands, close) and Escape, or a stale paste would fire on the next click after e.g. Ctrl+Z
+- Derived/cached state affected: paste mode must be cancelled by `FinishInteraction` (menu commands, close), Escape, window-level presses outside the canvas, and layer-selection changes, or a stale paste would fire on the next click after e.g. Ctrl+Z
 - Required propagation sequence:
   1. `OnPointerPressed` (left, not space-pan): if `_viewModel.PasteMode` → `TileAt` hit: `ApplyPasteAt(tile.X, tile.Y)`; miss: `CancelPasteMode()`; consume the press — set `e.Handled = true` and do NOT start a stroke or capture
   2. else route by `_viewModel.ActiveTool`: `Select` → set `SelectedX/SelectedY`, then `_viewModel.Refresh(EditorRefresh.Canvas)` (the selected-tile overlay only redraws on `CanvasInvalidated`/`Invalidate` — without this it stays stale until the next hover move); no stroke; `MultiSelect` → begin local rectangle drag (`_rectDragStart = tile`, `_multiSelecting = true`, `_rectDragMoved = false`) and capture the pointer (store it in a new `IPointer? _capturedPointer` field — the existing capture site `:131` stores nothing, and `FinishInteraction` has no event to release through); `FloodFill` → `_viewModel.Session.ApplyFloodFill(tile.X, tile.Y)`, set `SelectedX/SelectedY`, refresh; default → existing `BeginStroke`
   3. `IsGestureActive` (`:100`) and the capture condition (`:131`): include `_multiSelecting` — otherwise the drag freezes when the pointer leaves the canvas and release-outside never finalizes
-  4. `OnPointerMoved` while `_multiSelecting`: normalize `_rectDragStart`→current tile into inclusive bounds, **clamped to the map** (if `TileAt` is null mid-drag, clamp to the last in-bounds tile / map edge), set `_viewModel.SelectionRectangle = new MapTileRectangle(minX, minY, w, h)` (w/h = span+1), `_rectDragMoved = true`, `Invalidate()`
+  4. `OnPointerMoved` while `_multiSelecting`: normalize `_rectDragStart`→current tile into inclusive bounds; the raw `ScreenToTile` coordinate is clamped independently to `[0, Width-1]` / `[0, Height-1]` before normalizing against the drag origin (a null `TileAt` mid-drag clamps to the map edge), set `_viewModel.SelectionRectangle = new MapTileRectangle(minX, minY, w, h)` (w/h = span+1), `_rectDragMoved = true`, `Invalidate()`
   5. `OnPointerReleased` while `_multiSelecting`: if no move occurred, set a 1×1 rectangle at the pressed tile; clear `_multiSelecting`; `Invalidate()`
   6. `OnKeyDown` Escape (`:268`): existing `FinishInteraction(commit: false)` plus `_viewModel.CancelPasteMode()`
   7. `FinishInteraction`: add `_viewModel.CancelPasteMode()`, and clear `_multiSelecting`/`_rectDragStart` + release the captured pointer via `_capturedPointer?.Capture(null); _capturedPointer = null;` (Avalonia 11.3.20 has no `ReleaseCapture()` — the codebase pattern is `Pointer.Capture(null)`, see `MapCanvas.cs:224`) — a menu command or Escape mid-drag must not leave the canvas permanently gesture-active (`FinishInteraction` currently clears only `_stroking`/`_panning`)
@@ -1057,11 +1096,11 @@ git commit -m "feat: tile clipboard and paste mode in editor view model"
   - Select and FloodFill never leave `session.HasActiveStroke` true
   - paste mode ends after exactly one click (apply or cancel)
   - existing pencil/eraser/eyedropper/blocked stroke behavior is byte-for-byte unchanged
-- Observable proof required: adversarial test — entering paste mode, pressing the Undo menu path (`FinishInteraction`), then clicking does not paste (no document change, no history entry).
+- Observable proof required: adversarial test — entering paste mode, raising the real Undo menu item (`UndoCommand`), then clicking does not paste (no document change, no history entry).
 
 **Step 1: Write the failing tests**
 
-`tests/MapEditor.App.Tests/MapCanvasTests.cs` (follow the file's existing `CreateSmallMapAsync`/`Cell`/`MouseDown` patterns):
+`tests/MapEditor.App.Tests/MapCanvasTests.cs` (follow the file's existing `CreateSmallMapAsync`/`Cell`/`MouseDown` patterns; add `using Avalonia.Interactivity;` for `RoutedEventArgs`):
 
 ```csharp
 [AvaloniaFact]
@@ -1202,18 +1241,28 @@ public async Task PasteMode_ClickOutsideMapCancelsWithoutPasting()
 }
 
 [AvaloniaFact]
-public async Task PasteMode_FinishInteractionCancelsBeforeNextClick()
+public async Task PasteMode_UndoMenuCancelsBeforeNextClick()
 {
     Harness harness = await CreateSmallMapAsync();
     MapDocument document = harness.ViewModel.Session.Document;
-    document.SetLayer(0, 0, 0, new MapTileLayer(7, 7));
-    harness.ViewModel.SelectionRectangle = new MapTileRectangle(0, 0, 1, 1);
+
+    // paint a cell before entering paste mode so the Undo menu item is enabled
+    harness.ViewModel.Brush = new MapTileLayer(9, 9);
+    Point paint = new(Cell / 2, Cell / 2);
+    harness.Window.MouseDown(paint, MouseButton.Left, RawInputModifiers.None);
+    harness.Window.MouseUp(paint, MouseButton.Left, RawInputModifiers.None);
+    Assert.True(harness.ViewModel.CanUndo);
+
+    document.SetLayer(1, 0, 0, new MapTileLayer(7, 7));
+    harness.ViewModel.SelectionRectangle = new MapTileRectangle(1, 0, 1, 1);
     harness.ViewModel.CopySelection();
     harness.ViewModel.BeginPasteMode();
 
-    harness.Window.Canvas.FinishInteraction(commit: true);
+    harness.Window.Find<MenuItem>("UndoCommand").RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
     Assert.False(harness.ViewModel.PasteMode);
+    Assert.Equal(new MapTileLayer(0, 0), document[0, 0].GetLayer(0));
 
+    // the next click runs the active tool, not a paste
     harness.ViewModel.Brush = new MapTileLayer(4, 4);
     harness.ViewModel.ActiveTool = MapEditTool.Pencil;
     Point p = new(Cell + Cell / 2, Cell + Cell / 2);
@@ -1222,10 +1271,29 @@ public async Task PasteMode_FinishInteractionCancelsBeforeNextClick()
 
     Assert.Equal(new MapTileLayer(4, 4), document[1, 1].GetLayer(0));
 }
+
+[AvaloniaFact]
+public async Task PasteMode_ClickOnNonCanvasControl_CancelsWithoutPasting()
+{
+    Harness harness = await CreateSmallMapAsync();
+    MapDocument document = harness.ViewModel.Session.Document;
+    document.SetLayer(0, 0, 0, new MapTileLayer(7, 7));
+    harness.ViewModel.SelectionRectangle = new MapTileRectangle(0, 0, 1, 1);
+    harness.ViewModel.CopySelection();
+    harness.ViewModel.BeginPasteMode();
+
+    // the status bar is a plain control with no other side effects
+    Point status = harness.Window.Find<Border>("StatusBar").TranslatePoint(new Point(5, 5), harness.Window).Value;
+    harness.Window.MouseDown(status, MouseButton.Left, RawInputModifiers.None);
+    harness.Window.MouseUp(status, MouseButton.Left, RawInputModifiers.None);
+
+    Assert.False(harness.ViewModel.PasteMode);
+    Assert.False(harness.ViewModel.Session.CanUndo);
+}
 ```
 
 `tests/MapEditor.App.Tests/MainWindowTests.cs`:
-- `Layout_ContainsFourToolTogglesWithPencilActive` (`:176`): rename to `Layout_ContainsSevenToolTogglesWithPencilActive`; assert the three new toggles (`SelectTool`, `MultiSelectTool`, `FloodFillTool`) exist and Pencil is still checked by default.
+- `Layout_ContainsFourToolTogglesWithPencilActive` (`:176`): rename to `Layout_ContainsSevenToolTogglesWithPencilActive`; assert the three new toggles (`SelectTool`, `MultiSelectTool`, `FloodFillTool`) exist, Pencil is still checked by default, and the toolbar's toggle children appear in the design order Pencil, Eraser, Eyedropper, Blocked, Select, Multi-select, Flood fill (assert the sequence of `x:Name`s of the `ToggleButton` descendants of `Find<Border>("Toolbar")`).
 - Hotkey tests (use `KeyPressQwerty` — the `KeyPress(Key, …)` overload is `[Obsolete]`): `PhysicalKey.V` → `ActiveTool == Select`; `PhysicalKey.M` → `MultiSelect`; `PhysicalKey.B` → `FloodFill`; `PhysicalKey.X` → `BlockedToggle` (regression for the Part 1 change). Also add the V/M/B cases to `ShortcutTests.cs` next to the existing B/X cases (`:126-127`).
 - Ctrl+C/Ctrl+V (probe-verified: `KeyPressQwerty(PhysicalKey.C, RawInputModifiers.Control)` delivers `KeyModifiers.Control` headless — unlike pointer modifiers, which cannot be simulated): in `MainWindowTests` using the `MainWindowHarness`:
 
@@ -1233,7 +1301,7 @@ public async Task PasteMode_FinishInteractionCancelsBeforeNextClick()
 [AvaloniaFact]
 public void CtrlC_PopulatesClipboardAndCtrlV_EntersPasteMode()
 {
-    MainWindowHarness harness = Create();
+    using MainWindowHarness harness = MainWindowHarness.Create();
     harness.ViewModel.Session.Document.SetLayer(0, 0, 0, new MapTileLayer(7, 7));
     harness.ViewModel.SelectionRectangle = new MapTileRectangle(0, 0, 1, 1);
 
@@ -1247,7 +1315,7 @@ public void CtrlC_PopulatesClipboardAndCtrlV_EntersPasteMode()
 [AvaloniaFact]
 public void CtrlC_WithoutSelectionRectangle_DoesNothing()
 {
-    MainWindowHarness harness = Create();
+    using MainWindowHarness harness = MainWindowHarness.Create();
     harness.Window.KeyPressQwerty(PhysicalKey.C, RawInputModifiers.Control);
     Assert.Null(harness.ViewModel.Clipboard);
 }
@@ -1255,9 +1323,9 @@ public void CtrlC_WithoutSelectionRectangle_DoesNothing()
 [AvaloniaFact]
 public void CtrlC_WithBrushFieldFocused_KeepsNativeBehavior()
 {
-    MainWindowHarness harness = Create();
+    using MainWindowHarness harness = MainWindowHarness.Create();
     harness.ViewModel.SelectionRectangle = new MapTileRectangle(0, 0, 1, 1);
-    Find<TextBox>("BrushGraphic").Focus();
+    harness.Window.Find<TextBox>("BrushGraphic").Focus();
 
     harness.Window.KeyPressQwerty(PhysicalKey.C, RawInputModifiers.Control);
     Assert.Null(harness.ViewModel.Clipboard);
@@ -1274,7 +1342,7 @@ Expected: new tests fail (tools not wired, toggles missing).
 **Step 3: Implement**
 
 `MapCanvas.cs`:
-- New fields: `private MapTileCoordinate? _rectDragStart; private bool _multiSelecting; private bool _rectDragMoved;`
+- New fields: `private MapTileCoordinate? _rectDragStart; private bool _multiSelecting; private bool _rectDragMoved; private IPointer? _capturedPointer;`
 - `OnPointerPressed`: insert the paste-mode and tool routing described in the mutation impact before the existing `BeginStroke` call; only the default branch calls `BeginStroke`.
 - `OnPointerMoved`: add the `_multiSelecting` branch (before the `_stroking` branch).
 - `OnPointerReleased` / `OnPointerCaptureLost`: finalize `_multiSelecting` (1×1 if `!_rectDragMoved`).
@@ -1294,6 +1362,19 @@ Expected: new tests fail (tools not wired, toggles missing).
 
 `MainWindow.axaml.cs`:
 - `SyncToolButtons` (`:424`): add the three new toggles.
+- Window-level paste cancellation (any press not originating from the canvas cancels paste mode — clicks on the toolbar, right panel, or menus never reach `MapCanvas`): subscribe in the constructor and add:
+
+```csharp
+private void OnWindowPointerPressed(object? sender, PointerPressedEventArgs e)
+{
+    if (_viewModel.PasteMode && e.Source is not MapCanvas)
+    {
+        _viewModel.CancelPasteMode();
+    }
+}
+```
+
+(`PointerPressed` bubbles from the pressed control, so the window sees every press; `e.Source` is the canvas for canvas clicks, which the canvas handles itself — inside the map applies, outside cancels.)
 - `OnKeyDown` unmodified-letter switch: add `Key.V` → `Select`, `Key.M` → `MultiSelect`, `Key.B` → `FloodFill` (the `Key.X` → `BlockedToggle` case exists from Part 1; `case Key.B` currently at `:158` was moved to X by Part 1).
 - `OnKeyDown` primary-modifier switch: add, with a TextBox guard so brush fields keep native copy/paste:
 
@@ -1339,8 +1420,9 @@ git commit -m "feat: select, multi-select copy/paste, and flood fill tools in th
 | Paste applies exactly once; second click runs the active tool (adversarial) | `PasteMode_IsOneShot_SecondClickRunsActiveTool` |
 | Escape cancels paste mode without pasting | `PasteMode_EscapeCancelsWithoutPasting` |
 | Click outside the map cancels paste mode without pasting | `PasteMode_ClickOutsideMapCancelsWithoutPasting` |
-| Menu/close path cancels paste mode before the next click (adversarial) | `PasteMode_FinishInteractionCancelsBeforeNextClick` |
-| Toolbar shows all seven tools; hotkeys V/M/B/X route correctly | extended `MainWindowTests` toolbar + hotkey tests |
+| Menu/close path cancels paste mode before the next click (adversarial) | `PasteMode_UndoMenuCancelsBeforeNextClick` (raises the real Undo menu item) |
+| Click on a non-canvas control cancels paste mode without pasting | `PasteMode_ClickOnNonCanvasControl_CancelsWithoutPasting` |
+| Toolbar shows all seven tools in the design order; hotkeys V/M/B/X route correctly | extended `MainWindowTests` toolbar + hotkey tests |
 | Ctrl+C populates clipboard, Ctrl+V enters paste mode; no-selection Ctrl+C is a no-op | `CtrlC_PopulatesClipboardAndCtrlV_EntersPasteMode`, `CtrlC_WithoutSelectionRectangle_DoesNothing` |
 | Ctrl+C guarded against TextBox focus | `CtrlC_WithBrushFieldFocused_KeepsNativeBehavior` |
 
