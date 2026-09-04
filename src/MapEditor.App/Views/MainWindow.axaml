@@ -29,17 +29,6 @@
         </MenuItem>
       </MenuItem>
     </Menu>
-    <Border x:Name="Toolbar" Classes="chrome" DockPanel.Dock="Top" Padding="8,6" BorderThickness="0,0,0,1">
-      <StackPanel Orientation="Horizontal" Spacing="2">
-        <ToggleButton x:Name="PencilTool" Content="Pencil" Tag="Pencil" IsChecked="True" Checked="OnToolChecked" Unchecked="OnToolUnchecked" />
-        <ToggleButton x:Name="EraserTool" Content="Eraser" Tag="Eraser" Checked="OnToolChecked" Unchecked="OnToolUnchecked" />
-        <ToggleButton x:Name="EyedropperTool" Content="Eyedropper" Tag="Eyedropper" Checked="OnToolChecked" Unchecked="OnToolUnchecked" />
-        <ToggleButton x:Name="BlockedTool" Content="Blocked" Tag="BlockedToggle" Checked="OnToolChecked" Unchecked="OnToolUnchecked" />
-        <ToggleButton x:Name="SelectTool" Content="Select" Tag="Select" Checked="OnToolChecked" Unchecked="OnToolUnchecked" />
-        <ToggleButton x:Name="MultiSelectTool" Content="Multi-select" Tag="MultiSelect" Checked="OnToolChecked" Unchecked="OnToolUnchecked" />
-        <ToggleButton x:Name="FloodFillTool" Content="Flood fill" Tag="FloodFill" Checked="OnToolChecked" Unchecked="OnToolUnchecked" />
-      </StackPanel>
-    </Border>
     <Border x:Name="StatusBar" Classes="chrome" DockPanel.Dock="Bottom" Padding="12,5" BorderThickness="0,1,0,0">
       <StackPanel Orientation="Horizontal" Spacing="18">
         <TextBlock x:Name="HoverText" Classes="mono muted" Text="—" />
@@ -76,7 +65,22 @@
                      HorizontalAlignment="Right" Margin="0,3,3,3" IsVisible="False" />
         </Grid>
       </DockPanel>
-      <Border x:Name="CanvasHost" Classes="sunken" Grid.Column="2" Margin="10" ClipToBounds="True" />
+      <DockPanel Grid.Column="2">
+        <!-- A floating tool strip: the toolbar no longer spans the window, so a card reads better than a band. -->
+        <Border x:Name="Toolbar" Classes="card" DockPanel.Dock="Top"
+                Padding="4" Margin="10,10,10,0" HorizontalAlignment="Left">
+          <StackPanel Orientation="Horizontal" Spacing="2">
+            <ToggleButton x:Name="PencilTool" Content="Pencil" Tag="Pencil" IsChecked="True" Checked="OnToolChecked" Unchecked="OnToolUnchecked" />
+            <ToggleButton x:Name="EraserTool" Content="Eraser" Tag="Eraser" Checked="OnToolChecked" Unchecked="OnToolUnchecked" />
+            <ToggleButton x:Name="EyedropperTool" Content="Eyedropper" Tag="Eyedropper" Checked="OnToolChecked" Unchecked="OnToolUnchecked" />
+            <ToggleButton x:Name="BlockedTool" Content="Blocked" Tag="BlockedToggle" Checked="OnToolChecked" Unchecked="OnToolUnchecked" />
+            <ToggleButton x:Name="SelectTool" Content="Select" Tag="Select" Checked="OnToolChecked" Unchecked="OnToolUnchecked" />
+            <ToggleButton x:Name="MultiSelectTool" Content="Multi-select" Tag="MultiSelect" Checked="OnToolChecked" Unchecked="OnToolUnchecked" />
+            <ToggleButton x:Name="FloodFillTool" Content="Flood fill" Tag="FloodFill" Checked="OnToolChecked" Unchecked="OnToolUnchecked" />
+          </StackPanel>
+        </Border>
+        <Border x:Name="CanvasHost" Classes="sunken" Margin="10,8,10,10" ClipToBounds="True" />
+      </DockPanel>
       <StackPanel x:Name="RightPanel" Grid.Column="3" Spacing="0" Margin="12" Background="Transparent">
         <TextBlock Text="LAYERS" Classes="section" Margin="2,0,0,6" />
         <Border Classes="card">
