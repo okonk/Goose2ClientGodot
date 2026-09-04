@@ -27,6 +27,10 @@ public readonly struct MapTile
 
     public bool IsBlocked => (Flags & MapDocument.BlockedFlag) != 0;
 
+    public bool IsEmpty => _flags == 0
+        && _layer0 == default && _layer1 == default && _layer2 == default
+        && _layer3 == default && _layer4 == default;
+
     public bool IsRoof => GetLayer(MapDocument.LayerCount - 1).Graphic != 0;
 
     public MapTileLayer GetLayer(int layerIndex)
@@ -63,7 +67,7 @@ public readonly struct MapTile
 
 public sealed class MapDocument
 {
-    private readonly MapTile[] _tiles;
+    private MapTile[] _tiles;
 
     public const int LayerCount = 5;
     public const int BlockedFlag = 2;
@@ -80,9 +84,9 @@ public sealed class MapDocument
 
     public short EditorVersion { get; }
 
-    public int Width { get; }
+    public int Width { get; private set; }
 
-    public int Height { get; }
+    public int Height { get; private set; }
 
     public int TileCount => _tiles.Length;
 
@@ -113,6 +117,53 @@ public sealed class MapDocument
         }
 
         return new MapDocument(NewMapVersion, SupportedEditorVersion, width, height, new MapTile[checked(width * height)]);
+    }
+
+    internal void ResizeTo(MapTileRectangle window)
+    {
+        long width = window.Width;
+        long height = window.Height;
+        long x = window.X;
+        long y = window.Y;
+        if (width < MinDimension || width > MaxDimension)
+        {
+            throw new ArgumentOutOfRangeException(nameof(window));
+        }
+
+        if (height < MinDimension || height > MaxDimension)
+        {
+            throw new ArgumentOutOfRangeException(nameof(window));
+        }
+
+        long minOrigin = -MaxDimension;
+        long maxOrigin = MaxDimension;
+        if (x < minOrigin || x > maxOrigin)
+        {
+            throw new ArgumentOutOfRangeException(nameof(window));
+        }
+
+        if (y < minOrigin || y > maxOrigin)
+        {
+            throw new ArgumentOutOfRangeException(nameof(window));
+        }
+
+        int newWidth = (int)width;
+        int newHeight = (int)height;
+        var newTiles = new MapTile[checked(newWidth * newHeight)];
+        int oldStartX = Math.Max(0, (int)x);
+        int newStartX = Math.Max(0, -(int)x);
+        int copyWidth = (int)Math.Max(0, Math.Min((long)newWidth - newStartX, Width - oldStartX));
+        int oldStartY = Math.Max(0, (int)y);
+        int newStartY = Math.Max(0, -(int)y);
+        int copyHeight = (int)Math.Max(0, Math.Min((long)newHeight - newStartY, Height - oldStartY));
+        for (var row = 0; row < copyHeight; row++)
+        {
+            Array.Copy(_tiles, (row + oldStartY) * Width + oldStartX, newTiles, (row + newStartY) * newWidth + newStartX, copyWidth);
+        }
+
+        _tiles = newTiles;
+        Width = newWidth;
+        Height = newHeight;
     }
 
     public MapTile this[int x, int y]

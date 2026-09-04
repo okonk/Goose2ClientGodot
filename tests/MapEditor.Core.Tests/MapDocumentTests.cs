@@ -204,6 +204,44 @@ public class MapDocumentTests
         Assert.Equal(new MapTileLayer(4, 40), doc[1, 1].GetLayer(4));
     }
 
+    [Fact]
+    public void ResizeTo_GrowingNorthWest_MovesContentAndZeroFillsTheRest()
+    {
+        var doc = MapDocument.Create(3, 3);
+        doc.SetLayer(0, 0, 0, new MapTileLayer(5, 9));
+        doc.ResizeTo(new MapTileRectangle(-2, -1, 5, 4));
+
+        Assert.Equal(5, doc.Width);
+        Assert.Equal(4, doc.Height);
+        Assert.Equal(new MapTileLayer(5, 9), doc[2, 1].GetLayer(0));
+        Assert.Equal(new MapTileLayer(0, 0), doc[0, 0].GetLayer(0));
+        Assert.Equal(20, doc.TileCount);
+    }
+
+    [Fact]
+    public void ResizeTo_OversizedResult_ThrowsAndLeavesDocumentByteIdentical()
+    {
+        var doc = MapDocument.Create(3, 3);
+        doc.SetLayer(1, 1, 0, new MapTileLayer(4, 4));
+        doc.SetFlags(2, 2, MapDocument.BlockedFlag);
+        byte[] before = MapCodec.Encode(doc);
+
+        Assert.Throws<ArgumentOutOfRangeException>(
+            () => doc.ResizeTo(new MapTileRectangle(0, 0, 1001, 3)));
+
+        Assert.Equal(before, MapCodec.Encode(doc));
+    }
+
+    [Fact]
+    public void IsEmpty_IsFalseForABlockedTileWithNoGraphics()
+    {
+        var doc = MapDocument.Create(2, 2);
+        doc.SetFlags(0, 0, MapDocument.BlockedFlag);
+
+        Assert.False(doc[0, 0].IsEmpty);
+        Assert.True(doc[1, 1].IsEmpty);
+    }
+
     private static void SeedAllLayers(MapDocument doc)
     {
         for (var y = 0; y < doc.Height; y++)
