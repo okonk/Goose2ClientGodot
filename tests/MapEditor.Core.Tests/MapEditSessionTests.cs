@@ -587,5 +587,226 @@ public class MapEditSessionTests
         Assert.False(session.IsDirty);
     }
 
+    [Fact]
+    public void FloodFill_EmptyRegion_FillsWholeMapAsOneUndoableCommand()
+    {
+        var session = CreateSession(5, 5);
+        session.SelectedTileLayer = new MapTileLayer(3, 3);
+        Assert.True(session.ApplyFloodFill(2, 2));
+        for (int y = 0; y < 5; y++)
+            for (int x = 0; x < 5; x++)
+                Assert.Equal(new MapTileLayer(3, 3), session.Document[x, y].GetLayer(0));
+        Assert.True(session.CanUndo);
+        Assert.True(session.Undo());
+        for (int y = 0; y < 5; y++)
+            for (int x = 0; x < 5; x++)
+                Assert.Equal(new MapTileLayer(0, 0), session.Document[x, y].GetLayer(0));
+        Assert.True(session.CanRedo);
+        Assert.True(session.Redo());
+        for (int y = 0; y < 5; y++)
+            for (int x = 0; x < 5; x++)
+                Assert.Equal(new MapTileLayer(3, 3), session.Document[x, y].GetLayer(0));
+    }
+
+    [Fact]
+    public void FloodFill_SquareBoundary_FillsOnlyInterior()
+    {
+        var session = CreateSession(5, 5);
+        for (int i = 1; i <= 3; i++)
+        {
+            session.Document.SetLayer(i, 1, 0, new MapTileLayer(1, 1));
+            session.Document.SetLayer(i, 3, 0, new MapTileLayer(1, 1));
+            session.Document.SetLayer(1, i, 0, new MapTileLayer(1, 1));
+            session.Document.SetLayer(3, i, 0, new MapTileLayer(1, 1));
+        }
+
+        session.SelectedTileLayer = new MapTileLayer(9, 9);
+        Assert.True(session.ApplyFloodFill(2, 2));
+
+        Assert.Equal(new MapTileLayer(9, 9), session.Document[2, 2].GetLayer(0));
+        Assert.Equal(new MapTileLayer(1, 1), session.Document[1, 1].GetLayer(0));
+        Assert.Equal(new MapTileLayer(0, 0), session.Document[0, 0].GetLayer(0));
+    }
+
+    [Fact]
+    public void FloodFill_DiagonalOnlyConnection_DoesNotFill()
+    {
+        var session = CreateSession(4, 4);
+        // both in-map orthogonal neighbours of (0,0) are blockers; (1,1) and (2,2)
+        // match the start value and are reachable only diagonally
+        session.Document.SetLayer(1, 0, 0, new MapTileLayer(1, 1));
+        session.Document.SetLayer(0, 1, 0, new MapTileLayer(1, 1));
+
+        session.SelectedTileLayer = new MapTileLayer(9, 9);
+        Assert.True(session.ApplyFloodFill(0, 0));
+
+        Assert.Equal(new MapTileLayer(9, 9), session.Document[0, 0].GetLayer(0));
+        // an 8-directional fill would reach (1,1) and then (2,2) through the diagonal
+        Assert.Equal(new MapTileLayer(0, 0), session.Document[1, 1].GetLayer(0));
+        Assert.Equal(new MapTileLayer(0, 0), session.Document[2, 2].GetLayer(0));
+    }
+
+    [Fact]
+    public void FloodFill_DiagonalBlocker_DoesNotSealRegion()
+    {
+        var session = CreateSession(4, 4);
+        session.Document.SetLayer(1, 1, 0, new MapTileLayer(1, 1));
+
+        session.SelectedTileLayer = new MapTileLayer(3, 3);
+        Assert.True(session.ApplyFloodFill(0, 0));
+
+        // the blocker touches the start cell only diagonally, so the fill flows around it
+        int filled = 0;
+        for (int y = 0; y < 4; y++)
+        {
+            for (int x = 0; x < 4; x++)
+            {
+                if (session.Document[x, y].GetLayer(0) == new MapTileLayer(3, 3))
+                {
+                    filled++;
+                }
+            }
+        }
+
+        Assert.Equal(15, filled);
+    }
+
+    [Fact]
+    public void FloodFill_NonEmptyStartRegion_RefillsWithBrush()
+    {
+        var session = CreateSession(4, 4);
+        for (int x = 0; x < 4; x++)
+        {
+            for (int y = 0; y < 4; y++)
+            {
+                session.Document.SetLayer(x, y, 0, new MapTileLayer(3, 3));
+            }
+        }
+
+        session.SelectedTileLayer = new MapTileLayer(9, 9);
+        Assert.True(session.ApplyFloodFill(0, 0));
+
+        Assert.Equal(new MapTileLayer(9, 9), session.Document[0, 0].GetLayer(0));
+        Assert.Equal(new MapTileLayer(9, 9), session.Document[3, 3].GetLayer(0));
+    }
+
+    [Fact]
+    public void FloodFill_TargetEqualsStartValue_ReturnsFalseWithoutHistory()
+    {
+        var session = CreateSession(5, 5);
+        session.SelectedTileLayer = new MapTileLayer(0, 0);
+        Assert.False(session.ApplyFloodFill(0, 0));
+        Assert.False(session.CanUndo);
+    }
+
+    [Fact]
+    public void FloodFill_WithMultiLayerSelection_FillsOnlyTopmostLayer()
+    {
+        var session = CreateSession(5, 5);
+        session.SelectedLayers = 0b01001;
+        session.SelectedTileLayer = new MapTileLayer(3, 3);
+        Assert.True(session.ApplyFloodFill(0, 0));
+        Assert.Equal(new MapTileLayer(3, 3), session.Document[0, 0].GetLayer(3));
+        Assert.Equal(new MapTileLayer(0, 0), session.Document[0, 0].GetLayer(0));
+    }
+
+    [Fact]
+    public void LayerPatch_WritesCorrespondingLayersAsOneUndoableCommand()
+    {
+        var session = CreateSession(5, 5);
+        MapTileLayer[]?[] patch = new MapTileLayer[MapDocument.LayerCount][];
+        patch[1] = new MapTileLayer[] { new(5, 5), new(6, 6) };
+        patch[3] = new MapTileLayer[] { new(7, 7), new(8, 8) };
+
+        Assert.True(session.ApplyLayerPatch(1, 1, 2, 1, patch));
+        Assert.Equal(new MapTileLayer(5, 5), session.Document[1, 1].GetLayer(1));
+        Assert.Equal(new MapTileLayer(6, 6), session.Document[2, 1].GetLayer(1));
+        Assert.Equal(new MapTileLayer(7, 7), session.Document[1, 1].GetLayer(3));
+        Assert.Equal(new MapTileLayer(0, 0), session.Document[1, 1].GetLayer(0));
+        Assert.Equal(new MapTileLayer(0, 0), session.Document[1, 1].GetLayer(2));
+
+        Assert.True(session.Undo());
+        Assert.Equal(new MapTileLayer(0, 0), session.Document[1, 1].GetLayer(1));
+        Assert.Equal(new MapTileLayer(0, 0), session.Document[1, 1].GetLayer(3));
+        Assert.True(session.Redo());
+        Assert.Equal(new MapTileLayer(5, 5), session.Document[1, 1].GetLayer(1));
+    }
+
+    [Fact]
+    public void LayerPatch_NoDifferingCells_ReturnsFalseWithoutHistory()
+    {
+        var session = CreateSession(5, 5);
+        MapTileLayer[]?[] patch = new MapTileLayer[MapDocument.LayerCount][];
+        patch[0] = new MapTileLayer[] { new(0, 0) };
+        Assert.False(session.ApplyLayerPatch(0, 0, 1, 1, patch));
+        Assert.False(session.CanUndo);
+    }
+
+    [Theory]
+    [InlineData(4, 0, 2, 2)]
+    [InlineData(0, 4, 2, 2)]
+    [InlineData(0, 0, 0, 2)]
+    public void LayerPatch_OutOfBounds_ThrowsWithoutMutation(int originX, int originY, int width, int height)
+    {
+        var session = CreateSession(5, 5);
+        MapTileLayer[]?[] patch = new MapTileLayer[MapDocument.LayerCount][];
+        patch[0] = new MapTileLayer[width * height];
+        Assert.Throws<ArgumentOutOfRangeException>(() => session.ApplyLayerPatch(originX, originY, width, height, patch));
+        Assert.False(session.IsDirty);
+    }
+
+    [Fact]
+    public void LayerPatch_WrongInnerArrayLength_ThrowsWithoutMutation()
+    {
+        var session = CreateSession(5, 5);
+        session.Document.SetLayer(0, 0, 0, new MapTileLayer(1, 1));
+        MapTileLayer[]?[] patch = new MapTileLayer[MapDocument.LayerCount][];
+        patch[0] = new MapTileLayer[3];
+        Assert.Throws<ArgumentException>(() => session.ApplyLayerPatch(0, 0, 2, 2, patch));
+        Assert.Equal(new MapTileLayer(1, 1), session.Document[0, 0].GetLayer(0));
+        Assert.False(session.CanUndo);
+    }
+
+    [Theory]
+    [InlineData(MapEditTool.Select)]
+    [InlineData(MapEditTool.MultiSelect)]
+    [InlineData(MapEditTool.FloodFill)]
+    public void BeginStroke_NonStrokingTool_Throws(MapEditTool tool)
+    {
+        var session = CreateSession();
+        Assert.Throws<ArgumentOutOfRangeException>(() => session.BeginStroke(tool, 0, 0));
+    }
+
+    [Fact]
+    public void FloodFill_AndLayerPatch_WithActiveStroke_Throw()
+    {
+        var session = CreateSession(5, 5);
+        session.BeginStroke(MapEditTool.Pencil, 0, 0);
+        Assert.Throws<InvalidOperationException>(() => session.ApplyFloodFill(1, 1));
+        MapTileLayer[]?[] patch = new MapTileLayer[MapDocument.LayerCount][];
+        patch[0] = new MapTileLayer[] { new(1, 1) };
+        Assert.Throws<InvalidOperationException>(() => session.ApplyLayerPatch(0, 0, 1, 1, patch));
+    }
+
+    [Theory]
+    [InlineData(0, 0, 3, 3, 5, 5, 0, 0, 3, 3)]
+    [InlineData(3, 3, 4, 4, 5, 5, 3, 3, 2, 2)]
+    [InlineData(-2, -2, 3, 3, 5, 5, 0, 0, 1, 1)]
+    public void ClipTo_ClipsToBounds(int x, int y, int w, int h, int bw, int bh, int ex, int ey, int ew, int eh)
+    {
+        var clipped = new MapTileRectangle(x, y, w, h).ClipTo(bw, bh);
+        Assert.Equal(new MapTileRectangle(ex, ey, ew, eh), clipped);
+    }
+
+    [Theory]
+    [InlineData(5, 0, 2, 2, 5, 5)]
+    [InlineData(0, 5, 2, 2, 5, 5)]
+    [InlineData(-7, -7, 2, 2, 5, 5)]
+    [InlineData(0, 0, 0, 3, 5, 5)]
+    public void ClipTo_NoOverlapOrEmpty_ReturnsNull(int x, int y, int w, int h, int bw, int bh)
+    {
+        Assert.Null(new MapTileRectangle(x, y, w, h).ClipTo(bw, bh));
+    }
+
     private static MapEditSession CreateSession(int width = 4, int height = 4) => new(MapDocument.Create(width, height));
 }

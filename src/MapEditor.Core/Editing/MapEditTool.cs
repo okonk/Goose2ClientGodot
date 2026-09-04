@@ -5,5 +5,8 @@ public enum MapEditTool
     Pencil,
     Eraser,
     Eyedropper,
-    BlockedToggle
+    BlockedToggle,
+    Select,
+    MultiSelect,
+    FloodFill
 }

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace MapEditor.Core;
 
@@ -136,17 +137,143 @@ public sealed class MapEditSession
             return false;
         }
 
-        int beforeStateId = _currentStateId;
-        int afterStateId = _nextStateId++;
-        MapEditCommand command = stroke.LayerChanges is { } layerChanges
-            ? MapEditCommand.ForLayerChanges(layerChanges, beforeStateId, afterStateId)
-            : MapEditCommand.ForFlagsChanges(stroke.FlagsChanges!, beforeStateId, afterStateId);
-        _currentStateId = afterStateId;
-        _history.PushUndo(command);
+        if (stroke.LayerChanges is { } layerChanges)
+        {
+            PushLayerCommand(layerChanges);
+        }
+        else
+        {
+            int beforeStateId = _currentStateId;
+            int afterStateId = _nextStateId++;
+            _currentStateId = afterStateId;
+            _history.PushUndo(MapEditCommand.ForFlagsChanges(stroke.FlagsChanges!, beforeStateId, afterStateId));
+        }
+
         stroke.Release();
         return true;
     }
 
+    public bool ApplyFloodFill(int x, int y)
+    {
+        ValidateCoordinate(x, y);
+        if (_stroke != null)
+        {
+            throw new InvalidOperationException();
+        }
+
+        int layer = TopLayer;
+        MapTileLayer target = _selectedTileLayer;
+        MapTileLayer startValue = _document[x, y].GetLayer(layer);
+        if (startValue == target)
+        {
+            return false;
+        }
+
+        int width = _document.Width;
+        int height = _document.Height;
+        var visited = new StrokeVisitBitmap(_document.TileCount);
+        var changes = new MapEditChangeBuffer<MapLayerChange>();
+        var frontier = new Queue<int>();
+        int[] neighborOffsets = { -1, 1, -width, width };
+        int start = y * width + x;
+        visited.TryMark(start);
+        frontier.Enqueue(start);
+        while (frontier.Count > 0)
+        {
+            int index = frontier.Dequeue();
+            int cx = index % width;
+            int cy = index / width;
+            changes.Append(new MapLayerChange(cx, cy, layer, startValue, target));
+            _document.SetLayer(cx, cy, layer, target);
+
+            foreach (int offset in neighborOffsets)
+            {
+                int ni = index + offset;
+                if (ni < 0 || ni >= _document.TileCount)
+                {
+                    continue;
+                }
+
+                int nx = ni % width;
+                if (offset == -1 && cx == 0) continue;
+                if (offset == 1 && cx == width - 1) continue;
+                if (!visited.TryMark(ni))
+                {
+                    continue;
+                }
+
+                if (_document[nx, ni / width].GetLayer(layer) != startValue)
+                {
+                    continue;
+                }
+
+                frontier.Enqueue(ni);
+            }
+        }
+
+        PushLayerCommand(changes);
+        return true;
+    }
+
+    public bool ApplyLayerPatch(int originX, int originY, int width, int height, MapTileLayer[]?[] layerTiles)
+    {
+        if (_stroke != null)
+        {
+            throw new InvalidOperationException();
+        }
+
+        if (layerTiles is null || layerTiles.Length != MapDocument.LayerCount)
+        {
+            throw new ArgumentException(nameof(layerTiles));
+        }
+
+        if (width <= 0 || height <= 0 || originX < 0 || originY < 0 ||
+            width > _document.Width - originX || height > _document.Height - originY)
+        {
+            throw new ArgumentOutOfRangeException();
+        }
+
+        for (int layer = 0; layer < MapDocument.LayerCount; layer++)
+        {
+            if (layerTiles[layer] is { } tiles && tiles.Length != width * height)
+            {
+                throw new ArgumentException(nameof(layerTiles));
+            }
+        }
+
+        var changes = new MapEditChangeBuffer<MapLayerChange>();
+        for (int layer = 0; layer < MapDocument.LayerCount; layer++)
+        {
+            if (layerTiles[layer] is not { } tiles)
+            {
+                continue;
+            }
+
+            for (int row = 0; row < height; row++)
+            {
+                for (int col = 0; col < width; col++)
+                {
+                    int x = originX + col;
+                    int y = originY + row;
+                    MapTileLayer target = tiles[row * width + col];
+                    MapTileLayer current = _document[x, y].GetLayer(layer);
+                    if (current != target)
+                    {
+                        changes.Append(new MapLayerChange(x, y, layer, current, target));
+                        _document.SetLayer(x, y, layer, target);
+                    }
+                }
+            }
+        }
+
+        if (changes.Count == 0)
+        {
+            return false;
+        }
+
+        PushLayerCommand(changes);
+        return true;
+    }
     public void CancelStroke()
     {
         MapEditStroke stroke = _stroke ?? throw new InvalidOperationException();
@@ -249,6 +376,14 @@ public sealed class MapEditSession
         {
             ReplayFlagsChanges(command.FlagsChanges!, _document, reverse, before);
         }
+    }
+
+    private void PushLayerCommand(MapEditChangeBuffer<MapLayerChange> changes)
+    {
+        int beforeStateId = _currentStateId;
+        int afterStateId = _nextStateId++;
+        _currentStateId = afterStateId;
+        _history.PushUndo(MapEditCommand.ForLayerChanges(changes, beforeStateId, afterStateId));
     }
 
     private static void ReplayLayerChanges(MapEditChangeBuffer<MapLayerChange> buffer, MapDocument document, bool reverse, bool before)
