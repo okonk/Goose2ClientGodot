@@ -512,6 +512,38 @@ public class MainWindowTests : IDisposable
     }
 
     [AvaloniaFact]
+    public void Escape_CancelsPasteMode()
+    {
+        using MainWindowHarness harness = MainWindowHarness.Create();
+        harness.ViewModel.Session.Document.SetLayer(0, 0, 0, new MapTileLayer(7, 7));
+        harness.ViewModel.SelectionRectangle = new MapTileRectangle(0, 0, 1, 1);
+        harness.ViewModel.CopySelection();
+        harness.ViewModel.BeginPasteMode();
+        Assert.True(harness.ViewModel.PasteMode);
+
+        harness.Window.KeyPressQwerty(PhysicalKey.Escape, RawInputModifiers.None);
+
+        Assert.False(harness.ViewModel.PasteMode);
+        Assert.False(harness.ViewModel.Session.CanUndo);
+    }
+
+    [AvaloniaFact]
+    public void Escape_WithBrushFieldFocused_CancelsPasteMode()
+    {
+        using MainWindowHarness harness = MainWindowHarness.Create();
+        harness.ViewModel.Session.Document.SetLayer(0, 0, 0, new MapTileLayer(7, 7));
+        harness.ViewModel.SelectionRectangle = new MapTileRectangle(0, 0, 1, 1);
+        harness.ViewModel.CopySelection();
+        harness.ViewModel.BeginPasteMode();
+        harness.Window.FindControl<TextBox>("BrushGraphic").Focus();
+
+        harness.Window.KeyPressQwerty(PhysicalKey.Escape, RawInputModifiers.None);
+
+        Assert.False(harness.ViewModel.PasteMode);
+        Assert.False(harness.ViewModel.Session.CanUndo);
+    }
+
+    [AvaloniaFact]
     public async Task Title_TracksDirtyState()
     {
         Assert.Equal("Goose2 Map Editor — Untitled", Window.Title);
