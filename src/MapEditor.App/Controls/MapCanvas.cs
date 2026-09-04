@@ -21,6 +21,10 @@ internal sealed class MapCanvas : Control, ICustomHitTest
     private bool _stroking;
     private bool _panning;
     private bool _spaceDown;
+    private bool _multiSelecting;
+    private bool _rectDragMoved;
+    private MapTileCoordinate? _rectDragStart;
+    private IPointer? _capturedPointer;
     private Point _lastPanPosition;
     private Window? _hoverWindow;
 
@@ -56,6 +60,12 @@ internal sealed class MapCanvas : Control, ICustomHitTest
 
         _stroking = false;
         _panning = false;
+        _multiSelecting = false;
+        _rectDragStart = null;
+        _rectDragMoved = false;
+        _capturedPointer?.Capture(null);
+        _capturedPointer = null;
+        _viewModel.CancelPasteMode();
         _viewModel.Refresh(EditorRefresh.Canvas | EditorRefresh.Commands | EditorRefresh.Title);
     }
 
@@ -97,7 +107,7 @@ internal sealed class MapCanvas : Control, ICustomHitTest
         InvalidateVisual();
     }
 
-    internal bool IsGestureActive => _stroking || _panning;
+    internal bool IsGestureActive => _stroking || _panning || _multiSelecting;
 
     protected override void OnPointerPressed(PointerPressedEventArgs e)
     {
@@ -116,9 +126,23 @@ internal sealed class MapCanvas : Control, ICustomHitTest
             {
                 BeginPan(point.Position);
             }
+            else if (_viewModel.PasteMode)
+            {
+                MapTileCoordinate? tile = TileAt(point.Position);
+                if (tile is { } target)
+                {
+                    _viewModel.ApplyPasteAt(target.X, target.Y);
+                }
+                else
+                {
+                    _viewModel.CancelPasteMode();
+                }
+
+                e.Handled = true;
+            }
             else
             {
-                BeginStroke(point.Position);
+                BeginToolPress(point.Position);
             }
         }
         else if (properties.IsMiddleButtonPressed)
@@ -126,8 +150,9 @@ internal sealed class MapCanvas : Control, ICustomHitTest
             BeginPan(point.Position);
         }
 
-        if (_stroking || _panning)
+        if (_stroking || _panning || _multiSelecting)
         {
+            _capturedPointer = e.Pointer;
             e.Pointer.Capture(this);
             e.Handled = true;
         }
@@ -164,6 +189,23 @@ internal sealed class MapCanvas : Control, ICustomHitTest
         {
             _viewport = _viewport.PanByScreenDelta(new RenderPoint(position.X - _lastPanPosition.X, position.Y - _lastPanPosition.Y));
             _lastPanPosition = position;
+            Invalidate();
+            return;
+        }
+
+        if (_multiSelecting)
+        {
+            MapEditSession session = _viewModel.Session;
+            MapTileCoordinate current = _viewport.ScreenToTile(new RenderPoint(position.X, position.Y));
+            int x = Math.Clamp(current.X, 0, session.Document.Width - 1);
+            int y = Math.Clamp(current.Y, 0, session.Document.Height - 1);
+            MapTileCoordinate origin = _rectDragStart.Value;
+            _viewModel.SelectionRectangle = new MapTileRectangle(
+                Math.Min(origin.X, x),
+                Math.Min(origin.Y, y),
+                Math.Abs(x - origin.X) + 1,
+                Math.Abs(y - origin.Y) + 1);
+            _rectDragMoved = true;
             Invalidate();
             return;
         }
@@ -209,7 +251,7 @@ internal sealed class MapCanvas : Control, ICustomHitTest
     protected override void OnPointerReleased(PointerReleasedEventArgs e)
     {
         base.OnPointerReleased(e);
-        if (!_stroking && !_panning)
+        if (!_stroking && !_panning && !_multiSelecting)
         {
             return;
         }
@@ -220,6 +262,7 @@ internal sealed class MapCanvas : Control, ICustomHitTest
             _stroking = false;
         }
 
+        FinalizeMultiSelection();
         _panning = false;
         e.Pointer.Capture(null);
         e.Handled = true;
@@ -229,7 +272,7 @@ internal sealed class MapCanvas : Control, ICustomHitTest
     protected override void OnPointerCaptureLost(PointerCaptureLostEventArgs e)
     {
         base.OnPointerCaptureLost(e);
-        if (!_stroking && !_panning)
+        if (!_stroking && !_panning && !_multiSelecting)
         {
             return;
         }
@@ -239,6 +282,7 @@ internal sealed class MapCanvas : Control, ICustomHitTest
             _viewModel.Session.CompleteStroke();
         }
 
+        FinalizeMultiSelection();
         _stroking = false;
         _panning = false;
         _viewModel.Refresh(EditorRefresh.Canvas | EditorRefresh.Commands | EditorRefresh.Title);
@@ -271,6 +315,7 @@ internal sealed class MapCanvas : Control, ICustomHitTest
         if (e.Key == Key.Escape)
         {
             FinishInteraction(commit: false);
+            _viewModel.CancelPasteMode();
             e.Handled = true;
         }
         else if (e.Key == Key.Space)
@@ -288,6 +333,62 @@ internal sealed class MapCanvas : Control, ICustomHitTest
             _spaceDown = false;
             e.Handled = true;
         }
+    }
+
+    private void BeginToolPress(Point position)
+    {
+        switch (_viewModel.ActiveTool)
+        {
+            case MapEditTool.Select:
+                if (TileAt(position) is { } selected)
+                {
+                    _viewModel.SelectedX = selected.X;
+                    _viewModel.SelectedY = selected.Y;
+                    _viewModel.Refresh(EditorRefresh.Canvas);
+                }
+
+                break;
+            case MapEditTool.MultiSelect:
+                if (TileAt(position) is { } origin)
+                {
+                    _rectDragStart = origin;
+                    _multiSelecting = true;
+                    _rectDragMoved = false;
+                }
+
+                break;
+            case MapEditTool.FloodFill:
+                if (TileAt(position) is { } cell)
+                {
+                    _viewModel.Session.ApplyFloodFill(cell.X, cell.Y);
+                    _viewModel.SelectedX = cell.X;
+                    _viewModel.SelectedY = cell.Y;
+                    _viewModel.Refresh(EditorRefresh.Canvas | EditorRefresh.Commands | EditorRefresh.Title);
+                }
+
+                break;
+            default:
+                BeginStroke(position);
+                break;
+        }
+    }
+
+    private void FinalizeMultiSelection()
+    {
+        if (!_multiSelecting)
+        {
+            return;
+        }
+
+        if (!_rectDragMoved && _rectDragStart is { } origin)
+        {
+            _viewModel.SelectionRectangle = new MapTileRectangle(origin.X, origin.Y, 1, 1);
+        }
+
+        _multiSelecting = false;
+        _rectDragStart = null;
+        _rectDragMoved = false;
+        Invalidate();
     }
 
     private void BeginStroke(Point position)
@@ -336,6 +437,9 @@ internal sealed class MapCanvas : Control, ICustomHitTest
             _stroking = false;
             _panning = false;
             _spaceDown = false;
+            _multiSelecting = false;
+            _rectDragStart = null;
+            _rectDragMoved = false;
         }
 
         Invalidate();
@@ -357,7 +461,9 @@ internal sealed class MapCanvas : Control, ICustomHitTest
             _viewModel.ShowGrid,
             _viewModel.ShowBlocked,
             hovered,
-            selected);
+            selected,
+            SelectionRectangle: _viewModel.SelectionRectangle,
+            PasteGhost: _viewModel.PasteGhost);
         return new MapRenderRequest(session.Document, _viewport, options);
     }
 }

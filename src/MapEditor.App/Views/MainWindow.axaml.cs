@@ -53,6 +53,7 @@ internal partial class MainWindow : Window
         CanvasHost.Child = _canvas;
         PaletteBorder.Child = _palette;
         _palette.BindScrollBar(PaletteBar);
+        AddHandler(InputElement.PointerPressedEvent, OnWindowPointerPressed, RoutingStrategies.Tunnel);
         // TextChanged does not fire for programmatic Text sets, so validation tracks the property instead.
         BrushSheet.PropertyChanged += OnBrushFieldTextChanged;
         BrushGraphic.PropertyChanged += OnBrushFieldTextChanged;
@@ -133,6 +134,14 @@ internal partial class MainWindow : Window
                     OnRedo(this, new RoutedEventArgs());
                     e.Handled = true;
                     break;
+                case Key.C when modifiers == PrimaryModifier && e.Source is not TextBox:
+                    _viewModel.CopySelection();
+                    e.Handled = true;
+                    break;
+                case Key.V when modifiers == PrimaryModifier && e.Source is not TextBox:
+                    _viewModel.BeginPasteMode();
+                    e.Handled = true;
+                    break;
             }
 
             return;
@@ -140,6 +149,14 @@ internal partial class MainWindow : Window
 
         if (modifiers != KeyModifiers.None)
         {
+            return;
+        }
+
+        if (e.Key == Key.Escape)
+        {
+            _canvas.FinishInteraction(commit: false);
+            _viewModel.CancelPasteMode();
+            e.Handled = true;
             return;
         }
 
@@ -165,6 +182,18 @@ internal partial class MainWindow : Window
                 break;
             case Key.X:
                 _viewModel.ActiveTool = MapEditTool.BlockedToggle;
+                e.Handled = true;
+                break;
+            case Key.V:
+                _viewModel.ActiveTool = MapEditTool.Select;
+                e.Handled = true;
+                break;
+            case Key.M:
+                _viewModel.ActiveTool = MapEditTool.MultiSelect;
+                e.Handled = true;
+                break;
+            case Key.B:
+                _viewModel.ActiveTool = MapEditTool.FloodFill;
                 e.Handled = true;
                 break;
             case Key.Add or Key.OemPlus:
@@ -237,6 +266,14 @@ internal partial class MainWindow : Window
             tool == _viewModel.ActiveTool)
         {
             ((ToggleButton)sender).IsChecked = true;
+        }
+    }
+
+    private void OnWindowPointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (_viewModel.PasteMode && e.Source is not MapCanvas)
+        {
+            _viewModel.CancelPasteMode();
         }
     }
 
@@ -478,6 +515,9 @@ internal partial class MainWindow : Window
         EraserTool.IsChecked = _viewModel.ActiveTool == MapEditTool.Eraser;
         EyedropperTool.IsChecked = _viewModel.ActiveTool == MapEditTool.Eyedropper;
         BlockedTool.IsChecked = _viewModel.ActiveTool == MapEditTool.BlockedToggle;
+        SelectTool.IsChecked = _viewModel.ActiveTool == MapEditTool.Select;
+        MultiSelectTool.IsChecked = _viewModel.ActiveTool == MapEditTool.MultiSelect;
+        FloodFillTool.IsChecked = _viewModel.ActiveTool == MapEditTool.FloodFill;
     }
 
     private void SyncLayerRows()

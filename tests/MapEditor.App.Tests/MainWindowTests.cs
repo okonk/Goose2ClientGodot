@@ -12,6 +12,7 @@ using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Media;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 using MapEditor.App.Controls;
 using MapEditor.App.Dialogs;
 using MapEditor.App.Documents;
@@ -181,13 +182,20 @@ public class MainWindowTests : IDisposable
     }
 
     [AvaloniaFact]
-    public void Layout_ContainsFourToolTogglesWithPencilActive()
+    public void Layout_ContainsSevenToolTogglesWithPencilActive()
     {
         Assert.True(Find<ToggleButton>("PencilTool").IsChecked);
         Assert.False(Find<ToggleButton>("EraserTool").IsChecked);
         Assert.False(Find<ToggleButton>("EyedropperTool").IsChecked);
         Assert.False(Find<ToggleButton>("BlockedTool").IsChecked);
+        Assert.False(Find<ToggleButton>("SelectTool").IsChecked);
+        Assert.False(Find<ToggleButton>("MultiSelectTool").IsChecked);
+        Assert.False(Find<ToggleButton>("FloodFillTool").IsChecked);
         Assert.Equal(MapEditTool.Pencil, ViewModel.ActiveTool);
+
+        Assert.Equal(
+            new[] { "PencilTool", "EraserTool", "EyedropperTool", "BlockedTool", "SelectTool", "MultiSelectTool", "FloodFillTool" },
+            Find<Border>("Toolbar").GetVisualDescendants().OfType<ToggleButton>().Select(toggle => toggle.Name).ToArray());
 
         Find<ToggleButton>("EraserTool").IsChecked = true;
         Assert.Equal(MapEditTool.Eraser, ViewModel.ActiveTool);
@@ -448,6 +456,59 @@ public class MainWindowTests : IDisposable
 
         Window.KeyPressQwerty(PhysicalKey.Minus, RawInputModifiers.None);
         Assert.Equal(100, ViewModel.ZoomPercent);
+    }
+
+    [AvaloniaFact]
+    public void UnmodifiedVMBX_SelectToolToggles()
+    {
+        Window.KeyPressQwerty(PhysicalKey.V, RawInputModifiers.None);
+        Assert.Equal(MapEditTool.Select, ViewModel.ActiveTool);
+        Assert.True(Find<ToggleButton>("SelectTool").IsChecked);
+
+        Window.KeyPressQwerty(PhysicalKey.M, RawInputModifiers.None);
+        Assert.Equal(MapEditTool.MultiSelect, ViewModel.ActiveTool);
+        Assert.True(Find<ToggleButton>("MultiSelectTool").IsChecked);
+
+        Window.KeyPressQwerty(PhysicalKey.B, RawInputModifiers.None);
+        Assert.Equal(MapEditTool.FloodFill, ViewModel.ActiveTool);
+        Assert.True(Find<ToggleButton>("FloodFillTool").IsChecked);
+
+        Window.KeyPressQwerty(PhysicalKey.X, RawInputModifiers.None);
+        Assert.Equal(MapEditTool.BlockedToggle, ViewModel.ActiveTool);
+        Assert.True(Find<ToggleButton>("BlockedTool").IsChecked);
+    }
+
+    [AvaloniaFact]
+    public void CtrlC_PopulatesClipboardAndCtrlV_EntersPasteMode()
+    {
+        using MainWindowHarness harness = MainWindowHarness.Create();
+        harness.ViewModel.Session.Document.SetLayer(0, 0, 0, new MapTileLayer(7, 7));
+        harness.ViewModel.SelectionRectangle = new MapTileRectangle(0, 0, 1, 1);
+
+        harness.Window.KeyPressQwerty(PhysicalKey.C, RawInputModifiers.Control);
+        Assert.NotNull(harness.ViewModel.Clipboard);
+
+        harness.Window.KeyPressQwerty(PhysicalKey.V, RawInputModifiers.Control);
+        Assert.True(harness.ViewModel.PasteMode);
+    }
+
+    [AvaloniaFact]
+    public void CtrlC_WithoutSelectionRectangle_DoesNothing()
+    {
+        using MainWindowHarness harness = MainWindowHarness.Create();
+        harness.Window.KeyPressQwerty(PhysicalKey.C, RawInputModifiers.Control);
+        Assert.Null(harness.ViewModel.Clipboard);
+    }
+
+    [AvaloniaFact]
+    public void CtrlC_WithBrushFieldFocused_KeepsNativeBehavior()
+    {
+        using MainWindowHarness harness = MainWindowHarness.Create();
+        harness.ViewModel.SelectionRectangle = new MapTileRectangle(0, 0, 1, 1);
+        harness.Window.FindControl<TextBox>("BrushGraphic").Focus();
+
+        harness.Window.KeyPressQwerty(PhysicalKey.C, RawInputModifiers.Control);
+        Assert.Null(harness.ViewModel.Clipboard);
     }
 
     [AvaloniaFact]

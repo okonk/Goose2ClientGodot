@@ -131,7 +131,14 @@ public class ShortcutTests
         Assert.True(window.FindControl<Avalonia.Controls.Primitives.ToggleButton>("PencilTool")!.IsChecked);
 
         window.KeyPressQwerty(PhysicalKey.B, RawInputModifiers.None);
-        Assert.Equal(MapEditTool.Pencil, harness.ViewModel.ActiveTool);
+        Assert.Equal(MapEditTool.FloodFill, harness.ViewModel.ActiveTool);
+
+        window.KeyPressQwerty(PhysicalKey.V, RawInputModifiers.None);
+        Assert.Equal(MapEditTool.Select, harness.ViewModel.ActiveTool);
+        Assert.True(window.FindControl<Avalonia.Controls.Primitives.ToggleButton>("SelectTool")!.IsChecked);
+
+        window.KeyPressQwerty(PhysicalKey.M, RawInputModifiers.None);
+        Assert.Equal(MapEditTool.MultiSelect, harness.ViewModel.ActiveTool);
     }
 
     [AvaloniaFact]

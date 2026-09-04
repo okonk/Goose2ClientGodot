@@ -29,6 +29,9 @@
         <ToggleButton x:Name="EraserTool" Content="Eraser" Tag="Eraser" Checked="OnToolChecked" Unchecked="OnToolUnchecked" />
         <ToggleButton x:Name="EyedropperTool" Content="Eyedropper" Tag="Eyedropper" Checked="OnToolChecked" Unchecked="OnToolUnchecked" />
         <ToggleButton x:Name="BlockedTool" Content="Blocked" Tag="BlockedToggle" Checked="OnToolChecked" Unchecked="OnToolUnchecked" />
+        <ToggleButton x:Name="SelectTool" Content="Select" Tag="Select" Checked="OnToolChecked" Unchecked="OnToolUnchecked" />
+        <ToggleButton x:Name="MultiSelectTool" Content="Multi-select" Tag="MultiSelect" Checked="OnToolChecked" Unchecked="OnToolUnchecked" />
+        <ToggleButton x:Name="FloodFillTool" Content="Flood fill" Tag="FloodFill" Checked="OnToolChecked" Unchecked="OnToolUnchecked" />
       </StackPanel>
     </Border>
     <Border x:Name="StatusBar" DockPanel.Dock="Bottom" Padding="8,3" BorderBrush="#FFCCCCCC" BorderThickness="0,1,0,0">
