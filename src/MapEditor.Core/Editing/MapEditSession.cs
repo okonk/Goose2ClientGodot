@@ -174,7 +174,6 @@ public sealed class MapEditSession
         var visited = new StrokeVisitBitmap(_document.TileCount);
         var changes = new MapEditChangeBuffer<MapLayerChange>();
         var frontier = new Queue<int>();
-        int[] neighborOffsets = { -1, 1, -width, width };
         int start = y * width + x;
         visited.TryMark(start);
         frontier.Enqueue(start);
@@ -186,33 +185,44 @@ public sealed class MapEditSession
             changes.Append(new MapLayerChange(cx, cy, layer, startValue, target));
             _document.SetLayer(cx, cy, layer, target);
 
-            foreach (int offset in neighborOffsets)
+            if (cx > 0)
             {
-                int ni = index + offset;
-                if (ni < 0 || ni >= _document.TileCount)
-                {
-                    continue;
-                }
+                TryVisit(index - 1);
+            }
 
-                int nx = ni % width;
-                if (offset == -1 && cx == 0) continue;
-                if (offset == 1 && cx == width - 1) continue;
-                if (!visited.TryMark(ni))
-                {
-                    continue;
-                }
+            if (cx < width - 1)
+            {
+                TryVisit(index + 1);
+            }
 
-                if (_document[nx, ni / width].GetLayer(layer) != startValue)
-                {
-                    continue;
-                }
+            if (cy > 0)
+            {
+                TryVisit(index - width);
+            }
 
-                frontier.Enqueue(ni);
+            if (cy < height - 1)
+            {
+                TryVisit(index + width);
             }
         }
 
         PushLayerCommand(changes);
         return true;
+
+        void TryVisit(int ni)
+        {
+            if (!visited.TryMark(ni))
+            {
+                return;
+            }
+
+            if (_document[ni % width, ni / width].GetLayer(layer) != startValue)
+            {
+                return;
+            }
+
+            frontier.Enqueue(ni);
+        }
     }
 
     public bool ApplyLayerPatch(int originX, int originY, int width, int height, MapTileLayer[]?[] layerTiles)

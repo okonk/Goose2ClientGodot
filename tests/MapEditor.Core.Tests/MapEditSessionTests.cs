@@ -672,6 +672,19 @@ public class MapEditSessionTests
     }
 
     [Fact]
+    public void FloodFill_OneTileWideMap_FillsVertically()
+    {
+        // width == 1 degenerates the horizontal offsets into the vertical ones
+        var session = CreateSession(1, 5);
+        session.SelectedTileLayer = new MapTileLayer(3, 3);
+        Assert.True(session.ApplyFloodFill(0, 2));
+        for (int y = 0; y < 5; y++)
+        {
+            Assert.Equal(new MapTileLayer(3, 3), session.Document[0, y].GetLayer(0));
+        }
+    }
+
+    [Fact]
     public void FloodFill_NonEmptyStartRegion_RefillsWithBrush()
     {
         var session = CreateSession(4, 4);
