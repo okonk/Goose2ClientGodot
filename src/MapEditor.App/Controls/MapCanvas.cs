@@ -265,6 +265,7 @@ internal sealed class MapCanvas : Control, ICustomHitTest
         FinalizeMultiSelection();
         _panning = false;
         e.Pointer.Capture(null);
+        _capturedPointer = null;
         e.Handled = true;
         _viewModel.Refresh(EditorRefresh.Canvas | EditorRefresh.Commands | EditorRefresh.Title);
     }
@@ -285,6 +286,7 @@ internal sealed class MapCanvas : Control, ICustomHitTest
         FinalizeMultiSelection();
         _stroking = false;
         _panning = false;
+        _capturedPointer = null;
         _viewModel.Refresh(EditorRefresh.Canvas | EditorRefresh.Commands | EditorRefresh.Title);
     }
 

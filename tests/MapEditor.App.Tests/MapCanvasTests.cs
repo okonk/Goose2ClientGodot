@@ -564,6 +564,20 @@ public class MapCanvasTests
     }
 
     [AvaloniaFact]
+    public async Task MultiSelectTool_ClickWithoutMove_SetsSingleTileRectangle()
+    {
+        Harness harness = await CreateSmallMapAsync();
+        harness.ViewModel.ActiveTool = MapEditTool.MultiSelect;
+        Point p = new(Cell + Cell / 2, Cell + Cell / 2);
+        harness.Window.MouseDown(p, MouseButton.Left, RawInputModifiers.None);
+        harness.Window.MouseUp(p, MouseButton.Left, RawInputModifiers.None);
+
+        Assert.Equal(new MapTileRectangle(1, 1, 1, 1), harness.ViewModel.SelectionRectangle);
+        Assert.False(harness.ViewModel.Session.HasActiveStroke);
+        Assert.False(harness.ViewModel.Session.CanUndo);
+    }
+
+    [AvaloniaFact]
     public async Task PasteMode_IsOneShot_SecondClickRunsActiveTool()
     {
         Harness harness = await CreateSmallMapAsync();
