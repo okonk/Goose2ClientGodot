@@ -65,35 +65,35 @@
         <TextBlock Text="Layers" FontWeight="SemiBold" />
         <Border x:Name="Layer0Row" Tag="0" Background="Transparent" PointerPressed="OnLayerRowPressed">
           <Grid ColumnDefinitions="*,Auto">
-            <TextBlock x:Name="Layer0Label" Text="0 — Ground" VerticalAlignment="Center" />
+            <TextBlock x:Name="Layer0Label" Text="Ground (0)" VerticalAlignment="Center" />
             <CheckBox x:Name="Layer0VisibleCheck" Tag="0" Grid.Column="1" VerticalAlignment="Center"
                       Checked="OnLayerVisibilityChanged" Unchecked="OnLayerVisibilityChanged" />
           </Grid>
         </Border>
         <Border x:Name="Layer1Row" Tag="1" Background="Transparent" PointerPressed="OnLayerRowPressed">
           <Grid ColumnDefinitions="*,Auto">
-            <TextBlock x:Name="Layer1Label" Text="1 — Below Entities" VerticalAlignment="Center" />
+            <TextBlock x:Name="Layer1Label" Text="Below Entities (1)" VerticalAlignment="Center" />
             <CheckBox x:Name="Layer1VisibleCheck" Tag="1" Grid.Column="1" VerticalAlignment="Center"
                       Checked="OnLayerVisibilityChanged" Unchecked="OnLayerVisibilityChanged" />
           </Grid>
         </Border>
         <Border x:Name="Layer2Row" Tag="2" Background="Transparent" PointerPressed="OnLayerRowPressed">
           <Grid ColumnDefinitions="*,Auto">
-            <TextBlock x:Name="Layer2Label" Text="2 — Entities" VerticalAlignment="Center" />
+            <TextBlock x:Name="Layer2Label" Text="Entities (2)" VerticalAlignment="Center" />
             <CheckBox x:Name="Layer2VisibleCheck" Tag="2" Grid.Column="1" VerticalAlignment="Center"
                       Checked="OnLayerVisibilityChanged" Unchecked="OnLayerVisibilityChanged" />
           </Grid>
         </Border>
         <Border x:Name="Layer3Row" Tag="3" Background="Transparent" PointerPressed="OnLayerRowPressed">
           <Grid ColumnDefinitions="*,Auto">
-            <TextBlock x:Name="Layer3Label" Text="3 — Above Entities" VerticalAlignment="Center" />
+            <TextBlock x:Name="Layer3Label" Text="Above Entities (3)" VerticalAlignment="Center" />
             <CheckBox x:Name="Layer3VisibleCheck" Tag="3" Grid.Column="1" VerticalAlignment="Center"
                       Checked="OnLayerVisibilityChanged" Unchecked="OnLayerVisibilityChanged" />
           </Grid>
         </Border>
         <Border x:Name="Layer4Row" Tag="4" Background="Transparent" PointerPressed="OnLayerRowPressed">
           <Grid ColumnDefinitions="*,Auto">
-            <TextBlock x:Name="Layer4Label" Text="4 — Roof" VerticalAlignment="Center" />
+            <TextBlock x:Name="Layer4Label" Text="Roof (4)" VerticalAlignment="Center" />
             <CheckBox x:Name="Layer4VisibleCheck" Tag="4" Grid.Column="1" VerticalAlignment="Center"
                       Checked="OnLayerVisibilityChanged" Unchecked="OnLayerVisibilityChanged" />
           </Grid>

@@ -216,7 +216,7 @@ public class MainWindowTests : IDisposable
         {
             Assert.NotNull(Find<Border>($"Layer{layer}Row"));
             Assert.True(Find<CheckBox>($"Layer{layer}VisibleCheck").IsChecked == true);
-            Assert.Equal($"{layer} — {names[layer]}", Find<TextBlock>($"Layer{layer}Label").Text);
+            Assert.Equal($"{names[layer]} ({layer})", Find<TextBlock>($"Layer{layer}Label").Text);
         }
 
         Assert.Equal((byte)1, ViewModel.SelectedLayers);
