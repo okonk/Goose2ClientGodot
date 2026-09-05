@@ -737,6 +737,33 @@ public class MainWindowTests : IDisposable
     }
 
     [AvaloniaFact]
+    public async Task SpaceLatch_IsResetWhenTheDocumentIsSwitchedAway()
+    {
+        using MainWindowHarness harness = MainWindowHarness.Create();
+        MapDocumentViewModel first = harness.ViewModel;
+        MapCanvas firstCanvas = harness.Window.Canvas;
+        firstCanvas.Focus();
+        harness.Window.KeyPressQwerty(PhysicalKey.Space, RawInputModifiers.None);
+
+        harness.Dialogs.NewMapResult = new NewMapRequest(100, 100);
+        await harness.Workspace.NewAsync();
+        MapDocumentViewModel second = harness.Workspace.ActiveDocument;
+        harness.Window.Canvas.Focus();
+        harness.Window.KeyReleaseQwerty(PhysicalKey.Space, RawInputModifiers.None);
+
+        harness.Workspace.Activate(first);
+        first.Brush = new MapTileLayer(2, 2);
+        Point tile = harness.Window.Canvas.TranslatePoint(new Point(16, 16), harness.Window).Value;
+        harness.Window.MouseDown(tile, MouseButton.Left, RawInputModifiers.None);
+        Assert.True(first.Session.HasActiveStroke);
+        harness.Window.MouseUp(tile, MouseButton.Left, RawInputModifiers.None);
+
+        Assert.Equal(new MapTileLayer(2, 2), first.Session.Document[0, 0].GetLayer(0));
+        Assert.Equal(new RenderPoint(0, 0), firstCanvas.Viewport.WorldOrigin);
+        Assert.Equal(MapZoom.Percent100, firstCanvas.Viewport.Zoom);
+    }
+
+    [AvaloniaFact]
     public async Task Activate_RebindsChrome()
     {
         MapDocumentViewModel first = ViewModel;

@@ -56,6 +56,7 @@ internal sealed class MapCanvas : Control, ICustomHitTest
 
         _stroking = false;
         _panning = false;
+        _spaceDown = false;
         if (_rectDrag is not null)
         {
             if (commit)
