@@ -21,6 +21,15 @@ namespace Goose2Client.Character
         public bool IsInvisible { get; private set; }
         public bool IsHiddenFromViewer { get; private set; }
         private bool _hiddenBeforeApply;
+
+        public bool IsRoofOccluded
+        {
+            get
+            {
+                var mm = GameManager.Instance?.CurrentMapManager;
+                return mm != null && mm.IsRoofOccluding(X, Y);
+            }
+        }
         public float HPPercent { get; private set; } = 1f;
         public float MPPercent { get; private set; } = 1f;
         public CharacterType CharacterType { get; private set; }

@@ -99,6 +99,9 @@ namespace Goose2Client
                 // are still alive (queued free) — don't project them through the new map's canvas transform.
                 if (element.AnchorOwner.GetViewport() != _worldViewport.Current) { item.Visible = false; continue; }
                 if (element.AnchorOwner.IsHiddenFromViewer) { item.Visible = false; continue; }
+                // Roof band must draw above overhead text: the bridge's CanvasLayer can't be z-sorted
+                // under it, so hide the element when a visible roof tile covers the anchor's tile.
+                if (element.AnchorOwner.IsRoofOccluded) { item.Visible = false; continue; }
                 var pos = _worldViewport.WorldToWindow(element.AnchorOwner.GlobalPosition)   // calls the shared forward transform (lockstep with WindowToWorld)
                     + element.LocalOffsetWorld * _worldScale;
                 // No Position on CanvasItem — branch on the concrete base (elements are always one or the other):

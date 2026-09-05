@@ -20,7 +20,8 @@ namespace Goose2Client
 
         /// <summary>Absolute z for overhead name labels. Above all map TileMapLayers
         /// (ground 0–30, roofs 40) and Y-sorted objects/characters (15), matching Unity's
-        /// dedicated Names sorting layer — names always float on top of world geometry.</summary>
+        /// dedicated Names sorting layer. The label lives on the WorldTextBridge CanvasLayer and is
+        /// hidden instead while a visible roof band covers the character's tile (roof draws above names).</summary>
         public const int NamesZIndex = 100;
     }
 

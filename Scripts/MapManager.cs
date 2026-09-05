@@ -277,6 +277,15 @@ public partial class MapManager : Node2D
         _layers[4].Visible = !_map[x, y].IsRoof;
     }
 
+    /// <summary>True when the visible roof band covers tile (x,y). Overhead text lives on a
+    /// CanvasLayer above the world canvas, so "roof above names" is done by hiding, not z-order.</summary>
+    public bool IsRoofOccluding(int x, int y)
+    {
+        if (_map == null || _layers[4] == null) return false;
+        if (x < 0 || y < 0 || x >= _map.Width || y >= _map.Height) return false;
+        return _layers[4].Visible && _map[x, y].IsRoof;
+    }
+
     private void OnWeaponSpeed(object packetObj) => WeaponSpeed = ((WeaponSpeedPacket)packetObj).Speed;
 
     private void OnBattleText(object packetObj)
