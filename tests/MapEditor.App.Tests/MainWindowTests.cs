@@ -552,6 +552,90 @@ public class MainWindowTests : IDisposable
     }
 
     [AvaloniaFact]
+    public void DeleteKey_ClearsTilesOnSelectedLayers()
+    {
+        using MainWindowHarness harness = MainWindowHarness.Create();
+        harness.ViewModel.SelectedLayers = 0b01001;
+        harness.ViewModel.Session.Document.SetLayer(0, 0, 0, new MapTileLayer(7, 7));
+        harness.ViewModel.Session.Document.SetLayer(0, 0, 1, new MapTileLayer(8, 8));
+        harness.ViewModel.SelectionRectangle = new MapTileRectangle(0, 0, 1, 1);
+
+        harness.Window.KeyPressQwerty(PhysicalKey.Delete, RawInputModifiers.None);
+
+        Assert.Equal(new MapTileLayer(0, 0), harness.ViewModel.Session.Document[0, 0].GetLayer(0));
+        Assert.Equal(new MapTileLayer(8, 8), harness.ViewModel.Session.Document[0, 0].GetLayer(1));
+        Assert.True(harness.ViewModel.CanUndo);
+    }
+
+    [AvaloniaFact]
+    public void DeleteKey_WithoutSelectionRectangle_DoesNothing()
+    {
+        using MainWindowHarness harness = MainWindowHarness.Create();
+        harness.ViewModel.Session.Document.SetLayer(0, 0, 0, new MapTileLayer(7, 7));
+
+        harness.Window.KeyPressQwerty(PhysicalKey.Delete, RawInputModifiers.None);
+
+        Assert.Equal(new MapTileLayer(7, 7), harness.ViewModel.Session.Document[0, 0].GetLayer(0));
+        Assert.False(harness.ViewModel.CanUndo);
+    }
+
+    [AvaloniaFact]
+    public void DeleteKey_WithBrushFieldFocused_KeepsNativeBehavior()
+    {
+        using MainWindowHarness harness = MainWindowHarness.Create();
+        harness.ViewModel.Session.Document.SetLayer(0, 0, 0, new MapTileLayer(7, 7));
+        harness.ViewModel.SelectionRectangle = new MapTileRectangle(0, 0, 1, 1);
+        harness.Window.FindControl<TextBox>("BrushGraphic").Focus();
+
+        harness.Window.KeyPressQwerty(PhysicalKey.Delete, RawInputModifiers.None);
+
+        Assert.Equal(new MapTileLayer(7, 7), harness.ViewModel.Session.Document[0, 0].GetLayer(0));
+        Assert.False(harness.ViewModel.CanUndo);
+    }
+
+    [AvaloniaFact]
+    public void CtrlX_CopiesSelectionAndClearsTiles()
+    {
+        using MainWindowHarness harness = MainWindowHarness.Create();
+        harness.ViewModel.Session.Document.SetLayer(0, 0, 0, new MapTileLayer(7, 7));
+        harness.ViewModel.SelectionRectangle = new MapTileRectangle(0, 0, 1, 1);
+
+        harness.Window.KeyPressQwerty(PhysicalKey.X, RawInputModifiers.Control);
+
+        Assert.NotNull(harness.ViewModel.Clipboard);
+        Assert.Equal(new MapTileLayer(0, 0), harness.ViewModel.Session.Document[0, 0].GetLayer(0));
+        Assert.True(harness.ViewModel.CanUndo);
+    }
+
+    [AvaloniaFact]
+    public void CtrlX_WithoutSelectionRectangle_DoesNothing()
+    {
+        using MainWindowHarness harness = MainWindowHarness.Create();
+        harness.ViewModel.Session.Document.SetLayer(0, 0, 0, new MapTileLayer(7, 7));
+
+        harness.Window.KeyPressQwerty(PhysicalKey.X, RawInputModifiers.Control);
+
+        Assert.Null(harness.ViewModel.Clipboard);
+        Assert.Equal(new MapTileLayer(7, 7), harness.ViewModel.Session.Document[0, 0].GetLayer(0));
+        Assert.False(harness.ViewModel.CanUndo);
+    }
+
+    [AvaloniaFact]
+    public void CtrlX_WithBrushFieldFocused_KeepsNativeBehavior()
+    {
+        using MainWindowHarness harness = MainWindowHarness.Create();
+        harness.ViewModel.Session.Document.SetLayer(0, 0, 0, new MapTileLayer(7, 7));
+        harness.ViewModel.SelectionRectangle = new MapTileRectangle(0, 0, 1, 1);
+        harness.Window.FindControl<TextBox>("BrushGraphic").Focus();
+
+        harness.Window.KeyPressQwerty(PhysicalKey.X, RawInputModifiers.Control);
+
+        Assert.Null(harness.ViewModel.Clipboard);
+        Assert.Equal(new MapTileLayer(7, 7), harness.ViewModel.Session.Document[0, 0].GetLayer(0));
+        Assert.False(harness.ViewModel.CanUndo);
+    }
+
+    [AvaloniaFact]
     public void Escape_CancelsPasteMode()
     {
         using MainWindowHarness harness = MainWindowHarness.Create();

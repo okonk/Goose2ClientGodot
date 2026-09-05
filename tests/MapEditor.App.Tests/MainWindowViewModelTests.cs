@@ -515,12 +515,238 @@ public class MainWindowViewModelTests : IDisposable
     }
 
     [Fact]
+    public void ApplyPasteAt_SingleSourceLayer_PastesToCurrentlySelectedLayer()
+    {
+        _viewModel.SelectedLayers = 0b00001;
+        for (int x = 0; x < 3; x++)
+        {
+            _viewModel.Session.Document.SetLayer(x, 0, 0, new MapTileLayer(5, 5));
+        }
+
+        _viewModel.SelectionRectangle = new MapTileRectangle(0, 0, 3, 1);
+        _viewModel.CopySelection();
+        _viewModel.SelectedLayers = 0b00100;
+        _viewModel.BeginPasteMode();
+        _viewModel.ApplyPasteAt(5, 2);
+
+        for (int x = 5; x < 8; x++)
+        {
+            Assert.Equal(new MapTileLayer(5, 5), _viewModel.Session.Document[x, 2].GetLayer(2));
+            Assert.Equal(new MapTileLayer(0, 0), _viewModel.Session.Document[x, 2].GetLayer(0));
+        }
+    }
+
+    [Fact]
+    public void ApplyPasteAt_SingleSourceLayer_MultiTarget_PastesToTopMostSelected()
+    {
+        _viewModel.SelectedLayers = 0b00001;
+        for (int x = 0; x < 3; x++)
+        {
+            _viewModel.Session.Document.SetLayer(x, 0, 0, new MapTileLayer(5, 5));
+        }
+
+        _viewModel.SelectionRectangle = new MapTileRectangle(0, 0, 3, 1);
+        _viewModel.CopySelection();
+        _viewModel.SelectedLayers = 0b10001; // layers 0 and 4
+        _viewModel.BeginPasteMode();
+        _viewModel.ApplyPasteAt(5, 2);
+
+        for (int x = 5; x < 8; x++)
+        {
+            Assert.Equal(new MapTileLayer(5, 5), _viewModel.Session.Document[x, 2].GetLayer(4));
+            Assert.Equal(new MapTileLayer(0, 0), _viewModel.Session.Document[x, 2].GetLayer(0));
+        }
+    }
+
+    [Fact]
+    public void ApplyPasteAt_MultiSource_SingleTarget_PastesTopMostSourceToSelected()
+    {
+        for (int x = 0; x < 3; x++)
+        {
+            _viewModel.Session.Document.SetLayer(x, 0, 0, new MapTileLayer(5, 5));
+            _viewModel.Session.Document.SetLayer(x, 0, 3, new MapTileLayer(6, 6));
+        }
+
+        _viewModel.SelectedLayers = 0b01001; // layers 0 and 3
+        _viewModel.SelectionRectangle = new MapTileRectangle(0, 0, 3, 1);
+        _viewModel.CopySelection();
+        _viewModel.SelectedLayers = 0b00100;
+        _viewModel.BeginPasteMode();
+        _viewModel.ApplyPasteAt(5, 2);
+
+        for (int x = 5; x < 8; x++)
+        {
+            Assert.Equal(new MapTileLayer(6, 6), _viewModel.Session.Document[x, 2].GetLayer(2));
+        }
+    }
+
+    [Fact]
+    public void ApplyPasteAt_MultiSource_DifferentMultiTarget_PairsTopAlignedAndDropsUnpaired()
+    {
+        for (int x = 0; x < 3; x++)
+        {
+            _viewModel.Session.Document.SetLayer(x, 0, 0, new MapTileLayer(1, 1));
+            _viewModel.Session.Document.SetLayer(x, 0, 1, new MapTileLayer(2, 2));
+            _viewModel.Session.Document.SetLayer(x, 0, 3, new MapTileLayer(3, 3));
+        }
+
+        _viewModel.SelectedLayers = 0b01011; // layers 0, 1, 3
+        _viewModel.SelectionRectangle = new MapTileRectangle(0, 0, 3, 1);
+        _viewModel.CopySelection();
+        _viewModel.SelectedLayers = 0b10100; // layers 2, 4
+        _viewModel.BeginPasteMode();
+        _viewModel.ApplyPasteAt(5, 2);
+
+        for (int x = 5; x < 8; x++)
+        {
+            Assert.Equal(new MapTileLayer(3, 3), _viewModel.Session.Document[x, 2].GetLayer(4));
+            Assert.Equal(new MapTileLayer(2, 2), _viewModel.Session.Document[x, 2].GetLayer(2));
+            Assert.Equal(new MapTileLayer(0, 0), _viewModel.Session.Document[x, 2].GetLayer(0));
+        }
+    }
+
+    [Fact]
+    public void ApplyPasteAt_MultiSource_MoreTargetsThanSources_ExtraTargetsGetNothing()
+    {
+        for (int x = 0; x < 3; x++)
+        {
+            _viewModel.Session.Document.SetLayer(x, 0, 0, new MapTileLayer(5, 5));
+            _viewModel.Session.Document.SetLayer(x, 0, 3, new MapTileLayer(6, 6));
+        }
+
+        _viewModel.SelectedLayers = 0b01001; // layers 0, 3
+        _viewModel.SelectionRectangle = new MapTileRectangle(0, 0, 3, 1);
+        _viewModel.CopySelection();
+        _viewModel.SelectedLayers = 0b01110; // layers 1, 2, 3
+        _viewModel.BeginPasteMode();
+        _viewModel.ApplyPasteAt(5, 2);
+
+        for (int x = 5; x < 8; x++)
+        {
+            Assert.Equal(new MapTileLayer(6, 6), _viewModel.Session.Document[x, 2].GetLayer(3));
+            Assert.Equal(new MapTileLayer(5, 5), _viewModel.Session.Document[x, 2].GetLayer(2));
+            Assert.Equal(new MapTileLayer(0, 0), _viewModel.Session.Document[x, 2].GetLayer(1));
+        }
+    }
+
+    [Fact]
     public void PasteMode_CancelsWhenLayerSelectionChanges()
     {
         SeedClipboard();
         _viewModel.BeginPasteMode();
         _viewModel.SelectedLayers = 1 << 2;
         Assert.False(_viewModel.PasteMode);
+    }
+
+    [Fact]
+    public void DeleteSelection_ClearsTilesOnSelectedLayersOnly()
+    {
+        _viewModel.SelectedLayers = 0b01001; // layers 0 and 3
+        for (int x = 0; x < 3; x++)
+        {
+            _viewModel.Session.Document.SetLayer(x, 0, 0, new MapTileLayer(5, 5));
+            _viewModel.Session.Document.SetLayer(x, 0, 1, new MapTileLayer(6, 6));
+            _viewModel.Session.Document.SetLayer(x, 0, 3, new MapTileLayer(7, 7));
+        }
+
+        _viewModel.SelectionRectangle = new MapTileRectangle(0, 0, 3, 1);
+        _viewModel.DeleteSelection();
+
+        for (int x = 0; x < 3; x++)
+        {
+            Assert.Equal(new MapTileLayer(0, 0), _viewModel.Session.Document[x, 0].GetLayer(0));
+            Assert.Equal(new MapTileLayer(0, 0), _viewModel.Session.Document[x, 0].GetLayer(3));
+            Assert.Equal(new MapTileLayer(6, 6), _viewModel.Session.Document[x, 0].GetLayer(1));
+        }
+
+        Assert.Equal(new MapTileRectangle(0, 0, 3, 1), _viewModel.SelectionRectangle);
+        Assert.True(_viewModel.CanUndo);
+    }
+
+    [Fact]
+    public void DeleteSelection_UndoRestoresTiles()
+    {
+        _viewModel.SelectedLayers = 0b01001;
+        _viewModel.Session.Document.SetLayer(0, 0, 0, new MapTileLayer(5, 5));
+        _viewModel.Session.Document.SetLayer(0, 0, 3, new MapTileLayer(7, 7));
+
+        _viewModel.SelectionRectangle = new MapTileRectangle(0, 0, 1, 1);
+        _viewModel.DeleteSelection();
+        Assert.True(_viewModel.Undo());
+
+        Assert.Equal(new MapTileLayer(5, 5), _viewModel.Session.Document[0, 0].GetLayer(0));
+        Assert.Equal(new MapTileLayer(7, 7), _viewModel.Session.Document[0, 0].GetLayer(3));
+    }
+
+    [Fact]
+    public void DeleteSelection_WithoutSelectionRectangle_DoesNothing()
+    {
+        _viewModel.Session.Document.SetLayer(0, 0, 0, new MapTileLayer(5, 5));
+
+        _viewModel.DeleteSelection();
+
+        Assert.Equal(new MapTileLayer(5, 5), _viewModel.Session.Document[0, 0].GetLayer(0));
+        Assert.False(_viewModel.CanUndo);
+    }
+
+    [Fact]
+    public void DeleteSelection_WhenSelectionAlreadyEmpty_DoesNotCreateUndoEntry()
+    {
+        _viewModel.SelectionRectangle = new MapTileRectangle(0, 0, 2, 2);
+
+        _viewModel.DeleteSelection();
+
+        Assert.False(_viewModel.CanUndo);
+    }
+
+    [Fact]
+    public void DeleteSelection_CancelsPasteMode()
+    {
+        SeedClipboard();
+        _viewModel.BeginPasteMode();
+        _viewModel.DeleteSelection();
+        Assert.False(_viewModel.PasteMode);
+    }
+
+    [Fact]
+    public void CutSelection_CopiesTilesThenClearsThem()
+    {
+        _viewModel.SelectedLayers = 0b01001; // layers 0 and 3
+        for (int x = 0; x < 3; x++)
+        {
+            _viewModel.Session.Document.SetLayer(x, 0, 0, new MapTileLayer(5, 5));
+            _viewModel.Session.Document.SetLayer(x, 0, 3, new MapTileLayer(6, 6));
+        }
+
+        _viewModel.SelectionRectangle = new MapTileRectangle(0, 0, 3, 1);
+        _viewModel.CutSelection();
+
+        for (int x = 0; x < 3; x++)
+        {
+            Assert.Equal(new MapTileLayer(0, 0), _viewModel.Session.Document[x, 0].GetLayer(0));
+            Assert.Equal(new MapTileLayer(0, 0), _viewModel.Session.Document[x, 0].GetLayer(3));
+        }
+
+        var clip = _viewModel.Clipboard!;
+        Assert.Equal(3, clip.Width);
+        Assert.Equal(1, clip.Height);
+        Assert.Equal(new MapTileLayer(5, 5), clip.Layers[0]![0]);
+        Assert.Equal(new MapTileLayer(6, 6), clip.Layers[3]![0]);
+        Assert.Null(clip.Layers[1]);
+        Assert.Null(clip.Layers[2]);
+        Assert.True(_viewModel.CanUndo);
+    }
+
+    [Fact]
+    public void CutSelection_WithoutSelectionRectangle_DoesNothing()
+    {
+        _viewModel.Session.Document.SetLayer(0, 0, 0, new MapTileLayer(5, 5));
+
+        _viewModel.CutSelection();
+
+        Assert.Null(_viewModel.Clipboard);
+        Assert.Equal(new MapTileLayer(5, 5), _viewModel.Session.Document[0, 0].GetLayer(0));
+        Assert.False(_viewModel.CanUndo);
     }
 
     [Fact]

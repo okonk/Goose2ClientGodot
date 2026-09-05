@@ -263,6 +263,42 @@ internal sealed class MainWindowViewModel : ViewModelBase
         _clipboard = TileClipboard.Capture(_session.Document, _session.SelectedLayers, rect);
     }
 
+    public void CutSelection()
+    {
+        CopySelection();
+        DeleteSelection();
+    }
+
+    public void DeleteSelection()
+    {
+        if (SelectionRectangle is not { } rect)
+        {
+            return;
+        }
+
+        MapTileRectangle? target = rect.ClipTo(_session.Document.Width, _session.Document.Height);
+        if (target is not { } t)
+        {
+            return;
+        }
+
+        var patch = new MapTileLayer[MapDocument.LayerCount][];
+        for (int layer = 0; layer < MapDocument.LayerCount; layer++)
+        {
+            if ((_session.SelectedLayers & (1 << layer)) == 0)
+            {
+                continue;
+            }
+
+            // zero-initialized entries are the empty tile (0/0), same as the eraser
+            patch[layer] = new MapTileLayer[t.Width * t.Height];
+        }
+
+        _session.ApplyLayerPatch(t.X, t.Y, t.Width, t.Height, patch);
+        CancelPasteMode();
+        Refresh(EditorRefresh.Canvas | EditorRefresh.Commands | EditorRefresh.Title);
+    }
+
     public void BeginPasteMode()
     {
         if (_clipboard is not null)
@@ -296,9 +332,25 @@ internal sealed class MainWindowViewModel : ViewModelBase
             int sourceX = d.X - x;
             int sourceY = d.Y - y;
             var sub = new MapTileLayer[MapDocument.LayerCount][];
-            for (int layer = 0; layer < MapDocument.LayerCount; layer++)
+            // captured and selected layers pair up top-to-bottom; unpaired layers are dropped
+            var sources = new List<int>();
+            var targets = new List<int>();
+            for (int layer = MapDocument.LayerCount - 1; layer >= 0; layer--)
             {
-                if (clip.Layers[layer] is not { } data)
+                if (clip.Layers[layer] is not null)
+                {
+                    sources.Add(layer);
+                }
+
+                if ((_session.SelectedLayers & (1 << layer)) != 0)
+                {
+                    targets.Add(layer);
+                }
+            }
+
+            for (int i = 0; i < Math.Min(sources.Count, targets.Count); i++)
+            {
+                if (clip.Layers[sources[i]] is not { } data)
                 {
                     continue;
                 }
@@ -309,7 +361,7 @@ internal sealed class MainWindowViewModel : ViewModelBase
                     Array.Copy(data, (sourceY + row) * clip.Width + sourceX, slice, row * d.Width, d.Width);
                 }
 
-                sub[layer] = slice;
+                sub[targets[i]] = slice;
             }
 
             _session.ApplyLayerPatch(d.X, d.Y, d.Width, d.Height, sub);

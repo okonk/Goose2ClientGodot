@@ -153,6 +153,10 @@ internal partial class MainWindow : Window
                     _viewModel.BeginPasteMode();
                     e.Handled = true;
                     break;
+                case Key.X when modifiers == PrimaryModifier && e.Source is not TextBox:
+                    _viewModel.CutSelection();
+                    e.Handled = true;
+                    break;
             }
 
             return;
@@ -205,6 +209,10 @@ internal partial class MainWindow : Window
                 break;
             case Key.B:
                 _viewModel.ActiveTool = MapEditTool.FloodFill;
+                e.Handled = true;
+                break;
+            case Key.Delete:
+                _viewModel.DeleteSelection();
                 e.Handled = true;
                 break;
             case Key.Add or Key.OemPlus:
