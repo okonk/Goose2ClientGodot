@@ -125,8 +125,10 @@ already is.
 
 ## Close and quit
 
-Closing a clean tab drops it and activates the neighbour to the right, or to the
-left when it was last. Closing a dirty tab first activates it, then shows the
+Closing the active clean tab drops it and activates the neighbour to the right,
+or to the left when it was last. Closing an inactive tab leaves the active tab
+alone. The successor is activated before the closed document is removed, so the
+active document is always present in the collection. Closing a dirty tab first activates it, then shows the
 existing Save / Discard / Cancel dialog. Cancel aborts. Save runs that document's
 `SaveAsync`, which may open the Save-As picker; if the document is still dirty
 afterwards the close aborts too.
@@ -136,7 +138,8 @@ dance, but walks `Documents` in tab order, activating and prompting each dirty
 document. Cancel on any tab aborts the quit and leaves that tab active.
 
 `MainWindow` gains a single `_commandRunning` flag. While it is set, tab
-activation, tab close and the file commands are ignored. Today `RunCommandAsync`
+activation, tab close, the file commands, and closing the window are all refused —
+an in-flight Save-As continuation must not resume after the window has closed. Today `RunCommandAsync`
 is fire-and-forget and nothing prevents a second command starting while a dialog
 is open; with tabs that would let a Save-As picker for one tab resolve after the
 user has moved to another. This is a real bug the feature forces into the open.
@@ -158,6 +161,25 @@ dirty tabs, including cancel on the second tab. Extended `ShortcutTests` for
 Ctrl+T / W / Tab / 1-9. Extended `MapCanvasTests`: an in-flight stroke commits
 when the tab changes, and each tab keeps its own zoom and scroll across a switch
 and back. `MainWindowViewModelTests` is renamed with its class.
+
+## Path ownership
+
+`OpenAsync` refusing to open an already-open file is only half of it: Save-As can
+pick a path another tab already owns, which would leave two controllers with
+competing revisions for one file. Each document's controller consults the
+workspace before writing to a picked destination — at both the Save-As picker and
+the external-change Save-As branch — and reports "already open in another tab"
+instead of writing. Ownership is derived from the open documents at each attempt,
+never stored.
+
+## Lifetimes
+
+The clipboard and the asset controller are app-lifetime objects that reference
+per-tab ones, so closing a tab must unsubscribe or the document, its canvas and
+its palette stay reachable for the life of the workspace. `MapDocumentViewModel`
+is `IDisposable` and drops its clipboard, controller and session subscriptions;
+`WorkspaceViewModel.CloseAsync` disposes each removed document;
+`AssetContextController.Dispose` unsubscribes from the document collection.
 
 ## Deferred
 

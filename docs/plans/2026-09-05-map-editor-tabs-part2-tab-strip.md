@@ -2,7 +2,7 @@
 
 **Goal:** Expose the workspace built in Part 1 as a tab strip with per-tab close, keyboard shortcuts, drag-reorder, and a quit flow that prompts for each dirty map.
 
-**Architecture:** An `ItemsControl` bound to `WorkspaceViewModel.Documents` docks full width under the menu; each item is a tab header carrying the map name, a dirty dot, a close button, and drag/middle-click handling. Tab commands route through `WorkspaceViewModel.CloseAsync` / `ActiveDocument` / `Move`, so the UI adds presentation and input only. A single `_commandRunning` flag on `MainWindow` serialises modal commands against tab input.
+**Architecture:** A single-selection `ListBox` bound to `WorkspaceViewModel.Documents` docks full width under the menu; each item is a tab header carrying the map name, a dirty dot, a close button, and drag/middle-click handling. Tab commands route through `WorkspaceViewModel.CloseAsync` / `ActiveDocument` / `Move`, so the UI adds presentation and input only. A single `_commandRunning` flag on `MainWindow` serialises modal commands against tab input.
 
 **Tech Stack:** C#, .NET 10, Avalonia 11 (`ItemsControl` + `DataTemplate`, `ScrollViewer`), xUnit with `Avalonia.Headless.XUnit`.
 
@@ -48,9 +48,16 @@
 - Observable proof: assert the rendered header's dot visibility per tab, not that `Refresh` was called.
 
 **Steps:**
-1. Red: `TabStripTests` — `TabStrip_ShowsOneHeaderPerDocument`; `TabStrip_HeaderShowsFileName` after opening a saved map; `TabStrip_DirtyDot_AppearsOnEditAndClearsOnSave`; `TabStrip_InactiveTabDirtyDot_Updates` (edit tab A, activate B, assert A's header still shows the dot) — adversarial against wiring notifications only through the active document; `TabStrip_ActiveHeader_IsHighlighted`.
-2. Implement: an `ItemsControl` (inside a horizontal `ScrollViewer`, `HorizontalScrollBarVisibility="Auto"`) with `ItemsSource="{Binding Documents}"`, an `ItemsPanel` of `StackPanel Orientation="Horizontal"`, and an `ItemTemplate` of `Border Classes="tab"` containing the label, an `Ellipse` dirty dot bound to `IsDirty`, and a close `Button`. Tabs get `MinWidth`/`MaxWidth` so many tabs shrink and then scroll. Add `Border.tab`, `Border.tab.active` styles beside the existing `Border.row` rules.
-3. The strip's `DataContext` is the workspace; each item's is a `MapDocumentViewModel`. `MainWindow`'s own `DataContext` stays the active document (Part 1), so bind the strip's `ItemsSource` through an explicit named-control reference rather than inheriting `DataContext` — set `TabStrip.ItemsSource = Workspace.Documents` in the constructor instead of a XAML binding, and mark the active tab from `ActivateDocument`.
+1. Red: `TabStripTests` — `TabStrip_ShowsOneHeaderPerDocument`; `TabStrip_HeaderShowsFileName` after opening a saved map; `TabStrip_DirtyDot_AppearsOnEditAndClearsOnSave`; `TabStrip_InactiveTabDirtyDot_Updates` (edit tab A, activate B, assert A's header still shows the dot) — adversarial against wiring notifications only through the active document; `TabStrip_ActiveHeader_IsSelected` (assert `TabStrip.SelectedItem` and the item's `:selected` state follow `Workspace.ActiveDocument`); `TabStrip_ActivatingOffscreenTab_ScrollsItIntoView` (many tabs, activate the first, assert the strip's `ScrollViewer.Offset` moved); `TabStrip_SelectionChanged_DoesNotRecurse` (assert one `PropertyChanged` for `ActiveDocument` per switch).
+2. Implement: a `ListBox x:Name="TabStrip"` with `SelectionMode="Single"`, an `ItemsPanel` of `StackPanel Orientation="Horizontal"`, `ScrollViewer.HorizontalScrollBarVisibility="Auto"`, and an `ItemTemplate` of the label, an `Ellipse` dirty dot bound to `IsDirty`, and a close `Button`. Tabs get `MinWidth`/`MaxWidth` so many tabs shrink and then scroll.
+
+   Use a selecting control, not a plain `ItemsControl`. `ListBoxItem` carries a `:selected` pseudoclass, so the active tab styles as `ListBoxItem:selected /template/ ContentPresenter` with no bookkeeping, and it brings keyboard and accessibility semantics for free. Style it flat against the existing palette — strip the default `ListBox` border and background so the strip reads like the `chrome` band, and add the tab rules beside the existing `Border.row` ones in `EditorTheme.axaml`.
+
+3. Wiring, in `MainWindow`'s constructor: `TabStrip.ItemsSource = Workspace.Documents` (the strip's items are `MapDocumentViewModel`s while the window's own `DataContext` stays the active document, so set this in code rather than inheriting a `DataContext` binding). Selection is one-way out of the workspace and one-way in through the method, matching Part 1's private `ActiveDocument` setter:
+   - `ActivateDocument` sets `TabStrip.SelectedItem = document` (guarded by a re-entrancy flag) and calls `TabStrip.ScrollIntoView(document)`, which satisfies the design's promise that activating an already-open file scrolls its tab into view.
+   - `TabStrip.SelectionChanged` calls `Workspace.Activate(selected)` — never assigns `ActiveDocument` directly.
+
+   The re-entrancy flag matters: without it, `ActivateDocument` → `SelectedItem` → `SelectionChanged` → `Activate` → `PropertyChanged` → `ActivateDocument` loops.
 4. Green, then `dotnet test tests/MapEditor.App.Tests`.
 5. Commit: `feat: show a tab strip for open maps`.
 
@@ -62,7 +69,7 @@
 - Modify: `src/MapEditor.App/Views/MainWindow.axaml.cs`
 - Test: `tests/MapEditor.App.Tests/TabStripTests.cs`
 
-Left-click on a header sets `Workspace.ActiveDocument`; the close button and middle-click both call `Workspace.CloseAsync(document)` through `RunCommandAsync` (Task 5 guards it).
+Left-click on a header selects it, and the strip's `SelectionChanged` calls `Workspace.Activate`; the close button and middle-click both call `Workspace.CloseAsync(document)` through `RunCommandAsync` (Task 5 guards it).
 
 `OnWindowPointerPressed` (`:299-305`) cancels paste mode for any press whose source is not the `MapCanvas` — a tab click therefore cancels an armed paste. That is correct and worth a test: arming paste in tab A and clicking tab B must leave A's paste mode off, since the ghost would otherwise be stranded on a hidden map.
 
@@ -97,9 +104,13 @@ Commit: `feat: add tab keyboard shortcuts`.
 - Modify: `src/MapEditor.App/Views/MainWindow.axaml.cs` (or a small `TabStripDrag` helper beside `src/MapEditor.App/Controls/RectDrag.cs` if the window file grows unwieldy)
 - Test: `tests/MapEditor.App.Tests/TabStripTests.cs`
 
-Press on a header records the document and its index; once the pointer passes a neighbour's midpoint, call `Workspace.Move(from, to)`; release ends the drag; Escape during a drag restores the original order. Reordering never changes `ActiveDocument` (Part 1's `Move` guarantees this; assert it here at the UI level too). A drag that never crosses a midpoint is an ordinary click, so activation still happens on release.
+Press on a header records the document and its index **and captures the pointer** (`e.Pointer.Capture(header)`); once the pointer passes a neighbour's midpoint, call `Workspace.Move(from, to)`; release ends the drag and releases capture; Escape during a drag restores the original order and releases capture.
 
-**Tests:** `Drag_PastNeighbourMidpoint_ReordersTabs`; `Drag_DoesNotChangeActiveDocument`; `Drag_EscapeCancels_RestoresOriginalOrder`; `Drag_ShortPress_StillActivatesTab` — adversarial against a drag handler that swallows plain clicks.
+Capture is not optional: without it a release outside the header — or outside the window — never reaches the handler and the strip stays stuck in a drag, reordering on the next stray pointer move. Handle `PointerCaptureLost` as well, ending the drag in place and leaving the current order (the same shape `MapCanvas` uses for strokes at `MapCanvas.cs:296+`). Drag state must be cleared in every exit path: release, Escape, capture loss, and a document removed mid-drag.
+
+A press on the close `Button` must not start a drag — check the pressed source and bail before recording drag state, or the button's own click never fires cleanly. Reordering never changes `ActiveDocument` (Part 1's `Move` guarantees this; assert it here at the UI level too). A drag that never crosses a midpoint is an ordinary click, so activation still happens on release.
+
+**Tests:** `Drag_PastNeighbourMidpoint_ReordersTabs`; `Drag_DoesNotChangeActiveDocument`; `Drag_EscapeCancels_RestoresOriginalOrder`; `Drag_ShortPress_StillActivatesTab` — adversarial against a drag handler that swallows plain clicks; `Drag_CaptureLost_EndsDragCleanly` (raise capture-lost mid-drag, then move the pointer and assert the order does not change) — adversarial against the stuck-drag bug; `Drag_PressOnCloseButton_DoesNotStartDragAndStillCloses`.
 
 Commit: `feat: reorder tabs by dragging`.
 
@@ -114,12 +125,20 @@ Commit: `feat: reorder tabs by dragging`.
 **Mutation impact:**
 - Source of truth changed: a new `bool _commandRunning` on `MainWindow` guards entry to `RunCommandAsync`.
 - Important readers: every menu handler (`OnNew`, `OnOpen`, `OnSave`, `OnSaveAs`, `OnResize`, `OnLoadAssets`), the tab shortcuts, tab activation and tab close.
-- Derived state: none, but the flag interacts with `_closeGuardRunning` (`:474-510`), which stays independent — quitting must still work while nothing else is running, and `OnClosing` sets its own guard.
+- Derived state: none, but the flag gates `OnClosing` too — see the policy below.
 - Propagation: set the flag before awaiting, clear it in a `finally` so a thrown dialog cannot wedge the window (`ShowFatalErrorAsync` already swallows secondary failures at `:529-545`). While set, tab activation, tab close and file commands return without acting.
 - Invariant: a Save-As picker opened for one document can never write after the user has activated another — the picker's continuation still holds its own `MapDocumentViewModel`, and no activation could have happened while it was open.
 - Observable proof: a test using `FakeEditorDialogs.DirtyGate` (`Fakes/FakeEditorDialogs.cs:28`) to hold a prompt open, then attempting a tab switch, then releasing the gate.
 
-**Tests:** `TabSwitch_WhileDialogOpen_IsIgnored` — adversarial, fails today; `Command_ThatThrows_ClearsTheRunningFlag` (use `FakeEditorDialogs.PickOpenException`, then assert a following command still runs).
+**Closing while a command runs.** `OnClosing` must consult `_commandRunning` as well, and the policy is: **refuse the close**. Cancel the `Closing` event, do not set `_closeGuardRunning`, and do not start `CloseAllAsync`. A modal dialog is on screen; the user answers it, and the close works on the next attempt.
+
+The alternative — quitting anyway — is unsafe here. The continuation of an in-flight `SaveAsAsync` resumes after `Closed`, writes the file, replaces `_current` and fires `StateChanged` into a window whose `AssetContextController` is already disposed. `TryOpenAssetsAsync` guards exactly this with its `_closed` check (`MainWindow.axaml.cs:458-462`); the document-save path has no such guard, and adding one to every continuation is more surface than refusing one close.
+
+`_closeGuardRunning` stays separate and unchanged: it serialises repeat `Closing` events against each other, which is a different race from a modal command being open.
+
+**Tests:** `TabSwitch_WhileDialogOpen_IsIgnored` — adversarial, fails today; `Close_WhileSaveAsDialogOpen_IsRefused` — hold a Save-As open with a gate, attempt `Close()`, assert the window is still visible and `Dialogs.DirtyShown == 0`, then release the gate and assert a second `Close()` succeeds. A gated *Save-As* case specifically, not the existing asset-picker one, since saving is the path with no `_closed` guard; `Command_ThatThrows_ClearsTheRunningFlag` (use `FakeEditorDialogs.PickOpenException`, then assert a following command still runs).
+
+`FakeEditorDialogs` has `DirtyGate` and `AssetDirectoryPickGate` (`Fakes/FakeEditorDialogs.cs:27-28`) but no save-picker gate — add `SavePickGate` alongside them, mirroring the existing pattern.
 
 Commit: `fix: serialise modal editor commands against tab input`.
 
@@ -133,9 +152,11 @@ Commit: `fix: serialise modal editor commands against tab input`.
 
 `OnClosing` keeps its shape — cancel the event, run the guard, re-`Close()` on approval — and swaps `_viewModel.RequestCloseAsync()` for `Workspace.CloseAllAsync()`, which walks `Documents` in order, activating and prompting each dirty document (Part 1, Task 5). Before the walk, call `FinishInteraction(commit: true)` on the active canvas, as `:476` already does.
 
-`CloseAllAsync` activating each document means the window's `ActiveDocument` subscription runs `ActivateDocument` mid-quit; that is the intended behaviour (the user sees the map being asked about) and is safe because activation is synchronous and the `_commandRunning` guard is not held by `OnClosing`. Verify with the cancel test that the cancelled-on document is the one left active and visible.
+`CloseAllAsync` activating each document means the window's `ActiveDocument` subscription runs `ActivateDocument` mid-quit; that is the intended behaviour (the user sees the map being asked about) and is safe because activation is synchronous. Task 5's policy guarantees no other command is in flight when the quit starts. Verify with the cancel test that the cancelled-on document is the one left active and visible.
 
 **Tests:** `Close_TwoDirtyTabs_PromptsTwice`; `Close_CancelOnSecondTab_AbortsQuitAndLeavesItActive` (assert the window is still visible, `Documents.Count` unchanged, and `Workspace.ActiveDocument` is the second document) — adversarial; `Close_AllClean_ClosesWithoutPrompt` (the existing case, still passing).
+
+**Guard coverage inherited from Part 1, Task 4.** Removing `EditorDocumentController`'s own close guards leaves two controller tests without a subject: `RequestClose_SecondCallAfterApproval_DoesNotPromptAgain` and `RequestClose_DuplicateWhilePending_YieldsExactlyOnePrompt`. Their behaviour now belongs to `MainWindow._closeApproved` and `_closeGuardRunning`. Before this task is done, confirm `MainWindowCloseTests` has an equivalent for each — a re-entrant `Closing` during a pending prompt yielding exactly one dialog, and an approved close not re-prompting — and add whichever is missing. Do not let this coverage disappear in the move.
 
 Commit: `feat: prompt for each dirty map when quitting`.
 
