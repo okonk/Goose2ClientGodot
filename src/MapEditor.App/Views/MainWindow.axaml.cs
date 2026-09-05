@@ -107,8 +107,8 @@ internal partial class MainWindow : Window
 
     private void OnDocumentsChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
-        // Move/Replace/Reset put the same documents in both NewItems and OldItems; only Add/Remove
-        // change the set of hosted documents.
+        // The workspace only emits Add/Remove/Move, and Move carries the same document in both NewItems and
+        // OldItems, so only Add/Remove change the set of hosted documents.
         if (e.Action == NotifyCollectionChangedAction.Add && e.NewItems is not null)
         {
             foreach (MapDocumentViewModel document in e.NewItems)
