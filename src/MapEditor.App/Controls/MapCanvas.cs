@@ -14,7 +14,7 @@ namespace MapEditor.App.Controls;
 
 internal sealed class MapCanvas : Control, ICustomHitTest
 {
-    private readonly MainWindowViewModel _viewModel;
+    private readonly MapDocumentViewModel _viewModel;
     private readonly AssetContextController _assets;
     private MapEditSession _trackedSession;
     private ViewportTransform _viewport = new(new RenderSize(1, 1), new RenderPoint(0, 0), MapZoom.Percent100);
@@ -26,7 +26,7 @@ internal sealed class MapCanvas : Control, ICustomHitTest
     private Point _lastPanPosition;
     private Window? _hoverWindow;
 
-    public MapCanvas(MainWindowViewModel viewModel, AssetContextController assets)
+    public MapCanvas(MapDocumentViewModel viewModel, AssetContextController assets)
     {
         _viewModel = viewModel ?? throw new ArgumentNullException(nameof(viewModel));
         _assets = assets ?? throw new ArgumentNullException(nameof(assets));

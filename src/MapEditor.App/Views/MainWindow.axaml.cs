@@ -31,7 +31,7 @@ internal partial class MainWindow : Window
 
     private readonly IEditorDialogs _dialogs;
     private readonly AppSettingsStore _settings;
-    private readonly MainWindowViewModel _viewModel;
+    private readonly MapDocumentViewModel _viewModel;
     private readonly AssetContextController _assets;
     private readonly MapCanvas _canvas;
     private readonly SpritePaletteControl _palette;
@@ -45,7 +45,7 @@ internal partial class MainWindow : Window
     // Picker/settings continuations can resume after Closed; publishing then leaks an undisposed context.
     private bool _closed;
 
-    public MainWindow(IEditorDialogs dialogs, AppSettingsStore settings, MainWindowViewModel viewModel, AssetContextController assets)
+    public MainWindow(IEditorDialogs dialogs, AppSettingsStore settings, MapDocumentViewModel viewModel, AssetContextController assets)
     {
         _dialogs = dialogs ?? throw new ArgumentNullException(nameof(dialogs));
         _settings = settings ?? throw new ArgumentNullException(nameof(settings));
@@ -87,7 +87,7 @@ internal partial class MainWindow : Window
         Opened += OnOpened;
     }
 
-    internal MainWindowViewModel ViewModel => _viewModel;
+    internal MapDocumentViewModel ViewModel => _viewModel;
 
     internal IEditorDialogs Dialogs => _dialogs;
 
@@ -551,32 +551,32 @@ internal partial class MainWindow : Window
     {
         switch (e.PropertyName)
         {
-            case nameof(MainWindowViewModel.Title):
+            case nameof(MapDocumentViewModel.Title):
                 Title = _viewModel.Title;
                 break;
-            case nameof(MainWindowViewModel.ActiveTool):
+            case nameof(MapDocumentViewModel.ActiveTool):
                 SyncToolButtons();
                 break;
-            case nameof(MainWindowViewModel.SelectedLayers):
+            case nameof(MapDocumentViewModel.SelectedLayers):
                 if ((_viewModel.SelectedLayers & (1 << _layerAnchor)) == 0)
                 {
                     _layerAnchor = _viewModel.TopLayer;
                 }
                 SyncLayerRows();
                 break;
-            case nameof(MainWindowViewModel.LayerVisibility):
+            case nameof(MapDocumentViewModel.LayerVisibility):
                 SyncLayerRows();
                 break;
-            case nameof(MainWindowViewModel.Brush):
+            case nameof(MapDocumentViewModel.Brush):
                 SyncBrushFields();
                 break;
-            case nameof(MainWindowViewModel.HoverX):
-            case nameof(MainWindowViewModel.HoverY):
-            case nameof(MainWindowViewModel.SelectedX):
-            case nameof(MainWindowViewModel.SelectedY):
-            case nameof(MainWindowViewModel.ZoomPercent):
-            case nameof(MainWindowViewModel.MapWidth):
-            case nameof(MainWindowViewModel.MapHeight):
+            case nameof(MapDocumentViewModel.HoverX):
+            case nameof(MapDocumentViewModel.HoverY):
+            case nameof(MapDocumentViewModel.SelectedX):
+            case nameof(MapDocumentViewModel.SelectedY):
+            case nameof(MapDocumentViewModel.ZoomPercent):
+            case nameof(MapDocumentViewModel.MapWidth):
+            case nameof(MapDocumentViewModel.MapHeight):
                 SyncReadouts();
                 break;
         }

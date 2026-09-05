@@ -26,19 +26,19 @@ internal sealed class SpritePaletteControl : Control, ICustomHitTest
     private static readonly Brush TransparentFill = new SolidColorBrush(Color.FromArgb(0x00, 0x00, 0x00, 0x00));
     private static readonly Pen SelectionStroke = new(new SolidColorBrush(Color.FromArgb(0xFF, 0x33, 0x99, 0xFF)), 2.0);
 
-    private readonly MainWindowViewModel _viewModel;
+    private readonly MapDocumentViewModel _viewModel;
     private readonly AssetContextController _assets;
     private readonly Func<AssetContext, SpriteReference, SpriteResolution> _resolve;
     private ScrollBar? _bar;
     private double _offset;
 
-    public SpritePaletteControl(MainWindowViewModel viewModel, AssetContextController assets)
+    public SpritePaletteControl(MapDocumentViewModel viewModel, AssetContextController assets)
         : this(viewModel, assets, (context, reference) => context.Resolve(reference))
     {
     }
 
     internal SpritePaletteControl(
-        MainWindowViewModel viewModel,
+        MapDocumentViewModel viewModel,
         AssetContextController assets,
         Func<AssetContext, SpriteReference, SpriteResolution> resolve)
     {
@@ -207,10 +207,10 @@ internal sealed class SpritePaletteControl : Control, ICustomHitTest
     {
         switch (e.PropertyName)
         {
-            case nameof(MainWindowViewModel.SelectedSheet):
+            case nameof(MapDocumentViewModel.SelectedSheet):
                 OnPaletteInvalidated();
                 break;
-            case nameof(MainWindowViewModel.Brush):
+            case nameof(MapDocumentViewModel.Brush):
                 InvalidateVisual();
                 break;
         }

@@ -25,13 +25,13 @@ public class AssetContextControllerTests : IDisposable
     private readonly string _directory = Directory.CreateTempSubdirectory("map-editor-assets-ctx-").FullName;
     private readonly FakeEditorDialogs _dialogs = new();
     private readonly EditorDocumentController _documentController;
-    private readonly MainWindowViewModel _viewModel;
+    private readonly MapDocumentViewModel _viewModel;
     private readonly string _settingsPath;
 
     public AssetContextControllerTests()
     {
         _documentController = new EditorDocumentController(_dialogs, new MapFileStore());
-        _viewModel = new MainWindowViewModel(_documentController);
+        _viewModel = new MapDocumentViewModel(_documentController);
         _settingsPath = Path.Combine(_directory, "settings.json");
     }
 

@@ -8,17 +8,17 @@ namespace MapEditor.App.Rendering;
 
 internal sealed class AssetContextController : IDisposable
 {
-    private readonly MainWindowViewModel _viewModel;
+    private readonly MapDocumentViewModel _viewModel;
     private readonly AppSettingsStore _settings;
     private readonly Func<string, AssetContext> _openContext;
     private AssetContext _current;
 
-    public AssetContextController(MainWindowViewModel viewModel, AppSettingsStore settings)
+    public AssetContextController(MapDocumentViewModel viewModel, AppSettingsStore settings)
         : this(viewModel, settings, path => AssetContext.Create(path, new AvaloniaSpriteSheetLoader()))
     {
     }
 
-    internal AssetContextController(MainWindowViewModel viewModel, AppSettingsStore settings, Func<string, AssetContext> openContext)
+    internal AssetContextController(MapDocumentViewModel viewModel, AppSettingsStore settings, Func<string, AssetContext> openContext)
     {
         _viewModel = viewModel ?? throw new ArgumentNullException(nameof(viewModel));
         _settings = settings ?? throw new ArgumentNullException(nameof(settings));

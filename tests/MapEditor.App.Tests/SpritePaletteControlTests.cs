@@ -39,7 +39,7 @@ public class SpritePaletteControlTests : IDisposable
 
     private sealed record Harness(
         SpritePaletteControl Palette,
-        MainWindowViewModel ViewModel,
+        MapDocumentViewModel ViewModel,
         AssetContextController Assets,
         Window Window,
         ScrollBar Bar,
@@ -340,7 +340,7 @@ public class SpritePaletteControlTests : IDisposable
     {
         FakeEditorDialogs dialogs = new();
         EditorDocumentController documentController = new(dialogs, new MapFileStore());
-        MainWindowViewModel viewModel = new(documentController);
+        MapDocumentViewModel viewModel = new(documentController);
         string settingsPath = Path.Combine(_directory, "settings.json");
         CountingSpriteSheetLoader countingLoader = new(
             loaderBehavior ?? (path => SpriteSheetLoadResult.Success(new CountingSpriteSheetImage(64, 64))));

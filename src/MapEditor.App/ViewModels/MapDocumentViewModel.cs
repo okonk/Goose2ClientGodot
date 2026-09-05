@@ -18,7 +18,7 @@ internal enum EditorRefresh
     Document = 1 << 4
 }
 
-internal sealed class MainWindowViewModel : ViewModelBase
+internal sealed class MapDocumentViewModel : ViewModelBase
 {
     private const string UntitledName = "Untitled";
 
@@ -46,7 +46,7 @@ internal sealed class MainWindowViewModel : ViewModelBase
     private bool _canRedo;
     private bool _canSave;
 
-    public MainWindowViewModel(EditorDocumentController controller)
+    public MapDocumentViewModel(EditorDocumentController controller)
     {
         _controller = controller ?? throw new ArgumentNullException(nameof(controller));
         _session = _controller.Document.Session;

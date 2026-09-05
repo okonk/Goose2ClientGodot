@@ -36,7 +36,7 @@ internal sealed class MainWindowHarness : IDisposable
 
     public EditorDocumentController Controller { get; }
 
-    public MainWindowViewModel ViewModel { get; }
+    public MapDocumentViewModel ViewModel { get; }
 
     public AssetContextController Assets { get; }
 
@@ -47,7 +47,7 @@ internal sealed class MainWindowHarness : IDisposable
         TempDirectory = Directory.CreateTempSubdirectory("map-editor-window-").FullName;
         Settings = new AppSettingsStore(Path.Combine(TempDirectory, "settings.json"));
         Controller = new EditorDocumentController(Dialogs, new MapFileStore());
-        ViewModel = new MainWindowViewModel(Controller);
+        ViewModel = new MapDocumentViewModel(Controller);
         Assets = new AssetContextController(ViewModel, Settings);
         Window = new MainWindow(Dialogs, Settings, ViewModel, Assets);
     }
@@ -100,7 +100,7 @@ public class MainWindowTests : IDisposable
 
     private MainWindow Window => _harness.Window;
 
-    private MainWindowViewModel ViewModel => _harness.ViewModel;
+    private MapDocumentViewModel ViewModel => _harness.ViewModel;
 
     private T? TryFind<T>(string name) where T : Control
         => Window.FindControl<T>(name);

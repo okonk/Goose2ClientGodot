@@ -38,7 +38,7 @@ public class MapCanvasTests
     private static readonly Color BlockPreviewColor = Color.FromArgb(0x60, 0xFF, 0x00, 0x00);
     private static readonly Color UnblockPreviewColor = Color.FromArgb(0x60, 0x00, 0xFF, 0x00);
 
-    private sealed record Harness(MapCanvas Canvas, MainWindowViewModel ViewModel, FakeEditorDialogs Dialogs, Window Window, AssetContextController Assets);
+    private sealed record Harness(MapCanvas Canvas, MapDocumentViewModel ViewModel, FakeEditorDialogs Dialogs, Window Window, AssetContextController Assets);
 
     [AvaloniaFact]
     public async Task LeftPressRelease_PaintsOneCellAsSingleUndoEntry()
@@ -898,7 +898,7 @@ public class MapCanvasTests
     {
         FakeEditorDialogs dialogs = new();
         EditorDocumentController documentController = new(dialogs, new MapFileStore());
-        MainWindowViewModel viewModel = new(documentController);
+        MapDocumentViewModel viewModel = new(documentController);
         string settingsPath = Path.Combine(Path.GetTempPath(), "map-editor-canvas-tests", "settings.json");
         AssetContextController assets = new(viewModel, new AppSettingsStore(settingsPath));
         MapCanvas canvas = new(viewModel, assets)

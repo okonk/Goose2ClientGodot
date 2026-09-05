@@ -183,11 +183,11 @@ public class AvaloniaMapDrawSinkTests
         Assert.Equal(BitmapInterpolationMode.None, RenderOptions.GetBitmapInterpolationMode(canvas));
     }
 
-    private static (MapCanvas Canvas, MainWindowViewModel ViewModel, Window Window) CreateCanvas()
+    private static (MapCanvas Canvas, MapDocumentViewModel ViewModel, Window Window) CreateCanvas()
     {
         FakeEditorDialogs dialogs = new();
         EditorDocumentController documentController = new(dialogs, new MapFileStore());
-        MainWindowViewModel viewModel = new(documentController);
+        MapDocumentViewModel viewModel = new(documentController);
         string settingsPath = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "map-editor-sink-tests", "settings.json");
         AssetContextController assets = new(viewModel, new AppSettingsStore(settingsPath));
         MapCanvas canvas = new(viewModel, assets) { Width = 300, Height = 200 };

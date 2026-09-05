@@ -12,17 +12,17 @@ using Xunit;
 
 namespace MapEditor.App.Tests;
 
-public class MainWindowViewModelTests : IDisposable
+public class MapDocumentViewModelTests : IDisposable
 {
     private readonly string _directory = Directory.CreateTempSubdirectory("map-editor-vm-").FullName;
     private readonly FakeEditorDialogs _dialogs = new();
     private readonly EditorDocumentController _controller;
-    private readonly MainWindowViewModel _viewModel;
+    private readonly MapDocumentViewModel _viewModel;
 
-    public MainWindowViewModelTests()
+    public MapDocumentViewModelTests()
     {
         _controller = new EditorDocumentController(_dialogs, new MapFileStore());
-        _viewModel = new MainWindowViewModel(_controller);
+        _viewModel = new MapDocumentViewModel(_controller);
     }
 
     public void Dispose() => Directory.Delete(_directory, true);
@@ -92,7 +92,7 @@ public class MainWindowViewModelTests : IDisposable
         var raised = RaisedProperties(() => _viewModel.ActiveTool = MapEditTool.Eraser);
 
         Assert.Equal(MapEditTool.Eraser, _viewModel.ActiveTool);
-        Assert.Equal(new[] { nameof(MainWindowViewModel.ActiveTool) }, raised);
+        Assert.Equal(new[] { nameof(MapDocumentViewModel.ActiveTool) }, raised);
     }
 
     [Fact]
@@ -135,7 +135,7 @@ public class MainWindowViewModelTests : IDisposable
         var raised = RaisedProperties(() => _viewModel.SelectedLayers = (byte)0b01000);
 
         Assert.Equal((byte)0b01000, _controller.Document.Session.SelectedLayers);
-        Assert.Equal(new[] { nameof(MainWindowViewModel.SelectedLayers) }, raised);
+        Assert.Equal(new[] { nameof(MapDocumentViewModel.SelectedLayers) }, raised);
     }
 
     [Theory]
@@ -153,7 +153,7 @@ public class MainWindowViewModelTests : IDisposable
         var raised = RaisedProperties(() => _viewModel.Brush = new MapTileLayer(7, -2));
 
         Assert.Equal(new MapTileLayer(7, -2), _controller.Document.Session.SelectedTileLayer);
-        Assert.Equal(new[] { nameof(MainWindowViewModel.Brush) }, raised);
+        Assert.Equal(new[] { nameof(MapDocumentViewModel.Brush) }, raised);
     }
 
     [Fact]
@@ -162,7 +162,7 @@ public class MainWindowViewModelTests : IDisposable
         var raised = RaisedProperties(() => _viewModel.SelectedSheet = 2);
 
         Assert.Equal(2, _viewModel.SelectedSheet);
-        Assert.Equal(new[] { nameof(MainWindowViewModel.SelectedSheet) }, raised);
+        Assert.Equal(new[] { nameof(MapDocumentViewModel.SelectedSheet) }, raised);
     }
 
     [Fact]
@@ -171,7 +171,7 @@ public class MainWindowViewModelTests : IDisposable
         var raised = RaisedProperties(() => _viewModel.SetSheetIds(new[] { 3, 7 }));
 
         Assert.Equal(new[] { 3, 7 }, _viewModel.SheetIds);
-        Assert.Equal(new[] { nameof(MainWindowViewModel.SheetIds) }, raised);
+        Assert.Equal(new[] { nameof(MapDocumentViewModel.SheetIds) }, raised);
     }
 
     [Fact]
@@ -180,7 +180,7 @@ public class MainWindowViewModelTests : IDisposable
         var raised = RaisedProperties(() => _viewModel.LayerVisibility = (byte)0b11011);
 
         Assert.Equal((byte)0b11011, _viewModel.LayerVisibility);
-        Assert.Equal(new[] { nameof(MainWindowViewModel.LayerVisibility) }, raised);
+        Assert.Equal(new[] { nameof(MapDocumentViewModel.LayerVisibility) }, raised);
     }
 
     [Fact]
@@ -206,7 +206,7 @@ public class MainWindowViewModelTests : IDisposable
 
         Assert.False(_viewModel.ShowGrid);
         Assert.True(_viewModel.ShowBlocked);
-        Assert.Equal(new[] { nameof(MainWindowViewModel.ShowGrid), nameof(MainWindowViewModel.ShowBlocked) }, raised);
+        Assert.Equal(new[] { nameof(MapDocumentViewModel.ShowGrid), nameof(MapDocumentViewModel.ShowBlocked) }, raised);
     }
 
     [Fact]
@@ -218,7 +218,7 @@ public class MainWindowViewModelTests : IDisposable
             _viewModel.HoverY = 6;
         });
 
-        Assert.Equal(new[] { nameof(MainWindowViewModel.HoverX), nameof(MainWindowViewModel.HoverY) }, raised);
+        Assert.Equal(new[] { nameof(MapDocumentViewModel.HoverX), nameof(MapDocumentViewModel.HoverY) }, raised);
     }
 
     [Fact]
@@ -227,7 +227,7 @@ public class MainWindowViewModelTests : IDisposable
         var raised = RaisedProperties(() => _viewModel.ZoomPercent = 200);
 
         Assert.Equal(200, _viewModel.ZoomPercent);
-        Assert.Equal(new[] { nameof(MainWindowViewModel.ZoomPercent) }, raised);
+        Assert.Equal(new[] { nameof(MapDocumentViewModel.ZoomPercent) }, raised);
     }
 
     [Theory]
@@ -379,8 +379,8 @@ public class MainWindowViewModelTests : IDisposable
 
         await _viewModel.NewAsync();
 
-        Assert.Contains(nameof(MainWindowViewModel.SelectedLayers), raised);
-        Assert.Contains(nameof(MainWindowViewModel.Brush), raised);
+        Assert.Contains(nameof(MapDocumentViewModel.SelectedLayers), raised);
+        Assert.Contains(nameof(MapDocumentViewModel.Brush), raised);
         Assert.Equal((byte)1, _viewModel.SelectedLayers);
         Assert.Equal(new MapTileLayer(0, 0), _viewModel.Brush);
     }
