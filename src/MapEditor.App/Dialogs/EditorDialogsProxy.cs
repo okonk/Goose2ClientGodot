@@ -1,5 +1,6 @@
 using System;
 using System.Threading.Tasks;
+using MapEditor.Core;
 
 namespace MapEditor.App.Dialogs;
 
@@ -16,6 +17,8 @@ internal sealed class EditorDialogsProxy : IEditorDialogs
     }
 
     public Task<NewMapRequest?> ShowNewMapAsync() => Target.ShowNewMapAsync();
+
+    public Task<MapTileRectangle?> ShowResizeMapAsync(MapDocument document) => Target.ShowResizeMapAsync(document);
 
     public Task<DirtyChoice> ShowDirtyAsync(string displayName) => Target.ShowDirtyAsync(displayName);
 

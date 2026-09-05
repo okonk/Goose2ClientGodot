@@ -1,5 +1,6 @@
 using System;
 using System.Threading.Tasks;
+using MapEditor.Core;
 
 namespace MapEditor.App.Dialogs;
 
@@ -22,6 +23,8 @@ internal sealed record NewMapRequest(int Width, int Height);
 internal interface IEditorDialogs
 {
     Task<NewMapRequest?> ShowNewMapAsync();
+
+    Task<MapTileRectangle?> ShowResizeMapAsync(MapDocument document);
 
     Task<DirtyChoice> ShowDirtyAsync(string displayName);
 

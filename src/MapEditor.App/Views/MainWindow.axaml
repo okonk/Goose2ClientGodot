@@ -18,6 +18,8 @@
       <MenuItem x:Name="EditMenu" Header="_Edit">
         <MenuItem x:Name="UndoCommand" Header="_Undo" IsEnabled="{Binding CanUndo}" Click="OnUndo" />
         <MenuItem x:Name="RedoCommand" Header="_Redo" IsEnabled="{Binding CanRedo}" Click="OnRedo" />
+        <Separator />
+        <MenuItem x:Name="ResizeCommand" Header="Resize _Map" Click="OnResize" />
       </MenuItem>
       <MenuItem x:Name="ViewMenu" Header="_View">
         <MenuItem x:Name="GridMenuItem" Header="Grid" ToggleType="CheckBox" IsChecked="{Binding ShowGrid, Mode=TwoWay}" />

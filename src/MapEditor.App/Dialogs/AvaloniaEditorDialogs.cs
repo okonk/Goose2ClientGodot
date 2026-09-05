@@ -4,6 +4,7 @@ using System.IO;
 using System.Threading.Tasks;
 using Avalonia.Controls;
 using Avalonia.Platform.Storage;
+using MapEditor.Core;
 
 namespace MapEditor.App.Dialogs;
 
@@ -23,6 +24,8 @@ internal sealed class AvaloniaEditorDialogs : IEditorDialogs
     }
 
     public Task<NewMapRequest?> ShowNewMapAsync() => new NewMapDialog().ShowDialog<NewMapRequest?>(_owner);
+
+    public Task<MapTileRectangle?> ShowResizeMapAsync(MapDocument document) => new ResizeMapDialog(document).ShowDialog<MapTileRectangle?>(_owner);
 
     public Task<DirtyChoice> ShowDirtyAsync(string displayName) => new ChoiceDialog(
             "Unsaved changes",

@@ -242,6 +242,16 @@ internal partial class MainWindow : Window
 
     private void OnNew(object? sender, RoutedEventArgs e) => _ = RunCommandAsync(() => _viewModel.NewAsync());
 
+    private void OnResize(object? sender, RoutedEventArgs e)
+        => _ = RunCommandAsync(async () =>
+        {
+            MapTileRectangle? window = await _dialogs.ShowResizeMapAsync(_viewModel.Session.Document);
+            if (window is { } value)
+            {
+                _viewModel.ResizeMap(value);
+            }
+        });
+
     private void OnOpen(object? sender, RoutedEventArgs e) => _ = RunCommandAsync(() => _viewModel.OpenAsync());
 
     private void OnSave(object? sender, RoutedEventArgs e) => _ = RunCommandAsync(() => _viewModel.SaveAsync());

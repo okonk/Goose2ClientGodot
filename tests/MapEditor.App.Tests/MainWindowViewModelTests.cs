@@ -535,4 +535,120 @@ public class MainWindowViewModelTests : IDisposable
         Assert.Null(_viewModel.SelectionRectangle);
         Assert.False(_viewModel.PasteMode);
     }
+
+    private async Task New4x4Async()
+    {
+        _dialogs.NewMapResult = new NewMapRequest(4, 4);
+        _dialogs.DirtyResult = DirtyChoice.Discard;
+        await _viewModel.NewAsync();
+    }
+
+    [Fact]
+    public async Task ResizeMap_ShiftsSelectionAndRefreshesCachedDimensions()
+    {
+        await New4x4Async();
+        _viewModel.SelectedX = 0;
+        _viewModel.SelectedY = 0;
+
+        _viewModel.ResizeMap(new MapTileRectangle(-2, -2, 6, 6));
+
+        Assert.Equal(6, _viewModel.MapWidth);
+        Assert.Equal(6, _viewModel.MapHeight);
+        Assert.Equal(2, _viewModel.SelectedX);
+        Assert.Equal(2, _viewModel.SelectedY);
+    }
+
+    [Fact]
+    public async Task ResizeMap_SelectionCroppedAway_IsClearedNotClamped()
+    {
+        await New4x4Async();
+        _viewModel.SelectedX = 3;
+        _viewModel.SelectedY = 1;
+
+        _viewModel.ResizeMap(new MapTileRectangle(0, 0, 2, 4));
+
+        Assert.Null(_viewModel.SelectedX);
+        Assert.Null(_viewModel.SelectedY);
+    }
+
+    [Fact]
+    public async Task ResizeMap_CancelsPasteMode()
+    {
+        await New4x4Async();
+        _viewModel.SelectionRectangle = new MapTileRectangle(0, 0, 2, 2);
+        _viewModel.CopySelection();
+        _viewModel.BeginPasteMode();
+        Assert.True(_viewModel.PasteMode);
+
+        _viewModel.ResizeMap(new MapTileRectangle(0, 0, 4, 6));
+
+        Assert.False(_viewModel.PasteMode);
+    }
+
+    [Fact]
+    public async Task ResizeMap_PartiallyCroppedSelection_KeepsTheSurvivingPart()
+    {
+        await New4x4Async();
+        _viewModel.SelectionRectangle = new MapTileRectangle(1, 1, 3, 3);
+
+        _viewModel.ResizeMap(new MapTileRectangle(0, 0, 3, 3));
+
+        Assert.Equal(new MapTileRectangle(1, 1, 2, 2), _viewModel.SelectionRectangle);
+    }
+
+    [Fact]
+    public async Task UndoOfAResize_RestoresDimensionsAndUnshiftsTheSelection()
+    {
+        await New4x4Async();
+        _viewModel.SelectedX = 0;
+        _viewModel.SelectedY = 0;
+
+        _viewModel.ResizeMap(new MapTileRectangle(-2, -2, 6, 6));
+        Assert.Equal(6, _viewModel.MapWidth);
+        Assert.Equal(2, _viewModel.SelectedX);
+        Assert.Equal(2, _viewModel.SelectedY);
+
+        Assert.True(_viewModel.Undo());
+
+        Assert.Equal(4, _viewModel.MapWidth);
+        Assert.Equal(4, _viewModel.MapHeight);
+        Assert.Equal(0, _viewModel.SelectedX);
+        Assert.Equal(0, _viewModel.SelectedY);
+    }
+
+    [Fact]
+    public async Task RedoOfAResize_ReappliesDimensionsAndShift()
+    {
+        await New4x4Async();
+        _viewModel.SelectedX = 0;
+        _viewModel.SelectedY = 0;
+
+        _viewModel.ResizeMap(new MapTileRectangle(-2, -2, 6, 6));
+        Assert.True(_viewModel.Undo());
+        Assert.True(_viewModel.Redo());
+
+        Assert.Equal(6, _viewModel.MapWidth);
+        Assert.Equal(6, _viewModel.MapHeight);
+        Assert.Equal(2, _viewModel.SelectedX);
+        Assert.Equal(2, _viewModel.SelectedY);
+    }
+
+    [Fact]
+    public async Task DocumentReplacement_UnsubscribesTheOldSessionResizeHandler()
+    {
+        await New4x4Async();
+        MapEditSession first = _viewModel.Session;
+        first.ApplyResize(new MapTileRectangle(0, 0, 4, 6));
+        Assert.Equal(6, _viewModel.MapHeight);
+
+        _dialogs.NewMapResult = new NewMapRequest(8, 8);
+        await _viewModel.NewAsync();
+        Assert.Equal(8, _viewModel.MapWidth);
+        Assert.Equal(8, _viewModel.MapHeight);
+
+        first.ApplyResize(new MapTileRectangle(0, 0, 6, 6));
+
+        Assert.Equal(8, _viewModel.MapWidth);
+        Assert.Equal(8, _viewModel.MapHeight);
+    }
 }

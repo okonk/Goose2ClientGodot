@@ -55,6 +55,7 @@ internal sealed class MainWindowViewModel : ViewModelBase
         _title = BuildTitle();
         _canSave = _session.IsDirty;
         _controller.StateChanged += OnControllerStateChanged;
+        _session.Resized += OnSessionResized;
     }
 
     public event Action? CanvasInvalidated;
@@ -350,6 +351,16 @@ internal sealed class MainWindowViewModel : ViewModelBase
         return true;
     }
 
+    public void ResizeMap(MapTileRectangle window)
+    {
+        if (!_session.ApplyResize(window))
+        {
+            return;
+        }
+
+        Refresh(EditorRefresh.Canvas | EditorRefresh.Commands | EditorRefresh.Title);
+    }
+
     public void Refresh(EditorRefresh flags)
     {
         bool documentReplaced = false;
@@ -358,8 +369,10 @@ internal sealed class MainWindowViewModel : ViewModelBase
             MapEditSession session = _controller.Document.Session;
             if (!ReferenceEquals(session, _session))
             {
+                _session.Resized -= OnSessionResized;
                 documentReplaced = true;
                 _session = session;
+                _session.Resized += OnSessionResized;
                 SetField(ref _mapWidth, session.Document.Width, nameof(MapWidth));
                 SetField(ref _mapHeight, session.Document.Height, nameof(MapHeight));
                 HoverX = null;
@@ -400,6 +413,45 @@ internal sealed class MainWindowViewModel : ViewModelBase
     private void OnControllerStateChanged()
     {
         Refresh(EditorRefresh.Document | EditorRefresh.Title | EditorRefresh.Commands);
+    }
+
+    private void OnSessionResized(MapResizeTransform transform)
+    {
+        SetField(ref _mapWidth, transform.Width, nameof(MapWidth));
+        SetField(ref _mapHeight, transform.Height, nameof(MapHeight));
+        (SelectedX, SelectedY) = ShiftPoint(SelectedX, SelectedY, transform);
+        HoverX = null;
+        HoverY = null;
+        SelectionRectangle = ShiftRect(SelectionRectangle, transform);
+        CancelPasteMode();
+    }
+
+    private static (int? X, int? Y) ShiftPoint(int? x, int? y, in MapResizeTransform transform)
+    {
+        if (x is not { } xValue || y is not { } yValue)
+        {
+            return (null, null);
+        }
+
+        int shiftedX = xValue + transform.OffsetX;
+        int shiftedY = yValue + transform.OffsetY;
+        if (shiftedX < 0 || shiftedX >= transform.Width || shiftedY < 0 || shiftedY >= transform.Height)
+        {
+            return (null, null);
+        }
+
+        return (shiftedX, shiftedY);
+    }
+
+    private static MapTileRectangle? ShiftRect(MapTileRectangle? rect, in MapResizeTransform transform)
+    {
+        if (rect is not { } value)
+        {
+            return null;
+        }
+
+        return new MapTileRectangle(value.X + transform.OffsetX, value.Y + transform.OffsetY, value.Width, value.Height)
+            .ClipTo(transform.Width, transform.Height);
     }
 
     private string BuildTitle()

@@ -2,12 +2,14 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using MapEditor.App.Dialogs;
+using MapEditor.Core;
 
 namespace MapEditor.App.Tests.Fakes;
 
 internal sealed class FakeEditorDialogs : IEditorDialogs
 {
     public NewMapRequest? NewMapResult;
+    public MapTileRectangle? ResizeMapResult;
     public DirtyChoice DirtyResult = DirtyChoice.Cancel;
     public ExternalChangeChoice ExternalChangeResult = ExternalChangeChoice.Cancel;
     public Queue<ExternalChangeChoice>? ExternalChangeChoices;
@@ -26,6 +28,7 @@ internal sealed class FakeEditorDialogs : IEditorDialogs
     public TaskCompletionSource<string?>? AssetDirectoryPickGate;
 
     public int NewMapShown;
+    public int ResizeMapShown;
     public int DirtyShown;
     public int ExternalChangeShown;
     public int OpenPickShown;
@@ -41,6 +44,12 @@ internal sealed class FakeEditorDialogs : IEditorDialogs
         }
 
         return Task.FromResult(NewMapResult);
+    }
+
+    public Task<MapTileRectangle?> ShowResizeMapAsync(MapDocument document)
+    {
+        ResizeMapShown++;
+        return Task.FromResult(ResizeMapResult);
     }
 
     public Task<DirtyChoice> ShowDirtyAsync(string displayName)

@@ -438,6 +438,18 @@ public class MainWindowTests : IDisposable
     }
 
     [AvaloniaFact]
+    public void ResizeMenuItem_ShowsTheDialogAndAppliesTheReturnedWindow()
+    {
+        _harness.Dialogs.ResizeMapResult = new MapTileRectangle(0, 0, 6, 6);
+        Find<MenuItem>("ResizeCommand").RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Equal(1, _harness.Dialogs.ResizeMapShown);
+        Assert.Equal(6, ViewModel.MapWidth);
+        Assert.Equal(6, ViewModel.MapHeight);
+    }
+
+    [AvaloniaFact]
     public void DocumentReplacement_ResetsLayerAnchorToTopmostSelectedLayer()
     {
         Point row3 = Find<Border>("Layer3Row").TranslatePoint(new Point(10, 5), Window).Value;
