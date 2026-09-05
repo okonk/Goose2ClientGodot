@@ -110,6 +110,8 @@ internal sealed class MapDocumentViewModel : ViewModelBase, IDisposable
 
     public int TopLayer => _session.TopLayer;
 
+    internal int LayerAnchor { get; set; }
+
     public MapTileLayer Brush
     {
         get => _session.SelectedTileLayer;

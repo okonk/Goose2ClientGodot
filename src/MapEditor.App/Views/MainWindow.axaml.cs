@@ -38,7 +38,6 @@ internal partial class MainWindow : Window
     private readonly TextBlock[] _layerRefs;
     private Border[] _layerRows;
     private CheckBox[] _layerVisibleChecks;
-    private int _layerAnchor;
     private AppTheme _theme = AppTheme.Dark;
     private bool _closeGuardRunning;
     private bool _closeApproved;
@@ -99,7 +98,7 @@ internal partial class MainWindow : Window
 
     internal SpritePaletteControl Palette => _palette;
 
-    internal int LayerAnchor => _layerAnchor;
+    internal int LayerAnchor => _viewModel.LayerAnchor;
 
     internal static KeyGesture BuildShortcut(Key key, KeyModifiers extra, bool isMacOs)
         => new(key, extra | (isMacOs ? KeyModifiers.Meta : KeyModifiers.Control));
@@ -325,7 +324,7 @@ internal partial class MainWindow : Window
                 ? LayerClickMode.Range
                 : LayerClickMode.Plain;
 
-        (_viewModel.SelectedLayers, _layerAnchor) = LayerSelection.Apply(_viewModel.SelectedLayers, _layerAnchor, layer, mode);
+        (_viewModel.SelectedLayers, _viewModel.LayerAnchor) = LayerSelection.Apply(_viewModel.SelectedLayers, _viewModel.LayerAnchor, layer, mode);
         e.Handled = true;
     }
 
@@ -558,9 +557,9 @@ internal partial class MainWindow : Window
                 SyncToolButtons();
                 break;
             case nameof(MapDocumentViewModel.SelectedLayers):
-                if ((_viewModel.SelectedLayers & (1 << _layerAnchor)) == 0)
+                if ((_viewModel.SelectedLayers & (1 << _viewModel.LayerAnchor)) == 0)
                 {
-                    _layerAnchor = _viewModel.TopLayer;
+                    _viewModel.LayerAnchor = _viewModel.TopLayer;
                 }
                 SyncLayerRows();
                 break;

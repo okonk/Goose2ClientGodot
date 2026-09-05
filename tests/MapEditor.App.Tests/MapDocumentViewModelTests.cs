@@ -887,4 +887,15 @@ public class MapDocumentViewModelTests : IDisposable
         Assert.Equal(8, _viewModel.MapWidth);
         Assert.Equal(8, _viewModel.MapHeight);
     }
+
+    [Fact]
+    public void LayerAnchorIsIndependentPerViewModel()
+    {
+        MapDocumentViewModel other = new(new EditorDocumentController(new FakeEditorDialogs(), new MapFileStore()), new SharedTileClipboard());
+
+        _viewModel.LayerAnchor = 2;
+
+        Assert.Equal(2, _viewModel.LayerAnchor);
+        Assert.Equal(0, other.LayerAnchor);
+    }
 }
