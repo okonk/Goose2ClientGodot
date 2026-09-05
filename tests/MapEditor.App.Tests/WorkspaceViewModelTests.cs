@@ -467,6 +467,21 @@ public class WorkspaceViewModelTests : IDisposable
     }
 
     [Fact]
+    public async Task Close_OnlyDocument_KeepsActiveInsideDocumentsAtEveryNotification()
+    {
+        MapDocumentViewModel target = _workspace.ActiveDocument;
+
+        INotifyCollectionChanged documents = _workspace.Documents;
+        documents.CollectionChanged += (_, _) =>
+            Assert.Contains(_workspace.ActiveDocument, _workspace.Documents);
+
+        bool closed = await _workspace.CloseAsync(target);
+
+        Assert.True(closed);
+        Assert.Contains(_workspace.ActiveDocument, _workspace.Documents);
+    }
+
+    [Fact]
     public async Task Activate_RaisesPropertyChangedOnlyWhenChanged()
     {
         MapDocumentViewModel current = _workspace.ActiveDocument;

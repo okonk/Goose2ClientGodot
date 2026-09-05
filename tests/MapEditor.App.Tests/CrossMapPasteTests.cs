@@ -171,4 +171,25 @@ public class CrossMapPasteTests : IDisposable
         Assert.DoesNotContain(nameof(MapDocumentViewModel.Clipboard), raisedA);
         Assert.Contains(nameof(MapDocumentViewModel.Clipboard), raisedB);
     }
+
+    [Fact]
+    public void Dispose_StopsControllerAndSessionNotifications()
+    {
+        var raised = new List<string>();
+        _a.PropertyChanged += (sender, e) => raised.Add(e.PropertyName ?? string.Empty);
+
+        _a.Dispose();
+
+        _a.Session.SelectedTileLayer = new MapTileLayer(1, 1);
+        _a.Session.BeginStroke(MapEditTool.Pencil, 0, 0);
+        Assert.True(_a.Session.CompleteStroke());
+        _a.Undo();
+
+        _a.Session.ApplyResize(new MapTileRectangle(0, 0, 50, 50));
+
+        Assert.Empty(raised);
+        Assert.Equal(100, _a.MapWidth);
+        Assert.Equal(100, _a.MapHeight);
+        Assert.False(_a.CanRedo);
+    }
 }
