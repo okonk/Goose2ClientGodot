@@ -31,6 +31,26 @@
         </MenuItem>
       </MenuItem>
     </Menu>
+    <ListBox x:Name="TabStrip" DockPanel.Dock="Top"
+             SelectionMode="Single"
+             ScrollViewer.HorizontalScrollBarVisibility="Auto">
+      <ListBox.ItemsPanel>
+        <ItemsPanelTemplate>
+          <StackPanel Orientation="Horizontal" />
+        </ItemsPanelTemplate>
+      </ListBox.ItemsPanel>
+      <ListBox.ItemTemplate>
+        <DataTemplate>
+          <StackPanel Orientation="Horizontal" Spacing="6" Margin="10,5" MinWidth="72" MaxWidth="180">
+            <TextBlock Text="{Binding TabTitle}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+            <Ellipse Width="6" Height="6" Fill="{DynamicResource EditorAccentBrush}"
+                     IsVisible="{Binding IsDirty}" VerticalAlignment="Center" />
+            <Button Classes="tabClose" ToolTip.Tip="Close" PointerPressed="OnTabClosePressed"
+                    VerticalAlignment="Center" HorizontalAlignment="Right" />
+          </StackPanel>
+        </DataTemplate>
+      </ListBox.ItemTemplate>
+    </ListBox>
     <Border x:Name="StatusBar" Classes="chrome" DockPanel.Dock="Bottom" Padding="12,5" BorderThickness="0,1,0,0">
       <StackPanel Orientation="Horizontal" Spacing="18">
         <TextBlock x:Name="HoverText" Classes="mono muted" Text="—" />

@@ -41,6 +41,9 @@ internal sealed class MapDocumentViewModel : ViewModelBase, IDisposable
     private int _mapWidth;
     private int _mapHeight;
     private string _title;
+    private string _tabTitle;
+    private string _tabToolTip;
+    private bool _isDirty;
     private bool _canUndo;
     private bool _canRedo;
     private bool _canSave;
@@ -53,6 +56,9 @@ internal sealed class MapDocumentViewModel : ViewModelBase, IDisposable
         _mapWidth = _session.Document.Width;
         _mapHeight = _session.Document.Height;
         _title = BuildTitle();
+        _tabTitle = BuildTabTitle();
+        _tabToolTip = _controller.Document.Path ?? UntitledName;
+        _isDirty = _session.IsDirty;
         _canSave = _session.IsDirty;
         _controller.StateChanged += OnControllerStateChanged;
         _session.Resized += OnSessionResized;
@@ -232,6 +238,12 @@ internal sealed class MapDocumentViewModel : ViewModelBase, IDisposable
     public int MapHeight => _mapHeight;
 
     public string Title => _title;
+
+    public string TabTitle => _tabTitle;
+
+    public string TabToolTip => _tabToolTip;
+
+    public bool IsDirty => _session.IsDirty;
 
     public bool CanUndo => _canUndo;
 
@@ -427,6 +439,9 @@ internal sealed class MapDocumentViewModel : ViewModelBase, IDisposable
         if (flags.HasFlag(EditorRefresh.Title))
         {
             SetField(ref _title, BuildTitle(), nameof(Title));
+            SetField(ref _tabTitle, BuildTabTitle(), nameof(TabTitle));
+            SetField(ref _tabToolTip, _controller.Document.Path ?? UntitledName, nameof(TabToolTip));
+            SetField(ref _isDirty, _session.IsDirty, nameof(IsDirty));
         }
 
         if (flags.HasFlag(EditorRefresh.Commands))
@@ -434,6 +449,7 @@ internal sealed class MapDocumentViewModel : ViewModelBase, IDisposable
             SetField(ref _canUndo, _session.CanUndo, nameof(CanUndo));
             SetField(ref _canRedo, _session.CanRedo, nameof(CanRedo));
             SetField(ref _canSave, _session.IsDirty, nameof(CanSave));
+            SetField(ref _isDirty, _session.IsDirty, nameof(IsDirty));
         }
 
         if (flags.HasFlag(EditorRefresh.Canvas))
@@ -495,6 +511,9 @@ internal sealed class MapDocumentViewModel : ViewModelBase, IDisposable
         return new MapTileRectangle(value.X + transform.OffsetX, value.Y + transform.OffsetY, value.Width, value.Height)
             .ClipTo(transform.Width, transform.Height);
     }
+
+    private string BuildTabTitle()
+        => _controller.Document.Path is { } path ? Path.GetFileName(path) : UntitledName;
 
     private string BuildTitle()
     {

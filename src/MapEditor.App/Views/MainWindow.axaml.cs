@@ -45,6 +45,8 @@ internal partial class MainWindow : Window
     private AppTheme _theme = AppTheme.Dark;
     private bool _closeGuardRunning;
     private bool _closeApproved;
+    // Breaks ActivateDocument -> SelectedItem -> SelectionChanged -> Activate re-entering itself.
+    private bool _tabSelectionRunning;
     // Picker/settings continuations can resume after Closed; publishing then leaks an undisposed context.
     private bool _closed;
 
@@ -72,6 +74,9 @@ internal partial class MainWindow : Window
         _documents = _workspace.Documents;
         _documents.CollectionChanged += OnDocumentsChanged;
         _workspace.PropertyChanged += OnWorkspacePropertyChanged;
+        // The window's own DataContext is the active document, so the strip's items are set here.
+        TabStrip.ItemsSource = _workspace.Documents;
+        TabStrip.SelectionChanged += OnTabStripSelectionChanged;
         foreach (MapDocumentViewModel document in _workspace.Documents)
         {
             _views[document] = CreateView(document);
@@ -146,6 +151,19 @@ internal partial class MainWindow : Window
         }
     }
 
+    private void OnTabStripSelectionChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        if (_tabSelectionRunning || TabStrip.SelectedItem is not MapDocumentViewModel document)
+        {
+            return;
+        }
+
+        _workspace.Activate(document);
+    }
+
+    // A press on the close button must not select the tab it is about to close.
+    private void OnTabClosePressed(object? sender, PointerPressedEventArgs e) => e.Handled = true;
+
     private void ActivateDocument(MapDocumentViewModel document)
     {
         if (ReferenceEquals(_document, document))
@@ -165,6 +183,20 @@ internal partial class MainWindow : Window
         document.PropertyChanged += OnViewModelPropertyChanged;
         document.CanvasInvalidated += SyncReadouts;
         _document = document;
+        if (!_tabSelectionRunning)
+        {
+            _tabSelectionRunning = true;
+            try
+            {
+                TabStrip.SelectedItem = document;
+            }
+            finally
+            {
+                _tabSelectionRunning = false;
+            }
+        }
+
+        TabStrip.ScrollIntoView(document);
         DocumentView view = _views[document];
         DataContext = document;
         CanvasHost.Child = view.Canvas;

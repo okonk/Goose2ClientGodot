@@ -15,6 +15,7 @@
        corners always land on a dash and the pattern does not shift with the icon scale. -->
   <StreamGeometry x:Key="IconMultiSelect">M3 3 H8 M10.5 3 H13.5 M16 3 H21 M21 3 V8 M21 10.5 V13.5 M21 16 V21 M21 21 H16 M13.5 21 H10.5 M8 21 H3 M3 21 V16 M3 13.5 V10.5 M3 8 V3</StreamGeometry>
   <StreamGeometry x:Key="IconFloodFill">M11 4.5 L17.9 11.4 A1.5 1.5 0 0 1 17.9 13.6 L12.1 19.4 A1.5 1.5 0 0 1 9.9 19.4 L4.1 13.6 A1.5 1.5 0 0 1 4.1 11.4 Z M4.8 5.3 L10.2 10.7 M20 14.8 C19.4 16.5 18 17.4 18 19 A2 2 0 0 0 22 19 C22 17.4 20.6 16.5 20 14.8 Z</StreamGeometry>
+  <StreamGeometry x:Key="IconClose">M6 6 L18 18 M18 6 L6 18</StreamGeometry>
 
   <!--
     Icon-only toolbar button. Content is the icon Geometry, so a tool is one line of markup
@@ -56,6 +57,39 @@
     <Style Selector="^:checked:pointerover">
       <Setter Property="Background" Value="{DynamicResource EditorAccentHoverBrush}" />
       <Setter Property="Foreground" Value="White" />
+    </Style>
+  </ControlTheme>
+
+  <!-- Icon-only tab close button: same 24x24 grid and stroke weight as the toolbar set. -->
+  <ControlTheme x:Key="TabCloseButton" TargetType="Button">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Foreground" Value="{DynamicResource EditorMutedTextBrush}" />
+    <Setter Property="CornerRadius" Value="4" />
+    <Setter Property="Width" Value="16" />
+    <Setter Property="Height" Value="16" />
+    <Setter Property="Padding" Value="0" />
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Border Background="{TemplateBinding Background}"
+                CornerRadius="{TemplateBinding CornerRadius}">
+          <Viewbox Width="10" Height="10" Stretch="Uniform">
+            <Canvas Width="24" Height="24">
+              <Path Data="{StaticResource IconClose}"
+                    Stroke="{TemplateBinding Foreground}"
+                    StrokeThickness="2"
+                    StrokeLineCap="Round" />
+            </Canvas>
+          </Viewbox>
+        </Border>
+      </ControlTemplate>
+    </Setter>
+
+    <Style Selector="^:pointerover">
+      <Setter Property="Background" Value="{DynamicResource EditorHoverBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource EditorTextBrush}" />
+    </Style>
+    <Style Selector="^:pressed">
+      <Setter Property="Background" Value="{DynamicResource EditorPanelBrush}" />
     </Style>
   </ControlTheme>
 </ResourceDictionary>

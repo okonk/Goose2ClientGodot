@@ -221,6 +221,34 @@
     <Setter Property="Margin" Value="0,0,10,0" />
   </Style>
 
+  <!-- Tab strip: flat against the chrome band, no ListBox border of its own. -->
+  <Style Selector="ListBox#TabStrip">
+    <Setter Property="Background" Value="{DynamicResource EditorPanelBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource EditorBorderBrush}" />
+    <Setter Property="BorderThickness" Value="0,0,0,1" />
+    <Setter Property="Padding" Value="8,0" />
+  </Style>
+  <Style Selector="ListBox#TabStrip ListBoxItem">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="Padding" Value="0" />
+    <Setter Property="Margin" Value="0" />
+  </Style>
+  <Style Selector="ListBox#TabStrip ListBoxItem:pointerover /template/ ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource EditorSubtleHoverBrush}" />
+  </Style>
+  <Style Selector="ListBox#TabStrip ListBoxItem:selected /template/ ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource EditorElevatedBrush}" />
+  </Style>
+  <Style Selector="Button.tabClose">
+    <Setter Property="Theme" Value="{StaticResource TabCloseButton}" />
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="Padding" Value="0" />
+    <Setter Property="Width" Value="16" />
+    <Setter Property="Height" Value="16" />
+  </Style>
+
   <Style Selector="GridSplitter">
     <Setter Property="Background" Value="{DynamicResource EditorBorderBrush}" />
   </Style>
