@@ -35,6 +35,7 @@ internal partial class MainWindow : Window
     private readonly AppSettingsStore _settings;
     private readonly WorkspaceViewModel _workspace;
     private readonly AssetContextController _assets;
+    private readonly INotifyCollectionChanged _documents;
     // The workspace owns the view models' lifetime; the window must never dispose them.
     private readonly Dictionary<MapDocumentViewModel, DocumentView> _views = new();
     private MapDocumentViewModel? _document;
@@ -68,7 +69,8 @@ internal partial class MainWindow : Window
         // The async settings load reports failures; here a broken file just leaves the default theme.
         ApplyTheme(_settings.LoadOrDefault().Theme);
         ApplyHotKeys();
-        _workspace.DocumentCollection.CollectionChanged += OnDocumentsChanged;
+        _documents = _workspace.Documents;
+        _documents.CollectionChanged += OnDocumentsChanged;
         _workspace.PropertyChanged += OnWorkspacePropertyChanged;
         foreach (MapDocumentViewModel document in _workspace.Documents)
         {

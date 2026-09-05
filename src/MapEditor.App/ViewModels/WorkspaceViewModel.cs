@@ -30,8 +30,6 @@ internal sealed class WorkspaceViewModel : ViewModelBase
 
     internal ReadOnlyObservableCollection<MapDocumentViewModel> Documents { get; }
 
-    internal ObservableCollection<MapDocumentViewModel> DocumentCollection => _documents;
-
     internal MapDocumentViewModel ActiveDocument => _activeDocument;
 
     internal SharedTileClipboard Clipboard { get; }
