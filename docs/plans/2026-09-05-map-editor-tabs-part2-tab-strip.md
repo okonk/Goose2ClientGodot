@@ -61,10 +61,9 @@
 
    **Selection is press-driven, and that is the intended behaviour.** A `ListBox` selects on pointer press, so pressing a background tab activates it before any drag begins — the same as every other tab UI (Chrome, VS Code). Task 4's drag therefore always moves the *active* tab. This supersedes the earlier `Drag_DoesNotChangeActiveDocument` expectation at the UI level; the workspace-level guarantee that `Move` itself never changes activation is unaffected and still tested in Part 1. Suppressing selection until a release that failed to cross the drag threshold would be the alternative, and it is more machinery for a less conventional result.
 
-   Two places must still not follow the selection, and both need the same repair — put the selected item back:
+   One place must not follow the selection: a press on a background tab's ✕ must not select that tab on the way to closing it, or closing it immediately activates a successor and the user lands somewhere they never asked for. Mark the close button's `PointerPressed` handled so it never reaches the `ListBoxItem` (Task 2).
 
-   - **Close button.** A press on a background tab's ✕ must not select that tab on the way to closing it, or closing it immediately activates a successor and the user lands somewhere they never asked for. Mark the button's `PointerPressed` handled so it never reaches the `ListBoxItem`.
-   - **Refused activation.** When `_commandRunning` (Task 5) makes `MainWindow` ignore an activation, the `ListBox` has *already* moved its selection. Reset `TabStrip.SelectedItem = Workspace.ActiveDocument` (under the re-entrancy flag) so the strip cannot show one tab selected while the workspace holds another.
+   A second case arrives with `_commandRunning` in Task 5, where a *refused* activation leaves the strip's selection ahead of the workspace. The snap-back for that belongs with the flag that causes it, not here.
 4. Green, then `dotnet test tests/MapEditor.App.Tests`.
 5. Commit: `feat: show a tab strip for open maps`.
 
@@ -80,7 +79,7 @@ Left-click on a header selects it, and the strip's `SelectionChanged` calls `Wor
 
 `OnWindowPointerPressed` (`:299-305`) cancels paste mode for any press whose source is not the `MapCanvas` — a tab click therefore cancels an armed paste. That is correct and worth a test: arming paste in tab A and clicking tab B must leave A's paste mode off, since the ghost would otherwise be stranded on a hidden map.
 
-**Tests:** `Tab_LeftClick_ActivatesDocument`; `Tab_CloseButton_ClosesDocument`; `Tab_MiddleClick_ClosesDocument`; `Tab_CloseDirty_PromptsAndCancelKeepsTab` (via `FakeEditorDialogs.DirtyResult`); `Tab_CloseLastTab_LeavesFreshUntitled`; `Tab_Click_CancelsArmedPasteMode` — adversarial; `Tab_CloseButtonOnInactiveTab_DoesNotActivateIt` (three tabs, close the third while the first is active; assert the first is still active and was never deselected) — adversarial against the press-selection leak; `Tab_SelectionWhileCommandRunning_SnapsBackToActiveDocument` (hold a dialog with `DirtyGate`, click another tab, assert `TabStrip.SelectedItem` is still `Workspace.ActiveDocument`) — adversarial against UI/workspace divergence.
+**Tests:** `Tab_LeftClick_ActivatesDocument`; `Tab_CloseButton_ClosesDocument`; `Tab_MiddleClick_ClosesDocument`; `Tab_CloseDirty_PromptsAndCancelKeepsTab` (via `FakeEditorDialogs.DirtyResult`); `Tab_CloseLastTab_LeavesFreshUntitled`; `Tab_Click_CancelsArmedPasteMode` — adversarial; `Tab_CloseButtonOnInactiveTab_DoesNotActivateIt` (three tabs, close the third while the first is active; assert the first is still active and was never deselected) — adversarial against the press-selection leak.
 
 Commit: `feat: activate and close tabs with the pointer`.
 
@@ -137,13 +136,15 @@ Commit: `feat: reorder tabs by dragging`.
 - Invariant: a Save-As picker opened for one document can never write after the user has activated another — the picker's continuation still holds its own `MapDocumentViewModel`, and no activation could have happened while it was open.
 - Observable proof: a test using `FakeEditorDialogs.DirtyGate` (`Fakes/FakeEditorDialogs.cs:28`) to hold a prompt open, then attempting a tab switch, then releasing the gate.
 
+**Selection snap-back.** The `ListBox` selects on pointer press, so by the time `MainWindow` refuses an activation the strip has already moved its selection and now disagrees with `Workspace.ActiveDocument`. Whenever an activation is refused, reset `TabStrip.SelectedItem = Workspace.ActiveDocument` under Task 1's re-entrancy flag. This lands here rather than in Task 1 because the flag it repairs does not exist until this task.
+
 **Closing while a command runs.** `OnClosing` must consult `_commandRunning` as well, and the policy is: **refuse the close**. Cancel the `Closing` event, do not set `_closeGuardRunning`, and do not start `CloseAllAsync`. A modal dialog is on screen; the user answers it, and the close works on the next attempt.
 
 The alternative — quitting anyway — is unsafe here. The continuation of an in-flight `SaveAsAsync` resumes after `Closed`, writes the file, replaces `_current` and fires `StateChanged` into a window whose `AssetContextController` is already disposed. `TryOpenAssetsAsync` guards exactly this with its `_closed` check (`MainWindow.axaml.cs:458-462`); the document-save path has no such guard, and adding one to every continuation is more surface than refusing one close.
 
 `_closeGuardRunning` stays separate and unchanged: it serialises repeat `Closing` events against each other, which is a different race from a modal command being open.
 
-**Tests:** `TabSwitch_WhileDialogOpen_IsIgnored` — adversarial, fails today; `Close_WhileSaveAsDialogOpen_IsRefused` — hold a Save-As open with a gate, attempt `Close()`, assert the window is still visible and `Dialogs.DirtyShown == 0`, then release the gate and assert a second `Close()` succeeds. A gated *Save-As* case specifically, not the existing asset-picker one, since saving is the path with no `_closed` guard; `Command_ThatThrows_ClearsTheRunningFlag` (use `FakeEditorDialogs.PickOpenException`, then assert a following command still runs).
+**Tests:** `TabSwitch_WhileDialogOpen_IsIgnored` — adversarial, fails today; `Tab_SelectionWhileCommandRunning_SnapsBackToActiveDocument` (hold a dialog with `DirtyGate`, click another tab, assert both `Workspace.ActiveDocument` and `TabStrip.SelectedItem` are unchanged) — adversarial against UI/workspace divergence; `Close_WhileSaveAsDialogOpen_IsRefused` — hold a Save-As open with a gate, attempt `Close()`, assert the window is still visible and `Dialogs.DirtyShown == 0`, then release the gate and assert a second `Close()` succeeds. A gated *Save-As* case specifically, not the existing asset-picker one, since saving is the path with no `_closed` guard; `Command_ThatThrows_ClearsTheRunningFlag` (use `FakeEditorDialogs.PickOpenException`, then assert a following command still runs).
 
 `FakeEditorDialogs` has `DirtyGate` and `AssetDirectoryPickGate` (`Fakes/FakeEditorDialogs.cs:27-28`) but no save-picker gate — add `SavePickGate` alongside them, mirroring the existing pattern.
 

@@ -192,10 +192,10 @@ internal Task SaveAsync();
 internal Task SaveAsAsync();
 internal bool Undo();
 internal bool Redo();
-internal Task<bool> ConfirmCloseAsync();   // was RequestCloseCoreAsync's body, minus the guards
+internal Task<bool> ConfirmCloseAsync();
 ```
 
-**Contract for `ConfirmCloseAsync`:** returns true when the document may be discarded. Preconditions: caller (the workspace, or the window during quit) owns re-entrancy — this method has no internal guard and must not be called concurrently with itself. Postconditions: on `DirtyChoice.Save` it awaits `SaveAsync` and returns false if the document is still dirty afterwards (cancelled picker, failed write); on `Discard` returns true without saving; on `Cancel` returns false. It does not remove anything from the workspace and fires no events — closing is the caller's job.
+**Contract for `ConfirmCloseAsync`:** this is `RequestCloseCoreAsync`'s body minus the guards. It returns true when the document may be discarded. Preconditions: caller (the workspace, or the window during quit) owns re-entrancy — this method has no internal guard and must not be called concurrently with itself. Postconditions: on `DirtyChoice.Save` it awaits `SaveAsync` and returns false if the document is still dirty afterwards (cancelled picker, failed write); on `Discard` returns true without saving; on `Cancel` returns false. It does not remove anything from the workspace and fires no events — closing is the caller's job.
 
 Taking the initial `EditorDocument` as a constructor argument is what lets the workspace build a controller per opened file; `SaveCoreAsync` (`:263`) keeps replacing `_current` in place, which is still correct — that swaps path and revision, never the session.
 
@@ -203,8 +203,9 @@ Taking the initial `EditorDocument` as a constructor argument is what lets the w
 
 The delegate takes the asking `EditorDocument` as well as the candidate path, which is what keeps the workspace out of a construction cycle. The workspace must build a controller *before* the view model that owns it, so a delegate closing over "this document's view model" would capture a variable that is still null at construction time. Passing the asker at call time avoids that entirely:
 
+In `WorkspaceViewModel`, when creating a document:
+
 ```csharp
-// in WorkspaceViewModel, when creating a document
 var controller = new EditorDocumentController(_dialogs, _store, initial, IsPathOwnedElsewhere);
 
 private bool IsPathOwnedElsewhere(EditorDocument asker, string fullPath)
@@ -273,10 +274,10 @@ internal sealed class WorkspaceViewModel : ViewModelBase
     private readonly ObservableCollection<MapDocumentViewModel> _documents = new();
     internal ReadOnlyObservableCollection<MapDocumentViewModel> Documents { get; }
 
-    internal MapDocumentViewModel ActiveDocument { get; private set; }   // raises PropertyChanged
+    internal MapDocumentViewModel ActiveDocument { get; private set; }
     internal SharedTileClipboard Clipboard { get; }
 
-    internal void Activate(MapDocumentViewModel document);   // throws if not in _documents
+    internal void Activate(MapDocumentViewModel document);
     internal Task NewAsync();
     internal Task OpenAsync();
     internal Task<bool> CloseAsync(MapDocumentViewModel document);
@@ -285,7 +286,7 @@ internal sealed class WorkspaceViewModel : ViewModelBase
 }
 ```
 
-`ReadOnlyObservableCollection<T>` forwards `CollectionChanged`, so the window and the tab strip observe it exactly as they would the mutable one. Part 2 binds a selecting control to `ActiveDocument`; with a private setter that binding is one-way out of the workspace, and the control's selection change calls `Activate` instead — the membership check stays on the write path.
+`ActiveDocument` raises `PropertyChanged`; `Activate` throws when the document is not in `_documents`. `ReadOnlyObservableCollection<T>` forwards `CollectionChanged`, so the window and the tab strip observe it exactly as they would the mutable one. Part 2 binds a selecting control to `ActiveDocument`; with a private setter that binding is one-way out of the workspace, and the control's selection change calls `Activate` instead — the membership check stays on the write path.
 
 The constructor seeds one clean Untitled document (`MapDocument.Create()`, `initiallyDirty: false`) and makes it active, matching today's `EditorDocumentController` constructor.
 
