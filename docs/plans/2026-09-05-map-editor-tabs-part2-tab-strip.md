@@ -58,6 +58,13 @@
    - `TabStrip.SelectionChanged` calls `Workspace.Activate(selected)` — never assigns `ActiveDocument` directly.
 
    The re-entrancy flag matters: without it, `ActivateDocument` → `SelectedItem` → `SelectionChanged` → `Activate` → `PropertyChanged` → `ActivateDocument` loops.
+
+   **Selection is press-driven, and that is the intended behaviour.** A `ListBox` selects on pointer press, so pressing a background tab activates it before any drag begins — the same as every other tab UI (Chrome, VS Code). Task 4's drag therefore always moves the *active* tab. This supersedes the earlier `Drag_DoesNotChangeActiveDocument` expectation at the UI level; the workspace-level guarantee that `Move` itself never changes activation is unaffected and still tested in Part 1. Suppressing selection until a release that failed to cross the drag threshold would be the alternative, and it is more machinery for a less conventional result.
+
+   Two places must still not follow the selection, and both need the same repair — put the selected item back:
+
+   - **Close button.** A press on a background tab's ✕ must not select that tab on the way to closing it, or closing it immediately activates a successor and the user lands somewhere they never asked for. Mark the button's `PointerPressed` handled so it never reaches the `ListBoxItem`.
+   - **Refused activation.** When `_commandRunning` (Task 5) makes `MainWindow` ignore an activation, the `ListBox` has *already* moved its selection. Reset `TabStrip.SelectedItem = Workspace.ActiveDocument` (under the re-entrancy flag) so the strip cannot show one tab selected while the workspace holds another.
 4. Green, then `dotnet test tests/MapEditor.App.Tests`.
 5. Commit: `feat: show a tab strip for open maps`.
 
@@ -73,7 +80,7 @@ Left-click on a header selects it, and the strip's `SelectionChanged` calls `Wor
 
 `OnWindowPointerPressed` (`:299-305`) cancels paste mode for any press whose source is not the `MapCanvas` — a tab click therefore cancels an armed paste. That is correct and worth a test: arming paste in tab A and clicking tab B must leave A's paste mode off, since the ghost would otherwise be stranded on a hidden map.
 
-**Tests:** `Tab_LeftClick_ActivatesDocument`; `Tab_CloseButton_ClosesDocument`; `Tab_MiddleClick_ClosesDocument`; `Tab_CloseDirty_PromptsAndCancelKeepsTab` (via `FakeEditorDialogs.DirtyResult`); `Tab_CloseLastTab_LeavesFreshUntitled`; `Tab_Click_CancelsArmedPasteMode` — adversarial.
+**Tests:** `Tab_LeftClick_ActivatesDocument`; `Tab_CloseButton_ClosesDocument`; `Tab_MiddleClick_ClosesDocument`; `Tab_CloseDirty_PromptsAndCancelKeepsTab` (via `FakeEditorDialogs.DirtyResult`); `Tab_CloseLastTab_LeavesFreshUntitled`; `Tab_Click_CancelsArmedPasteMode` — adversarial; `Tab_CloseButtonOnInactiveTab_DoesNotActivateIt` (three tabs, close the third while the first is active; assert the first is still active and was never deselected) — adversarial against the press-selection leak; `Tab_SelectionWhileCommandRunning_SnapsBackToActiveDocument` (hold a dialog with `DirtyGate`, click another tab, assert `TabStrip.SelectedItem` is still `Workspace.ActiveDocument`) — adversarial against UI/workspace divergence.
 
 Commit: `feat: activate and close tabs with the pointer`.
 
@@ -104,13 +111,13 @@ Commit: `feat: add tab keyboard shortcuts`.
 - Modify: `src/MapEditor.App/Views/MainWindow.axaml.cs` (or a small `TabStripDrag` helper beside `src/MapEditor.App/Controls/RectDrag.cs` if the window file grows unwieldy)
 - Test: `tests/MapEditor.App.Tests/TabStripTests.cs`
 
-Press on a header records the document and its index **and captures the pointer** (`e.Pointer.Capture(header)`); once the pointer passes a neighbour's midpoint, call `Workspace.Move(from, to)`; release ends the drag and releases capture; Escape during a drag restores the original order and releases capture.
+The pressed tab is already active by the time a drag starts (Task 1), so a drag only ever reorders the active tab. Press on a header records the document and its index **and captures the pointer** (`e.Pointer.Capture(header)`); once the pointer passes a neighbour's midpoint, call `Workspace.Move(from, to)`; release ends the drag and releases capture; Escape during a drag restores the original order and releases capture.
 
 Capture is not optional: without it a release outside the header — or outside the window — never reaches the handler and the strip stays stuck in a drag, reordering on the next stray pointer move. Handle `PointerCaptureLost` as well, ending the drag in place and leaving the current order (the same shape `MapCanvas` uses for strokes at `MapCanvas.cs:296+`). Drag state must be cleared in every exit path: release, Escape, capture loss, and a document removed mid-drag.
 
 A press on the close `Button` must not start a drag — check the pressed source and bail before recording drag state, or the button's own click never fires cleanly. Reordering never changes `ActiveDocument` (Part 1's `Move` guarantees this; assert it here at the UI level too). A drag that never crosses a midpoint is an ordinary click, so activation still happens on release.
 
-**Tests:** `Drag_PastNeighbourMidpoint_ReordersTabs`; `Drag_DoesNotChangeActiveDocument`; `Drag_EscapeCancels_RestoresOriginalOrder`; `Drag_ShortPress_StillActivatesTab` — adversarial against a drag handler that swallows plain clicks; `Drag_CaptureLost_EndsDragCleanly` (raise capture-lost mid-drag, then move the pointer and assert the order does not change) — adversarial against the stuck-drag bug; `Drag_PressOnCloseButton_DoesNotStartDragAndStillCloses`.
+**Tests:** `Drag_PastNeighbourMidpoint_ReordersTabs`; `Drag_OfBackgroundTab_ActivatesItOnPress` (replacing the earlier `Drag_DoesNotChangeActiveDocument` — see Task 1 on press-driven selection; the workspace-level `Move_DoesNotChangeActiveDocument` from Part 1 stays); `Drag_EscapeCancels_RestoresOriginalOrder`; `Drag_ShortPress_StillActivatesTab` — adversarial against a drag handler that swallows plain clicks; `Drag_CaptureLost_EndsDragCleanly` (raise capture-lost mid-drag, then move the pointer and assert the order does not change) — adversarial against the stuck-drag bug; `Drag_PressOnCloseButton_DoesNotStartDragAndStillCloses`.
 
 Commit: `feat: reorder tabs by dragging`.
 

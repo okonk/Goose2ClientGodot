@@ -120,8 +120,10 @@ Also add to `MapDocumentViewModelTests`: `Refresh_Commands_DoesNotClearClipboard
 
 **Lifetime contract.** The clipboard outlives every document, so a `Changed` subscription is a strong reference from an app-lifetime object to a per-tab one. `MapDocumentViewModel` becomes `IDisposable`:
 
+Idempotent, and safe on a document that was never activated:
+
 ```csharp
-public void Dispose()   // idempotent; safe to call on a document never activated
+public void Dispose()
 {
     _clipboard.Changed -= OnClipboardChanged;
     _controller.StateChanged -= OnControllerStateChanged;
@@ -175,7 +177,15 @@ The controller stops being able to replace its document. Removed: `NewAsync` (`:
 New shape:
 
 ```csharp
-internal EditorDocumentController(IEditorDialogs dialogs, MapFileStore store, EditorDocument initial);
+internal EditorDocumentController(
+    IEditorDialogs dialogs,
+    MapFileStore store,
+    EditorDocument initial,
+    Func<EditorDocument, string, bool> isPathOwnedElsewhere);
+
+internal EditorDocumentController(IEditorDialogs dialogs, MapFileStore store, EditorDocument initial)
+    : this(dialogs, store, initial, static (_, _) => false);
+
 internal EditorDocument Document { get; }
 internal event Action? StateChanged;
 internal Task SaveAsync();
@@ -189,19 +199,27 @@ internal Task<bool> ConfirmCloseAsync();   // was RequestCloseCoreAsync's body, 
 
 Taking the initial `EditorDocument` as a constructor argument is what lets the workspace build a controller per opened file; `SaveCoreAsync` (`:263`) keeps replacing `_current` in place, which is still correct — that swaps path and revision, never the session.
 
-**Path ownership.** `OpenAsync`'s duplicate check (Task 5) is not enough on its own: Save-As picks an arbitrary destination, so an Untitled document can save straight over a path another tab already owns, leaving two controllers with competing revisions for one file and breaking the "same file never opens twice" invariant from the other direction. The controller therefore gains a fourth constructor argument:
+**Path ownership.** `OpenAsync`'s duplicate check (Task 5) is not enough on its own: Save-As picks an arbitrary destination, so an Untitled document can save straight over a path another tab already owns, leaving two controllers with competing revisions for one file and breaking the "same file never opens twice" invariant from the other direction. Hence the fourth constructor argument above, and the three-argument overload that supplies `static (_, _) => false` for the existing controller tests, which construct controllers directly and know nothing about a workspace.
+
+The delegate takes the asking `EditorDocument` as well as the candidate path, which is what keeps the workspace out of a construction cycle. The workspace must build a controller *before* the view model that owns it, so a delegate closing over "this document's view model" would capture a variable that is still null at construction time. Passing the asker at call time avoids that entirely:
 
 ```csharp
-internal EditorDocumentController(
-    IEditorDialogs dialogs,
-    MapFileStore store,
-    EditorDocument initial,
-    Func<string, bool> isPathOwnedElsewhere);   // full path -> owned by a *different* open document
+// in WorkspaceViewModel, when creating a document
+var controller = new EditorDocumentController(_dialogs, _store, initial, IsPathOwnedElsewhere);
+
+private bool IsPathOwnedElsewhere(EditorDocument asker, string fullPath)
+    => _documents.Any(d => !ReferenceEquals(d.Document, asker) &&
+                           d.Document.Path is { } owned &&
+                           string.Equals(owned, fullPath, PathComparison));
 ```
 
-The workspace supplies a delegate that scans `Documents`, skipping the document this controller belongs to (Task 5). The controller consults it at both Save-As destinations — the picker result in `SaveAsAsync` (`:135`) and the `ExternalChangeChoice.SaveAs` branch of `SaveCoreAsync` (`:273-275`) — and on a hit shows `ShowErrorAsync(new ErrorPresentation("Save map", $"{destination}: already open in another tab."))` and returns without writing. The document stays dirty with its original path and revision untouched. The default for tests that construct a controller directly is `_ => false`.
+`MapDocumentViewModel` exposes `internal EditorDocument Document => _controller.Document` for this (Part 2 also wants it for `TabTitle`/`TabToolTip`). Identity is by `EditorDocument` reference rather than by view model, and the controller always passes its current `_current`, so the comparison stays correct across the `SaveCoreAsync` replacement that swaps path and revision. `PathComparison` is the platform-aware comparison already at `EditorDocumentController.cs:11-13` — move it somewhere both types can use.
 
-Ownership is derived, not stored: it is computed from `Documents` at each Save-As, so a tab closed in between frees its path with no bookkeeping to go stale.
+The controller consults the delegate at both Save-As destinations — the picker result in `SaveAsAsync` (`:135`) and the `ExternalChangeChoice.SaveAs` branch of `SaveCoreAsync` (`:273-275`) — and on a hit shows `ShowErrorAsync(new ErrorPresentation("Save map", $"{destination}: already open in another tab."))` and returns without writing. The document stays dirty with its original path and revision untouched.
+
+Saving over a document's *own* path is not "owned elsewhere" and stays legal: the asker is excluded by reference, so the existing same-path revision guard (`SaveAsAsync:137-143`, covered by `SaveAs_SamePathAfterExternalRewrite_StillGuardsExpectedRevision:434`) still governs that case.
+
+Ownership is derived, not stored: it is computed from `_documents` at each Save-As, so a tab closed in between frees its path with no bookkeeping to go stale.
 
 New controller tests: `SaveAs_PathOwnedByAnotherDocument_ReportsErrorAndKeepsDirtyState` (assert the destination file is not created, the document is still dirty, and `Path`/`Revision` are unchanged); `Save_ExternalConflictSaveAs_PathOwnedByAnotherDocument_ReportsErrorAndKeepsOriginal` — adversarial, because the external-change branch is the one an implementation forgets; `SaveAs_UnownedPath_Writes` as the negative control. A workspace-level `SaveAs_ToAnotherDocumentsPath_LeavesBothDocumentsIntact` goes in Task 5, using the real delegate rather than a stub.
 

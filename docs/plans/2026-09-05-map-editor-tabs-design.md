@@ -116,7 +116,9 @@ open tabs. Activating an already-open file scrolls its tab into view.
 - Ctrl+1..8 jump to that index; Ctrl+9 jumps to the last tab.
 - Middle-click on a tab closes it through the same path as the close button.
 - Drag a tab past a neighbour's midpoint to reorder; Escape cancels back to the
-  original order. Reordering never changes which tab is active.
+  original order. Pressing a tab activates it before the drag starts, as in any
+  tab UI, so a drag reorders the active tab; the reorder itself never changes
+  which tab is active.
 
 Ctrl+Tab is a known risk: Avalonia's focus manager consumes Tab for directional
 navigation and may run before `Window.OnKeyDown`. Register the tab shortcuts as a
@@ -126,8 +128,9 @@ already is.
 ## Close and quit
 
 Closing the active clean tab drops it and activates the neighbour to the right,
-or to the left when it was last. Closing an inactive tab leaves the active tab
-alone. The successor is activated before the closed document is removed, so the
+or to the left when it was last. Closing an inactive *clean* tab leaves the active tab
+alone; an inactive dirty tab is activated before it prompts, so the user can see
+the map being asked about, and stays active if they cancel. The successor is activated before the closed document is removed, so the
 active document is always present in the collection. Closing a dirty tab first activates it, then shows the
 existing Save / Discard / Cancel dialog. Cancel aborts. Save runs that document's
 `SaveAsync`, which may open the Save-As picker; if the document is still dirty
