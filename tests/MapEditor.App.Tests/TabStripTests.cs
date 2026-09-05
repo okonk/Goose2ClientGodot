@@ -39,6 +39,9 @@ public class TabStripTests
     private static string TabLabel(ListBoxItem tab)
         => tab.GetVisualDescendants().OfType<TextBlock>().First().Text;
 
+    private static object? TabTip(ListBoxItem tab)
+        => tab.GetVisualDescendants().OfType<StackPanel>().First().GetValue(ToolTip.TipProperty);
+
     private static Avalonia.Controls.Shapes.Ellipse TabDirtyDot(ListBoxItem tab)
         => tab.GetVisualDescendants().OfType<Avalonia.Controls.Shapes.Ellipse>().Single();
 
@@ -87,6 +90,7 @@ public class TabStripTests
         MapDocumentViewModel initial = _harness.ViewModel;
         Assert.Equal("Untitled", TabLabel(TabFor(initial)));
         Assert.Equal("Untitled", initial.TabToolTip);
+        Assert.Equal("Untitled", TabTip(TabFor(initial)));
 
         string path = WriteMap("open.bytes");
         _harness.Dialogs.OpenPickResult = path;
@@ -96,6 +100,7 @@ public class TabStripTests
 
         Assert.Equal("open.bytes", TabLabel(TabFor(opened)));
         Assert.Equal(Path.GetFullPath(path), opened.TabToolTip);
+        Assert.Equal(Path.GetFullPath(path), TabTip(TabFor(opened)));
         Assert.Equal("Untitled", TabLabel(TabFor(initial)));
     }
 
