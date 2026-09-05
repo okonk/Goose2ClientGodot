@@ -764,7 +764,7 @@ public class MainWindowTests : IDisposable
     }
 
     [AvaloniaFact]
-    public async Task Move_ActiveDocument_KeepsItsViewsRegistered()
+    public async Task Move_InactiveDocument_KeepsItsViewsRegistered()
     {
         using MainWindowHarness harness = MainWindowHarness.Create();
         MapDocumentViewModel first = harness.ViewModel;
@@ -787,7 +787,7 @@ public class MainWindowTests : IDisposable
     }
 
     [AvaloniaFact]
-    public async Task Move_InactiveDocument_KeepsItsViewsRegistered()
+    public async Task Move_ActiveDocument_KeepsItsViewsRegistered()
     {
         using MainWindowHarness harness = MainWindowHarness.Create();
         harness.Dialogs.NewMapResult = new NewMapRequest(100, 100);
