@@ -807,6 +807,48 @@ public class MainWindowTests : IDisposable
     }
 
     [AvaloniaFact]
+    public void SpaceLatch_IsClearedWhenTheCanvasLosesFocus()
+    {
+        using MainWindowHarness harness = MainWindowHarness.Create();
+        MapDocumentViewModel first = harness.ViewModel;
+        first.Brush = new MapTileLayer(2, 2);
+        MapCanvas canvas = harness.Window.Canvas;
+        canvas.Focus();
+        harness.Window.KeyPressQwerty(PhysicalKey.Space, RawInputModifiers.None);
+        harness.Window.FindControl<Button>("LoadAssetsButton").Focus();
+
+        ViewportTransform viewport = canvas.Viewport;
+        Point tile = canvas.TranslatePoint(new Point(16, 16), harness.Window).Value;
+        harness.Window.MouseDown(tile, MouseButton.Left, RawInputModifiers.None);
+
+        Assert.True(first.Session.HasActiveStroke);
+        harness.Window.MouseUp(tile, MouseButton.Left, RawInputModifiers.None);
+
+        Assert.Equal(new MapTileLayer(2, 2), first.Session.Document[0, 0].GetLayer(0));
+        Assert.Equal(viewport.WorldOrigin, canvas.Viewport.WorldOrigin);
+        Assert.Equal(viewport.Zoom, canvas.Viewport.Zoom);
+    }
+
+    [AvaloniaFact]
+    public async Task Activate_CancelsPasteModeOnTheOutgoingDocument()
+    {
+        using MainWindowHarness harness = MainWindowHarness.Create();
+        MapDocumentViewModel first = harness.ViewModel;
+        first.Session.Document.SetLayer(0, 0, 0, new MapTileLayer(7, 7));
+        first.SelectionRectangle = new MapTileRectangle(0, 0, 1, 1);
+        first.CopySelection();
+        first.BeginPasteMode();
+        Assert.True(first.PasteMode);
+
+        harness.Dialogs.NewMapResult = new NewMapRequest(100, 100);
+        await harness.Workspace.NewAsync();
+        MapDocumentViewModel second = harness.Workspace.ActiveDocument;
+
+        Assert.False(first.PasteMode);
+        Assert.False(second.PasteMode);
+    }
+
+    [AvaloniaFact]
     public async Task Activate_RebindsChrome()
     {
         MapDocumentViewModel first = ViewModel;
