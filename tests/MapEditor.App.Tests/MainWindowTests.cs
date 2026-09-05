@@ -34,8 +34,6 @@ internal sealed class MainWindowHarness : IDisposable
 
     public AppSettingsStore Settings { get; }
 
-    public EditorDocumentController Controller { get; }
-
     public MapDocumentViewModel ViewModel { get; }
 
     public AssetContextController Assets { get; }
@@ -46,10 +44,9 @@ internal sealed class MainWindowHarness : IDisposable
     {
         TempDirectory = Directory.CreateTempSubdirectory("map-editor-window-").FullName;
         Settings = new AppSettingsStore(Path.Combine(TempDirectory, "settings.json"));
-        Controller = new EditorDocumentController(Dialogs, new MapFileStore(),
-            new EditorDocument(new MapEditSession(MapDocument.Create(), initiallyDirty: false), null, null));
-        ViewModel = new MapDocumentViewModel(Controller, new SharedTileClipboard());
-        Assets = new AssetContextController(ViewModel, Settings);
+        var workspace = new WorkspaceViewModel(Dialogs, new MapFileStore());
+        ViewModel = workspace.ActiveDocument;
+        Assets = new AssetContextController(workspace, Settings);
         Window = new MainWindow(Dialogs, Settings, ViewModel, Assets);
     }
 
@@ -722,7 +719,7 @@ public class MainWindowTests : IDisposable
     [AvaloniaFact]
     public async Task LoadAssetsButton_UnexpectedExceptionAtWindowBoundary_ShowsLastErrorDialogAndStaysUsable()
     {
-        EditorDocument before = _harness.Controller.Document;
+        EditorDocument before = _harness.ViewModel.Document;
         _harness.Dialogs.PickAssetDirectoryException = new InvalidOperationException("pick failed");
 
         Find<Button>("LoadAssetsButton").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
@@ -730,7 +727,7 @@ public class MainWindowTests : IDisposable
 
         ErrorPresentation lastResort = Assert.Single(_harness.Dialogs.Errors, error => error.Title == "Error");
         Assert.Contains("pick failed", lastResort.Message);
-        Assert.Same(before, _harness.Controller.Document);
+        Assert.Same(before, _harness.ViewModel.Document);
         Assert.True(Window.IsVisible);
         Assert.False(_harness.Assets.Current.IsAvailable);
     }

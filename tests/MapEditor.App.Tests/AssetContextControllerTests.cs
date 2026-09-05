@@ -1,6 +1,8 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 using MapEditor.App.Dialogs;
 using MapEditor.App.Documents;
 using MapEditor.App.Rendering;
@@ -24,15 +26,14 @@ public class AssetContextControllerTests : IDisposable
 
     private readonly string _directory = Directory.CreateTempSubdirectory("map-editor-assets-ctx-").FullName;
     private readonly FakeEditorDialogs _dialogs = new();
-    private readonly EditorDocumentController _documentController;
+    private readonly WorkspaceViewModel _workspace;
     private readonly MapDocumentViewModel _viewModel;
     private readonly string _settingsPath;
 
     public AssetContextControllerTests()
     {
-        _documentController = new EditorDocumentController(_dialogs, new MapFileStore(),
-            new EditorDocument(new MapEditSession(MapDocument.Create(), initiallyDirty: false), null, null));
-        _viewModel = new MapDocumentViewModel(_documentController, new SharedTileClipboard());
+        _workspace = new WorkspaceViewModel(_dialogs, new MapFileStore());
+        _viewModel = _workspace.ActiveDocument;
         _settingsPath = Path.Combine(_directory, "settings.json");
     }
 
@@ -40,7 +41,13 @@ public class AssetContextControllerTests : IDisposable
         => Directory.Delete(_directory, recursive: true);
 
     private AssetContextController CreateController()
-        => new(_viewModel, new AppSettingsStore(_settingsPath));
+        => new(_workspace, new AppSettingsStore(_settingsPath));
+
+    private Task AddDocumentAsync()
+    {
+        _dialogs.NewMapResult = new NewMapRequest(10, 10);
+        return _workspace.NewAsync();
+    }
 
     private string WriteAssetDirectory(string name, string manifestJson)
     {
@@ -234,7 +241,7 @@ public class AssetContextControllerTests : IDisposable
     {
         File.WriteAllText(Path.Combine(_directory, "blocker"), "not a directory");
         AssetContextController controller = new(
-            _viewModel,
+            _workspace,
             new AppSettingsStore(Path.Combine(_directory, "blocker", "settings.json")));
         string firstDirectory = WriteAssetDirectory("assets-first", TwoSheetJson);
         Assert.True(controller.TryOpen(firstDirectory));
@@ -293,5 +300,80 @@ public class AssetContextControllerTests : IDisposable
                 Assert.Equal(SpriteResolutionStatus.AssetsUnavailable, operation.Reason);
                 Assert.False(string.IsNullOrEmpty(operation.Diagnostic));
             });
+    }
+
+    [Fact]
+    public async Task TryOpen_WithSeveralDocuments_UpdatesEveryOne()
+    {
+        await AddDocumentAsync();
+        await AddDocumentAsync();
+        using AssetContextController controller = CreateController();
+        string assetDirectory = WriteAssetDirectory("assets-multi", TwoSheetJson);
+        var canvasInvalidations = new Dictionary<MapDocumentViewModel, int>();
+        var paletteInvalidations = new Dictionary<MapDocumentViewModel, int>();
+        foreach (MapDocumentViewModel document in _workspace.Documents)
+        {
+            canvasInvalidations[document] = 0;
+            paletteInvalidations[document] = 0;
+            document.CanvasInvalidated += () => canvasInvalidations[document]++;
+            document.PaletteInvalidated += () => paletteInvalidations[document]++;
+        }
+
+        bool opened = controller.TryOpen(assetDirectory);
+
+        Assert.True(opened);
+        foreach (MapDocumentViewModel document in _workspace.Documents)
+        {
+            Assert.Equal(new[] { 1, 2 }, document.SheetIds);
+            Assert.Equal(1, document.SelectedSheet);
+            Assert.Equal(1, canvasInvalidations[document]);
+            Assert.Equal(1, paletteInvalidations[document]);
+        }
+    }
+
+    [Fact]
+    public async Task Move_DoesNotReseedTheMovedDocument()
+    {
+        await AddDocumentAsync();
+        MapDocumentViewModel moved = _workspace.ActiveDocument;
+        using AssetContextController controller = CreateController();
+        string assetDirectory = WriteAssetDirectory("assets-move", TwoSheetJson);
+        Assert.True(controller.TryOpen(assetDirectory));
+        moved.SelectedSheet = 2;
+
+        _workspace.Move(1, 0);
+
+        Assert.Equal(new[] { 1, 2 }, moved.SheetIds);
+        Assert.Equal(2, moved.SelectedSheet);
+        Assert.Same(moved, _workspace.Documents[0]);
+    }
+
+    [Fact]
+    public async Task DocumentAddedAfterOpen_IsSeededWithCurrentSheetIds()
+    {
+        using AssetContextController controller = CreateController();
+        string assetDirectory = WriteAssetDirectory("assets-late", TwoSheetJson);
+        Assert.True(controller.TryOpen(assetDirectory));
+
+        await AddDocumentAsync();
+
+        MapDocumentViewModel late = _workspace.ActiveDocument;
+        Assert.Equal(new[] { 1, 2 }, late.SheetIds);
+        Assert.Equal(1, late.SelectedSheet);
+    }
+
+    [Fact]
+    public async Task Dispose_StopsAssetNotifications()
+    {
+        AssetContextController controller = CreateController();
+        string assetDirectory = WriteAssetDirectory("assets-dispose", TwoSheetJson);
+        Assert.True(controller.TryOpen(assetDirectory));
+        controller.Dispose();
+
+        await AddDocumentAsync();
+
+        MapDocumentViewModel late = _workspace.ActiveDocument;
+        Assert.Empty(late.SheetIds);
+        Assert.Equal(0, late.SelectedSheet);
     }
 }

@@ -63,7 +63,7 @@ public class AppStartupTests : IDisposable
         Assert.Same(composed.Settings, composed.Window.Settings);
         Assert.Same(composed.ViewModel, composed.Window.ViewModel);
         Assert.Same(composed.Assets, composed.Window.Assets);
-        Assert.Same(composed.Controller.Document.Session, composed.Window.ViewModel.Session);
+        Assert.Same(composed.Workspace.ActiveDocument.Session, composed.Window.ViewModel.Session);
         Assert.False(composed.Window.ViewModel.Session.IsDirty);
         Assert.False(composed.Window.Assets.Current.IsAvailable);
     }

@@ -186,11 +186,10 @@ public class AvaloniaMapDrawSinkTests
     private static (MapCanvas Canvas, MapDocumentViewModel ViewModel, Window Window) CreateCanvas()
     {
         FakeEditorDialogs dialogs = new();
-        EditorDocumentController documentController = new(dialogs, new MapFileStore(),
-            new EditorDocument(new MapEditSession(MapDocument.Create(), initiallyDirty: false), null, null));
-        MapDocumentViewModel viewModel = new(documentController, new SharedTileClipboard());
+        var workspace = new WorkspaceViewModel(dialogs, new MapFileStore());
+        MapDocumentViewModel viewModel = workspace.ActiveDocument;
         string settingsPath = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "map-editor-sink-tests", "settings.json");
-        AssetContextController assets = new(viewModel, new AppSettingsStore(settingsPath));
+        AssetContextController assets = new(workspace, new AppSettingsStore(settingsPath));
         MapCanvas canvas = new(viewModel, assets) { Width = 300, Height = 200 };
         Panel host = new() { Children = { canvas } };
         Window window = new() { Content = host };

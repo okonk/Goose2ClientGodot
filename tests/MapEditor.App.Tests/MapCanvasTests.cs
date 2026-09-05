@@ -869,11 +869,13 @@ public class MapCanvasTests
     private static Harness CreateSmallMapAsync()
     {
         FakeEditorDialogs dialogs = new();
-        EditorDocumentController documentController = new(dialogs, new MapFileStore(),
-            new EditorDocument(new MapEditSession(MapDocument.Create(MapSize, MapSize), initiallyDirty: false), null, null));
-        MapDocumentViewModel viewModel = new(documentController, new SharedTileClipboard());
+        var workspace = new WorkspaceViewModel(dialogs, new MapFileStore());
+        dialogs.NewMapResult = new NewMapRequest(MapSize, MapSize);
+        // FakeEditorDialogs answers synchronously, so this completes before the next line
+        workspace.NewAsync().GetAwaiter().GetResult();
+        MapDocumentViewModel viewModel = workspace.ActiveDocument;
         string settingsPath = Path.Combine(Path.GetTempPath(), "map-editor-canvas-tests", "settings.json");
-        AssetContextController assets = new(viewModel, new AppSettingsStore(settingsPath));
+        AssetContextController assets = new(workspace, new AppSettingsStore(settingsPath));
         MapCanvas canvas = new(viewModel, assets)
         {
             Width = CanvasWidth,

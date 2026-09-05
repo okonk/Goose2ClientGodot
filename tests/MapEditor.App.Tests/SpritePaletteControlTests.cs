@@ -339,14 +339,13 @@ public class SpritePaletteControlTests : IDisposable
         Action<string>? prepareAssets = null)
     {
         FakeEditorDialogs dialogs = new();
-        EditorDocumentController documentController = new(dialogs, new MapFileStore(),
-            new EditorDocument(new MapEditSession(MapDocument.Create(), initiallyDirty: false), null, null));
-        MapDocumentViewModel viewModel = new(documentController, new SharedTileClipboard());
+        var workspace = new WorkspaceViewModel(dialogs, new MapFileStore());
+        MapDocumentViewModel viewModel = workspace.ActiveDocument;
         string settingsPath = Path.Combine(_directory, "settings.json");
         CountingSpriteSheetLoader countingLoader = new(
             loaderBehavior ?? (path => SpriteSheetLoadResult.Success(new CountingSpriteSheetImage(64, 64))));
         ISpriteSheetLoader loader = sheetLoader ?? countingLoader;
-        AssetContextController assets = new(viewModel, new AppSettingsStore(settingsPath), path => AssetContext.Create(path, loader));
+        AssetContextController assets = new(workspace, new AppSettingsStore(settingsPath), path => AssetContext.Create(path, loader));
         List<SpriteReference> resolved = new();
         SpritePaletteControl palette = new(viewModel, assets, (context, reference) =>
         {
