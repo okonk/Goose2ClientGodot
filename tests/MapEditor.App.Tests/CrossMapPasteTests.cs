@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Threading.Tasks;
 using MapEditor.App.Dialogs;
 using MapEditor.App.Documents;
@@ -13,7 +12,6 @@ namespace MapEditor.App.Tests;
 
 public class CrossMapPasteTests : IDisposable
 {
-    private readonly string _directory = Directory.CreateTempSubdirectory("map-editor-cross-paste-").FullName;
     private readonly FakeEditorDialogs _dialogsA = new();
     private readonly FakeEditorDialogs _dialogsB = new();
     private readonly SharedTileClipboard _clipboard = new();
@@ -30,7 +28,6 @@ public class CrossMapPasteTests : IDisposable
     {
         _a.Dispose();
         _b.Dispose();
-        Directory.Delete(_directory, true);
     }
 
     private Task Make3x3Async(MapDocumentViewModel viewModel, FakeEditorDialogs dialogs)
