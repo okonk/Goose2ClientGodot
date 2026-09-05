@@ -332,7 +332,9 @@ public partial class MapManager : Node2D
         });
     }
 
-    private int ItemKey(int x, int y) => y * _map.Height + x;
+    internal static int ItemKey(MapDocument map, int x, int y) => y * map.Width + x;
+
+    private int ItemKey(int x, int y) => ItemKey(_map, x, y);
 
     private void OnMapObject(object packetObj)
     {

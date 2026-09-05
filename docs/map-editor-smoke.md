@@ -27,7 +27,7 @@ git diff --check
 git status --short
 ```
 
-Expected: Core 166 passed, Rendering 159 passed, App 183 passed, Godot 459 passed, and the
+Expected: Core 216 passed, Rendering 171 passed, App 284 passed, Godot 460 passed, and the
 same four suites green in the solution run; Release build 0 errors; `bash -n` clean;
 script tests 62/62; the publisher produces a new `build/map-editor/<BUILD_ID>` release
 directory containing all four archives plus `BUILD-METADATA.txt`; both greps return empty
@@ -62,7 +62,17 @@ Requires a display-equipped host. Run after the automated gates pass.
 7. **Dirty prompts and shortcuts.** Exercise New / Open / close with a dirty document:
    Save / Discard / Cancel each behave. Verify the native keyboard shortcuts on Linux,
    Windows, and macOS.
-8. **Publish and per-host launch.** Run the mandatory no-RID all-platform publisher
+8. **Blocked rectangle gesture.** Select the Blocked tool and drag across a rectangle:
+   the preview fill shows the block colour on the cells to be blocked, and releasing blocks
+   the whole rectangle as a single undo entry. Hold Shift and drag: the preview shows the
+   unblock colour and releasing clears the rectangle. Press Escape mid-drag (or let the
+   pointer capture be lost): the drag cancels, no tiles change, and no undo entry is made.
+9. **Resize round trip with undo.** Open Edit → Resize Map, enter the new size using the
+   offset and absolute entries, and apply: the map resizes and the view-model coordinates
+   shift with it. Undo and then redo the resize: the document and the view-model
+   coordinates both return to their prior state. Verify the discard warning appears when
+   the resize would drop content.
+10. **Publish and per-host launch.** Run the mandatory no-RID all-platform publisher
    (`./build-map-editor.sh --skip-tests`) and record inspection of all four archives
    (see below). Run/extract the local Linux archive on the Linux host; on each target host
    launch the corresponding Windows x64 / macOS x64 / macOS arm64 archive. Keep archive
