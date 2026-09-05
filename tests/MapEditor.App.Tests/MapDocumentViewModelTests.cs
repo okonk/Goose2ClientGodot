@@ -348,7 +348,7 @@ public class MapDocumentViewModelTests : IDisposable
     }
 
     [Fact]
-    public async Task RequestClose_DelegatesToController()
+    public async Task ConfirmClose_DelegatesToController()
     {
         MapEditSession session = _viewModel.Session;
         session.SelectedTileLayer = new MapTileLayer(1, 1);
@@ -356,7 +356,7 @@ public class MapDocumentViewModelTests : IDisposable
         Assert.True(session.CompleteStroke());
         _dialogs.DirtyResult = DirtyChoice.Discard;
 
-        Assert.True(await _viewModel.RequestCloseAsync());
+        Assert.True(await _viewModel.ConfirmCloseAsync());
         Assert.Equal(1, _dialogs.DirtyShown);
     }
 

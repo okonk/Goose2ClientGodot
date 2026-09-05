@@ -14,8 +14,7 @@ internal enum EditorRefresh
     Title = 1 << 0,
     Commands = 1 << 1,
     Canvas = 1 << 2,
-    Palette = 1 << 3,
-    Document = 1 << 4
+    Palette = 1 << 3
 }
 
 internal sealed class MapDocumentViewModel : ViewModelBase, IDisposable
@@ -389,7 +388,7 @@ internal sealed class MapDocumentViewModel : ViewModelBase, IDisposable
 
     public Task SaveAsAsync() => _controller.SaveAsAsync();
 
-    public Task<bool> RequestCloseAsync() => _controller.ConfirmCloseAsync();
+    public Task<bool> ConfirmCloseAsync() => _controller.ConfirmCloseAsync();
 
     public bool Undo()
     {
@@ -425,29 +424,6 @@ internal sealed class MapDocumentViewModel : ViewModelBase, IDisposable
 
     public void Refresh(EditorRefresh flags)
     {
-        bool documentReplaced = false;
-        if (flags.HasFlag(EditorRefresh.Document))
-        {
-            MapEditSession session = _controller.Document.Session;
-            if (!ReferenceEquals(session, _session))
-            {
-                _session.Resized -= OnSessionResized;
-                documentReplaced = true;
-                _session = session;
-                _session.Resized += OnSessionResized;
-                SetField(ref _mapWidth, session.Document.Width, nameof(MapWidth));
-                SetField(ref _mapHeight, session.Document.Height, nameof(MapHeight));
-                HoverX = null;
-                HoverY = null;
-                SelectedX = null;
-                SelectedY = null;
-                CancelPasteMode();
-                SelectionRectangle = null;
-                OnPropertyChanged(nameof(SelectedLayers));
-                OnPropertyChanged(nameof(Brush));
-            }
-        }
-
         if (flags.HasFlag(EditorRefresh.Title))
         {
             SetField(ref _title, BuildTitle(), nameof(Title));
@@ -460,7 +436,7 @@ internal sealed class MapDocumentViewModel : ViewModelBase, IDisposable
             SetField(ref _canSave, _session.IsDirty, nameof(CanSave));
         }
 
-        if (documentReplaced || flags.HasFlag(EditorRefresh.Canvas))
+        if (flags.HasFlag(EditorRefresh.Canvas))
         {
             CanvasInvalidated?.Invoke();
         }
@@ -473,7 +449,7 @@ internal sealed class MapDocumentViewModel : ViewModelBase, IDisposable
 
     private void OnControllerStateChanged()
     {
-        Refresh(EditorRefresh.Document | EditorRefresh.Title | EditorRefresh.Commands);
+        Refresh(EditorRefresh.Title | EditorRefresh.Commands);
     }
 
     private void OnClipboardChanged()

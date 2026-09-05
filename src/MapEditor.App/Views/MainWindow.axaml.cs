@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Threading.Tasks;
 using Avalonia;
@@ -31,10 +33,11 @@ internal partial class MainWindow : Window
 
     private readonly IEditorDialogs _dialogs;
     private readonly AppSettingsStore _settings;
-    private readonly MapDocumentViewModel _viewModel;
+    private readonly WorkspaceViewModel _workspace;
     private readonly AssetContextController _assets;
-    private readonly MapCanvas _canvas;
-    private readonly SpritePaletteControl _palette;
+    // The workspace owns the view models' lifetime; the window must never dispose them.
+    private readonly Dictionary<MapDocumentViewModel, DocumentView> _views = new();
+    private MapDocumentViewModel? _document;
     private readonly TextBlock[] _layerRefs;
     private Border[] _layerRows;
     private CheckBox[] _layerVisibleChecks;
@@ -44,39 +47,35 @@ internal partial class MainWindow : Window
     // Picker/settings continuations can resume after Closed; publishing then leaks an undisposed context.
     private bool _closed;
 
-    public MainWindow(IEditorDialogs dialogs, AppSettingsStore settings, MapDocumentViewModel viewModel, AssetContextController assets)
+    private sealed record DocumentView(MapCanvas Canvas, SpritePaletteControl Palette);
+
+    public MainWindow(IEditorDialogs dialogs, AppSettingsStore settings, WorkspaceViewModel workspace, AssetContextController assets)
     {
         _dialogs = dialogs ?? throw new ArgumentNullException(nameof(dialogs));
         _settings = settings ?? throw new ArgumentNullException(nameof(settings));
-        _viewModel = viewModel ?? throw new ArgumentNullException(nameof(viewModel));
+        _workspace = workspace ?? throw new ArgumentNullException(nameof(workspace));
         _assets = assets ?? throw new ArgumentNullException(nameof(assets));
         InitializeComponent();
         Body.ColumnDefinitions[0].Width = new GridLength(
             DefaultPaletteColumns * SpritePaletteControl.CellSize + PaletteChromeWidth, GridUnitType.Pixel);
-        _canvas = new MapCanvas(_viewModel, _assets);
-        _palette = new SpritePaletteControl(_viewModel, _assets);
         _layerRefs = new[] { Layer0Ref, Layer1Ref, Layer2Ref, Layer3Ref, Layer4Ref };
         _layerRows = new[] { Layer0Row, Layer1Row, Layer2Row, Layer3Row, Layer4Row };
         _layerVisibleChecks = new[] { Layer0VisibleCheck, Layer1VisibleCheck, Layer2VisibleCheck, Layer3VisibleCheck, Layer4VisibleCheck };
-        CanvasHost.Child = _canvas;
-        PaletteBorder.Child = _palette;
-        _palette.BindScrollBar(PaletteBar);
         AddHandler(InputElement.PointerPressedEvent, OnWindowPointerPressed, RoutingStrategies.Tunnel);
         // TextChanged does not fire for programmatic Text sets, so validation tracks the property instead.
         BrushSheet.PropertyChanged += OnBrushFieldTextChanged;
         BrushGraphic.PropertyChanged += OnBrushFieldTextChanged;
-        DataContext = _viewModel;
-        Title = _viewModel.Title;
         // The async settings load reports failures; here a broken file just leaves the default theme.
         ApplyTheme(_settings.LoadOrDefault().Theme);
         ApplyHotKeys();
-        _viewModel.PropertyChanged += OnViewModelPropertyChanged;
-        _viewModel.CanvasInvalidated += SyncReadouts;
-        SyncToolButtons();
-        SyncLayerRows();
-        SyncBrushFields();
-        SyncReadouts();
-        SyncAssetDirectory();
+        _workspace.DocumentCollection.CollectionChanged += OnDocumentsChanged;
+        _workspace.PropertyChanged += OnWorkspacePropertyChanged;
+        foreach (MapDocumentViewModel document in _workspace.Documents)
+        {
+            _views[document] = CreateView(document);
+        }
+
+        ActivateDocument(_workspace.ActiveDocument);
         Closing += OnClosing;
         Closed += (sender, e) =>
         {
@@ -86,7 +85,13 @@ internal partial class MainWindow : Window
         Opened += OnOpened;
     }
 
-    internal MapDocumentViewModel ViewModel => _viewModel;
+    internal WorkspaceViewModel Workspace => _workspace;
+
+    internal MapCanvas Canvas => _views[_document!].Canvas;
+
+    internal SpritePaletteControl Palette => _views[_document!].Palette;
+
+    internal int LayerAnchor => _document!.LayerAnchor;
 
     internal IEditorDialogs Dialogs => _dialogs;
 
@@ -94,14 +99,87 @@ internal partial class MainWindow : Window
 
     internal AssetContextController Assets => _assets;
 
-    internal MapCanvas Canvas => _canvas;
+    internal bool HasViewFor(MapDocumentViewModel document) => _views.ContainsKey(document);
 
-    internal SpritePaletteControl Palette => _palette;
+    private MapDocumentViewModel Document => _document!;
 
-    internal int LayerAnchor => _viewModel.LayerAnchor;
+    private void OnDocumentsChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        if (e.NewItems is not null)
+        {
+            foreach (MapDocumentViewModel document in e.NewItems)
+            {
+                _views[document] = CreateView(document);
+            }
+        }
+
+        if (e.OldItems is not null)
+        {
+            foreach (MapDocumentViewModel document in e.OldItems)
+            {
+                DocumentView view = _views[document];
+                if (ReferenceEquals(CanvasHost.Child, view.Canvas))
+                {
+                    CanvasHost.Child = null;
+                }
+
+                if (ReferenceEquals(PaletteBorder.Child, view.Palette))
+                {
+                    PaletteBorder.Child = null;
+                }
+
+                view.Palette.UnbindScrollBar();
+                _views.Remove(document);
+            }
+        }
+    }
+
+    private void OnWorkspacePropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(WorkspaceViewModel.ActiveDocument))
+        {
+            ActivateDocument(_workspace.ActiveDocument);
+        }
+    }
+
+    private void ActivateDocument(MapDocumentViewModel document)
+    {
+        if (ReferenceEquals(_document, document))
+        {
+            return;
+        }
+
+        DocumentView? outgoing = _document is { } current ? _views[current] : null;
+        outgoing?.Canvas.FinishInteraction(commit: true);
+        _document?.CancelPasteMode();
+        if (_document is { } previous)
+        {
+            previous.PropertyChanged -= OnViewModelPropertyChanged;
+            previous.CanvasInvalidated -= SyncReadouts;
+        }
+
+        document.PropertyChanged += OnViewModelPropertyChanged;
+        document.CanvasInvalidated += SyncReadouts;
+        _document = document;
+        DocumentView view = _views[document];
+        DataContext = document;
+        CanvasHost.Child = view.Canvas;
+        PaletteBorder.Child = view.Palette;
+        outgoing?.Palette.UnbindScrollBar();
+        view.Palette.BindScrollBar(PaletteBar);
+        SyncToolButtons();
+        SyncLayerRows();
+        SyncBrushFields();
+        SyncReadouts();
+        SyncAssetDirectory();
+        Title = document.Title;
+    }
 
     internal static KeyGesture BuildShortcut(Key key, KeyModifiers extra, bool isMacOs)
         => new(key, extra | (isMacOs ? KeyModifiers.Meta : KeyModifiers.Control));
+
+    private DocumentView CreateView(MapDocumentViewModel document)
+        => new(new MapCanvas(document, _assets), new SpritePaletteControl(document, _assets));
 
     protected override void OnKeyDown(KeyEventArgs e)
     {
@@ -116,6 +194,14 @@ internal partial class MainWindow : Window
         {
             switch (e.Key)
             {
+                case Key.N when modifiers == PrimaryModifier:
+                    OnNew(this, new RoutedEventArgs());
+                    e.Handled = true;
+                    break;
+                case Key.O when modifiers == PrimaryModifier:
+                    OnOpen(this, new RoutedEventArgs());
+                    e.Handled = true;
+                    break;
                 case Key.S when modifiers == PrimaryModifier:
                     OnSave(this, new RoutedEventArgs());
                     e.Handled = true;
@@ -137,15 +223,15 @@ internal partial class MainWindow : Window
                     e.Handled = true;
                     break;
                 case Key.C when modifiers == PrimaryModifier && e.Source is not TextBox:
-                    _viewModel.CopySelection();
+                    Document.CopySelection();
                     e.Handled = true;
                     break;
                 case Key.V when modifiers == PrimaryModifier && e.Source is not TextBox:
-                    _viewModel.BeginPasteMode();
+                    Document.BeginPasteMode();
                     e.Handled = true;
                     break;
                 case Key.X when modifiers == PrimaryModifier && e.Source is not TextBox:
-                    _viewModel.CutSelection();
+                    Document.CutSelection();
                     e.Handled = true;
                     break;
             }
@@ -160,8 +246,8 @@ internal partial class MainWindow : Window
 
         if (e.Key == Key.Escape)
         {
-            _canvas.FinishInteraction(commit: false);
-            _viewModel.CancelPasteMode();
+            Canvas.FinishInteraction(commit: false);
+            Document.CancelPasteMode();
             e.Handled = true;
             return;
         }
@@ -175,43 +261,43 @@ internal partial class MainWindow : Window
         switch (e.Key)
         {
             case Key.P:
-                _viewModel.ActiveTool = MapEditTool.Pencil;
+                Document.ActiveTool = MapEditTool.Pencil;
                 e.Handled = true;
                 break;
             case Key.E:
-                _viewModel.ActiveTool = MapEditTool.Eraser;
+                Document.ActiveTool = MapEditTool.Eraser;
                 e.Handled = true;
                 break;
             case Key.I:
-                _viewModel.ActiveTool = MapEditTool.Eyedropper;
+                Document.ActiveTool = MapEditTool.Eyedropper;
                 e.Handled = true;
                 break;
             case Key.X:
-                _viewModel.ActiveTool = MapEditTool.Blocked;
+                Document.ActiveTool = MapEditTool.Blocked;
                 e.Handled = true;
                 break;
             case Key.V:
-                _viewModel.ActiveTool = MapEditTool.Select;
+                Document.ActiveTool = MapEditTool.Select;
                 e.Handled = true;
                 break;
             case Key.M:
-                _viewModel.ActiveTool = MapEditTool.MultiSelect;
+                Document.ActiveTool = MapEditTool.MultiSelect;
                 e.Handled = true;
                 break;
             case Key.B:
-                _viewModel.ActiveTool = MapEditTool.FloodFill;
+                Document.ActiveTool = MapEditTool.FloodFill;
                 e.Handled = true;
                 break;
             case Key.Delete:
-                _viewModel.DeleteSelection();
+                Document.DeleteSelection();
                 e.Handled = true;
                 break;
             case Key.Add or Key.OemPlus:
-                _canvas.ZoomStep(zoomIn: true);
+                Canvas.ZoomStep(zoomIn: true);
                 e.Handled = true;
                 break;
             case Key.Subtract or Key.OemMinus:
-                _canvas.ZoomStep(zoomIn: false);
+                Canvas.ZoomStep(zoomIn: false);
                 e.Handled = true;
                 break;
         }
@@ -224,6 +310,8 @@ internal partial class MainWindow : Window
     private void ApplyHotKeys()
     {
         bool isMac = OperatingSystem.IsMacOS();
+        NewCommand.HotKey = BuildShortcut(Key.N, KeyModifiers.None, isMac);
+        OpenCommand.HotKey = BuildShortcut(Key.O, KeyModifiers.None, isMac);
         SaveCommand.HotKey = BuildShortcut(Key.S, KeyModifiers.None, isMac);
         SaveAsCommand.HotKey = BuildShortcut(Key.S, KeyModifiers.Shift, isMac);
         UndoCommand.HotKey = BuildShortcut(Key.Z, KeyModifiers.None, isMac);
@@ -240,36 +328,40 @@ internal partial class MainWindow : Window
     private void OnResize(object? sender, RoutedEventArgs e)
         => _ = RunCommandAsync(async () =>
         {
-            MapTileRectangle? window = await _dialogs.ShowResizeMapAsync(_viewModel.Session.Document);
+            MapTileRectangle? window = await _dialogs.ShowResizeMapAsync(Document.Session.Document);
             if (window is { } value)
             {
-                _viewModel.ResizeMap(value);
+                Document.ResizeMap(value);
             }
         });
 
-    private void OnSave(object? sender, RoutedEventArgs e) => _ = RunCommandAsync(() => _viewModel.SaveAsync());
+    private void OnNew(object? sender, RoutedEventArgs e) => _ = RunCommandAsync(() => _workspace.NewAsync());
 
-    private void OnSaveAs(object? sender, RoutedEventArgs e) => _ = RunCommandAsync(() => _viewModel.SaveAsAsync());
+    private void OnOpen(object? sender, RoutedEventArgs e) => _ = RunCommandAsync(() => _workspace.OpenAsync());
+
+    private void OnSave(object? sender, RoutedEventArgs e) => _ = RunCommandAsync(() => Document.SaveAsync());
+
+    private void OnSaveAs(object? sender, RoutedEventArgs e) => _ = RunCommandAsync(() => Document.SaveAsAsync());
 
     private void OnExit(object? sender, RoutedEventArgs e) => Close();
 
     private void OnUndo(object? sender, RoutedEventArgs e)
     {
-        _canvas.FinishInteraction(commit: true);
-        _viewModel.Undo();
+        Canvas.FinishInteraction(commit: true);
+        Document.Undo();
     }
 
     private void OnRedo(object? sender, RoutedEventArgs e)
     {
-        _canvas.FinishInteraction(commit: true);
-        _viewModel.Redo();
+        Canvas.FinishInteraction(commit: true);
+        Document.Redo();
     }
 
     private void OnToolChecked(object? sender, RoutedEventArgs e)
     {
         if (sender is ToggleButton { Tag: string name } && Enum.TryParse(name, out MapEditTool tool))
         {
-            _viewModel.ActiveTool = tool;
+            Document.ActiveTool = tool;
         }
     }
 
@@ -277,7 +369,7 @@ internal partial class MainWindow : Window
     {
         if (sender is ToggleButton { Tag: string tag } &&
             Enum.TryParse<MapEditTool>(tag, out MapEditTool tool) &&
-            tool == _viewModel.ActiveTool)
+            tool == Document.ActiveTool)
         {
             ((ToggleButton)sender).IsChecked = true;
         }
@@ -285,9 +377,9 @@ internal partial class MainWindow : Window
 
     private void OnWindowPointerPressed(object? sender, PointerPressedEventArgs e)
     {
-        if (_viewModel.PasteMode && e.Source is not MapCanvas)
+        if (Document.PasteMode && e.Source is not MapCanvas)
         {
-            _viewModel.CancelPasteMode();
+            Document.CancelPasteMode();
         }
     }
 
@@ -310,7 +402,7 @@ internal partial class MainWindow : Window
                 ? LayerClickMode.Range
                 : LayerClickMode.Plain;
 
-        (_viewModel.SelectedLayers, _viewModel.LayerAnchor) = LayerSelection.Apply(_viewModel.SelectedLayers, _viewModel.LayerAnchor, layer, mode);
+        (Document.SelectedLayers, Document.LayerAnchor) = LayerSelection.Apply(Document.SelectedLayers, Document.LayerAnchor, layer, mode);
         e.Handled = true;
     }
 
@@ -318,14 +410,14 @@ internal partial class MainWindow : Window
     {
         if (sender is CheckBox { Tag: string tag } && int.TryParse(tag, out int layer))
         {
-            byte mask = _viewModel.LayerVisibility;
+            byte mask = Document.LayerVisibility;
             mask = (byte)(mask & ~(1 << layer));
             if (sender is CheckBox { IsChecked: true })
             {
                 mask |= (byte)(1 << layer);
             }
 
-            _viewModel.LayerVisibility = mask;
+            Document.LayerVisibility = mask;
         }
     }
 
@@ -350,9 +442,9 @@ internal partial class MainWindow : Window
         }
 
         MapTileLayer brush = new(sheet, graphic);
-        if (_viewModel.Brush != brush)
+        if (Document.Brush != brush)
         {
-            _viewModel.Brush = brush;
+            Document.Brush = brush;
         }
     }
 
@@ -460,7 +552,7 @@ internal partial class MainWindow : Window
 
     private async void OnClosing(object? sender, WindowClosingEventArgs e)
     {
-        _canvas.FinishInteraction(commit: true);
+        Canvas.FinishInteraction(commit: true);
         if (_closeApproved)
         {
             return;
@@ -476,7 +568,7 @@ internal partial class MainWindow : Window
         bool approved;
         try
         {
-            approved = await _viewModel.RequestCloseAsync();
+            approved = await _workspace.CloseAllAsync();
         }
         catch (OutOfMemoryException)
         {
@@ -501,7 +593,7 @@ internal partial class MainWindow : Window
 
     private async Task RunCommandAsync(Func<Task> command)
     {
-        _canvas.FinishInteraction(commit: true);
+        Canvas.FinishInteraction(commit: true);
         try
         {
             await command();
@@ -537,15 +629,15 @@ internal partial class MainWindow : Window
         switch (e.PropertyName)
         {
             case nameof(MapDocumentViewModel.Title):
-                Title = _viewModel.Title;
+                Title = Document.Title;
                 break;
             case nameof(MapDocumentViewModel.ActiveTool):
                 SyncToolButtons();
                 break;
             case nameof(MapDocumentViewModel.SelectedLayers):
-                if ((_viewModel.SelectedLayers & (1 << _viewModel.LayerAnchor)) == 0)
+                if ((Document.SelectedLayers & (1 << Document.LayerAnchor)) == 0)
                 {
-                    _viewModel.LayerAnchor = _viewModel.TopLayer;
+                    Document.LayerAnchor = Document.TopLayer;
                 }
                 SyncLayerRows();
                 break;
@@ -569,19 +661,19 @@ internal partial class MainWindow : Window
 
     private void SyncToolButtons()
     {
-        PencilTool.IsChecked = _viewModel.ActiveTool == MapEditTool.Pencil;
-        EraserTool.IsChecked = _viewModel.ActiveTool == MapEditTool.Eraser;
-        EyedropperTool.IsChecked = _viewModel.ActiveTool == MapEditTool.Eyedropper;
-        BlockedTool.IsChecked = _viewModel.ActiveTool == MapEditTool.Blocked;
-        SelectTool.IsChecked = _viewModel.ActiveTool == MapEditTool.Select;
-        MultiSelectTool.IsChecked = _viewModel.ActiveTool == MapEditTool.MultiSelect;
-        FloodFillTool.IsChecked = _viewModel.ActiveTool == MapEditTool.FloodFill;
+        PencilTool.IsChecked = Document.ActiveTool == MapEditTool.Pencil;
+        EraserTool.IsChecked = Document.ActiveTool == MapEditTool.Eraser;
+        EyedropperTool.IsChecked = Document.ActiveTool == MapEditTool.Eyedropper;
+        BlockedTool.IsChecked = Document.ActiveTool == MapEditTool.Blocked;
+        SelectTool.IsChecked = Document.ActiveTool == MapEditTool.Select;
+        MultiSelectTool.IsChecked = Document.ActiveTool == MapEditTool.MultiSelect;
+        FloodFillTool.IsChecked = Document.ActiveTool == MapEditTool.FloodFill;
     }
 
     private void SyncLayerRows()
     {
-        byte selection = _viewModel.SelectedLayers;
-        byte visibility = _viewModel.LayerVisibility;
+        byte selection = Document.SelectedLayers;
+        byte visibility = Document.LayerVisibility;
         for (int layer = 0; layer < MapDocument.LayerCount; layer++)
         {
             _layerRows[layer].Background = (selection & (1 << layer)) != 0 ? SelectedRowBrush : Brushes.Transparent;
@@ -591,7 +683,7 @@ internal partial class MainWindow : Window
 
     private void SyncBrushFields()
     {
-        MapTileLayer brush = _viewModel.Brush;
+        MapTileLayer brush = Document.Brush;
         if (brush.Sheet.ToString() != BrushSheet.Text)
         {
             BrushSheet.Text = brush.Sheet.ToString();
@@ -609,16 +701,16 @@ internal partial class MainWindow : Window
 
     private void SyncReadouts()
     {
-        HoverText.Text = _viewModel.HoverX is { } hoverX && _viewModel.HoverY is { } hoverY
+        HoverText.Text = Document.HoverX is { } hoverX && Document.HoverY is { } hoverY
             ? $"{hoverX}, {hoverY}"
             : "—";
-        ZoomText.Text = $"{_viewModel.ZoomPercent}%";
-        SizeText.Text = $"{_viewModel.MapWidth} × {_viewModel.MapHeight}";
-        if (_viewModel.SelectedX is { } selectedX && _viewModel.SelectedY is { } selectedY &&
-            selectedX >= 0 && selectedX < _viewModel.MapWidth &&
-            selectedY >= 0 && selectedY < _viewModel.MapHeight)
+        ZoomText.Text = $"{Document.ZoomPercent}%";
+        SizeText.Text = $"{Document.MapWidth} × {Document.MapHeight}";
+        if (Document.SelectedX is { } selectedX && Document.SelectedY is { } selectedY &&
+            selectedX >= 0 && selectedX < Document.MapWidth &&
+            selectedY >= 0 && selectedY < Document.MapHeight)
         {
-            MapTile tile = _viewModel.Session.Document[selectedX, selectedY];
+            MapTile tile = Document.Session.Document[selectedX, selectedY];
             SelectedText.Text = $"{selectedX}, {selectedY}";
             BlockedText.Text = tile.IsBlocked ? "blocked: yes" : "blocked: no";
             for (int layer = 0; layer < MapDocument.LayerCount; layer++)

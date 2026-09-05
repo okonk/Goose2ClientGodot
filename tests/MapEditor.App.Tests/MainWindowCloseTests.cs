@@ -211,9 +211,9 @@ public class MainWindowCloseTests
         Assert.True(File.Exists(mapPath));
         Assert.Equal(new MapTileLayer(4, 6), new MapFileStore().Open(mapPath).Document[0, 0].GetLayer(0));
 
-        Assert.True(harness.ViewModel.CanUndo);
+        Assert.True(harness.ViewModel.Session.CanUndo);
         Assert.True(harness.ViewModel.Undo());
-        Assert.False(harness.ViewModel.CanUndo);
+        Assert.False(harness.ViewModel.Session.CanUndo);
         Assert.Equal(new MapTileLayer(0, 0), harness.ViewModel.Session.Document[0, 0].GetLayer(0));
     }
 

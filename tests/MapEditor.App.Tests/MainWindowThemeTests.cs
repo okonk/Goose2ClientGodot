@@ -134,9 +134,8 @@ public class MainWindowThemeTests : IDisposable
     private MainWindow CreateWindow()
     {
         var workspace = new WorkspaceViewModel(_dialogs, new MapFileStore());
-        var viewModel = workspace.ActiveDocument;
         _assets = new AssetContextController(workspace, _settings);
-        _window = new MainWindow(_dialogs, _settings, viewModel, _assets);
+        _window = new MainWindow(_dialogs, _settings, workspace, _assets);
         _window.Show();
         Dispatcher.UIThread.RunJobs();
         return _window;

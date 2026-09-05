@@ -34,6 +34,8 @@ internal sealed class MainWindowHarness : IDisposable
 
     public AppSettingsStore Settings { get; }
 
+    public WorkspaceViewModel Workspace { get; }
+
     public MapDocumentViewModel ViewModel { get; }
 
     public AssetContextController Assets { get; }
@@ -44,10 +46,10 @@ internal sealed class MainWindowHarness : IDisposable
     {
         TempDirectory = Directory.CreateTempSubdirectory("map-editor-window-").FullName;
         Settings = new AppSettingsStore(Path.Combine(TempDirectory, "settings.json"));
-        var workspace = new WorkspaceViewModel(Dialogs, new MapFileStore());
-        ViewModel = workspace.ActiveDocument;
-        Assets = new AssetContextController(workspace, Settings);
-        Window = new MainWindow(Dialogs, Settings, ViewModel, Assets);
+        Workspace = new WorkspaceViewModel(Dialogs, new MapFileStore());
+        ViewModel = Workspace.ActiveDocument;
+        Assets = new AssetContextController(Workspace, Settings);
+        Window = new MainWindow(Dialogs, Settings, Workspace, Assets);
     }
 
     public static MainWindowHarness Create()
@@ -159,7 +161,7 @@ public class MainWindowTests : IDisposable
     [AvaloniaFact]
     public void Layout_ContainsFileEditToolbarCommands()
     {
-        foreach (string name in new[] { "SaveCommand", "SaveAsCommand", "ExitCommand" })
+        foreach (string name in new[] { "NewCommand", "OpenCommand", "SaveCommand", "SaveAsCommand", "ExitCommand" })
         {
             Assert.NotNull(Find<MenuItem>(name));
         }
@@ -395,6 +397,8 @@ public class MainWindowTests : IDisposable
     {
         Assert.False(OperatingSystem.IsMacOS());
 
+        Assert.Equal(new KeyGesture(Key.N, KeyModifiers.Control), (KeyGesture)Find<MenuItem>("NewCommand").HotKey!);
+        Assert.Equal(new KeyGesture(Key.O, KeyModifiers.Control), (KeyGesture)Find<MenuItem>("OpenCommand").HotKey!);
         Assert.Equal(new KeyGesture(Key.S, KeyModifiers.Control), (KeyGesture)Find<MenuItem>("SaveCommand").HotKey!);
         Assert.Equal(new KeyGesture(Key.S, KeyModifiers.Control | KeyModifiers.Shift), (KeyGesture)Find<MenuItem>("SaveAsCommand").HotKey!);
         Assert.Equal(new KeyGesture(Key.Z, KeyModifiers.Control), (KeyGesture)Find<MenuItem>("UndoCommand").HotKey!);
@@ -658,6 +662,161 @@ public class MainWindowTests : IDisposable
         ViewModel.Brush = new MapTileLayer(9, 21);
         Assert.Equal("9", sheet.Text);
         Assert.Equal("21", graphic.Text);
+    }
+
+    [AvaloniaFact]
+    public void Startup_HostsTheInitialCanvasAndPalette()
+    {
+        using MainWindowHarness harness = MainWindowHarness.Create();
+
+        Assert.NotNull(harness.Window.FindControl<Border>("CanvasHost")!.Child);
+        Assert.IsType<MapCanvas>(harness.Window.FindControl<Border>("CanvasHost")!.Child);
+        Assert.Same(harness.Window.Canvas, harness.Window.FindControl<Border>("CanvasHost")!.Child);
+
+        Assert.NotNull(harness.Window.FindControl<Border>("PaletteBorder")!.Child);
+        Assert.IsType<SpritePaletteControl>(harness.Window.FindControl<Border>("PaletteBorder")!.Child);
+        Assert.Same(harness.Window.Palette, harness.Window.FindControl<Border>("PaletteBorder")!.Child);
+    }
+
+    [AvaloniaFact]
+    public async Task Activate_SwitchingDocuments_KeepsEachViewportIndependent()
+    {
+        using MainWindowHarness harness = MainWindowHarness.Create();
+        MapDocumentViewModel first = harness.ViewModel;
+        harness.Window.Canvas.ZoomStep(zoomIn: true);
+        Assert.Equal(200, first.ZoomPercent);
+
+        harness.Dialogs.NewMapResult = new NewMapRequest(100, 100);
+        await harness.Workspace.NewAsync();
+        MapDocumentViewModel second = harness.Workspace.ActiveDocument;
+        Assert.Equal(100, second.ZoomPercent);
+
+        harness.Workspace.Activate(first);
+        Assert.Equal(200, first.ZoomPercent);
+
+        harness.Workspace.Activate(second);
+        Assert.Equal(100, second.ZoomPercent);
+    }
+
+    [AvaloniaFact]
+    public async Task Activate_MidStroke_CommitsTheStroke()
+    {
+        using MainWindowHarness harness = MainWindowHarness.Create();
+        MapDocumentViewModel first = harness.ViewModel;
+        first.Brush = new MapTileLayer(3, 9);
+        Point tileCenter = harness.Window.Canvas.TranslatePoint(new Point(16, 16), harness.Window).Value;
+        harness.Window.MouseDown(tileCenter, MouseButton.Left, RawInputModifiers.None);
+        Assert.True(first.Session.HasActiveStroke);
+
+        harness.Dialogs.NewMapResult = new NewMapRequest(100, 100);
+        await harness.Workspace.NewAsync();
+
+        Assert.False(first.Session.HasActiveStroke);
+        Assert.True(first.CanUndo);
+        Assert.True(first.Session.IsDirty);
+    }
+
+    [AvaloniaFact]
+    public async Task Activate_DeactivatedCanvas_StopsTrackingHover()
+    {
+        using MainWindowHarness harness = MainWindowHarness.Create();
+        MapDocumentViewModel first = harness.ViewModel;
+        Point firstTile = harness.Window.Canvas.TranslatePoint(new Point(48, 16), harness.Window).Value;
+        harness.Window.MouseMove(firstTile, RawInputModifiers.None);
+        Assert.Equal(1, first.HoverX);
+        Assert.Equal(0, first.HoverY);
+
+        harness.Dialogs.NewMapResult = new NewMapRequest(100, 100);
+        await harness.Workspace.NewAsync();
+
+        Point otherTile = harness.Window.Canvas.TranslatePoint(new Point(16, 16), harness.Window).Value;
+        harness.Window.MouseMove(otherTile, RawInputModifiers.None);
+
+        Assert.Equal(1, first.HoverX);
+        Assert.Equal(0, first.HoverY);
+    }
+
+    [AvaloniaFact]
+    public async Task Activate_RebindsChrome()
+    {
+        MapDocumentViewModel first = ViewModel;
+        first.Brush = new MapTileLayer(3, 5);
+        first.Session.BeginStroke(MapEditTool.Pencil, 0, 0);
+        Assert.True(first.Session.CompleteStroke());
+        first.Refresh(EditorRefresh.Title);
+
+        _harness.Dialogs.NewMapResult = new NewMapRequest(100, 100);
+        await _harness.Workspace.NewAsync();
+        MapDocumentViewModel second = _harness.Workspace.ActiveDocument;
+
+        first.ActiveTool = MapEditTool.Eraser;
+        first.SelectedLayers = (byte)0b00100;
+        second.ActiveTool = MapEditTool.Select;
+        second.Brush = new MapTileLayer(9, 1);
+        second.SelectedLayers = (byte)0b00010;
+
+        _harness.Workspace.Activate(first);
+        Assert.True(Find<ToggleButton>("EraserTool").IsChecked);
+        Assert.False(Find<ToggleButton>("SelectTool").IsChecked);
+        Assert.Equal("3", Find<TextBox>("BrushSheet").Text);
+        Assert.Equal("5", Find<TextBox>("BrushGraphic").Text);
+        Assert.NotEqual(Brushes.Transparent, Find<Border>("Layer2Row").Background);
+        Assert.Equal(Brushes.Transparent, Find<Border>("Layer1Row").Background);
+        Assert.Equal(first.Title, Window.Title);
+
+        _harness.Workspace.Activate(second);
+        Assert.True(Find<ToggleButton>("SelectTool").IsChecked);
+        Assert.False(Find<ToggleButton>("EraserTool").IsChecked);
+        Assert.Equal("9", Find<TextBox>("BrushSheet").Text);
+        Assert.Equal("1", Find<TextBox>("BrushGraphic").Text);
+        Assert.NotEqual(Brushes.Transparent, Find<Border>("Layer1Row").Background);
+        Assert.Equal(Brushes.Transparent, Find<Border>("Layer2Row").Background);
+        Assert.Equal(second.Title, Window.Title);
+    }
+
+    [AvaloniaFact]
+    public async Task PaletteBar_AfterSwitch_ScrollsOnlyTheActivePalette()
+    {
+        MapDocumentViewModel first = ViewModel;
+        SpritePaletteControl firstPalette = Window.Palette;
+        _harness.Dialogs.AssetDirectoryPickResult = WriteManyFrameAssetDirectory();
+        Find<Button>("LoadAssetsButton").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        Dispatcher.UIThread.RunJobs();
+
+        ScrollBar bar = Find<ScrollBar>("PaletteBar");
+        Assert.True(bar.IsVisible);
+        bar.Value = 100;
+        Assert.Equal(100, firstPalette.Offset);
+
+        _harness.Dialogs.NewMapResult = new NewMapRequest(100, 100);
+        await _harness.Workspace.NewAsync();
+        SpritePaletteControl secondPalette = Window.Palette;
+        Dispatcher.UIThread.RunJobs();
+
+        bar.Value = 50;
+        Assert.Equal(50, secondPalette.Offset);
+        Assert.Equal(100, firstPalette.Offset);
+    }
+
+    [AvaloniaFact]
+    public async Task CloseDocument_UnhostsAndDropsItsViews()
+    {
+        MapDocumentViewModel first = ViewModel;
+        MapCanvas firstCanvas = Window.Canvas;
+
+        _harness.Dialogs.NewMapResult = new NewMapRequest(100, 100);
+        await _harness.Workspace.NewAsync();
+        MapDocumentViewModel second = _harness.Workspace.ActiveDocument;
+        MapCanvas secondCanvas = Window.Canvas;
+        SpritePaletteControl secondPalette = Window.Palette;
+        Assert.True(Window.HasViewFor(first));
+        Assert.NotSame(firstCanvas, secondCanvas);
+
+        Assert.True(await _harness.Workspace.CloseAsync(first));
+
+        Assert.False(Window.HasViewFor(first));
+        Assert.Same(secondCanvas, Find<Border>("CanvasHost").Child);
+        Assert.Same(secondPalette, Find<Border>("PaletteBorder").Child);
     }
 
     [AvaloniaFact]

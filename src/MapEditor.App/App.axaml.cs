@@ -33,15 +33,14 @@ public partial class App : Application
         AppSettingsStore store = settings ?? new AppSettingsStore(SettingsPathResolver.Resolve());
         IEditorDialogs surface = dialogs ?? new EditorDialogsProxy();
         var workspace = new WorkspaceViewModel(surface, new MapFileStore());
-        var viewModel = workspace.ActiveDocument;
         var assets = new AssetContextController(workspace, store);
-        var window = new MainWindow(surface, store, viewModel, assets);
+        var window = new MainWindow(surface, store, workspace, assets);
         if (surface is EditorDialogsProxy proxy)
         {
             proxy.Target = new AvaloniaEditorDialogs(window);
         }
 
-        return new ComposedEditor(window, surface, store, workspace, viewModel, assets);
+        return new ComposedEditor(window, surface, store, workspace, assets);
     }
 }
 
@@ -50,5 +49,4 @@ internal sealed record ComposedEditor(
     IEditorDialogs Dialogs,
     AppSettingsStore Settings,
     WorkspaceViewModel Workspace,
-    MapDocumentViewModel ViewModel,
     AssetContextController Assets);

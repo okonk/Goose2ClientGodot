@@ -16,7 +16,6 @@ internal sealed class MapCanvas : Control, ICustomHitTest
 {
     private readonly MapDocumentViewModel _viewModel;
     private readonly AssetContextController _assets;
-    private MapEditSession _trackedSession;
     private ViewportTransform _viewport = new(new RenderSize(1, 1), new RenderPoint(0, 0), MapZoom.Percent100);
     private bool _stroking;
     private bool _panning;
@@ -30,7 +29,6 @@ internal sealed class MapCanvas : Control, ICustomHitTest
     {
         _viewModel = viewModel ?? throw new ArgumentNullException(nameof(viewModel));
         _assets = assets ?? throw new ArgumentNullException(nameof(assets));
-        _trackedSession = _viewModel.Session;
         Focusable = true;
         RenderOptions.SetBitmapInterpolationMode(this, BitmapInterpolationMode.None);
         _viewModel.CanvasInvalidated += OnCanvasInvalidated;
@@ -463,22 +461,7 @@ internal sealed class MapCanvas : Control, ICustomHitTest
         return tile;
     }
 
-    private void OnCanvasInvalidated()
-    {
-        MapEditSession session = _viewModel.Session;
-        if (!ReferenceEquals(session, _trackedSession))
-        {
-            _trackedSession = session;
-            _viewport = new ViewportTransform(new RenderSize(Bounds.Width, Bounds.Height), new RenderPoint(0, 0), MapZoom.Percent100);
-            _viewModel.ZoomPercent = 100;
-            _stroking = false;
-            _panning = false;
-            _spaceDown = false;
-            _rectDrag = null;
-        }
-
-        Invalidate();
-    }
+    private void OnCanvasInvalidated() => Invalidate();
 
     private MapRenderRequest BuildRenderRequest()
     {

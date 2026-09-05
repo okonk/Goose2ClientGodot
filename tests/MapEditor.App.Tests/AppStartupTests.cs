@@ -46,8 +46,8 @@ public class AppStartupTests : IDisposable
         app.OnFrameworkInitializationCompleted();
 
         var window = Assert.IsType<MainWindow>(lifetime.MainWindow);
-        Assert.False(window.ViewModel.Session.IsDirty);
-        Assert.Equal("Goose2 Map Editor — Untitled", window.ViewModel.Title);
+        Assert.False(window.Workspace.ActiveDocument.Session.IsDirty);
+        Assert.Equal("Goose2 Map Editor — Untitled", window.Workspace.ActiveDocument.Title);
         Assert.False(window.Assets.Current.IsAvailable);
     }
 
@@ -61,10 +61,9 @@ public class AppStartupTests : IDisposable
 
         Assert.Same(composed.Dialogs, composed.Window.Dialogs);
         Assert.Same(composed.Settings, composed.Window.Settings);
-        Assert.Same(composed.ViewModel, composed.Window.ViewModel);
+        Assert.Same(composed.Workspace.ActiveDocument, composed.Window.Workspace.ActiveDocument);
         Assert.Same(composed.Assets, composed.Window.Assets);
-        Assert.Same(composed.Workspace.ActiveDocument.Session, composed.Window.ViewModel.Session);
-        Assert.False(composed.Window.ViewModel.Session.IsDirty);
+        Assert.False(composed.Window.Workspace.ActiveDocument.Session.IsDirty);
         Assert.False(composed.Window.Assets.Current.IsAvailable);
     }
 
@@ -80,7 +79,7 @@ public class AppStartupTests : IDisposable
         Assert.Equal(1, dialogs.AssetDirectoryPickShown);
         Assert.False(composed.Assets.Current.IsAvailable);
 
-        MapEditSession session = composed.ViewModel.Session;
+        MapEditSession session = composed.Workspace.ActiveDocument.Session;
         session.SelectedTileLayer = new MapTileLayer(1, 1);
         session.BeginStroke(MapEditTool.Pencil, 0, 0);
         Assert.True(session.CompleteStroke());
@@ -127,7 +126,7 @@ public class AppStartupTests : IDisposable
 
         Assert.Equal(0, dialogs.AssetDirectoryPickShown);
         Assert.True(composed.Assets.Current.IsAvailable);
-        Assert.Equal(new[] { 1, 2 }, composed.ViewModel.SheetIds);
+        Assert.Equal(new[] { 1, 2 }, composed.Workspace.ActiveDocument.SheetIds);
 
         dialogs.DirtyResult = DirtyChoice.Discard;
         composed.Window.Close();

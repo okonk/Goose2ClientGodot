@@ -96,6 +96,15 @@ internal sealed class SpritePaletteControl : Control, ICustomHitTest
         SyncBar();
     }
 
+    internal void UnbindScrollBar()
+    {
+        if (_bar is { } bar)
+        {
+            bar.ValueChanged -= OnBarValueChanged;
+            _bar = null;
+        }
+    }
+
     internal void RenderPalette(IMapDrawTarget target)
     {
         using IDisposable clip = target.PushClip(new Rect(Bounds.Size));

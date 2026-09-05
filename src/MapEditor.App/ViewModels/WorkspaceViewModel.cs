@@ -30,6 +30,8 @@ internal sealed class WorkspaceViewModel : ViewModelBase
 
     internal ReadOnlyObservableCollection<MapDocumentViewModel> Documents { get; }
 
+    internal ObservableCollection<MapDocumentViewModel> DocumentCollection => _documents;
+
     internal MapDocumentViewModel ActiveDocument => _activeDocument;
 
     internal SharedTileClipboard Clipboard { get; }
@@ -142,7 +144,7 @@ internal sealed class WorkspaceViewModel : ViewModelBase
             Activate(document);
         }
 
-        if (!await document.RequestCloseAsync())
+        if (!await document.ConfirmCloseAsync())
         {
             return false;
         }
@@ -166,7 +168,7 @@ internal sealed class WorkspaceViewModel : ViewModelBase
                 Activate(document);
             }
 
-            if (!await document.RequestCloseAsync())
+            if (!await document.ConfirmCloseAsync())
             {
                 return false;
             }
