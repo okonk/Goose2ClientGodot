@@ -764,6 +764,49 @@ public class MainWindowTests : IDisposable
     }
 
     [AvaloniaFact]
+    public async Task Move_ActiveDocument_KeepsItsViewsRegistered()
+    {
+        using MainWindowHarness harness = MainWindowHarness.Create();
+        MapDocumentViewModel first = harness.ViewModel;
+        MapCanvas firstCanvas = harness.Window.Canvas;
+        SpritePaletteControl firstPalette = harness.Window.Palette;
+        ViewportTransform viewport = firstCanvas.Viewport;
+
+        harness.Dialogs.NewMapResult = new NewMapRequest(100, 100);
+        await harness.Workspace.NewAsync();
+
+        harness.Workspace.Move(0, 1);
+        MapDocumentViewModel second = harness.Workspace.ActiveDocument;
+        harness.Workspace.Activate(second);
+        harness.Workspace.Activate(first);
+
+        Assert.Same(firstCanvas, harness.Window.Canvas);
+        Assert.Same(firstPalette, harness.Window.Palette);
+        Assert.Equal(viewport.WorldOrigin, firstCanvas.Viewport.WorldOrigin);
+        Assert.Equal(viewport.Zoom, firstCanvas.Viewport.Zoom);
+    }
+
+    [AvaloniaFact]
+    public async Task Move_InactiveDocument_KeepsItsViewsRegistered()
+    {
+        using MainWindowHarness harness = MainWindowHarness.Create();
+        harness.Dialogs.NewMapResult = new NewMapRequest(100, 100);
+        await harness.Workspace.NewAsync();
+        MapDocumentViewModel second = harness.Workspace.ActiveDocument;
+        MapCanvas secondCanvas = harness.Window.Canvas;
+        SpritePaletteControl secondPalette = harness.Window.Palette;
+        ViewportTransform viewport = secondCanvas.Viewport;
+
+        harness.Workspace.Move(1, 0);
+        harness.Workspace.Activate(second);
+
+        Assert.Same(secondCanvas, harness.Window.Canvas);
+        Assert.Same(secondPalette, harness.Window.Palette);
+        Assert.Equal(viewport.WorldOrigin, secondCanvas.Viewport.WorldOrigin);
+        Assert.Equal(viewport.Zoom, secondCanvas.Viewport.Zoom);
+    }
+
+    [AvaloniaFact]
     public async Task Activate_RebindsChrome()
     {
         MapDocumentViewModel first = ViewModel;

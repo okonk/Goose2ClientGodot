@@ -107,7 +107,9 @@ internal partial class MainWindow : Window
 
     private void OnDocumentsChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
-        if (e.NewItems is not null)
+        // Move/Replace/Reset put the same documents in both NewItems and OldItems; only Add/Remove
+        // change the set of hosted documents.
+        if (e.Action == NotifyCollectionChangedAction.Add && e.NewItems is not null)
         {
             foreach (MapDocumentViewModel document in e.NewItems)
             {
@@ -115,7 +117,7 @@ internal partial class MainWindow : Window
             }
         }
 
-        if (e.OldItems is not null)
+        if (e.Action == NotifyCollectionChangedAction.Remove && e.OldItems is not null)
         {
             foreach (MapDocumentViewModel document in e.OldItems)
             {
