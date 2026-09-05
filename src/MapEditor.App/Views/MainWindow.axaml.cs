@@ -164,6 +164,26 @@ internal partial class MainWindow : Window
     // A press on the close button must not select the tab it is about to close.
     private void OnTabClosePressed(object? sender, PointerPressedEventArgs e) => e.Handled = true;
 
+    private void OnTabCloseClicked(object? sender, RoutedEventArgs e)
+    {
+        if (sender is Button { DataContext: MapDocumentViewModel document })
+        {
+            _ = RunCommandAsync(() => _workspace.CloseAsync(document));
+        }
+    }
+
+    private void OnTabHeaderPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (sender is not StackPanel { DataContext: MapDocumentViewModel document } header ||
+            !e.GetCurrentPoint(header).Properties.IsMiddleButtonPressed)
+        {
+            return;
+        }
+
+        e.Handled = true;
+        _ = RunCommandAsync(() => _workspace.CloseAsync(document));
+    }
+
     private void ActivateDocument(MapDocumentViewModel document)
     {
         if (ReferenceEquals(_document, document))

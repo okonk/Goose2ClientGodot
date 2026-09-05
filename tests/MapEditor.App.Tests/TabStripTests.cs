@@ -203,6 +203,151 @@ public class TabStripTests
     }
 
     [AvaloniaFact]
+    public async Task Tab_LeftClick_ActivatesDocument()
+    {
+        MapDocumentViewModel first = _harness.ViewModel;
+        MapDocumentViewModel second = await NewDocumentAsync();
+
+        TextBlock label = TabFor(second).GetVisualDescendants().OfType<TextBlock>().First();
+        Point point = label.TranslatePoint(new Point(5, 5), _harness.Window).Value;
+        _harness.Window.MouseDown(point, MouseButton.Left, RawInputModifiers.None);
+        _harness.Window.MouseUp(point, MouseButton.Left, RawInputModifiers.None);
+
+        Assert.Same(second, _harness.Workspace.ActiveDocument);
+        Assert.True(TabFor(second).IsSelected);
+        Assert.False(TabFor(first).IsSelected);
+    }
+
+    [AvaloniaFact]
+    public async Task Tab_CloseButton_ClosesDocument()
+    {
+        MapDocumentViewModel first = _harness.ViewModel;
+        MapDocumentViewModel second = await NewDocumentAsync();
+
+        Button close = TabFor(first).GetVisualDescendants().OfType<Button>().First();
+        Point point = close.TranslatePoint(new Point(8, 8), _harness.Window).Value;
+        _harness.Window.MouseDown(point, MouseButton.Left, RawInputModifiers.None);
+        _harness.Window.MouseUp(point, MouseButton.Left, RawInputModifiers.None);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.DoesNotContain(first, _harness.Workspace.Documents);
+        Assert.Same(second, _harness.Workspace.ActiveDocument);
+        Assert.Single(_harness.Workspace.Documents);
+    }
+
+    [AvaloniaFact]
+    public async Task Tab_MiddleClick_ClosesDocument()
+    {
+        MapDocumentViewModel first = _harness.ViewModel;
+        MapDocumentViewModel second = await NewDocumentAsync();
+
+        TextBlock label = TabFor(first).GetVisualDescendants().OfType<TextBlock>().First();
+        Point point = label.TranslatePoint(new Point(5, 5), _harness.Window).Value;
+        _harness.Window.MouseDown(point, MouseButton.Middle, RawInputModifiers.None);
+        _harness.Window.MouseUp(point, MouseButton.Middle, RawInputModifiers.None);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.DoesNotContain(first, _harness.Workspace.Documents);
+        Assert.Same(second, _harness.Workspace.ActiveDocument);
+        Assert.Single(_harness.Workspace.Documents);
+    }
+
+    [AvaloniaFact]
+    public async Task Tab_CloseDirty_PromptsAndCancelKeepsTab()
+    {
+        MapDocumentViewModel first = _harness.ViewModel;
+        MapDocumentViewModel second = await NewDocumentAsync();
+        Edit(first);
+        Dispatcher.UIThread.RunJobs();
+
+        _harness.Dialogs.DirtyResult = DirtyChoice.Cancel;
+
+        Button close = TabFor(first).GetVisualDescendants().OfType<Button>().First();
+        Point point = close.TranslatePoint(new Point(8, 8), _harness.Window).Value;
+        _harness.Window.MouseDown(point, MouseButton.Left, RawInputModifiers.None);
+        _harness.Window.MouseUp(point, MouseButton.Left, RawInputModifiers.None);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Equal(1, _harness.Dialogs.DirtyShown);
+        Assert.Equal(2, _harness.Workspace.Documents.Count);
+        Assert.Same(first, _harness.Workspace.ActiveDocument);
+        Assert.NotNull(TabFor(first));
+        Assert.NotNull(TabFor(second));
+    }
+
+    [AvaloniaFact]
+    public async Task Tab_CloseLastTab_LeavesFreshUntitled()
+    {
+        MapDocumentViewModel only = _harness.ViewModel;
+
+        Button close = TabFor(only).GetVisualDescendants().OfType<Button>().First();
+        Point point = close.TranslatePoint(new Point(8, 8), _harness.Window).Value;
+        _harness.Window.MouseDown(point, MouseButton.Left, RawInputModifiers.None);
+        _harness.Window.MouseUp(point, MouseButton.Left, RawInputModifiers.None);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Single(_harness.Workspace.Documents);
+        MapDocumentViewModel fresh = _harness.Workspace.ActiveDocument;
+        Assert.NotSame(only, fresh);
+        Assert.Equal("Untitled", fresh.TabTitle);
+        Assert.NotNull(TabFor(fresh));
+    }
+
+    [AvaloniaFact]
+    public async Task Tab_Click_CancelsArmedPasteMode()
+    {
+        MapDocumentViewModel first = _harness.ViewModel;
+        MapDocumentViewModel second = await NewDocumentAsync();
+        _harness.Workspace.Activate(first);
+        Dispatcher.UIThread.RunJobs();
+
+        first.Session.Document.SetLayer(0, 0, 0, new MapTileLayer(7, 7));
+        first.SelectionRectangle = new MapTileRectangle(0, 0, 1, 1);
+        first.CopySelection();
+        first.BeginPasteMode();
+        Assert.True(first.PasteMode);
+
+        TextBlock label = TabFor(second).GetVisualDescendants().OfType<TextBlock>().First();
+        Point point = label.TranslatePoint(new Point(5, 5), _harness.Window).Value;
+        _harness.Window.MouseDown(point, MouseButton.Left, RawInputModifiers.None);
+        _harness.Window.MouseUp(point, MouseButton.Left, RawInputModifiers.None);
+
+        Assert.False(first.PasteMode);
+        Assert.Same(second, _harness.Workspace.ActiveDocument);
+    }
+
+    [AvaloniaFact]
+    public async Task Tab_CloseButtonOnInactiveTab_DoesNotActivateIt()
+    {
+        MapDocumentViewModel first = _harness.ViewModel;
+        MapDocumentViewModel second = await NewDocumentAsync();
+        MapDocumentViewModel third = await NewDocumentAsync();
+        _harness.Workspace.Activate(first);
+        Dispatcher.UIThread.RunJobs();
+
+        int activeChanges = 0;
+        _harness.Workspace.PropertyChanged += (sender, e) =>
+        {
+            if (e.PropertyName == nameof(WorkspaceViewModel.ActiveDocument))
+            {
+                activeChanges++;
+            }
+        };
+
+        Button close = TabFor(third).GetVisualDescendants().OfType<Button>().First();
+        Point point = close.TranslatePoint(new Point(8, 8), _harness.Window).Value;
+        _harness.Window.MouseDown(point, MouseButton.Left, RawInputModifiers.None);
+        _harness.Window.MouseUp(point, MouseButton.Left, RawInputModifiers.None);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.DoesNotContain(third, _harness.Workspace.Documents);
+        Assert.Equal(0, activeChanges);
+        Assert.Same(first, _harness.Workspace.ActiveDocument);
+        Assert.True(TabFor(first).IsSelected);
+        Assert.False(TabFor(second).IsSelected);
+    }
+
+    [AvaloniaFact]
     public async Task TabStrip_PressingBackgroundTab_ActivatesIt()
     {
         MapDocumentViewModel first = _harness.ViewModel;
@@ -228,8 +373,10 @@ public class TabStripTests
         Point point = close.TranslatePoint(new Point(8, 8), _harness.Window).Value;
         _harness.Window.MouseDown(point, MouseButton.Left, RawInputModifiers.None);
         _harness.Window.MouseUp(point, MouseButton.Left, RawInputModifiers.None);
+        Dispatcher.UIThread.RunJobs();
 
+        Assert.DoesNotContain(first, _harness.Workspace.Documents);
         Assert.Same(second, _harness.Workspace.ActiveDocument);
-        Assert.False(TabFor(first).IsSelected);
+        Assert.True(TabFor(second).IsSelected);
     }
 }

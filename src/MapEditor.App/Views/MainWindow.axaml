@@ -42,11 +42,11 @@
       <ListBox.ItemTemplate>
         <DataTemplate>
           <StackPanel Orientation="Horizontal" Spacing="6" Margin="10,5" MinWidth="72" MaxWidth="180"
-                      ToolTip.Tip="{Binding TabToolTip}">
+                      ToolTip.Tip="{Binding TabToolTip}" PointerPressed="OnTabHeaderPressed">
             <TextBlock Text="{Binding TabTitle}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
             <Ellipse Width="6" Height="6" Fill="{DynamicResource EditorAccentBrush}"
                      IsVisible="{Binding IsDirty}" VerticalAlignment="Center" />
-            <Button Classes="tabClose" ToolTip.Tip="Close" PointerPressed="OnTabClosePressed"
+            <Button Classes="tabClose" ToolTip.Tip="Close" PointerPressed="OnTabClosePressed" Click="OnTabCloseClicked"
                     VerticalAlignment="Center" HorizontalAlignment="Right" />
           </StackPanel>
         </DataTemplate>
