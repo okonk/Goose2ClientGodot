@@ -74,6 +74,8 @@ internal sealed class MapDocumentViewModel : ViewModelBase, IDisposable
 
     public MapEditSession Session => _controller.Document.Session;
 
+    internal EditorDocument Document => _controller.Document;
+
     public MapEditTool ActiveTool
     {
         get => _activeTool;
@@ -383,15 +385,11 @@ internal sealed class MapDocumentViewModel : ViewModelBase, IDisposable
         Refresh(EditorRefresh.Canvas | EditorRefresh.Commands | EditorRefresh.Title);
     }
 
-    public Task NewAsync() => _controller.NewAsync();
-
-    public Task OpenAsync() => _controller.OpenAsync();
-
     public Task SaveAsync() => _controller.SaveAsync();
 
     public Task SaveAsAsync() => _controller.SaveAsAsync();
 
-    public Task<bool> RequestCloseAsync() => _controller.RequestCloseAsync();
+    public Task<bool> RequestCloseAsync() => _controller.ConfirmCloseAsync();
 
     public bool Undo()
     {

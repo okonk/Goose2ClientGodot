@@ -20,8 +20,8 @@ public class CrossMapPasteTests : IDisposable
 
     public CrossMapPasteTests()
     {
-        _a = new MapDocumentViewModel(new EditorDocumentController(_dialogsA, new MapFileStore()), _clipboard);
-        _b = new MapDocumentViewModel(new EditorDocumentController(_dialogsB, new MapFileStore()), _clipboard);
+        _a = new MapDocumentViewModel(new EditorDocumentController(_dialogsA, new MapFileStore(), InitialDocument()), _clipboard);
+        _b = new MapDocumentViewModel(new EditorDocumentController(_dialogsB, new MapFileStore(), InitialDocument(3, 3)), _clipboard);
     }
 
     public void Dispose()
@@ -30,17 +30,12 @@ public class CrossMapPasteTests : IDisposable
         _b.Dispose();
     }
 
-    private Task Make3x3Async(MapDocumentViewModel viewModel, FakeEditorDialogs dialogs)
-    {
-        dialogs.NewMapResult = new NewMapRequest(3, 3);
-        dialogs.DirtyResult = DirtyChoice.Discard;
-        return viewModel.NewAsync();
-    }
+    private static EditorDocument InitialDocument(int width = 100, int height = 100)
+        => new(new MapEditSession(MapDocument.Create(width, height), initiallyDirty: false), null, null);
 
     [Fact]
-    public async Task Paste_IntoOtherDocument_CopiesTiles()
+    public void Paste_IntoOtherDocument_CopiesTiles()
     {
-        await Make3x3Async(_b, _dialogsB);
         _a.Session.Document.SetLayer(0, 0, 0, new MapTileLayer(1, 1));
         _a.Session.Document.SetLayer(1, 0, 0, new MapTileLayer(2, 2));
         _a.Session.Document.SetLayer(0, 1, 0, new MapTileLayer(3, 3));
@@ -59,9 +54,8 @@ public class CrossMapPasteTests : IDisposable
     }
 
     [Fact]
-    public async Task Paste_IntoOtherDocument_LeavesSourceUnchanged()
+    public void Paste_IntoOtherDocument_LeavesSourceUnchanged()
     {
-        await Make3x3Async(_b, _dialogsB);
         _a.Session.Document.SetLayer(0, 0, 0, new MapTileLayer(1, 1));
         _a.Session.Document.SetLayer(1, 0, 0, new MapTileLayer(2, 2));
         _a.Session.Document.SetLayer(0, 1, 0, new MapTileLayer(3, 3));
@@ -81,9 +75,8 @@ public class CrossMapPasteTests : IDisposable
     }
 
     [Fact]
-    public async Task Paste_IntoSmallerDocument_ClipsToDestination()
+    public void Paste_IntoSmallerDocument_ClipsToDestination()
     {
-        await Make3x3Async(_b, _dialogsB);
         for (int y = 0; y < 4; y++)
         {
             for (int x = 0; x < 4; x++)
@@ -114,9 +107,8 @@ public class CrossMapPasteTests : IDisposable
     }
 
     [Fact]
-    public async Task Paste_WhollyOutsideDestination_LeavesDocumentClean()
+    public void Paste_WhollyOutsideDestination_LeavesDocumentClean()
     {
-        await Make3x3Async(_b, _dialogsB);
         _a.Session.Document.SetLayer(0, 0, 0, new MapTileLayer(9, 9));
         _a.SelectionRectangle = new MapTileRectangle(0, 0, 2, 2);
         _a.CopySelection();
@@ -135,9 +127,8 @@ public class CrossMapPasteTests : IDisposable
     }
 
     [Fact]
-    public async Task Paste_WithDifferentSelectedLayers_PairsTopDown()
+    public void Paste_WithDifferentSelectedLayers_PairsTopDown()
     {
-        await Make3x3Async(_b, _dialogsB);
         _a.SelectedLayers = 0b00011; // layers 0 and 1
         _a.Session.Document.SetLayer(0, 0, 0, new MapTileLayer(1, 1));
         _a.Session.Document.SetLayer(0, 0, 1, new MapTileLayer(2, 2));

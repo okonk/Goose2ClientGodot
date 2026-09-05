@@ -339,7 +339,8 @@ public class SpritePaletteControlTests : IDisposable
         Action<string>? prepareAssets = null)
     {
         FakeEditorDialogs dialogs = new();
-        EditorDocumentController documentController = new(dialogs, new MapFileStore());
+        EditorDocumentController documentController = new(dialogs, new MapFileStore(),
+            new EditorDocument(new MapEditSession(MapDocument.Create(), initiallyDirty: false), null, null));
         MapDocumentViewModel viewModel = new(documentController, new SharedTileClipboard());
         string settingsPath = Path.Combine(_directory, "settings.json");
         CountingSpriteSheetLoader countingLoader = new(

@@ -19,12 +19,15 @@ public class EditorDocumentControllerTests : IDisposable
 
     public EditorDocumentControllerTests()
     {
-        _controller = new EditorDocumentController(_dialogs, _store);
+        _controller = new EditorDocumentController(_dialogs, _store, InitialDocument());
     }
 
     public void Dispose() => Directory.Delete(_directory, true);
 
     private string MapPath(string name) => Path.Combine(_directory, name);
+
+    private static EditorDocument InitialDocument()
+        => new(new MapEditSession(MapDocument.Create(), initiallyDirty: false), null, null);
 
     private void Paint(MapEditSession session, int x, int y, MapTileLayer layer)
     {
@@ -46,211 +49,6 @@ public class EditorDocumentControllerTests : IDisposable
         Assert.False(document.Session.CanUndo);
         Assert.False(document.Session.CanRedo);
         Assert.False(document.Session.HasActiveStroke);
-    }
-
-    [Fact]
-    public async Task New_ValidDimensions_PublishesNewDocumentOnce()
-    {
-        MapEditSession before = _controller.Document.Session;
-        int stateChanges = 0;
-        _controller.StateChanged += () => stateChanges++;
-
-        _dialogs.NewMapResult = new NewMapRequest(50, 60);
-        _dialogs.DirtyResult = DirtyChoice.Discard;
-
-        await _controller.NewAsync();
-
-        EditorDocument document = _controller.Document;
-        Assert.NotSame(before, document.Session);
-        Assert.Equal(50, document.Session.Document.Width);
-        Assert.Equal(60, document.Session.Document.Height);
-        Assert.False(document.Session.IsDirty);
-        Assert.Null(document.Path);
-        Assert.Null(document.Revision);
-        Assert.Equal(0, _dialogs.DirtyShown);
-        Assert.Equal(1, stateChanges);
-    }
-
-    [Theory]
-    [InlineData(0, 100)]
-    [InlineData(1001, 100)]
-    [InlineData(100, 0)]
-    [InlineData(100, 1001)]
-    public async Task New_InvalidDimensions_KeepsCurrentDocument(int width, int height)
-    {
-        EditorDocument before = _controller.Document;
-        int stateChanges = 0;
-        _controller.StateChanged += () => stateChanges++;
-
-        _dialogs.NewMapResult = new NewMapRequest(width, height);
-
-        await _controller.NewAsync();
-
-        Assert.Same(before, _controller.Document);
-        Assert.Equal(0, _dialogs.DirtyShown);
-        Assert.Equal(0, stateChanges);
-        Assert.Empty(_dialogs.Errors);
-    }
-
-    [Fact]
-    public async Task New_Canceled_KeepsCurrentDocumentWithoutDirtyPrompt()
-    {
-        EditorDocument before = _controller.Document;
-
-        _dialogs.NewMapResult = null;
-
-        await _controller.NewAsync();
-
-        Assert.Same(before, _controller.Document);
-        Assert.Equal(0, _dialogs.DirtyShown);
-    }
-
-    [Fact]
-    public async Task New_DirtyAndCanceled_KeepsCurrentDocument()
-    {
-        EditorDocument before = _controller.Document;
-        Paint(_controller.Document.Session, 0, 0, new MapTileLayer(1, 1));
-
-        _dialogs.NewMapResult = new NewMapRequest(10, 10);
-        _dialogs.DirtyResult = DirtyChoice.Cancel;
-
-        await _controller.NewAsync();
-
-        Assert.Same(before, _controller.Document);
-        Assert.Equal(1, _dialogs.DirtyShown);
-        Assert.True(_controller.Document.Session.IsDirty);
-    }
-
-    [Fact]
-    public async Task New_DirtyAndSave_SavesOldDocumentThenPublishesNewDocument()
-    {
-        string path = MapPath("old.bytes");
-        Paint(_controller.Document.Session, 3, 4, new MapTileLayer(1, 2));
-
-        _dialogs.NewMapResult = new NewMapRequest(10, 10);
-        _dialogs.DirtyResult = DirtyChoice.Save;
-        _dialogs.SavePickResult = path;
-        int stateChanges = 0;
-        _controller.StateChanged += () => stateChanges++;
-
-        await _controller.NewAsync();
-
-        EditorDocument document = _controller.Document;
-        Assert.Equal(10, document.Session.Document.Width);
-        Assert.Equal(10, document.Session.Document.Height);
-        Assert.Equal("Untitled", _dialogs.LastSaveSuggestedName);
-        OpenedMap saved = _store.Open(path);
-        Assert.Equal(new MapTileLayer(1, 2), saved.Document[3, 4].GetLayer(0));
-        Assert.Equal(2, stateChanges);
-    }
-
-    [Fact]
-    public async Task New_DirtyAndSaveCanceled_AbortsNew()
-    {
-        EditorDocument before = _controller.Document;
-        Paint(_controller.Document.Session, 0, 0, new MapTileLayer(1, 1));
-
-        _dialogs.NewMapResult = new NewMapRequest(10, 10);
-        _dialogs.DirtyResult = DirtyChoice.Save;
-        _dialogs.SavePickResult = null;
-
-        await _controller.NewAsync();
-
-        Assert.Same(before, _controller.Document);
-        Assert.True(_controller.Document.Session.IsDirty);
-    }
-
-    [Fact]
-    public async Task Open_ValidFile_PublishesCleanDocumentWithPathAndRevision()
-    {
-        string path = MapPath("open.bytes");
-        MapDocument source = MapDocument.Create(40, 30);
-        Paint(new MapEditSession(source), 5, 6, new MapTileLayer(2, 7));
-        MapFileRevision revision = _store.Save(path, source);
-
-        MapEditSession before = _controller.Document.Session;
-        int stateChanges = 0;
-        _controller.StateChanged += () => stateChanges++;
-
-        _dialogs.OpenPickResult = path;
-        _dialogs.DirtyResult = DirtyChoice.Discard;
-
-        await _controller.OpenAsync();
-
-        EditorDocument document = _controller.Document;
-        Assert.NotSame(before, document.Session);
-        Assert.Equal(Path.GetFullPath(path), document.Path);
-        Assert.Equal(revision, document.Revision);
-        Assert.False(document.Session.IsDirty);
-        Assert.False(document.Session.CanUndo);
-        Assert.Equal(new MapTileLayer(2, 7), document.Session.Document[5, 6].GetLayer(0));
-        Assert.Equal(1, stateChanges);
-    }
-
-    [Fact]
-    public async Task Open_MissingFile_ReportsErrorAndKeepsCurrentDocument()
-    {
-        EditorDocument before = _controller.Document;
-
-        _dialogs.OpenPickResult = MapPath("missing.bytes");
-        _dialogs.DirtyResult = DirtyChoice.Discard;
-
-        await _controller.OpenAsync();
-
-        Assert.Same(before, _controller.Document);
-        ErrorPresentation error = Assert.Single(_dialogs.Errors);
-        Assert.Equal("Open map", error.Title);
-        Assert.Contains("missing.bytes", error.Message);
-    }
-
-    [Fact]
-    public async Task Open_MalformedFile_ReportsTypedFormatReasonAndKeepsCurrentDocument()
-    {
-        string path = MapPath("bad.bytes");
-        File.WriteAllBytes(path, new byte[] { 1, 2, 3 });
-        EditorDocument before = _controller.Document;
-
-        _dialogs.OpenPickResult = path;
-        _dialogs.DirtyResult = DirtyChoice.Discard;
-
-        await _controller.OpenAsync();
-
-        Assert.Same(before, _controller.Document);
-        ErrorPresentation error = Assert.Single(_dialogs.Errors);
-        Assert.Equal("Open map", error.Title);
-        Assert.Contains(path, error.Message);
-        Assert.Contains("truncated header", error.Message);
-    }
-
-    [Fact]
-    public async Task Open_CanceledPicker_KeepsCurrentDocument()
-    {
-        EditorDocument before = _controller.Document;
-
-        _dialogs.OpenPickResult = null;
-
-        await _controller.OpenAsync();
-
-        Assert.Same(before, _controller.Document);
-        Assert.Equal(0, _dialogs.DirtyShown);
-        Assert.Empty(_dialogs.Errors);
-    }
-
-    [Fact]
-    public async Task Open_DirtyAndCanceled_KeepsCurrentDocument()
-    {
-        EditorDocument before = _controller.Document;
-        Paint(_controller.Document.Session, 0, 0, new MapTileLayer(1, 1));
-        string path = MapPath("open2.bytes");
-        _store.Save(path, MapDocument.Create(10, 10));
-
-        _dialogs.OpenPickResult = path;
-        _dialogs.DirtyResult = DirtyChoice.Cancel;
-
-        await _controller.OpenAsync();
-
-        Assert.Same(before, _controller.Document);
-        Assert.Equal(1, _dialogs.DirtyShown);
     }
 
     [Fact]
@@ -309,6 +107,47 @@ public class EditorDocumentControllerTests : IDisposable
         Assert.True(_controller.Document.Session.IsDirty);
         Assert.Null(_controller.Document.Path);
         Assert.Equal(0, stateChanges);
+        Assert.Empty(_dialogs.Errors);
+    }
+
+    [Fact]
+    public async Task SaveAs_PathOwnedByAnotherDocument_ReportsErrorAndKeepsDirtyState()
+    {
+        string ownedPath = MapPath("owned.bytes");
+        EditorDocument initial = InitialDocument();
+        var controller = new EditorDocumentController(_dialogs, _store, initial, (_, path) => path == ownedPath);
+        Paint(initial.Session, 0, 0, new MapTileLayer(1, 1));
+        _dialogs.SavePickResult = ownedPath;
+
+        await controller.SaveAsAsync();
+
+        EditorDocument document = controller.Document;
+        Assert.True(document.Session.IsDirty);
+        Assert.Null(document.Path);
+        Assert.Null(document.Revision);
+        Assert.False(File.Exists(ownedPath));
+        ErrorPresentation error = Assert.Single(_dialogs.Errors);
+        Assert.Equal("Save map", error.Title);
+        Assert.Contains($"{ownedPath}: already open in another tab.", error.Message);
+    }
+
+    [Fact]
+    public async Task SaveAs_UnownedPath_Writes()
+    {
+        string path = MapPath("unowned.bytes");
+        EditorDocument initial = InitialDocument();
+        var controller = new EditorDocumentController(_dialogs, _store, initial, (_, candidate) => candidate == MapPath("other.bytes"));
+        Paint(initial.Session, 0, 0, new MapTileLayer(1, 1));
+        _dialogs.SavePickResult = path;
+
+        await controller.SaveAsAsync();
+
+        EditorDocument document = controller.Document;
+        Assert.False(document.Session.IsDirty);
+        Assert.Equal(Path.GetFullPath(path), document.Path);
+        Assert.NotNull(document.Revision);
+        OpenedMap opened = _store.Open(path);
+        Assert.Equal(new MapTileLayer(1, 1), opened.Document[0, 0].GetLayer(0));
         Assert.Empty(_dialogs.Errors);
     }
 
@@ -431,6 +270,40 @@ public class EditorDocumentControllerTests : IDisposable
     }
 
     [Fact]
+    public async Task Save_ExternalConflictSaveAs_PathOwnedByAnotherDocument_ReportsErrorAndKeepsOriginal()
+    {
+        string path = MapPath("conflict-owned.bytes");
+        string ownedPath = MapPath("owned-by-other.bytes");
+        EditorDocument initial = InitialDocument();
+        var controller = new EditorDocumentController(_dialogs, _store, initial, (_, candidate) => candidate == ownedPath);
+        _dialogs.SavePickResult = path;
+        await controller.SaveAsAsync();
+        MapFileRevision expected = controller.Document.Revision!.Value;
+
+        MapDocument external = MapDocument.Create();
+        Paint(new MapEditSession(external), 0, 0, new MapTileLayer(9, 9));
+        _store.Save(path, external);
+        Paint(initial.Session, 1, 1, new MapTileLayer(3, 3));
+
+        _dialogs.ExternalChangeResult = ExternalChangeChoice.SaveAs;
+        _dialogs.SavePickResult = ownedPath;
+
+        await controller.SaveAsync();
+
+        EditorDocument document = controller.Document;
+        Assert.True(document.Session.IsDirty);
+        Assert.Equal(expected, document.Revision);
+        Assert.Equal(Path.GetFullPath(path), document.Path);
+        Assert.False(File.Exists(ownedPath));
+        OpenedMap onDisk = _store.Open(path);
+        Assert.Equal(new MapTileLayer(9, 9), onDisk.Document[0, 0].GetLayer(0));
+        Assert.Equal(1, _dialogs.ExternalChangeShown);
+        ErrorPresentation error = Assert.Single(_dialogs.Errors);
+        Assert.Equal("Save map", error.Title);
+        Assert.Contains($"{ownedPath}: already open in another tab.", error.Message);
+    }
+
+    [Fact]
     public async Task SaveAs_SamePathAfterExternalRewrite_StillGuardsExpectedRevision()
     {
         string path = MapPath("guard.bytes");
@@ -511,153 +384,69 @@ public class EditorDocumentControllerTests : IDisposable
     }
 
     [Fact]
-    public async Task RequestClose_CleanDocument_ApprovesWithoutPrompt()
+    public async Task ConfirmClose_CleanDocument_ApprovesWithoutPrompt()
     {
         _dialogs.SavePickResult = MapPath("close-clean.bytes");
         await _controller.SaveAsAsync();
 
-        Assert.True(await _controller.RequestCloseAsync());
+        Assert.True(await _controller.ConfirmCloseAsync());
         Assert.Equal(0, _dialogs.DirtyShown);
     }
 
     [Fact]
-    public async Task RequestClose_DirtyAndCanceled_Rejects()
+    public async Task ConfirmClose_DirtyAndCanceled_Rejects()
     {
         Paint(_controller.Document.Session, 0, 0, new MapTileLayer(1, 1));
 
-        Assert.False(await _controller.RequestCloseAsync());
+        Assert.False(await _controller.ConfirmCloseAsync());
         Assert.Equal(1, _dialogs.DirtyShown);
         Assert.True(_controller.Document.Session.IsDirty);
     }
 
     [Fact]
-    public async Task RequestClose_DirtyAndDiscarded_Approves()
+    public async Task ConfirmClose_DirtyAndDiscarded_Approves()
     {
         Paint(_controller.Document.Session, 0, 0, new MapTileLayer(1, 1));
         _dialogs.DirtyResult = DirtyChoice.Discard;
 
-        Assert.True(await _controller.RequestCloseAsync());
+        Assert.True(await _controller.ConfirmCloseAsync());
         Assert.True(_controller.Document.Session.IsDirty);
     }
 
     [Fact]
-    public async Task RequestClose_DirtyAndSaveSucceeds_Approves()
+    public async Task ConfirmClose_DirtyAndSaveSucceeds_Approves()
     {
         Paint(_controller.Document.Session, 0, 0, new MapTileLayer(1, 1));
         _dialogs.DirtyResult = DirtyChoice.Save;
         _dialogs.SavePickResult = MapPath("close-save.bytes");
 
-        Assert.True(await _controller.RequestCloseAsync());
+        Assert.True(await _controller.ConfirmCloseAsync());
         Assert.False(_controller.Document.Session.IsDirty);
     }
 
     [Fact]
-    public async Task RequestClose_DirtyAndSaveCanceled_Rejects()
+    public async Task ConfirmClose_DirtyAndSaveCanceled_Rejects()
     {
         Paint(_controller.Document.Session, 0, 0, new MapTileLayer(1, 1));
         _dialogs.DirtyResult = DirtyChoice.Save;
         _dialogs.SavePickResult = null;
 
-        Assert.False(await _controller.RequestCloseAsync());
+        Assert.False(await _controller.ConfirmCloseAsync());
         Assert.True(_controller.Document.Session.IsDirty);
     }
 
     [Fact]
-    public async Task RequestClose_SecondCallAfterApproval_DoesNotPromptAgain()
-    {
-        Paint(_controller.Document.Session, 0, 0, new MapTileLayer(1, 1));
-        _dialogs.DirtyResult = DirtyChoice.Discard;
-
-        Assert.True(await _controller.RequestCloseAsync());
-        int dirtyShown = _dialogs.DirtyShown;
-
-        Assert.True(await _controller.RequestCloseAsync());
-        Assert.Equal(dirtyShown, _dialogs.DirtyShown);
-    }
-
-    [Fact]
-    public async Task RequestClose_DuplicateWhilePending_YieldsExactlyOnePrompt()
-    {
-        Paint(_controller.Document.Session, 0, 0, new MapTileLayer(1, 1));
-        var gate = new TaskCompletionSource<DirtyChoice>(TaskCreationOptions.RunContinuationsAsynchronously);
-        _dialogs.DirtyGate = gate;
-
-        Task<bool> first = _controller.RequestCloseAsync();
-        Assert.False(await _controller.RequestCloseAsync());
-        Assert.Equal(1, _dialogs.DirtyShown);
-
-        gate.SetResult(DirtyChoice.Discard);
-        Assert.True(await first);
-    }
-
-    [Fact]
-    public async Task RequestClose_DialogFailure_PresentsErrorAndRemainsCancelableAgain()
+    public async Task ConfirmClose_DialogFailure_PresentsErrorAndRemainsCancelableAgain()
     {
         Paint(_controller.Document.Session, 0, 0, new MapTileLayer(1, 1));
         _dialogs.ShowDirtyException = new InvalidOperationException("dialog failed");
 
-        Assert.False(await _controller.RequestCloseAsync());
+        Assert.False(await _controller.ConfirmCloseAsync());
         Assert.Equal("Close", Assert.Single(_dialogs.Errors).Title);
 
         _dialogs.ShowDirtyException = null;
         _dialogs.DirtyResult = DirtyChoice.Discard;
-        Assert.True(await _controller.RequestCloseAsync());
-    }
-
-    [Fact]
-    public async Task New_DialogFailure_PresentsLastResortErrorAndKeepsDocument()
-    {
-        EditorDocument before = _controller.Document;
-        Paint(before.Session, 0, 0, new MapTileLayer(1, 1));
-        _dialogs.ShowNewMapException = new InvalidOperationException("dialog failed");
-
-        await _controller.NewAsync();
-
-        Assert.Same(before, _controller.Document);
-        Assert.True(before.Session.IsDirty);
-        Assert.Null(before.Path);
-        Assert.Null(before.Revision);
-        ErrorPresentation error = Assert.Single(_dialogs.Errors);
-        Assert.Equal("New map", error.Title);
-        Assert.Contains("dialog failed", error.Message);
-    }
-
-    [Fact]
-    public async Task New_DirtyAndDirtyDialogFailure_PresentsLastResortErrorAndKeepsDocument()
-    {
-        EditorDocument before = _controller.Document;
-        Paint(before.Session, 0, 0, new MapTileLayer(1, 1));
-        _dialogs.NewMapResult = new NewMapRequest(10, 10);
-        _dialogs.ShowDirtyException = new InvalidOperationException("dialog failed");
-
-        await _controller.NewAsync();
-
-        Assert.Same(before, _controller.Document);
-        Assert.True(before.Session.IsDirty);
-        Assert.Null(before.Path);
-        Assert.Null(before.Revision);
-        Assert.Equal(1, _dialogs.DirtyShown);
-        ErrorPresentation error = Assert.Single(_dialogs.Errors);
-        Assert.Equal("New map", error.Title);
-        Assert.Contains("dialog failed", error.Message);
-    }
-
-    [Fact]
-    public async Task Open_DialogFailure_PresentsLastResortErrorAndKeepsDocument()
-    {
-        EditorDocument before = _controller.Document;
-        Paint(before.Session, 0, 0, new MapTileLayer(1, 1));
-        _dialogs.PickOpenException = new InvalidOperationException("dialog failed");
-
-        await _controller.OpenAsync();
-
-        Assert.Same(before, _controller.Document);
-        Assert.True(before.Session.IsDirty);
-        Assert.Null(before.Path);
-        Assert.Null(before.Revision);
-        ErrorPresentation error = Assert.Single(_dialogs.Errors);
-        Assert.Equal("Open map", error.Title);
-        Assert.Contains("dialog failed", error.Message);
+        Assert.True(await _controller.ConfirmCloseAsync());
     }
 
     [Fact]

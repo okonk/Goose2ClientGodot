@@ -8,110 +8,37 @@ namespace MapEditor.App.Documents;
 
 internal sealed class EditorDocumentController
 {
-    private static readonly StringComparison PathComparison = OperatingSystem.IsWindows()
+    internal static readonly StringComparison PathComparison = OperatingSystem.IsWindows()
         ? StringComparison.OrdinalIgnoreCase
         : StringComparison.Ordinal;
 
     private readonly IEditorDialogs _dialogs;
     private readonly MapFileStore _store;
+    private readonly Func<EditorDocument, string, bool> _isPathOwnedElsewhere;
     private EditorDocument _current;
-    private bool _closeGuardRunning;
-    private bool _closeApproved;
 
-    public EditorDocumentController(IEditorDialogs dialogs, MapFileStore store)
+    internal EditorDocumentController(
+        IEditorDialogs dialogs,
+        MapFileStore store,
+        EditorDocument initial,
+        Func<EditorDocument, string, bool> isPathOwnedElsewhere)
     {
         _dialogs = dialogs ?? throw new ArgumentNullException(nameof(dialogs));
         _store = store ?? throw new ArgumentNullException(nameof(store));
-        _current = new EditorDocument(new MapEditSession(MapDocument.Create(), initiallyDirty: false), null, null);
+        _current = initial ?? throw new ArgumentNullException(nameof(initial));
+        _isPathOwnedElsewhere = isPathOwnedElsewhere ?? throw new ArgumentNullException(nameof(isPathOwnedElsewhere));
     }
 
-    public EditorDocument Document => _current;
-
-    public event Action? StateChanged;
-
-    public async Task NewAsync()
+    internal EditorDocumentController(IEditorDialogs dialogs, MapFileStore store, EditorDocument initial)
+        : this(dialogs, store, initial, static (_, _) => false)
     {
-        try
-        {
-            NewMapRequest? request = await _dialogs.ShowNewMapAsync();
-            if (request is null ||
-                request.Width < MapDocument.MinDimension || request.Width > MapDocument.MaxDimension ||
-                request.Height < MapDocument.MinDimension || request.Height > MapDocument.MaxDimension)
-            {
-                return;
-            }
-
-            if (!await ResolveDirtyAsync())
-            {
-                return;
-            }
-
-            var session = new MapEditSession(MapDocument.Create(request.Width, request.Height), initiallyDirty: false);
-            _current = new EditorDocument(session, null, null);
-            NotifyStateChanged();
-        }
-        catch (OutOfMemoryException)
-        {
-            throw;
-        }
-        catch (Exception ex)
-        {
-            await _dialogs.ShowErrorAsync(new ErrorPresentation("New map", ex.Message));
-        }
     }
 
-    public async Task OpenAsync()
-    {
-        string? picked = null;
-        try
-        {
-            picked = await _dialogs.PickOpenMapAsync();
-            if (picked is null)
-            {
-                return;
-            }
+    internal EditorDocument Document => _current;
 
-            if (!await ResolveDirtyAsync())
-            {
-                return;
-            }
+    internal event Action? StateChanged;
 
-            OpenedMap opened;
-            try
-            {
-                opened = _store.Open(picked);
-            }
-            catch (MapFormatException ex)
-            {
-                await _dialogs.ShowErrorAsync(new ErrorPresentation("Open map", $"{picked}: {DescribeFormatError(ex.Error)}."));
-                return;
-            }
-            catch (MapValidationException ex)
-            {
-                await _dialogs.ShowErrorAsync(new ErrorPresentation("Open map", $"{picked}: {ex.Message}"));
-                return;
-            }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or PathTooLongException)
-            {
-                await _dialogs.ShowErrorAsync(new ErrorPresentation("Open map", $"{picked}: {ex.Message}"));
-                return;
-            }
-
-            var session = new MapEditSession(opened.Document, initiallyDirty: false);
-            _current = new EditorDocument(session, Path.GetFullPath(picked), opened.Revision);
-            NotifyStateChanged();
-        }
-        catch (OutOfMemoryException)
-        {
-            throw;
-        }
-        catch (Exception ex)
-        {
-            await _dialogs.ShowErrorAsync(new ErrorPresentation("Open map", picked is { } path ? $"{path}: {ex.Message}" : ex.Message));
-        }
-    }
-
-    public async Task SaveAsync()
+    internal async Task SaveAsync()
     {
         try
         {
@@ -134,7 +61,7 @@ internal sealed class EditorDocumentController
         }
     }
 
-    public async Task SaveAsAsync()
+    internal async Task SaveAsAsync()
     {
         string? destination = null;
         try
@@ -147,6 +74,12 @@ internal sealed class EditorDocumentController
             }
 
             destination = Path.GetFullPath(picked);
+            if (_isPathOwnedElsewhere(_current, destination))
+            {
+                await _dialogs.ShowErrorAsync(new ErrorPresentation("Save map", $"{destination}: already open in another tab."));
+                return;
+            }
+
             // Re-selecting the current path must keep the external-change guard active.
             MapFileRevision? expected = string.Equals(destination, _current.Path, PathComparison)
                 ? _current.Revision
@@ -163,7 +96,7 @@ internal sealed class EditorDocumentController
         }
     }
 
-    public bool Undo()
+    internal bool Undo()
     {
         if (!_current.Session.Undo())
         {
@@ -174,7 +107,7 @@ internal sealed class EditorDocumentController
         return true;
     }
 
-    public bool Redo()
+    internal bool Redo()
     {
         if (!_current.Session.Redo())
         {
@@ -185,28 +118,12 @@ internal sealed class EditorDocumentController
         return true;
     }
 
-    public Task<bool> RequestCloseAsync()
-    {
-        // The window cancels every Closing event and re-invokes Close() only after approval;
-        // the running flag keeps re-entrant Closing events from stacking prompts.
-        if (_closeGuardRunning)
-        {
-            return Task.FromResult(false);
-        }
-
-        _closeGuardRunning = true;
-        return RequestCloseCoreAsync();
-    }
-
-    private async Task<bool> RequestCloseCoreAsync()
+    // The caller owns re-entrancy (the window's close guard); this must not be
+    // called concurrently with itself.
+    internal async Task<bool> ConfirmCloseAsync()
     {
         try
         {
-            if (_closeApproved)
-            {
-                return true;
-            }
-
             if (_current.Session.IsDirty)
             {
                 DirtyChoice choice = await _dialogs.ShowDirtyAsync(DisplayName);
@@ -225,7 +142,6 @@ internal sealed class EditorDocumentController
                 }
             }
 
-            _closeApproved = true;
             return true;
         }
         catch (Exception ex)
@@ -233,32 +149,6 @@ internal sealed class EditorDocumentController
             await _dialogs.ShowErrorAsync(new ErrorPresentation("Close", ex.Message));
             return false;
         }
-        finally
-        {
-            _closeGuardRunning = false;
-        }
-    }
-
-    private async Task<bool> ResolveDirtyAsync()
-    {
-        if (!_current.Session.IsDirty)
-        {
-            return true;
-        }
-
-        DirtyChoice choice = await _dialogs.ShowDirtyAsync(DisplayName);
-        if (choice == DirtyChoice.Cancel)
-        {
-            return false;
-        }
-
-        if (choice == DirtyChoice.Discard)
-        {
-            return true;
-        }
-
-        await SaveAsync();
-        return !_current.Session.IsDirty;
     }
 
     private async Task SaveCoreAsync(string path, MapFileRevision? expectedRevision)
@@ -307,7 +197,7 @@ internal sealed class EditorDocumentController
         StateChanged?.Invoke();
     }
 
-    private static string DescribeFormatError(MapFormatError error) => error switch
+    internal static string DescribeFormatError(MapFormatError error) => error switch
     {
         MapFormatError.TruncatedHeader => "truncated header",
         MapFormatError.UnsupportedEditorVersion => "unsupported editor version",

@@ -26,30 +26,6 @@ public class ShortcutTests
     }
 
     [AvaloniaFact]
-    public void ControlN_InvokesNew()
-    {
-        using MainWindowHarness harness = MainWindowHarness.Create();
-        harness.Window.Canvas.Focus();
-
-        harness.Window.KeyPressQwerty(PhysicalKey.N, RawInputModifiers.Control);
-        Dispatcher.UIThread.RunJobs();
-
-        Assert.Equal(1, harness.Dialogs.NewMapShown);
-    }
-
-    [AvaloniaFact]
-    public void ControlO_InvokesOpen()
-    {
-        using MainWindowHarness harness = MainWindowHarness.Create();
-        harness.Window.Canvas.Focus();
-
-        harness.Window.KeyPressQwerty(PhysicalKey.O, RawInputModifiers.Control);
-        Dispatcher.UIThread.RunJobs();
-
-        Assert.Equal(1, harness.Dialogs.OpenPickShown);
-    }
-
-    [AvaloniaFact]
     public void ControlS_InvokesSave()
     {
         using MainWindowHarness harness = MainWindowHarness.Create();

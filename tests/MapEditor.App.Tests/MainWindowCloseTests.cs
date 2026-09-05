@@ -29,12 +29,6 @@ public class MainWindowCloseTests
     public void Close_CleanDocument_ClosesWithoutPrompt()
     {
         using MainWindowHarness harness = MainWindowHarness.Create();
-        string mapPath = Path.Combine(harness.TempDirectory, "clean.bytes");
-        new MapFileStore().Save(mapPath, MapDocument.Create(10, 10));
-        harness.Dialogs.OpenPickResult = mapPath;
-        harness.Dialogs.DirtyResult = DirtyChoice.Discard;
-        harness.Window.FindControl<Avalonia.Controls.MenuItem>("OpenCommand")!.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Avalonia.Controls.MenuItem.ClickEvent));
-        Dispatcher.UIThread.RunJobs();
         Assert.False(harness.ViewModel.Session.IsDirty);
 
         var counter = new ClosingCounter(harness.Window);

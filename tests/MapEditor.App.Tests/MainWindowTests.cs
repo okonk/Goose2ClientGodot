@@ -46,7 +46,8 @@ internal sealed class MainWindowHarness : IDisposable
     {
         TempDirectory = Directory.CreateTempSubdirectory("map-editor-window-").FullName;
         Settings = new AppSettingsStore(Path.Combine(TempDirectory, "settings.json"));
-        Controller = new EditorDocumentController(Dialogs, new MapFileStore());
+        Controller = new EditorDocumentController(Dialogs, new MapFileStore(),
+            new EditorDocument(new MapEditSession(MapDocument.Create(), initiallyDirty: false), null, null));
         ViewModel = new MapDocumentViewModel(Controller, new SharedTileClipboard());
         Assets = new AssetContextController(ViewModel, Settings);
         Window = new MainWindow(Dialogs, Settings, ViewModel, Assets);
@@ -161,7 +162,7 @@ public class MainWindowTests : IDisposable
     [AvaloniaFact]
     public void Layout_ContainsFileEditToolbarCommands()
     {
-        foreach (string name in new[] { "NewCommand", "OpenCommand", "SaveCommand", "SaveAsCommand", "ExitCommand" })
+        foreach (string name in new[] { "SaveCommand", "SaveAsCommand", "ExitCommand" })
         {
             Assert.NotNull(Find<MenuItem>(name));
         }
@@ -397,8 +398,6 @@ public class MainWindowTests : IDisposable
     {
         Assert.False(OperatingSystem.IsMacOS());
 
-        Assert.Equal(new KeyGesture(Key.N, KeyModifiers.Control), (KeyGesture)Find<MenuItem>("NewCommand").HotKey!);
-        Assert.Equal(new KeyGesture(Key.O, KeyModifiers.Control), (KeyGesture)Find<MenuItem>("OpenCommand").HotKey!);
         Assert.Equal(new KeyGesture(Key.S, KeyModifiers.Control), (KeyGesture)Find<MenuItem>("SaveCommand").HotKey!);
         Assert.Equal(new KeyGesture(Key.S, KeyModifiers.Control | KeyModifiers.Shift), (KeyGesture)Find<MenuItem>("SaveAsCommand").HotKey!);
         Assert.Equal(new KeyGesture(Key.Z, KeyModifiers.Control), (KeyGesture)Find<MenuItem>("UndoCommand").HotKey!);
@@ -411,33 +410,6 @@ public class MainWindowTests : IDisposable
     }
 
     [AvaloniaFact]
-    public void NewSmallerMap_WithOutOfRangeSelection_ClearsSelectionWithoutError()
-    {
-        int invalidationsBefore = Window.Canvas.InvalidationCount;
-        ViewModel.Brush = new MapTileLayer(2, 3);
-        Point tileCenter = TileCenter(5, 5);
-        Window.MouseDown(tileCenter, MouseButton.Left, RawInputModifiers.None);
-        Window.MouseUp(tileCenter, MouseButton.Left, RawInputModifiers.None);
-        Window.MouseMove(tileCenter, RawInputModifiers.None);
-        Assert.Equal(5, ViewModel.SelectedX);
-        Assert.Equal(5, ViewModel.SelectedY);
-
-        _harness.Dialogs.DirtyResult = DirtyChoice.Discard;
-        _harness.Dialogs.NewMapResult = new NewMapRequest(4, 4);
-        Find<MenuItem>("NewCommand").RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
-        Dispatcher.UIThread.RunJobs();
-
-        Assert.Empty(_harness.Dialogs.Errors);
-        Assert.Null(ViewModel.SelectedX);
-        Assert.Null(ViewModel.SelectedY);
-        Assert.Equal(4, ViewModel.MapWidth);
-        Assert.Equal(4, ViewModel.MapHeight);
-        Assert.Equal("—", Find<TextBlock>("SelectedText").Text);
-        Assert.True(Window.Canvas.InvalidationCount > invalidationsBefore);
-        Assert.Equal("Goose2 Map Editor — Untitled", Window.Title);
-    }
-
-    [AvaloniaFact]
     public void ResizeMenuItem_ShowsTheDialogAndAppliesTheReturnedWindow()
     {
         _harness.Dialogs.ResizeMapResult = new MapTileRectangle(0, 0, 6, 6);
@@ -447,40 +419,6 @@ public class MainWindowTests : IDisposable
         Assert.Equal(1, _harness.Dialogs.ResizeMapShown);
         Assert.Equal(6, ViewModel.MapWidth);
         Assert.Equal(6, ViewModel.MapHeight);
-    }
-
-    [AvaloniaFact]
-    public void DocumentReplacement_ResetsLayerAnchorToTopmostSelectedLayer()
-    {
-        Point row3 = Find<Border>("Layer3Row").TranslatePoint(new Point(10, 5), Window).Value;
-        Window.MouseDown(row3, MouseButton.Left, RawInputModifiers.None);
-        Window.MouseUp(row3, MouseButton.Left, RawInputModifiers.None);
-        Assert.Equal(3, Window.LayerAnchor);
-
-        _harness.Dialogs.DirtyResult = DirtyChoice.Discard;
-        _harness.Dialogs.NewMapResult = new NewMapRequest(4, 4);
-        Find<MenuItem>("NewCommand").RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
-        Dispatcher.UIThread.RunJobs();
-
-        Assert.Equal((byte)1, ViewModel.SelectedLayers);
-        Assert.Equal(0, Window.LayerAnchor);
-    }
-
-    [AvaloniaFact]
-    public async Task OpenCommand_UnexpectedExceptionAtWindowBoundary_ShowsLastErrorDialogAndKeepsDocument()
-    {
-        EditorDocument before = _harness.Controller.Document;
-        _harness.Dialogs.PickOpenException = new InvalidOperationException("pick failed");
-        _harness.Dialogs.ShowErrorException = new IOException("dialog down");
-
-        Find<MenuItem>("OpenCommand").RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
-        Dispatcher.UIThread.RunJobs();
-
-        ErrorPresentation lastResort = Assert.Single(_harness.Dialogs.Errors, error => error.Title == "Error");
-        Assert.Contains("dialog down", lastResort.Message);
-        Assert.Same(before, _harness.Controller.Document);
-        Assert.False(_harness.ViewModel.Session.IsDirty);
-        Assert.True(Window.IsVisible);
     }
 
     [AvaloniaFact]

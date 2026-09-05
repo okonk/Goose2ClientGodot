@@ -32,7 +32,8 @@ public partial class App : Application
     {
         AppSettingsStore store = settings ?? new AppSettingsStore(SettingsPathResolver.Resolve());
         IEditorDialogs surface = dialogs ?? new EditorDialogsProxy();
-        var controller = new EditorDocumentController(surface, new MapFileStore());
+        var controller = new EditorDocumentController(surface, new MapFileStore(),
+            new EditorDocument(new MapEditSession(MapDocument.Create(), initiallyDirty: false), null, null));
         var viewModel = new MapDocumentViewModel(controller, new SharedTileClipboard());
         var assets = new AssetContextController(viewModel, store);
         var window = new MainWindow(surface, store, viewModel, assets);

@@ -116,14 +116,6 @@ internal partial class MainWindow : Window
         {
             switch (e.Key)
             {
-                case Key.N when modifiers == PrimaryModifier:
-                    OnNew(this, new RoutedEventArgs());
-                    e.Handled = true;
-                    break;
-                case Key.O when modifiers == PrimaryModifier:
-                    OnOpen(this, new RoutedEventArgs());
-                    e.Handled = true;
-                    break;
                 case Key.S when modifiers == PrimaryModifier:
                     OnSave(this, new RoutedEventArgs());
                     e.Handled = true;
@@ -232,8 +224,6 @@ internal partial class MainWindow : Window
     private void ApplyHotKeys()
     {
         bool isMac = OperatingSystem.IsMacOS();
-        NewCommand.HotKey = BuildShortcut(Key.N, KeyModifiers.None, isMac);
-        OpenCommand.HotKey = BuildShortcut(Key.O, KeyModifiers.None, isMac);
         SaveCommand.HotKey = BuildShortcut(Key.S, KeyModifiers.None, isMac);
         SaveAsCommand.HotKey = BuildShortcut(Key.S, KeyModifiers.Shift, isMac);
         UndoCommand.HotKey = BuildShortcut(Key.Z, KeyModifiers.None, isMac);
@@ -247,8 +237,6 @@ internal partial class MainWindow : Window
         }
     }
 
-    private void OnNew(object? sender, RoutedEventArgs e) => _ = RunCommandAsync(() => _viewModel.NewAsync());
-
     private void OnResize(object? sender, RoutedEventArgs e)
         => _ = RunCommandAsync(async () =>
         {
@@ -258,8 +246,6 @@ internal partial class MainWindow : Window
                 _viewModel.ResizeMap(value);
             }
         });
-
-    private void OnOpen(object? sender, RoutedEventArgs e) => _ = RunCommandAsync(() => _viewModel.OpenAsync());
 
     private void OnSave(object? sender, RoutedEventArgs e) => _ = RunCommandAsync(() => _viewModel.SaveAsync());
 
