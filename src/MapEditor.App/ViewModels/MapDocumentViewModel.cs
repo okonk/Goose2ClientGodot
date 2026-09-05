@@ -18,11 +18,12 @@ internal enum EditorRefresh
     Document = 1 << 4
 }
 
-internal sealed class MapDocumentViewModel : ViewModelBase
+internal sealed class MapDocumentViewModel : ViewModelBase, IDisposable
 {
     private const string UntitledName = "Untitled";
 
     private readonly EditorDocumentController _controller;
+    private readonly SharedTileClipboard _clipboard;
     private MapEditSession _session;
 
     private MapEditTool _activeTool = MapEditTool.Pencil;
@@ -35,7 +36,6 @@ internal sealed class MapDocumentViewModel : ViewModelBase
     private int? _hoverY;
     private int? _selectedX;
     private int? _selectedY;
-    private TileClipboard? _clipboard;
     private bool _pasteMode;
     private MapTileRectangle? _selectionRectangle;
     private int _zoomPercent = 100;
@@ -46,9 +46,10 @@ internal sealed class MapDocumentViewModel : ViewModelBase
     private bool _canRedo;
     private bool _canSave;
 
-    public MapDocumentViewModel(EditorDocumentController controller)
+    public MapDocumentViewModel(EditorDocumentController controller, SharedTileClipboard clipboard)
     {
         _controller = controller ?? throw new ArgumentNullException(nameof(controller));
+        _clipboard = clipboard ?? throw new ArgumentNullException(nameof(clipboard));
         _session = _controller.Document.Session;
         _mapWidth = _session.Document.Width;
         _mapHeight = _session.Document.Height;
@@ -56,6 +57,15 @@ internal sealed class MapDocumentViewModel : ViewModelBase
         _canSave = _session.IsDirty;
         _controller.StateChanged += OnControllerStateChanged;
         _session.Resized += OnSessionResized;
+        _clipboard.Changed += OnClipboardChanged;
+    }
+
+    public void Dispose()
+    {
+        // the shared clipboard outlives every document; unsubscribing here lets a closed tab be collected
+        _clipboard.Changed -= OnClipboardChanged;
+        _controller.StateChanged -= OnControllerStateChanged;
+        _session.Resized -= OnSessionResized;
     }
 
     public event Action? CanvasInvalidated;
@@ -226,7 +236,7 @@ internal sealed class MapDocumentViewModel : ViewModelBase
 
     public bool CanSave => _canSave;
 
-    public TileClipboard? Clipboard => _clipboard;
+    public TileClipboard? Clipboard => _clipboard.Current;
 
     public bool PasteMode
     {
@@ -244,7 +254,7 @@ internal sealed class MapDocumentViewModel : ViewModelBase
     {
         get
         {
-            if (!_pasteMode || _clipboard is not { } clip || HoverX is not { } x || HoverY is not { } y)
+            if (!_pasteMode || _clipboard.Current is not { } clip || HoverX is not { } x || HoverY is not { } y)
             {
                 return null;
             }
@@ -260,7 +270,7 @@ internal sealed class MapDocumentViewModel : ViewModelBase
             return;
         }
 
-        _clipboard = TileClipboard.Capture(_session.Document, _session.SelectedLayers, rect);
+        _clipboard.Current = TileClipboard.Capture(_session.Document, _session.SelectedLayers, rect);
     }
 
     public void CutSelection()
@@ -301,7 +311,7 @@ internal sealed class MapDocumentViewModel : ViewModelBase
 
     public void BeginPasteMode()
     {
-        if (_clipboard is not null)
+        if (_clipboard.Current is not null)
         {
             PasteMode = true;
             Refresh(EditorRefresh.Canvas);
@@ -319,7 +329,7 @@ internal sealed class MapDocumentViewModel : ViewModelBase
 
     public void ApplyPasteAt(int x, int y)
     {
-        TileClipboard? clip = _clipboard;
+        TileClipboard? clip = _clipboard.Current;
         if (clip is null)
         {
             return;
@@ -431,7 +441,6 @@ internal sealed class MapDocumentViewModel : ViewModelBase
                 HoverY = null;
                 SelectedX = null;
                 SelectedY = null;
-                _clipboard = null;
                 CancelPasteMode();
                 SelectionRectangle = null;
                 OnPropertyChanged(nameof(SelectedLayers));
@@ -465,6 +474,11 @@ internal sealed class MapDocumentViewModel : ViewModelBase
     private void OnControllerStateChanged()
     {
         Refresh(EditorRefresh.Document | EditorRefresh.Title | EditorRefresh.Commands);
+    }
+
+    private void OnClipboardChanged()
+    {
+        OnPropertyChanged(nameof(Clipboard));
     }
 
     private void OnSessionResized(MapResizeTransform transform)

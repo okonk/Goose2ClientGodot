@@ -31,7 +31,7 @@ public class AssetContextControllerTests : IDisposable
     public AssetContextControllerTests()
     {
         _documentController = new EditorDocumentController(_dialogs, new MapFileStore());
-        _viewModel = new MapDocumentViewModel(_documentController);
+        _viewModel = new MapDocumentViewModel(_documentController, new SharedTileClipboard());
         _settingsPath = Path.Combine(_directory, "settings.json");
     }
 

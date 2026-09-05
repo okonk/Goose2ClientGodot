@@ -22,7 +22,7 @@ public class MapDocumentViewModelTests : IDisposable
     public MapDocumentViewModelTests()
     {
         _controller = new EditorDocumentController(_dialogs, new MapFileStore());
-        _viewModel = new MapDocumentViewModel(_controller);
+        _viewModel = new MapDocumentViewModel(_controller, new SharedTileClipboard());
     }
 
     public void Dispose() => Directory.Delete(_directory, true);
@@ -750,14 +750,24 @@ public class MapDocumentViewModelTests : IDisposable
     }
 
     [Fact]
-    public async Task NewDocument_ClearsClipboardPasteAndSelectionRectangle()
+    public void Refresh_Commands_DoesNotClearClipboard()
+    {
+        SeedClipboard();
+
+        _viewModel.Refresh(EditorRefresh.Commands | EditorRefresh.Title);
+
+        Assert.NotNull(_viewModel.Clipboard);
+    }
+
+    [Fact]
+    public async Task NewDocument_KeepsClipboard_ClearsPasteAndSelectionRectangle()
     {
         SeedClipboard();
         _viewModel.BeginPasteMode();
         _dialogs.NewMapResult = new NewMapRequest(10, 10);
         _dialogs.DirtyResult = DirtyChoice.Discard;
         await _viewModel.NewAsync();
-        Assert.Null(_viewModel.Clipboard);
+        Assert.NotNull(_viewModel.Clipboard);
         Assert.Null(_viewModel.SelectionRectangle);
         Assert.False(_viewModel.PasteMode);
     }

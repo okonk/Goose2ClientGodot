@@ -898,7 +898,7 @@ public class MapCanvasTests
     {
         FakeEditorDialogs dialogs = new();
         EditorDocumentController documentController = new(dialogs, new MapFileStore());
-        MapDocumentViewModel viewModel = new(documentController);
+        MapDocumentViewModel viewModel = new(documentController, new SharedTileClipboard());
         string settingsPath = Path.Combine(Path.GetTempPath(), "map-editor-canvas-tests", "settings.json");
         AssetContextController assets = new(viewModel, new AppSettingsStore(settingsPath));
         MapCanvas canvas = new(viewModel, assets)

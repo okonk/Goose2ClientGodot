@@ -134,7 +134,7 @@ public class MainWindowThemeTests : IDisposable
     private MainWindow CreateWindow()
     {
         var controller = new EditorDocumentController(_dialogs, new MapFileStore());
-        var viewModel = new MapDocumentViewModel(controller);
+        var viewModel = new MapDocumentViewModel(controller, new SharedTileClipboard());
         _assets = new AssetContextController(viewModel, _settings);
         _window = new MainWindow(_dialogs, _settings, viewModel, _assets);
         _window.Show();

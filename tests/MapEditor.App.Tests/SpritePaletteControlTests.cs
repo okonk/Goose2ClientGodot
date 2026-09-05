@@ -340,7 +340,7 @@ public class SpritePaletteControlTests : IDisposable
     {
         FakeEditorDialogs dialogs = new();
         EditorDocumentController documentController = new(dialogs, new MapFileStore());
-        MapDocumentViewModel viewModel = new(documentController);
+        MapDocumentViewModel viewModel = new(documentController, new SharedTileClipboard());
         string settingsPath = Path.Combine(_directory, "settings.json");
         CountingSpriteSheetLoader countingLoader = new(
             loaderBehavior ?? (path => SpriteSheetLoadResult.Success(new CountingSpriteSheetImage(64, 64))));

@@ -47,7 +47,7 @@ internal sealed class MainWindowHarness : IDisposable
         TempDirectory = Directory.CreateTempSubdirectory("map-editor-window-").FullName;
         Settings = new AppSettingsStore(Path.Combine(TempDirectory, "settings.json"));
         Controller = new EditorDocumentController(Dialogs, new MapFileStore());
-        ViewModel = new MapDocumentViewModel(Controller);
+        ViewModel = new MapDocumentViewModel(Controller, new SharedTileClipboard());
         Assets = new AssetContextController(ViewModel, Settings);
         Window = new MainWindow(Dialogs, Settings, ViewModel, Assets);
     }
