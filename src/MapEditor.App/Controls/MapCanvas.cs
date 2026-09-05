@@ -2,6 +2,7 @@ using System;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Interactivity;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Rendering;
@@ -346,6 +347,12 @@ internal sealed class MapCanvas : Control, ICustomHitTest
             _spaceDown = false;
             e.Handled = true;
         }
+    }
+
+    protected override void OnLostFocus(RoutedEventArgs e)
+    {
+        base.OnLostFocus(e);
+        _spaceDown = false;
     }
 
     private void BeginToolPress(Point position, KeyModifiers modifiers)
