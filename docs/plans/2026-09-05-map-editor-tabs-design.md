@@ -75,17 +75,29 @@ On activation the window:
 
 1. calls `FinishInteraction(commit: true)` on the outgoing canvas,
 2. cancels the outgoing document's paste mode,
-3. detaches the outgoing canvas's window `PointerMoved` hover handler and
-   attaches the incoming one, so only the visible canvas tracks hover,
+3. swaps `CanvasHost.Child` and `PaletteBorder.Child` to the incoming
+   document's canvas and palette,
 4. detaches `PropertyChanged` / `CanvasInvalidated` from the old view model and
    attaches to the new,
 5. swaps `DataContext` and re-runs `SyncToolButtons`, `SyncLayerRows`,
    `SyncBrushFields`, `SyncReadouts` and the title.
 
-`SpritePaletteControl` stays a single shared instance with a rebindable view
-model, and resets its scroll offset on rebind. `AssetContextController` stays
-app-wide and disposed once on window close; reloading assets invalidates every
-tab's palette, not just the active one.
+Hover needs no explicit handling: `MapCanvas` already attaches and detaches its
+window `PointerMoved` handler in `OnAttachedToVisualTree` /
+`OnDetachedFromVisualTree` (`src/MapEditor.App/Controls/MapCanvas.cs:168-186`),
+so swapping `CanvasHost.Child` removes the outgoing canvas from the tree and
+stops it tracking the cursor.
+
+`SpritePaletteControl` is also per document, held in the same bundle as the
+canvas, which gives per-tab scroll offset for free. The window's shared
+`PaletteBar` scroll bar is bound to the incoming palette on activation
+(`BindScrollBar`, `SpritePaletteControl.cs:77`) and unbound from the outgoing
+one, so an inactive palette never reacts to the bar.
+
+`AssetContextController` stays app-wide and disposed once on window close. It
+currently holds a single view model (`AssetContextController.cs:11`); it becomes
+workspace-aware, seeding each newly added document with the current sheet ids and
+looping over `Documents` on `TryOpen` so every tab's palette is invalidated.
 
 ## Tab strip
 
@@ -150,6 +162,5 @@ and back. `MainWindowViewModelTests` is renamed with its class.
 ## Deferred
 
 - Session restore of open tabs across launches.
-- Per-tab palette scroll offset (reset to top on rebind instead).
 - A combined "save these N maps?" quit dialog; prompting per dirty tab reuses the
   existing dialog.
