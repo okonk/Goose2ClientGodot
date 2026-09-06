@@ -78,6 +78,10 @@ Requires a display-equipped host. Run after the automated gates pass.
    launch the corresponding Windows x64 / macOS x64 / macOS arm64 archive. Keep archive
    inspection and target-host launch results as separate entries. The macOS artifacts are
    unsigned/unnotarized and may require an OS override to launch.
+11. **Tabs.** Open three maps as tabs. Edit one and confirm only its dot appears. Copy in
+   one and paste in another. Reorder by dragging. Ctrl+Tab through them. Close a dirty
+   tab and cancel, then discard. Close the last tab and confirm a fresh Untitled appears.
+   Quit with two dirty maps and cancel on the second.
 
 ## Archive inspection vs target-host launch
 
@@ -170,3 +174,26 @@ This proves the artifact runs; the failure is the absent X11 stack, not a build 
 - Headed checklist item 8 target-host launches: Windows x64, macOS x64, macOS arm64
   (separate per-host entries; macOS artifacts unsigned/unnotarized).
 - A full headed Linux run on a display-equipped host to confirm the editor window opens.
+
+### 2026-09-06 — Linux (headless container, no display server, non-root)
+
+Automated gates (all run from the repo root, baseline `efdb669`):
+
+- Core tests: 216/216 passed.
+- Rendering tests: 171/171 passed.
+- App tests: 374/374 passed.
+- `./build-map-editor.sh --skip-tests linux-x64`: success; new release dir
+  `build/map-editor/20260906T005823Z-efdb669` with the linux-x64 archive and
+  `BUILD-METADATA.txt` (`DIRTY=0`, `GIT_SHA=efdb669`, `RIDS=linux-x64`).
+
+Linux target-host launch (headless): extracted the Linux archive and ran
+`MapEditor.App`. The .NET runtime started and the app reached Avalonia X11 initialization,
+then failed on the missing display library, as expected on this host
+(`DllNotFoundException: libX11.so.6`).
+
+**PENDING (require a display-equipped or target host):**
+
+- Headed checklist item 11 (tabs: open three maps, per-tab edit, copy/paste across tabs,
+  drag reorder, Ctrl+Tab, dirty-tab close cancel/discard, last-tab close, quit with two
+  dirty maps).
+- The headed items still pending from the 2026-09-03 entry above.
