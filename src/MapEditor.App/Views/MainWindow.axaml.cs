@@ -65,6 +65,9 @@ internal partial class MainWindow : Window
         _layerRows = new[] { Layer0Row, Layer1Row, Layer2Row, Layer3Row, Layer4Row };
         _layerVisibleChecks = new[] { Layer0VisibleCheck, Layer1VisibleCheck, Layer2VisibleCheck, Layer3VisibleCheck, Layer4VisibleCheck };
         AddHandler(InputElement.PointerPressedEvent, OnWindowPointerPressed, RoutingStrategies.Tunnel);
+        // Tunnel so tab shortcuts win over the window's Tab focus navigation, which would otherwise
+        // consume Ctrl+Tab before any bubbling handler sees it.
+        AddHandler(InputElement.KeyDownEvent, OnTabShortcutKeyDown, RoutingStrategies.Tunnel);
         // TextChanged does not fire for programmatic Text sets, so validation tracks the property instead.
         BrushSheet.PropertyChanged += OnBrushFieldTextChanged;
         BrushGraphic.PropertyChanged += OnBrushFieldTextChanged;
@@ -362,6 +365,66 @@ internal partial class MainWindow : Window
     private static KeyModifiers PrimaryModifier => OperatingSystem.IsMacOS() ? KeyModifiers.Meta : KeyModifiers.Control;
 
     private static bool IsPrimaryModifier(KeyModifiers modifiers) => (modifiers & PrimaryModifier) != 0;
+
+    private void OnTabShortcutKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (!IsPrimaryModifier(e.KeyModifiers))
+        {
+            return;
+        }
+
+        switch (e.Key)
+        {
+            case Key.T when e.KeyModifiers == PrimaryModifier:
+                _ = RunCommandAsync(() => _workspace.NewAsync());
+                e.Handled = true;
+                break;
+            case Key.W when e.KeyModifiers == PrimaryModifier:
+                _ = RunCommandAsync(() => _workspace.CloseAsync(_document!));
+                e.Handled = true;
+                break;
+            case Key.Tab when e.KeyModifiers == (PrimaryModifier | KeyModifiers.Shift):
+                CycleTab(-1);
+                e.Handled = true;
+                break;
+            case Key.Tab when e.KeyModifiers == PrimaryModifier:
+                CycleTab(1);
+                e.Handled = true;
+                break;
+            case Key.D1 or Key.D2 or Key.D3 or Key.D4 or Key.D5 or Key.D6 or Key.D7 or Key.D8
+                when e.KeyModifiers == PrimaryModifier:
+                ActivateTabByIndex((int)(e.Key - Key.D1 + 1));
+                e.Handled = true;
+                break;
+            case Key.D9 when e.KeyModifiers == PrimaryModifier:
+                ActivateTabByIndex(_workspace.Documents.Count);
+                e.Handled = true;
+                break;
+        }
+    }
+
+    private void CycleTab(int direction)
+    {
+        var documents = _workspace.Documents;
+        if (documents.Count < 2)
+        {
+            return;
+        }
+
+        int index = documents.IndexOf(_document!);
+        _workspace.Activate(documents[(index + direction + documents.Count) % documents.Count]);
+    }
+
+    private void ActivateTabByIndex(int oneBasedIndex)
+    {
+        var documents = _workspace.Documents;
+        if (oneBasedIndex < 1 || oneBasedIndex > documents.Count)
+        {
+            return;
+        }
+
+        _workspace.Activate(documents[oneBasedIndex - 1]);
+    }
 
     private void ApplyHotKeys()
     {

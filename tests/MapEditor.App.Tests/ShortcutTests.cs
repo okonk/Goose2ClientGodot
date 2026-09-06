@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Headless;
@@ -8,6 +9,7 @@ using Avalonia.Input;
 using Avalonia.Threading;
 using MapEditor.App.Controls;
 using MapEditor.App.Dialogs;
+using MapEditor.App.ViewModels;
 using MapEditor.Core;
 using MapEditor.Rendering;
 using Xunit;
@@ -23,6 +25,157 @@ public class ShortcutTests
         Point tileCenter = window.Canvas.TranslatePoint(new Point(16, 16), window).Value;
         window.MouseDown(tileCenter, MouseButton.Left, RawInputModifiers.None);
         window.MouseUp(tileCenter, MouseButton.Left, RawInputModifiers.None);
+    }
+
+    private static async Task<MapDocumentViewModel> NewDocumentAsync(MainWindowHarness harness)
+    {
+        harness.Dialogs.NewMapResult = new NewMapRequest(100, 100);
+        await harness.Workspace.NewAsync();
+        Dispatcher.UIThread.RunJobs();
+        return harness.Workspace.ActiveDocument;
+    }
+
+    [AvaloniaFact]
+    public async Task ControlT_AddsTab()
+    {
+        using MainWindowHarness harness = MainWindowHarness.Create();
+        MapDocumentViewModel first = harness.ViewModel;
+        harness.Dialogs.NewMapResult = new NewMapRequest(100, 100);
+        harness.Window.Canvas.Focus();
+
+        harness.Window.KeyPressQwerty(PhysicalKey.T, RawInputModifiers.Control);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Equal(2, harness.Workspace.Documents.Count);
+        MapDocumentViewModel second = harness.Workspace.ActiveDocument;
+        Assert.NotSame(first, second);
+        Assert.Equal(1, harness.Dialogs.NewMapShown);
+    }
+
+    [AvaloniaFact]
+    public async Task ControlW_ClosesActiveTab()
+    {
+        using MainWindowHarness harness = MainWindowHarness.Create();
+        MapDocumentViewModel first = harness.ViewModel;
+        MapDocumentViewModel second = await NewDocumentAsync(harness);
+        harness.Workspace.Activate(first);
+        harness.Window.Canvas.Focus();
+
+        harness.Window.KeyPressQwerty(PhysicalKey.W, RawInputModifiers.Control);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Single(harness.Workspace.Documents);
+        Assert.Same(second, harness.Workspace.ActiveDocument);
+    }
+
+    [AvaloniaFact]
+    public async Task ControlTab_CyclesForwardWithWrap()
+    {
+        using MainWindowHarness harness = MainWindowHarness.Create();
+        MapDocumentViewModel first = harness.ViewModel;
+        MapDocumentViewModel second = await NewDocumentAsync(harness);
+        MapDocumentViewModel third = await NewDocumentAsync(harness);
+        harness.Workspace.Activate(first);
+        harness.Window.Canvas.Focus();
+
+        harness.Window.KeyPressQwerty(PhysicalKey.Tab, RawInputModifiers.Control);
+        Dispatcher.UIThread.RunJobs();
+        Assert.Same(second, harness.Workspace.ActiveDocument);
+
+        harness.Window.KeyPressQwerty(PhysicalKey.Tab, RawInputModifiers.Control);
+        Dispatcher.UIThread.RunJobs();
+        Assert.Same(third, harness.Workspace.ActiveDocument);
+
+        harness.Window.KeyPressQwerty(PhysicalKey.Tab, RawInputModifiers.Control);
+        Dispatcher.UIThread.RunJobs();
+        Assert.Same(first, harness.Workspace.ActiveDocument);
+    }
+
+    [AvaloniaFact]
+    public async Task ControlShiftTab_CyclesBackwardWithWrap()
+    {
+        using MainWindowHarness harness = MainWindowHarness.Create();
+        MapDocumentViewModel first = harness.ViewModel;
+        MapDocumentViewModel second = await NewDocumentAsync(harness);
+        MapDocumentViewModel third = await NewDocumentAsync(harness);
+        harness.Workspace.Activate(third);
+        harness.Window.Canvas.Focus();
+
+        harness.Window.KeyPressQwerty(PhysicalKey.Tab, RawInputModifiers.Control | RawInputModifiers.Shift);
+        Dispatcher.UIThread.RunJobs();
+        Assert.Same(second, harness.Workspace.ActiveDocument);
+
+        harness.Window.KeyPressQwerty(PhysicalKey.Tab, RawInputModifiers.Control | RawInputModifiers.Shift);
+        Dispatcher.UIThread.RunJobs();
+        Assert.Same(first, harness.Workspace.ActiveDocument);
+
+        harness.Window.KeyPressQwerty(PhysicalKey.Tab, RawInputModifiers.Control | RawInputModifiers.Shift);
+        Dispatcher.UIThread.RunJobs();
+        Assert.Same(third, harness.Workspace.ActiveDocument);
+    }
+
+    [AvaloniaFact]
+    public async Task Control3_ActivatesThirdTab()
+    {
+        using MainWindowHarness harness = MainWindowHarness.Create();
+        MapDocumentViewModel first = harness.ViewModel;
+        MapDocumentViewModel second = await NewDocumentAsync(harness);
+        MapDocumentViewModel third = await NewDocumentAsync(harness);
+        harness.Workspace.Activate(first);
+        harness.Window.Canvas.Focus();
+
+        harness.Window.KeyPressQwerty(PhysicalKey.Digit3, RawInputModifiers.Control);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Same(third, harness.Workspace.ActiveDocument);
+    }
+
+    [AvaloniaFact]
+    public async Task Control9_ActivatesLastTab()
+    {
+        using MainWindowHarness harness = MainWindowHarness.Create();
+        MapDocumentViewModel first = harness.ViewModel;
+        MapDocumentViewModel second = await NewDocumentAsync(harness);
+        MapDocumentViewModel third = await NewDocumentAsync(harness);
+        harness.Workspace.Activate(first);
+        harness.Window.Canvas.Focus();
+
+        harness.Window.KeyPressQwerty(PhysicalKey.Digit9, RawInputModifiers.Control);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Same(third, harness.Workspace.ActiveDocument);
+    }
+
+    [AvaloniaFact]
+    public async Task Control5_WithThreeTabs_DoesNothing()
+    {
+        using MainWindowHarness harness = MainWindowHarness.Create();
+        MapDocumentViewModel first = harness.ViewModel;
+        await NewDocumentAsync(harness);
+        await NewDocumentAsync(harness);
+        harness.Workspace.Activate(first);
+        harness.Window.Canvas.Focus();
+
+        harness.Window.KeyPressQwerty(PhysicalKey.Digit5, RawInputModifiers.Control);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Same(first, harness.Workspace.ActiveDocument);
+    }
+
+    [AvaloniaFact]
+    public async Task ControlTab_WithFocusInBrushField_StillSwitchesTabs()
+    {
+        using MainWindowHarness harness = MainWindowHarness.Create();
+        MapDocumentViewModel first = harness.ViewModel;
+        MapDocumentViewModel second = await NewDocumentAsync(harness);
+        harness.Workspace.Activate(first);
+        TextBox graphic = harness.Window.FindControl<TextBox>("BrushGraphic")!;
+        graphic.Focus();
+
+        harness.Window.KeyPressQwerty(PhysicalKey.Tab, RawInputModifiers.Control);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Same(second, harness.Workspace.ActiveDocument);
     }
 
     [AvaloniaFact]
