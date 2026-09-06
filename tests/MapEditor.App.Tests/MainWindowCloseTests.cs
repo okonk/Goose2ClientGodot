@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
 using Avalonia;
@@ -8,6 +9,7 @@ using Avalonia.Headless.XUnit;
 using Avalonia.Input;
 using Avalonia.Threading;
 using MapEditor.App.Dialogs;
+using MapEditor.App.ViewModels;
 using MapEditor.Core;
 using Xunit;
 
@@ -278,6 +280,75 @@ public class MainWindowCloseTests
         Assert.False(harness.Window.IsVisible);
         Assert.True(harness.Assets.Current.IsDisposed);
         Assert.Empty(harness.Dialogs.Errors);
+    }
+
+    private static void MakeDirty(MapDocumentViewModel document)
+    {
+        document.Brush = new MapTileLayer(1, 2);
+        document.Session.BeginStroke(MapEditTool.Pencil, 0, 0);
+        Assert.True(document.Session.CompleteStroke());
+    }
+
+    [AvaloniaFact]
+    public async Task Close_TwoDirtyTabs_PromptsTwice()
+    {
+        using MainWindowHarness harness = MainWindowHarness.Create();
+        harness.Dialogs.NewMapResult = new NewMapRequest(100, 100);
+        await harness.Workspace.NewAsync();
+        Dispatcher.UIThread.RunJobs();
+        MapDocumentViewModel second = harness.Workspace.ActiveDocument;
+        MakeDirty(harness.ViewModel);
+        MakeDirty(second);
+        harness.Dialogs.DirtyResult = DirtyChoice.Discard;
+
+        var counter = new ClosingCounter(harness.Window);
+        harness.Window.Close();
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.False(harness.Window.IsVisible);
+        Assert.Equal(2, harness.Dialogs.DirtyShown);
+        Assert.Equal(2, counter.Count);
+    }
+
+    [AvaloniaFact]
+    public async Task Close_CancelOnSecondTab_AbortsQuitAndLeavesItActive()
+    {
+        using MainWindowHarness harness = MainWindowHarness.Create();
+        harness.Dialogs.NewMapResult = new NewMapRequest(100, 100);
+        await harness.Workspace.NewAsync();
+        Dispatcher.UIThread.RunJobs();
+        MapDocumentViewModel first = harness.ViewModel;
+        MapDocumentViewModel second = harness.Workspace.ActiveDocument;
+        MakeDirty(first);
+        MakeDirty(second);
+        var firstPrompt = new TaskCompletionSource<DirtyChoice>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var secondPrompt = new TaskCompletionSource<DirtyChoice>(TaskCreationOptions.RunContinuationsAsynchronously);
+        harness.Dialogs.DirtyGates = new Queue<TaskCompletionSource<DirtyChoice>>(new[] { firstPrompt, secondPrompt });
+
+        var counter = new ClosingCounter(harness.Window);
+        harness.Window.Close();
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Equal(1, harness.Dialogs.DirtyShown);
+        Assert.Same(first, harness.Workspace.ActiveDocument);
+        Assert.Same(first, harness.Window.DataContext);
+
+        firstPrompt.SetResult(DirtyChoice.Discard);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Equal(2, harness.Dialogs.DirtyShown);
+        Assert.Same(second, harness.Workspace.ActiveDocument);
+
+        secondPrompt.SetResult(DirtyChoice.Cancel);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.True(harness.Window.IsVisible);
+        Assert.Single(harness.Workspace.Documents);
+        Assert.Same(second, harness.Workspace.Documents[0]);
+        Assert.Same(second, harness.Workspace.ActiveDocument);
+        Assert.Same(second, harness.Window.DataContext);
+        Assert.True(second.Session.IsDirty);
+        Assert.Equal(1, counter.Count);
     }
 
     private static string WriteAssetDirectory(string root)

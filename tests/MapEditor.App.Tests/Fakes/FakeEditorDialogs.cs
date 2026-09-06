@@ -25,6 +25,7 @@ internal sealed class FakeEditorDialogs : IEditorDialogs
     public Exception? ShowDirtyException;
     public Exception? ShowErrorException;
     public TaskCompletionSource<DirtyChoice>? DirtyGate;
+    public Queue<TaskCompletionSource<DirtyChoice>>? DirtyGates;
     public TaskCompletionSource<string?>? AssetDirectoryPickGate;
     public TaskCompletionSource<string?>? SavePickGate;
 
@@ -59,6 +60,11 @@ internal sealed class FakeEditorDialogs : IEditorDialogs
         if (ShowDirtyException is { } exception)
         {
             return Task.FromException<DirtyChoice>(exception);
+        }
+
+        if (DirtyGates is { Count: > 0 } gates)
+        {
+            return gates.Dequeue().Task;
         }
 
         if (DirtyGate is { } gate)
