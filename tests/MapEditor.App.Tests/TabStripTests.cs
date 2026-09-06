@@ -1,3 +1,4 @@
+using System;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
@@ -16,7 +17,7 @@ using Xunit;
 
 namespace MapEditor.App.Tests;
 
-public class TabStripTests
+public class TabStripTests : IDisposable
 {
     private readonly MainWindowHarness _harness = MainWindowHarness.Create();
 
