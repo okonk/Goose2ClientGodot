@@ -1,0 +1,843 @@
+{
+  "sheets": [
+    {
+      "sheet": "NPCs",
+      "table": "npc_templates",
+      "columns": [
+        {
+          "name": "npc_id",
+          "header": "ID",
+          "kind": "Id",
+          "sql": "INTEGER",
+          "required": true,
+          "pk": true
+        },
+        {
+          "name": "npc_type",
+          "header": "type (Monster)",
+          "kind": "Enum",
+          "sql": "SMALLINT",
+          "default": "2",
+          "required": false,
+          "pk": false,
+          "enumNames": [
+            "Monster",
+            "Vendor",
+            "Banker",
+            "Quest"
+          ]
+        },
+        {
+          "name": "npc_name",
+          "header": "name",
+          "kind": "Text",
+          "sql": "TEXT",
+          "required": true,
+          "pk": false
+        },
+        {
+          "name": "npc_title",
+          "header": "title",
+          "kind": "Text",
+          "sql": "TEXT",
+          "default": "\u0027\u0027",
+          "required": false,
+          "pk": false
+        },
+        {
+          "name": "npc_surname",
+          "header": "surname",
+          "kind": "Text",
+          "sql": "TEXT",
+          "default": "\u0027\u0027",
+          "required": false,
+          "pk": false
+        },
+        {
+          "name": "respawn_time",
+          "header": "respawn time",
+          "kind": "Int",
+          "sql": "INT",
+          "default": "0",
+          "required": false,
+          "pk": false
+        },
+        {
+          "name": "npc_facing",
+          "header": "facing (3)",
+          "kind": "Int",
+          "sql": "SMALLINT",
+          "default": "3",
+          "required": false,
+          "pk": false
+        },
+        {
+          "name": "npc_level",
+          "header": "lvl (1)",
+          "kind": "Int",
+          "sql": "SMALLINT",
+          "default": "1",
+          "required": false,
+          "pk": false
+        },
+        {
+          "name": "experience",
+          "header": "exp (0)",
+          "kind": "Int",
+          "sql": "BIGINT",
+          "default": "0",
+          "required": false,
+          "pk": false
+        },
+        {
+          "name": "aggro_range",
+          "header": "aggro range (0)",
+          "kind": "Int",
+          "sql": "SMALLINT",
+          "default": "0",
+          "required": false,
+          "pk": false
+        },
+        {
+          "name": "attack_range",
+          "header": "attack range (0)",
+          "kind": "Int",
+          "sql": "SMALLINT",
+          "default": "0",
+          "required": false,
+          "pk": false
+        },
+        {
+          "name": "attack_speed",
+          "header": "attack speed (2)",
+          "kind": "Decimal",
+          "sql": "DECIMAL(9,4)",
+          "default": "2",
+          "required": false,
+          "pk": false
+        },
+        {
+          "name": "move_speed",
+          "header": "move speed (2)",
+          "kind": "Decimal",
+          "sql": "DECIMAL(9,4)",
+          "default": "2",
+          "required": false,
+          "pk": false
+        },
+        {
+          "name": "stationary",
+          "header": "stationary (0)",
+          "kind": "Bool",
+          "sql": "CHAR(1)",
+          "default": "\u00270\u0027",
+          "required": false,
+          "pk": false
+        },
+        {
+          "name": "stunnable",
+          "header": "stunnable (0)",
+          "kind": "Bool",
+          "sql": "CHAR(1)",
+          "default": "\u00270\u0027",
+          "required": false,
+          "pk": false
+        },
+        {
+          "name": "rootable",
+          "header": "rootable (0)",
+          "kind": "Bool",
+          "sql": "CHAR(1)",
+          "default": "\u00270\u0027",
+          "required": false,
+          "pk": false
+        },
+        {
+          "name": "slowable",
+          "header": "slowable (0)",
+          "kind": "Bool",
+          "sql": "CHAR(1)",
+          "default": "\u00270\u0027",
+          "required": false,
+          "pk": false
+        },
+        {
+          "name": "invincible",
+          "header": "invincible (0)",
+          "kind": "Bool",
+          "sql": "CHAR(1)",
+          "default": "\u00270\u0027",
+          "required": false,
+          "pk": false
+        },
+        {
+          "name": "see_invisible",
+          "header": "see_invisible (0)",
+          "kind": "Bool",
+          "sql": "CHAR(1)",
+          "default": "\u00270\u0027",
+          "required": false,
+          "pk": false
+        },
+        {
+          "name": "npc_hp",
+          "header": "hp (0)",
+          "kind": "Int",
+          "sql": "INT",
+          "default": "0",
+          "required": false,
+          "pk": false
+        },
+        {
+          "name": "npc_mp",
+          "header": "mp (0)",
+          "kind": "Int",
+          "sql": "INT",
+          "default": "0",
+          "required": false,
+          "pk": false
+        },
+        {
+          "name": "npc_sp",
+          "header": "sp (0)",
+          "kind": "Int",
+          "sql": "INT",
+          "default": "0",
+          "required": false,
+          "pk": false
+        },
+        {
+          "name": "class_id",
+          "header": "class id",
+          "kind": "Id",
+          "sql": "SMALLINT",
+          "default": "1",
+          "required": false,
+          "pk": false,
+          "ref": "Classes"
+        },
+        {
+          "name": "stat_ac",
+          "header": "ac (0)",
+          "kind": "Int",
+          "sql": "SMALLINT",
+          "default": "0",
+          "required": false,
+          "pk": false
+        },
+        {
+          "name": "stat_str",
+          "header": "str (0)",
+          "kind": "Int",
+          "sql": "SMALLINT",
+          "default": "0",
+          "required": false,
+          "pk": false
+        },
+        {
+          "name": "stat_sta",
+          "header": "sta (0)",
+          "kind": "Int",
+          "sql": "SMALLINT",
+          "default": "0",
+          "required": false,
+          "pk": false
+        },
+        {
+          "name": "stat_dex",
+          "header": "dex (0)",
+          "kind": "Int",
+          "sql": "SMALLINT",
+          "default": "0",
+          "required": false,
+          "pk": false
+        },
+        {
+          "name": "stat_int",
+          "header": "int (0)",
+          "kind": "Int",
+          "sql": "SMALLINT",
+          "default": "0",
+          "required": false,
+          "pk": false
+        },
+        {
+          "name": "res_fire",
+          "header": "fr (0)",
+          "kind": "Int",
+          "sql": "SMALLINT",
+          "default": "0",
+          "required": false,
+          "pk": false
+        },
+        {
+          "name": "res_water",
+          "header": "wr (0)",
+          "kind": "Int",
+          "sql": "SMALLINT",
+          "default": "0",
+          "required": false,
+          "pk": false
+        },
+        {
+          "name": "res_spirit",
+          "header": "sr (0)",
+          "kind": "Int",
+          "sql": "SMALLINT",
+          "default": "0",
+          "required": false,
+          "pk": false
+        },
+        {
+          "name": "res_air",
+          "header": "ar (0)",
+          "kind": "Int",
+          "sql": "SMALLINT",
+          "default": "0",
+          "required": false,
+          "pk": false
+        },
+        {
+          "name": "res_earth",
+          "header": "er (0)",
+          "kind": "Int",
+          "sql": "SMALLINT",
+          "default": "0",
+          "required": false,
+          "pk": false
+        },
+        {
+          "name": "body_state",
+          "header": "body state (3)",
+          "kind": "Int",
+          "sql": "SMALLINT",
+          "default": "3",
+          "required": false,
+          "pk": false
+        },
+        {
+          "name": "body_id",
+          "header": "body id (1)",
+          "kind": "Int",
+          "sql": "SMALLINT",
+          "default": "1",
+          "required": false,
+          "pk": false
+        },
+        {
+          "name": "body_r",
+          "header": "body r",
+          "kind": "Int",
+          "sql": "SMALLINT",
+          "default": "0",
+          "required": false,
+          "pk": false
+        },
+        {
+          "name": "body_g",
+          "header": "body g",
+          "kind": "Int",
+          "sql": "SMALLINT",
+          "default": "0",
+          "required": false,
+          "pk": false
+        },
+        {
+          "name": "body_b",
+          "header": "body b",
+          "kind": "Int",
+          "sql": "SMALLINT",
+          "default": "0",
+          "required": false,
+          "pk": false
+        },
+        {
+          "name": "body_a",
+          "header": "body a",
+          "kind": "Int",
+          "sql": "SMALLINT",
+          "default": "0",
+          "required": false,
+          "pk": false
+        },
+        {
+          "name": "face_id",
+          "header": "face id (0)",
+          "kind": "Int",
+          "sql": "SMALLINT",
+          "default": "0",
+          "required": false,
+          "pk": false
+        },
+        {
+          "name": "hair_id",
+          "header": "hair id (0)",
+          "kind": "Int",
+          "sql": "SMALLINT",
+          "default": "0",
+          "required": false,
+          "pk": false
+        },
+        {
+          "name": "hair_r",
+          "header": "hair r",
+          "kind": "Int",
+          "sql": "SMALLINT",
+          "default": "0",
+          "required": false,
+          "pk": false
+        },
+        {
+          "name": "hair_g",
+          "header": "hair g",
+          "kind": "Int",
+          "sql": "SMALLINT",
+          "default": "0",
+          "required": false,
+          "pk": false
+        },
+        {
+          "name": "hair_b",
+          "header": "hair b",
+          "kind": "Int",
+          "sql": "SMALLINT",
+          "default": "0",
+          "required": false,
+          "pk": false
+        },
+        {
+          "name": "hair_a",
+          "header": "hair a",
+          "kind": "Int",
+          "sql": "SMALLINT",
+          "default": "0",
+          "required": false,
+          "pk": false
+        },
+        {
+          "name": "equipped_items",
+          "header": "equipped items (0,*,0,*,0,*,0,*,0,*,0,*)",
+          "kind": "Text",
+          "sql": "TEXT",
+          "default": "\u00270,*,0,*,0,*,0,*,0,*,0,*\u0027",
+          "required": false,
+          "pk": false
+        },
+        {
+          "name": "weapon_damage",
+          "header": "weapon dmg (1)",
+          "kind": "Int",
+          "sql": "INT",
+          "default": "1",
+          "required": false,
+          "pk": false
+        },
+        {
+          "name": "armor_pierce",
+          "header": "armor pierce",
+          "kind": "Int",
+          "sql": "INT",
+          "default": "0",
+          "required": false,
+          "pk": false
+        },
+        {
+          "name": "hp_percent_regen",
+          "header": "hp % reg",
+          "kind": "Decimal",
+          "sql": "DECIMAL(9,4)",
+          "default": "0",
+          "required": false,
+          "pk": false
+        },
+        {
+          "name": "hp_static_regen",
+          "header": "hp static reg",
+          "kind": "Int",
+          "sql": "INT",
+          "default": "0",
+          "required": false,
+          "pk": false
+        },
+        {
+          "name": "mp_percent_regen",
+          "header": "mp % reg",
+          "kind": "Decimal",
+          "sql": "DECIMAL(9,4)",
+          "default": "0",
+          "required": false,
+          "pk": false
+        },
+        {
+          "name": "mp_static_regen",
+          "header": "mp static reg",
+          "kind": "Int",
+          "sql": "INT",
+          "default": "0",
+          "required": false,
+          "pk": false
+        },
+        {
+          "name": "npc_alliance",
+          "header": "alliance",
+          "kind": "Text",
+          "sql": "TEXT",
+          "default": "\u0027\u0027",
+          "required": false,
+          "pk": false
+        },
+        {
+          "name": "stuck_behaviour",
+          "header": "stuck behaviour (DoNothing)",
+          "kind": "Enum",
+          "sql": "SMALLINT",
+          "default": "0",
+          "required": false,
+          "pk": false,
+          "enumNames": [
+            "DoNothing",
+            "TeleportToAggro",
+            "TeleportAggro"
+          ]
+        },
+        {
+          "name": "stuck_timeout",
+          "header": "stuck timeout (20)",
+          "kind": "Int",
+          "sql": "INT",
+          "default": "20",
+          "required": false,
+          "pk": false
+        },
+        {
+          "name": "credit_dealer",
+          "header": "credit dealer (0)",
+          "kind": "Bool",
+          "sql": "CHAR(1)",
+          "default": "\u00270\u0027",
+          "required": false,
+          "pk": false
+        },
+        {
+          "name": "quest_ids",
+          "header": "quest ids",
+          "kind": "Text",
+          "sql": "TEXT",
+          "default": "\u0027\u0027",
+          "required": false,
+          "pk": false
+        },
+        {
+          "name": "script_path",
+          "header": "script_path",
+          "kind": "Text",
+          "sql": "TEXT",
+          "default": "\u0027Scripts/NPC/BaseNPC.csx\u0027",
+          "required": false,
+          "pk": false
+        },
+        {
+          "name": "script_params",
+          "header": "script params",
+          "kind": "Text",
+          "sql": "TEXT",
+          "default": "\u0027\u0027",
+          "required": false,
+          "pk": false
+        }
+      ],
+      "composites": [
+        {
+          "kind": "Rgba",
+          "columns": [
+            "body_r",
+            "body_g",
+            "body_b",
+            "body_a"
+          ]
+        },
+        {
+          "kind": "Rgba",
+          "columns": [
+            "hair_r",
+            "hair_g",
+            "hair_b",
+            "hair_a"
+          ]
+        },
+        {
+          "kind": "EquipSlots",
+          "columns": [
+            "equipped_items"
+          ]
+        },
+        {
+          "kind": "IdList",
+          "columns": [
+            "quest_ids"
+          ],
+          "source": "Quests"
+        }
+      ],
+      "indexes": []
+    },
+    {
+      "sheet": "NPC Spawns",
+      "table": "npc_spawns",
+      "columns": [
+        {
+          "name": "npc_id",
+          "header": "npc id",
+          "kind": "Id",
+          "sql": "INT",
+          "required": true,
+          "pk": false,
+          "ref": "NPCs"
+        },
+        {
+          "name": "map_id",
+          "header": "map id",
+          "kind": "Id",
+          "sql": "SMALLINT",
+          "required": true,
+          "pk": false,
+          "ref": "Maps"
+        },
+        {
+          "name": "map_x",
+          "header": "map x",
+          "kind": "Int",
+          "sql": "SMALLINT",
+          "required": true,
+          "pk": false
+        },
+        {
+          "name": "map_y",
+          "header": "map y",
+          "kind": "Int",
+          "sql": "SMALLINT",
+          "required": true,
+          "pk": false
+        }
+      ],
+      "composites": [],
+      "indexes": []
+    },
+    {
+      "sheet": "Warptiles",
+      "table": "warptiles",
+      "columns": [
+        {
+          "name": "map_id",
+          "header": "map id",
+          "kind": "Id",
+          "sql": "SMALLINT",
+          "required": true,
+          "pk": false,
+          "ref": "Maps"
+        },
+        {
+          "name": "map_x",
+          "header": "map x",
+          "kind": "Int",
+          "sql": "SMALLINT",
+          "required": true,
+          "pk": false
+        },
+        {
+          "name": "map_y",
+          "header": "map y",
+          "kind": "Int",
+          "sql": "SMALLINT",
+          "required": true,
+          "pk": false
+        },
+        {
+          "name": "warp_id",
+          "header": "warp to map id",
+          "kind": "Id",
+          "sql": "SMALLINT",
+          "required": true,
+          "pk": false,
+          "ref": "Maps"
+        },
+        {
+          "name": "warp_x",
+          "header": "warp to x",
+          "kind": "Int",
+          "sql": "SMALLINT",
+          "required": true,
+          "pk": false
+        },
+        {
+          "name": "warp_y",
+          "header": "warp to y",
+          "kind": "Int",
+          "sql": "SMALLINT",
+          "required": true,
+          "pk": false
+        }
+      ],
+      "composites": [],
+      "indexes": []
+    },
+    {
+      "sheet": "Maps",
+      "table": "maps",
+      "columns": [
+        {
+          "name": "map_id",
+          "header": "id",
+          "kind": "Id",
+          "sql": "INTEGER",
+          "required": true,
+          "pk": true
+        },
+        {
+          "name": "map_name",
+          "header": "name",
+          "kind": "Text",
+          "sql": "TEXT",
+          "required": true,
+          "pk": false
+        },
+        {
+          "name": "map_filename",
+          "header": "filename",
+          "kind": "Text",
+          "sql": "TEXT",
+          "required": true,
+          "pk": false
+        },
+        {
+          "name": "min_level",
+          "header": "min_level (0)",
+          "kind": "Int",
+          "sql": "SMALLINT",
+          "default": "0",
+          "required": false,
+          "pk": false
+        },
+        {
+          "name": "max_level",
+          "header": "max_level (0)",
+          "kind": "Int",
+          "sql": "SMALLINT",
+          "default": "0",
+          "required": false,
+          "pk": false
+        },
+        {
+          "name": "min_experience",
+          "header": "min_experience (0)",
+          "kind": "Int",
+          "sql": "BIGINT",
+          "default": "0",
+          "required": false,
+          "pk": false
+        },
+        {
+          "name": "max_experience",
+          "header": "max_experience (0)",
+          "kind": "Int",
+          "sql": "BIGINT",
+          "default": "0",
+          "required": false,
+          "pk": false
+        },
+        {
+          "name": "pvp_enabled",
+          "header": "pvp_enabled (0)",
+          "kind": "Bool",
+          "sql": "CHAR(1)",
+          "default": "\u00270\u0027",
+          "required": false,
+          "pk": false
+        },
+        {
+          "name": "chat_enabled",
+          "header": "chat_enabled (1)",
+          "kind": "Bool",
+          "sql": "CHAR(1)",
+          "default": "\u00271\u0027",
+          "required": false,
+          "pk": false
+        },
+        {
+          "name": "auction_enabled",
+          "header": "auction_enabled (1)",
+          "kind": "Bool",
+          "sql": "CHAR(1)",
+          "default": "\u00271\u0027",
+          "required": false,
+          "pk": false
+        },
+        {
+          "name": "shout_enabled",
+          "header": "shout_enabled (1)",
+          "kind": "Bool",
+          "sql": "CHAR(1)",
+          "default": "\u00271\u0027",
+          "required": false,
+          "pk": false
+        },
+        {
+          "name": "spells_enabled",
+          "header": "spells_enabled (1)",
+          "kind": "Bool",
+          "sql": "CHAR(1)",
+          "default": "\u00271\u0027",
+          "required": false,
+          "pk": false
+        },
+        {
+          "name": "bind_enabled",
+          "header": "bind_enabled (0)",
+          "kind": "Bool",
+          "sql": "CHAR(1)",
+          "default": "\u00270\u0027",
+          "required": false,
+          "pk": false
+        },
+        {
+          "name": "items_enabled",
+          "header": "items_enabled (1)",
+          "kind": "Bool",
+          "sql": "CHAR(1)",
+          "default": "\u00271\u0027",
+          "required": false,
+          "pk": false
+        },
+        {
+          "name": "pets_enabled",
+          "header": "pets_enabled (1)",
+          "kind": "Bool",
+          "sql": "CHAR(1)",
+          "default": "\u00271\u0027",
+          "required": false,
+          "pk": false
+        },
+        {
+          "name": "script_path",
+          "header": "script path",
+          "kind": "Text",
+          "sql": "TEXT",
+          "default": "\u0027\u0027",
+          "required": false,
+          "pk": false
+        },
+        {
+          "name": "script_params",
+          "header": "script params",
+          "kind": "Text",
+          "sql": "TEXT",
+          "default": "\u0027\u0027",
+          "required": false,
+          "pk": false
+        }
+      ],
+      "composites": [],
+      "indexes": []
+    }
+  ]
+}
