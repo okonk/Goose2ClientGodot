@@ -147,6 +147,38 @@ public class ShortcutTests
     }
 
     [AvaloniaFact]
+    public async Task Control9_WithTenTabs_ActivatesTheTenthTab()
+    {
+        using MainWindowHarness harness = MainWindowHarness.Create();
+        MapDocumentViewModel first = harness.ViewModel;
+        for (int i = 0; i < 9; i++)
+        {
+            await NewDocumentAsync(harness);
+        }
+        MapDocumentViewModel last = harness.Workspace.Documents[9];
+        harness.Workspace.Activate(first);
+        harness.Window.Canvas.Focus();
+
+        harness.Window.KeyPressQwerty(PhysicalKey.Digit9, RawInputModifiers.Control);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Same(last, harness.Workspace.ActiveDocument);
+    }
+
+    [AvaloniaFact]
+    public void ControlTab_WithSingleTab_DoesNothing()
+    {
+        using MainWindowHarness harness = MainWindowHarness.Create();
+        MapDocumentViewModel only = harness.ViewModel;
+        harness.Window.Canvas.Focus();
+
+        harness.Window.KeyPressQwerty(PhysicalKey.Tab, RawInputModifiers.Control);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Same(only, harness.Workspace.ActiveDocument);
+    }
+
+    [AvaloniaFact]
     public async Task Control5_WithThreeTabs_DoesNothing()
     {
         using MainWindowHarness harness = MainWindowHarness.Create();

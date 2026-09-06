@@ -1122,6 +1122,26 @@ public class MainWindowTests : IDisposable
         Assert.Equal(2, harness.Workspace.Documents.Count);
     }
 
+    [AvaloniaFact]
+    public void LoadAssetsCommand_ThatThrows_ClearsTheRunningFlag()
+    {
+        using MainWindowHarness harness = MainWindowHarness.Create();
+        harness.Dialogs.PickAssetDirectoryException = new InvalidOperationException("pick failed");
+
+        harness.Window.FindControl<Button>("LoadAssetsButton")!.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        Dispatcher.UIThread.RunJobs();
+
+        ErrorPresentation error = Assert.Single(harness.Dialogs.Errors);
+        Assert.Equal("Error", error.Title);
+        Assert.Contains("pick failed", error.Message);
+
+        harness.Dialogs.NewMapResult = new NewMapRequest(100, 100);
+        harness.Window.FindControl<MenuItem>("NewCommand")!.RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Equal(2, harness.Workspace.Documents.Count);
+    }
+
     private static ListBox TabStripOf(MainWindowHarness harness)
         => harness.Window.FindControl<ListBox>("TabStrip")
            ?? throw new InvalidOperationException("missing TabStrip");

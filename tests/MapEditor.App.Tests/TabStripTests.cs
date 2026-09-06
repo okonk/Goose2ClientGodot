@@ -131,11 +131,14 @@ public class TabStripTests : IDisposable
         Assert.True(document.IsDirty);
         Assert.True(TabDirtyDot(tab).IsVisible);
 
-        _harness.Dialogs.SavePickResult = Path.Combine(_harness.TempDirectory, "saved.bytes");
+        string savedPath = Path.Combine(_harness.TempDirectory, "saved.bytes");
+        _harness.Dialogs.SavePickResult = savedPath;
         await document.SaveAsync();
 
         Assert.False(document.IsDirty);
         Assert.False(TabDirtyDot(tab).IsVisible);
+        Assert.Equal("saved.bytes", TabLabel(tab));
+        Assert.Equal(Path.GetFullPath(savedPath), TabTip(tab));
     }
 
     [AvaloniaFact]
@@ -378,6 +381,52 @@ public class TabStripTests : IDisposable
 
         _harness.Window.MouseUp(past, MouseButton.Left, RawInputModifiers.None);
         Assert.Equal(new[] { second, first }, _harness.Workspace.Documents);
+    }
+
+    [AvaloniaFact]
+    public async Task Drag_MultiStep_ReordersAcrossSeveralTabs()
+    {
+        MapDocumentViewModel first = _harness.ViewModel;
+        MapDocumentViewModel second = await NewDocumentAsync();
+        MapDocumentViewModel third = await NewDocumentAsync();
+
+        StackPanel firstHeader = TabHeader(TabFor(first));
+        Point press = TabPoint(firstHeader, new Point(5, 5));
+        _harness.Window.MouseDown(press, MouseButton.Left, RawInputModifiers.None);
+
+        StackPanel secondHeader = TabHeader(TabFor(second));
+        _harness.Window.MouseMove(TabPoint(secondHeader, PastMidpoint(secondHeader)), RawInputModifiers.None);
+        Assert.Equal(new[] { second, first, third }, _harness.Workspace.Documents);
+        Dispatcher.UIThread.RunJobs();
+
+        StackPanel thirdHeader = TabHeader(TabFor(third));
+        _harness.Window.MouseMove(TabPoint(thirdHeader, PastMidpoint(thirdHeader)), RawInputModifiers.None);
+        Assert.Equal(new[] { second, third, first }, _harness.Workspace.Documents);
+
+        _harness.Window.MouseUp(TabPoint(thirdHeader, PastMidpoint(thirdHeader)), MouseButton.Left, RawInputModifiers.None);
+        Assert.Equal(new[] { second, third, first }, _harness.Workspace.Documents);
+    }
+
+    [AvaloniaFact]
+    public async Task Drag_DocumentRemovedMidDrag_EndsDragCleanly()
+    {
+        MapDocumentViewModel first = _harness.ViewModel;
+        MapDocumentViewModel second = await NewDocumentAsync();
+        MapDocumentViewModel third = await NewDocumentAsync();
+
+        StackPanel firstHeader = TabHeader(TabFor(first));
+        Point press = TabPoint(firstHeader, new Point(5, 5));
+        _harness.Window.MouseDown(press, MouseButton.Left, RawInputModifiers.None);
+
+        await _harness.Workspace.CloseAsync(first);
+        Dispatcher.UIThread.RunJobs();
+
+        StackPanel thirdHeader = TabHeader(TabFor(third));
+        _harness.Window.MouseMove(TabPoint(thirdHeader, PastMidpoint(thirdHeader)), RawInputModifiers.None);
+        Assert.Equal(new[] { second, third }, _harness.Workspace.Documents);
+
+        _harness.Window.MouseUp(TabPoint(thirdHeader, PastMidpoint(thirdHeader)), MouseButton.Left, RawInputModifiers.None);
+        Assert.Equal(new[] { second, third }, _harness.Workspace.Documents);
     }
 
     [AvaloniaFact]

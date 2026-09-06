@@ -311,6 +311,45 @@ public class MainWindowCloseTests
     }
 
     [AvaloniaFact]
+    public async Task Close_MixedDirtyAndCleanTabs_PromptsOnlyDirtyInOrder()
+    {
+        using MainWindowHarness harness = MainWindowHarness.Create();
+        harness.Dialogs.NewMapResult = new NewMapRequest(100, 100);
+        await harness.Workspace.NewAsync();
+        Dispatcher.UIThread.RunJobs();
+        MapDocumentViewModel second = harness.Workspace.ActiveDocument;
+        await harness.Workspace.NewAsync();
+        Dispatcher.UIThread.RunJobs();
+        MapDocumentViewModel third = harness.Workspace.ActiveDocument;
+        MapDocumentViewModel first = harness.ViewModel;
+        MakeDirty(first);
+        MakeDirty(third);
+        var firstPrompt = new TaskCompletionSource<DirtyChoice>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var secondPrompt = new TaskCompletionSource<DirtyChoice>(TaskCreationOptions.RunContinuationsAsynchronously);
+        harness.Dialogs.DirtyGates = new Queue<TaskCompletionSource<DirtyChoice>>(new[] { firstPrompt, secondPrompt });
+
+        var counter = new ClosingCounter(harness.Window);
+        harness.Window.Close();
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Equal(1, harness.Dialogs.DirtyShown);
+        Assert.Same(first, harness.Window.DataContext);
+
+        firstPrompt.SetResult(DirtyChoice.Discard);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Equal(2, harness.Dialogs.DirtyShown);
+        Assert.Same(third, harness.Window.DataContext);
+
+        secondPrompt.SetResult(DirtyChoice.Discard);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.False(harness.Window.IsVisible);
+        Assert.Equal(2, harness.Dialogs.DirtyShown);
+        Assert.Equal(2, counter.Count);
+    }
+
+    [AvaloniaFact]
     public async Task Close_CancelOnSecondTab_AbortsQuitAndLeavesItActive()
     {
         using MainWindowHarness harness = MainWindowHarness.Create();
