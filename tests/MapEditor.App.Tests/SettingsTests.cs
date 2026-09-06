@@ -138,6 +138,100 @@ public class SettingsTests
     }
 
     [Fact]
+    public void Load_MissingSpreadsheetUrlField_IsUnset()
+    {
+        var directory = CreateTempDirectory();
+        try
+        {
+            var path = Path.Combine(directory, "settings.json");
+            File.WriteAllText(path, "{ \"assetDirectory\": \"/data/assets\", \"theme\": \"Light\" }");
+
+            Assert.Equal(new AppSettings("/data/assets", AppTheme.Light), new AppSettingsStore(path).Load());
+        }
+        finally
+        {
+            Directory.Delete(directory, true);
+        }
+    }
+
+    [Theory]
+    [InlineData("https://docs.google.com/spreadsheets/d/abc123")]
+    [InlineData(null)]
+    public void SaveThenLoad_RoundTripsSpreadsheetUrl(string? spreadsheetUrl)
+    {
+        var directory = CreateTempDirectory();
+        try
+        {
+            var path = Path.Combine(directory, "settings.json");
+            var store = new AppSettingsStore(path);
+            store.Save(new AppSettings("/data/assets", AppTheme.Light, spreadsheetUrl));
+
+            Assert.Equal(new AppSettings("/data/assets", AppTheme.Light, spreadsheetUrl), store.Load());
+        }
+        finally
+        {
+            Directory.Delete(directory, true);
+        }
+    }
+
+    [Fact]
+    public void Update_RewritesSpreadsheetUrlAndKeepsAssetAndTheme()
+    {
+        var directory = CreateTempDirectory();
+        try
+        {
+            var store = new AppSettingsStore(Path.Combine(directory, "settings.json"));
+            store.Save(new AppSettings("/data/assets", AppTheme.Light, "https://docs.google.com/spreadsheets/d/abc123"));
+
+            store.Update(current => current with { SpreadsheetUrl = "https://docs.google.com/spreadsheets/d/def456" });
+
+            Assert.Equal(new AppSettings("/data/assets", AppTheme.Light, "https://docs.google.com/spreadsheets/d/def456"), store.Load());
+        }
+        finally
+        {
+            Directory.Delete(directory, true);
+        }
+    }
+
+    [Fact]
+    public void Update_RewritesAssetDirectoryAndKeepsSpreadsheetUrlAndTheme()
+    {
+        var directory = CreateTempDirectory();
+        try
+        {
+            var store = new AppSettingsStore(Path.Combine(directory, "settings.json"));
+            store.Save(new AppSettings("/data/assets", AppTheme.Light, "https://docs.google.com/spreadsheets/d/abc123"));
+
+            store.Update(current => current with { AssetDirectory = "/other/assets" });
+
+            Assert.Equal(new AppSettings("/other/assets", AppTheme.Light, "https://docs.google.com/spreadsheets/d/abc123"), store.Load());
+        }
+        finally
+        {
+            Directory.Delete(directory, true);
+        }
+    }
+
+    [Fact]
+    public void Update_RewritesThemeAndKeepsAssetAndSpreadsheetUrl()
+    {
+        var directory = CreateTempDirectory();
+        try
+        {
+            var store = new AppSettingsStore(Path.Combine(directory, "settings.json"));
+            store.Save(new AppSettings("/data/assets", AppTheme.Light, "https://docs.google.com/spreadsheets/d/abc123"));
+
+            store.Update(current => current with { Theme = AppTheme.Dark });
+
+            Assert.Equal(new AppSettings("/data/assets", AppTheme.Dark, "https://docs.google.com/spreadsheets/d/abc123"), store.Load());
+        }
+        finally
+        {
+            Directory.Delete(directory, true);
+        }
+    }
+
+    [Fact]
     public void Update_UnreadableFile_StartsFromDefaults()
     {
         var directory = CreateTempDirectory();

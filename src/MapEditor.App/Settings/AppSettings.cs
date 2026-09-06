@@ -1,3 +1,6 @@
 namespace MapEditor.App.Settings;
 
-public sealed record AppSettings(string? AssetDirectory, AppTheme Theme = AppTheme.Dark);
+public sealed record AppSettings(
+    string? AssetDirectory,
+    AppTheme Theme = AppTheme.Dark,
+    string? SpreadsheetUrl = null);
