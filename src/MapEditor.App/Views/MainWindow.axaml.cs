@@ -558,6 +558,7 @@ internal partial class MainWindow : Window
         }
     }
 
+    // D1–D8 and NumPad1–8 are contiguous in Avalonia's Key enum, with the NumPad values above D8.
     private static int DigitIndex(Key key)
         => key <= Key.D8 ? key - Key.D1 + 1 : key - Key.NumPad1 + 1;
 

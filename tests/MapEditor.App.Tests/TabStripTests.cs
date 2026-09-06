@@ -269,6 +269,23 @@ public class TabStripTests : IDisposable
     }
 
     [AvaloniaFact]
+    public async Task Tab_MiddlePressOnCloseButton_ClosesDocument()
+    {
+        MapDocumentViewModel first = _harness.ViewModel;
+        MapDocumentViewModel second = await NewDocumentAsync();
+
+        Button close = TabFor(second).GetVisualDescendants().OfType<Button>().First();
+        Point point = close.TranslatePoint(new Point(8, 8), _harness.Window).Value;
+        _harness.Window.MouseDown(point, MouseButton.Middle, RawInputModifiers.None);
+        _harness.Window.MouseUp(point, MouseButton.Middle, RawInputModifiers.None);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.DoesNotContain(second, _harness.Workspace.Documents);
+        Assert.Same(first, _harness.Workspace.ActiveDocument);
+        Assert.Single(_harness.Workspace.Documents);
+    }
+
+    [AvaloniaFact]
     public async Task Tab_CloseDirty_PromptsAndCancelKeepsTab()
     {
         MapDocumentViewModel first = _harness.ViewModel;

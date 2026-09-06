@@ -317,7 +317,6 @@ public class MainWindowCloseTests
         harness.Dialogs.NewMapResult = new NewMapRequest(100, 100);
         await harness.Workspace.NewAsync();
         Dispatcher.UIThread.RunJobs();
-        MapDocumentViewModel second = harness.Workspace.ActiveDocument;
         await harness.Workspace.NewAsync();
         Dispatcher.UIThread.RunJobs();
         MapDocumentViewModel third = harness.Workspace.ActiveDocument;

@@ -147,6 +147,22 @@ public class ShortcutTests
     }
 
     [AvaloniaFact]
+    public async Task ControlNumPad3_ActivatesThirdTab()
+    {
+        using MainWindowHarness harness = MainWindowHarness.Create();
+        MapDocumentViewModel first = harness.ViewModel;
+        MapDocumentViewModel second = await NewDocumentAsync(harness);
+        MapDocumentViewModel third = await NewDocumentAsync(harness);
+        harness.Workspace.Activate(first);
+        harness.Window.Canvas.Focus();
+
+        harness.Window.KeyPressQwerty(PhysicalKey.NumPad3, RawInputModifiers.Control);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Same(third, harness.Workspace.ActiveDocument);
+    }
+
+    [AvaloniaFact]
     public async Task Control9_WithTenTabs_ActivatesTheTenthTab()
     {
         using MainWindowHarness harness = MainWindowHarness.Create();
