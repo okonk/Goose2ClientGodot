@@ -55,6 +55,7 @@ public class SpritePaletteControlTests : IDisposable
         Harness harness = await CreateAsync(Manifest((1, 60, 100), (2, 1, 99)));
         RecordingMapDrawTarget target = new();
 
+        harness.Resolved.Clear();
         harness.Palette.RenderPalette(target);
 
         Assert.Equal(Enumerable.Range(100, 48).Select(g => new SpriteReference(1, g)), harness.Resolved);
@@ -81,6 +82,7 @@ public class SpritePaletteControlTests : IDisposable
         Harness harness = await CreateAsync(json);
         RecordingMapDrawTarget target = new();
 
+        harness.Resolved.Clear();
         harness.Palette.RenderPalette(target);
 
         Assert.Equal(new[] { 10, 20, 30, 40 }, harness.Resolved.Select(r => r.Graphic).ToArray());
