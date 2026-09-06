@@ -725,3 +725,16 @@ Confirm:
 - the client has no runtime filesystem dependency on the server repository;
 - mutable collections are privately owned and exposed only through read-only views;
 - no generated artifact or source change remains uncommitted in either repository.
+
+## Part 1 completion notes (handoff to Parts 2–4)
+
+Part 1 is implemented and reviewed (server `249bcae`, client `2be0e3f..170de13`). Known constraints and gotchas for later parts:
+
+- **Artifact JSON keys differ from the property names.** The generated artifact uses column keys `pk`, `ref`, and `enumNames` (not `isPrimaryKey`/`refSheet`). The client DTO in `src/MapEditor.GameData/Schema/GameDataSchema.cs` maps `pk`→`IsPrimaryKey` and `ref`→`RefSheet`. Do not "fix" either side without regenerating and re-verifying the artifact.
+- **`enumNames` is embedded but not exposed.** `ColumnSchema` (locked contract) has no enum property, so the enum value lists for `npc_type` and `stuck_behaviour` are unreachable through the public API. If a later part needs enum validation or pickers, extend `ColumnSchema` + the DTO as a deliberate contract change (the data is already in the artifact).
+- **`NPCs.class_id` carries `ref: "Classes"`, which is not in the artifact** (only the four consumed sheets are emitted). Never resolve `RefSheet` via `GetRequiredSheet` without a membership check; if a later part needs class data, decide server-side whether `Classes` joins the artifact or refs are documented as possibly-external.
+- **`Load(Stream)` is strict on shape but not on unknown properties.** Unknown JSON properties are ignored (required — the artifact intentionally carries `enumNames`), and an omitted `required`/`pk` defaults to `false` rather than throwing. The artifact is trusted and byte-verified by the reproducibility check; do not add `UnmappedMemberHandling.Disallow` without also mapping `enumNames`.
+- **Warp destination numeric range is `[0, sqlMax]`.** The lower bound 0 is a product rule (negative destination coordinates block Push), not the SQL type minimum; the upper bound follows the generated `Sql`. Do not "simplify" the 0 back to the SQL min.
+- **Cast-resistant read-only views.** On the installed .NET runtime, `ReadOnlyCollection<T>` implements `IList<T>` (cast succeeds; only mutation throws). Where a public `IReadOnlyList<T>` must not be castable to a mutable interface, use the `IReadOnlyList<T>`-only live view pattern from `SheetEditSession.LiveReadOnlyView<T>`.
+- **`Goose.IntegrationTests` is not in `Goose.sln`**; CI running only the sln skips the workbook-header contract test. Run it explicitly or add it to the sln.
+- The server repo contains pre-existing untracked scratch files (`probe4.csproj`, an old plan doc) unrelated to this work.
