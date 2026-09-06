@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Globalization;
 using MapEditor.GameData.Schema;
 
@@ -138,7 +139,7 @@ public sealed class SheetRowMapper
         cells[_spawnMapId.Index] = Format(row.MapId);
         cells[_spawnMapX.Index] = Format(row.MapX);
         cells[_spawnMapY.Index] = Format(row.MapY);
-        return cells;
+        return new ReadOnlyCollection<string?>(cells);
     }
 
     public IReadOnlyList<string?> ToCells(WarpRow row)
@@ -150,7 +151,7 @@ public sealed class SheetRowMapper
         cells[_warpId.Index] = Format(row.WarpId);
         cells[_warpX.Index] = Format(row.WarpX);
         cells[_warpY.Index] = Format(row.WarpY);
-        return cells;
+        return new ReadOnlyCollection<string?>(cells);
     }
 
     private static Field Resolve(SheetSchema sheet, string name)

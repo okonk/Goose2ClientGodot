@@ -91,6 +91,6 @@ public sealed class ReplacementPlanner
             .Select(rowNumber => new RowDelete(rowNumber))
             .ToList();
 
-        return new ReplacementPlan(sheet, deletes, inserts);
+        return new ReplacementPlan(sheet, deletes.AsReadOnly(), inserts.AsReadOnly());
     }
 }

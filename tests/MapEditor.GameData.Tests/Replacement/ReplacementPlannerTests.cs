@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -404,6 +405,21 @@ public class ReplacementPlannerTests
         Assert.Equal("9", cells[warptiles.GetColumnIndex("warp_id")]);
         Assert.Equal("10", cells[warptiles.GetColumnIndex("warp_x")]);
         Assert.Equal("11", cells[warptiles.GetColumnIndex("warp_y")]);
+    }
+
+    [Fact]
+    public void Plan_DeletesAndInserts_CannotBeCastToMutableLists()
+    {
+        var planner = Planner();
+        var remote = new[] { new RemoteRow<NpcSpawnRow>(2, new NpcSpawnRow(1, 5, 10, 11)) };
+        var desired = new[] { new NpcSpawnRow(1, 5, 99, 99) };
+
+        var plan = planner.PlanSpawnReplacement(remote, desired, 5);
+
+        Assert.Single(plan.Deletes);
+        Assert.Single(plan.Inserts);
+        Assert.Throws<InvalidCastException>(() => (List<RowDelete>)plan.Deletes);
+        Assert.Throws<InvalidCastException>(() => (List<RowInsert>)plan.Inserts);
     }
 
     private static ReplacementPlanner Planner() =>

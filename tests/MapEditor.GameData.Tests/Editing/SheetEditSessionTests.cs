@@ -280,4 +280,19 @@ public class SheetEditSessionTests
         Assert.Equal(new[] { Spawn(1, 1, 1, 1) }, first.Spawns);
         Assert.False(first.IsDirty);
     }
+
+    [Fact]
+    public void SpawnsAndWarpsViews_CannotBeCastToMutableInterfaces_AndReflectEdits()
+    {
+        var session = new SheetEditSession(new[] { Spawn(1, 10, 5, 6) }, new[] { Warp(10, 1, 2, 55, 30, 40) });
+
+        Assert.Throws<InvalidCastException>(() => (IList<NpcSpawnRow>)session.Spawns);
+        Assert.Throws<InvalidCastException>(() => (IList<WarpRow>)session.Warps);
+        Assert.Throws<InvalidCastException>(() => (List<NpcSpawnRow>)session.Spawns);
+        Assert.Throws<InvalidCastException>(() => (List<WarpRow>)session.Warps);
+
+        session.AddSpawn(Spawn(2, 10, 7, 8));
+        Assert.Equal(2, session.Spawns.Count);
+        Assert.Equal(Spawn(2, 10, 7, 8), session.Spawns[1]);
+    }
 }

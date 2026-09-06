@@ -332,6 +332,19 @@ public class SheetRowMapperTests
     }
 
     [Fact]
+    public void ToCells_Result_CannotBeCastToArray()
+    {
+        var schema = GameDataSchema.LoadEmbedded();
+        var mapper = new SheetRowMapper(schema);
+
+        var spawnCells = mapper.ToCells(new NpcSpawnRow(7, 1, 2, 3));
+        var warpCells = mapper.ToCells(new WarpRow(1, 2, 3, 9, 10, 11));
+
+        Assert.Throws<InvalidCastException>(() => (string?[])spawnCells);
+        Assert.Throws<InvalidCastException>(() => (string?[])warpCells);
+    }
+
+    [Fact]
     public void ToCells_WithReorderedSchema_PlacesValuesAtDescriptorIndexes()
     {
         var json = """

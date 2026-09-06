@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using MapEditor.GameData.Rows;
 
@@ -8,6 +9,8 @@ public sealed class SheetEditSession
 {
     private readonly List<NpcSpawnRow> _spawns;
     private readonly List<WarpRow> _warps;
+    private readonly IReadOnlyList<NpcSpawnRow> _spawnsView;
+    private readonly IReadOnlyList<WarpRow> _warpsView;
     private readonly LinkedList<SheetEditCommand> _undo = new();
     private readonly LinkedList<SheetEditCommand> _redo = new();
     private int _currentStateId;
@@ -18,11 +21,14 @@ public sealed class SheetEditSession
     {
         _spawns = new List<NpcSpawnRow>(spawns ?? throw new ArgumentNullException(nameof(spawns)));
         _warps = new List<WarpRow>(warps ?? throw new ArgumentNullException(nameof(warps)));
+        // ReadOnlyCollection<T> implements IList<T> and would stay castable to a mutable interface.
+        _spawnsView = new LiveReadOnlyView<NpcSpawnRow>(_spawns);
+        _warpsView = new LiveReadOnlyView<WarpRow>(_warps);
     }
 
-    public IReadOnlyList<NpcSpawnRow> Spawns => _spawns;
+    public IReadOnlyList<NpcSpawnRow> Spawns => _spawnsView;
 
-    public IReadOnlyList<WarpRow> Warps => _warps;
+    public IReadOnlyList<WarpRow> Warps => _warpsView;
 
     public bool IsDirty => _currentStateId != _pushedStateId;
 
@@ -139,5 +145,20 @@ public sealed class SheetEditSession
     {
         _redo.Clear();
         _undo.AddLast(command);
+    }
+
+    private sealed class LiveReadOnlyView<T> : IReadOnlyList<T>
+    {
+        private readonly List<T> _list;
+
+        public LiveReadOnlyView(List<T> list) => _list = list;
+
+        public T this[int index] => _list[index];
+
+        public int Count => _list.Count;
+
+        public IEnumerator<T> GetEnumerator() => _list.GetEnumerator();
+
+        IEnumerator IEnumerable.GetEnumerator() => _list.GetEnumerator();
     }
 }
