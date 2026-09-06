@@ -276,14 +276,13 @@ internal partial class MainWindow : Window
         if (ReferenceEquals(_dragPointer, e.Pointer))
         {
             e.Pointer.Capture(null);
+            ClearTabDrag();
         }
-
-        ClearTabDrag();
     }
 
     private void OnWindowPointerCaptureLost(object? sender, PointerCaptureLostEventArgs e)
     {
-        if (_dragDocument is not null)
+        if (_dragDocument is not null && ReferenceEquals(_dragPointer, e.Pointer))
         {
             ClearTabDrag();
         }
