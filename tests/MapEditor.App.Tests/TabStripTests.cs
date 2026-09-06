@@ -42,6 +42,15 @@ public class TabStripTests
     private static object? TabTip(ListBoxItem tab)
         => tab.GetVisualDescendants().OfType<StackPanel>().First().GetValue(ToolTip.TipProperty);
 
+    private static StackPanel TabHeader(ListBoxItem tab)
+        => tab.GetVisualDescendants().OfType<StackPanel>().First();
+
+    private Point TabPoint(Visual target, Point local)
+        => target.TranslatePoint(local, _harness.Window).Value;
+
+    private static Point PastMidpoint(Visual target)
+        => new(target.Bounds.Width / 2 + 5, target.Bounds.Height / 2);
+
     private static Avalonia.Controls.Shapes.Ellipse TabDirtyDot(ListBoxItem tab)
         => tab.GetVisualDescendants().OfType<Avalonia.Controls.Shapes.Ellipse>().Single();
 
@@ -345,6 +354,133 @@ public class TabStripTests
         Assert.Same(first, _harness.Workspace.ActiveDocument);
         Assert.True(TabFor(first).IsSelected);
         Assert.False(TabFor(second).IsSelected);
+    }
+
+    [AvaloniaFact]
+    public async Task Drag_PastNeighbourMidpoint_ReordersTabs()
+    {
+        MapDocumentViewModel first = _harness.ViewModel;
+        MapDocumentViewModel second = await NewDocumentAsync();
+
+        StackPanel firstHeader = TabHeader(TabFor(first));
+        StackPanel secondHeader = TabHeader(TabFor(second));
+        Point press = TabPoint(firstHeader, new Point(5, 5));
+        Point past = TabPoint(secondHeader, PastMidpoint(secondHeader));
+        _harness.Window.MouseDown(press, MouseButton.Left, RawInputModifiers.None);
+        _harness.Window.MouseMove(past, RawInputModifiers.None);
+
+        Assert.Equal(new[] { second, first }, _harness.Workspace.Documents);
+        Assert.Same(first, _harness.Workspace.ActiveDocument);
+
+        _harness.Window.MouseUp(past, MouseButton.Left, RawInputModifiers.None);
+        Assert.Equal(new[] { second, first }, _harness.Workspace.Documents);
+    }
+
+    [AvaloniaFact]
+    public async Task Drag_OfBackgroundTab_ActivatesItOnPress()
+    {
+        MapDocumentViewModel first = _harness.ViewModel;
+        MapDocumentViewModel second = await NewDocumentAsync();
+
+        StackPanel secondHeader = TabHeader(TabFor(second));
+        Point press = TabPoint(secondHeader, new Point(5, 5));
+        _harness.Window.MouseDown(press, MouseButton.Left, RawInputModifiers.None);
+
+        Assert.Same(second, _harness.Workspace.ActiveDocument);
+        Assert.True(TabFor(second).IsSelected);
+
+        _harness.Window.MouseUp(press, MouseButton.Left, RawInputModifiers.None);
+        Assert.Equal(new[] { first, second }, _harness.Workspace.Documents);
+        Assert.Same(second, _harness.Workspace.ActiveDocument);
+    }
+
+    [AvaloniaFact]
+    public async Task Drag_EscapeCancels_RestoresOriginalOrder()
+    {
+        MapDocumentViewModel first = _harness.ViewModel;
+        MapDocumentViewModel second = await NewDocumentAsync();
+
+        StackPanel firstHeader = TabHeader(TabFor(first));
+        StackPanel secondHeader = TabHeader(TabFor(second));
+        Point press = TabPoint(firstHeader, new Point(5, 5));
+        Point past = TabPoint(secondHeader, PastMidpoint(secondHeader));
+        _harness.Window.MouseDown(press, MouseButton.Left, RawInputModifiers.None);
+        _harness.Window.MouseMove(past, RawInputModifiers.None);
+        Assert.Equal(new[] { second, first }, _harness.Workspace.Documents);
+
+        _harness.Window.KeyPressQwerty(PhysicalKey.Escape, RawInputModifiers.None);
+
+        Assert.Equal(new[] { first, second }, _harness.Workspace.Documents);
+        Assert.Same(first, _harness.Workspace.ActiveDocument);
+
+        _harness.Window.MouseUp(past, MouseButton.Left, RawInputModifiers.None);
+        Assert.Equal(new[] { first, second }, _harness.Workspace.Documents);
+    }
+
+    [AvaloniaFact]
+    public async Task Drag_ShortPress_StillActivatesTab()
+    {
+        MapDocumentViewModel first = _harness.ViewModel;
+        MapDocumentViewModel second = await NewDocumentAsync();
+
+        StackPanel secondHeader = TabHeader(TabFor(second));
+        Point press = TabPoint(secondHeader, new Point(5, 5));
+        _harness.Window.MouseDown(press, MouseButton.Left, RawInputModifiers.None);
+        _harness.Window.MouseUp(press, MouseButton.Left, RawInputModifiers.None);
+
+        Assert.Same(second, _harness.Workspace.ActiveDocument);
+        Assert.True(TabFor(second).IsSelected);
+        Assert.False(TabFor(first).IsSelected);
+        Assert.Equal(new[] { first, second }, _harness.Workspace.Documents);
+    }
+
+    [AvaloniaFact]
+    public async Task Drag_CaptureLost_EndsDragCleanly()
+    {
+        MapDocumentViewModel first = _harness.ViewModel;
+        MapDocumentViewModel second = await NewDocumentAsync();
+
+        StackPanel firstHeader = TabHeader(TabFor(first));
+        StackPanel secondHeader = TabHeader(TabFor(second));
+        Point press = TabPoint(firstHeader, new Point(5, 5));
+        Point past = TabPoint(secondHeader, PastMidpoint(secondHeader));
+        IPointer? pointer = null;
+        _harness.Window.AddHandler(InputElement.PointerMovedEvent, (s, e) => pointer = e.Pointer);
+        _harness.Window.MouseDown(press, MouseButton.Left, RawInputModifiers.None);
+        _harness.Window.MouseMove(past, RawInputModifiers.None);
+        Assert.Equal(new[] { second, first }, _harness.Workspace.Documents);
+        Assert.NotNull(pointer!.Captured);
+        pointer.Capture(null);
+
+        Point stray = TabPoint(secondHeader, new Point(0, secondHeader.Bounds.Height / 2));
+        _harness.Window.MouseMove(stray, RawInputModifiers.None);
+        Assert.Equal(new[] { second, first }, _harness.Workspace.Documents);
+
+        _harness.Window.MouseUp(stray, MouseButton.Left, RawInputModifiers.None);
+        Assert.Equal(new[] { second, first }, _harness.Workspace.Documents);
+    }
+
+    [AvaloniaFact]
+    public async Task Drag_PressOnCloseButton_DoesNotStartDragAndStillCloses()
+    {
+        MapDocumentViewModel first = _harness.ViewModel;
+        MapDocumentViewModel second = await NewDocumentAsync();
+        MapDocumentViewModel third = await NewDocumentAsync();
+        _harness.Workspace.Activate(first);
+        Dispatcher.UIThread.RunJobs();
+
+        Button close = TabFor(first).GetVisualDescendants().OfType<Button>().First();
+        Point press = close.TranslatePoint(new Point(8, 8), _harness.Window).Value;
+        StackPanel secondHeader = TabHeader(TabFor(second));
+        Point past = TabPoint(secondHeader, PastMidpoint(secondHeader));
+        _harness.Window.MouseDown(press, MouseButton.Left, RawInputModifiers.None);
+        _harness.Window.MouseMove(past, RawInputModifiers.None);
+        _harness.Window.MouseUp(press, MouseButton.Left, RawInputModifiers.None);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.DoesNotContain(first, _harness.Workspace.Documents);
+        Assert.Equal(new[] { second, third }, _harness.Workspace.Documents);
+        Assert.Same(second, _harness.Workspace.ActiveDocument);
     }
 
     [AvaloniaFact]

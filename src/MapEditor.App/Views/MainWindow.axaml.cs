@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.ComponentModel;
+using System.Linq;
 using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
@@ -11,6 +12,7 @@ using Avalonia.Interactivity;
 using Avalonia.Markup.Xaml;
 using Avalonia.Media;
 using Avalonia.Styling;
+using Avalonia.VisualTree;
 using MapEditor.App.Controls;
 using MapEditor.App.Dialogs;
 using MapEditor.App.Rendering;
@@ -42,6 +44,9 @@ internal partial class MainWindow : Window
     private readonly TextBlock[] _layerRefs;
     private Border[] _layerRows;
     private CheckBox[] _layerVisibleChecks;
+    private MapDocumentViewModel? _dragDocument;
+    private IPointer? _dragPointer;
+    private int _dragIndex;
     private AppTheme _theme = AppTheme.Dark;
     private bool _closeGuardRunning;
     private bool _closeApproved;
@@ -65,6 +70,9 @@ internal partial class MainWindow : Window
         _layerRows = new[] { Layer0Row, Layer1Row, Layer2Row, Layer3Row, Layer4Row };
         _layerVisibleChecks = new[] { Layer0VisibleCheck, Layer1VisibleCheck, Layer2VisibleCheck, Layer3VisibleCheck, Layer4VisibleCheck };
         AddHandler(InputElement.PointerPressedEvent, OnWindowPointerPressed, RoutingStrategies.Tunnel);
+        AddHandler(InputElement.PointerMovedEvent, OnWindowPointerMoved);
+        AddHandler(InputElement.PointerReleasedEvent, OnWindowPointerReleased);
+        AddHandler(InputElement.PointerCaptureLostEvent, OnWindowPointerCaptureLost);
         // Tunnel so tab shortcuts win over the window's Tab focus navigation, which would otherwise
         // consume Ctrl+Tab before any bubbling handler sees it.
         AddHandler(InputElement.KeyDownEvent, OnTabShortcutKeyDown, RoutingStrategies.Tunnel);
@@ -127,6 +135,11 @@ internal partial class MainWindow : Window
 
         if (e.Action == NotifyCollectionChangedAction.Remove && e.OldItems is not null)
         {
+            if (e.OldItems.Contains(_dragDocument))
+            {
+                ClearTabDrag();
+            }
+
             foreach (MapDocumentViewModel document in e.OldItems)
             {
                 DocumentView view = _views[document];
@@ -177,14 +190,121 @@ internal partial class MainWindow : Window
 
     private void OnTabHeaderPressed(object? sender, PointerPressedEventArgs e)
     {
-        if (sender is not StackPanel { DataContext: MapDocumentViewModel document } header ||
-            !e.GetCurrentPoint(header).Properties.IsMiddleButtonPressed)
+        if (sender is not StackPanel { DataContext: MapDocumentViewModel document } header)
         {
             return;
         }
 
-        e.Handled = true;
-        _ = RunCommandAsync(() => _workspace.CloseAsync(document));
+        PointerPointProperties properties = e.GetCurrentPoint(header).Properties;
+        if (properties.IsMiddleButtonPressed)
+        {
+            e.Handled = true;
+            _ = RunCommandAsync(() => _workspace.CloseAsync(document));
+            return;
+        }
+
+        if (!properties.IsLeftButtonPressed || PressedInsideButton(e.Source as Visual))
+        {
+            return;
+        }
+
+        _dragDocument = document;
+        _dragPointer = e.Pointer;
+        _dragIndex = _workspace.Documents.IndexOf(document);
+        e.Pointer.Capture(header);
+    }
+
+    private void OnWindowPointerMoved(object? sender, PointerEventArgs e)
+    {
+        if (_dragDocument is not { } document || !ReferenceEquals(_dragPointer, e.Pointer))
+        {
+            return;
+        }
+
+        if (!_workspace.Documents.Contains(document))
+        {
+            ClearTabDrag();
+            return;
+        }
+
+        // A Move recreates the tab containers, so the header must be re-resolved on every move.
+        if (GetTabHeader(document) is not { } header)
+        {
+            return;
+        }
+
+        int index = _workspace.Documents.IndexOf(document);
+        Point position = e.GetPosition(header);
+        if (position.Y < 0 || position.Y > header.Bounds.Height)
+        {
+            return;
+        }
+
+        if (index > 0 &&
+            GetTabHeader(_workspace.Documents[index - 1]) is { } left &&
+            left.TranslatePoint(new Point(left.Bounds.Width / 2, 0), header) is { } leftMid &&
+            position.X < leftMid.X)
+        {
+            _workspace.Move(index, index - 1);
+            return;
+        }
+
+        if (index + 1 < _workspace.Documents.Count &&
+            GetTabHeader(_workspace.Documents[index + 1]) is { } right &&
+            right.TranslatePoint(new Point(right.Bounds.Width / 2, 0), header) is { } rightMid &&
+            position.X > rightMid.X)
+        {
+            _workspace.Move(index, index + 1);
+        }
+    }
+
+    private void OnWindowPointerReleased(object? sender, PointerReleasedEventArgs e)
+    {
+        if (_dragDocument is null)
+        {
+            return;
+        }
+
+        if (ReferenceEquals(_dragPointer, e.Pointer))
+        {
+            e.Pointer.Capture(null);
+        }
+
+        ClearTabDrag();
+    }
+
+    private void OnWindowPointerCaptureLost(object? sender, PointerCaptureLostEventArgs e)
+    {
+        if (_dragDocument is not null)
+        {
+            ClearTabDrag();
+        }
+    }
+
+    private void ClearTabDrag()
+    {
+        _dragDocument = null;
+        _dragPointer = null;
+    }
+
+    private StackPanel? GetTabHeader(MapDocumentViewModel document)
+        => TabStrip.ContainerFromItem(document) is ListBoxItem { } item
+            ? item.GetVisualDescendants().OfType<StackPanel>().FirstOrDefault()
+            : null;
+
+    private static bool PressedInsideButton(Visual? source)
+    {
+        while (source is { } visual)
+        {
+            if (visual is Button)
+            {
+                return true;
+            }
+
+            source = visual.GetVisualParent();
+        }
+
+        return false;
     }
 
     private void ActivateDocument(MapDocumentViewModel document)
@@ -245,6 +365,20 @@ internal partial class MainWindow : Window
         base.OnKeyDown(e);
         if (e.Handled)
         {
+            return;
+        }
+
+        if (e.Key == Key.Escape && _dragDocument is not null)
+        {
+            int index = _workspace.Documents.IndexOf(_dragDocument!);
+            if (index != _dragIndex)
+            {
+                _workspace.Move(index, _dragIndex);
+            }
+
+            _dragPointer?.Capture(null);
+            ClearTabDrag();
+            e.Handled = true;
             return;
         }
 
