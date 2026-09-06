@@ -224,7 +224,18 @@ public sealed class SheetRowMapper
         var trimmed = def.Trim();
         if (trimmed.Length >= 2 && trimmed[0] == '\'' && trimmed[^1] == '\'')
         {
-            return trimmed[1..^1].Replace("''", "'");
+            var quoteCount = 0;
+            foreach (var ch in trimmed)
+            {
+                if (ch == '\'')
+                {
+                    quoteCount++;
+                }
+            }
+            if (quoteCount % 2 == 0)
+            {
+                return trimmed[1..^1].Replace("''", "'");
+            }
         }
         throw new FormatException(
             $"Sheet '{field.Sheet.Sheet}' column '{field.Column.Name}' has an unsupported text default: '{def}'.");

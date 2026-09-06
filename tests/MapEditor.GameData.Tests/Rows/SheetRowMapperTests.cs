@@ -501,6 +501,62 @@ public class SheetRowMapperTests
     }
 
     [Fact]
+    public void MapNpc_WithOddQuoteCountTextDefault_ThrowsFormatException()
+    {
+        var json = """
+        {"sheets":[
+          {"sheet":"NPCs","table":"npc_templates","columns":[
+            {"name":"npc_id","header":"id","kind":"Id","sql":"INTEGER","required":true,"pk":true},
+            {"name":"npc_name","header":"name","kind":"Text","sql":"TEXT","required":true,"pk":false},
+            {"name":"body_state","header":"bs","kind":"Int","sql":"SMALLINT","default":"3","required":false,"pk":false},
+            {"name":"body_id","header":"bid","kind":"Int","sql":"SMALLINT","default":"1","required":false,"pk":false},
+            {"name":"body_r","header":"br","kind":"Int","sql":"SMALLINT","default":"0","required":false,"pk":false},
+            {"name":"body_g","header":"bg","kind":"Int","sql":"SMALLINT","default":"0","required":false,"pk":false},
+            {"name":"body_b","header":"bb","kind":"Int","sql":"SMALLINT","default":"0","required":false,"pk":false},
+            {"name":"body_a","header":"ba","kind":"Int","sql":"SMALLINT","default":"0","required":false,"pk":false},
+            {"name":"face_id","header":"face","kind":"Int","sql":"SMALLINT","default":"0","required":false,"pk":false},
+            {"name":"hair_id","header":"hair","kind":"Int","sql":"SMALLINT","default":"0","required":false,"pk":false},
+            {"name":"hair_r","header":"hr","kind":"Int","sql":"SMALLINT","default":"0","required":false,"pk":false},
+            {"name":"hair_g","header":"hg","kind":"Int","sql":"SMALLINT","default":"0","required":false,"pk":false},
+            {"name":"hair_b","header":"hb","kind":"Int","sql":"SMALLINT","default":"0","required":false,"pk":false},
+            {"name":"hair_a","header":"ha","kind":"Int","sql":"SMALLINT","default":"0","required":false,"pk":false},
+            {"name":"equipped_items","header":"items","kind":"Text","sql":"TEXT","default":"'''","required":false,"pk":false}
+          ]},
+          {"sheet":"NPC Spawns","table":"npc_spawns","columns":[
+            {"name":"npc_id","header":"npc","kind":"Id","sql":"INT","required":true,"pk":false},
+            {"name":"map_id","header":"map","kind":"Id","sql":"SMALLINT","required":true,"pk":false},
+            {"name":"map_x","header":"x","kind":"Int","sql":"SMALLINT","required":true,"pk":false},
+            {"name":"map_y","header":"y","kind":"Int","sql":"SMALLINT","required":true,"pk":false}
+          ]},
+          {"sheet":"Warptiles","table":"warptiles","columns":[
+            {"name":"map_id","header":"map","kind":"Id","sql":"SMALLINT","required":true,"pk":false},
+            {"name":"map_x","header":"x","kind":"Int","sql":"SMALLINT","required":true,"pk":false},
+            {"name":"map_y","header":"y","kind":"Int","sql":"SMALLINT","required":true,"pk":false},
+            {"name":"warp_id","header":"wid","kind":"Id","sql":"SMALLINT","required":true,"pk":false},
+            {"name":"warp_x","header":"wx","kind":"Int","sql":"SMALLINT","required":true,"pk":false},
+            {"name":"warp_y","header":"wy","kind":"Int","sql":"SMALLINT","required":true,"pk":false}
+          ]},
+          {"sheet":"Maps","table":"maps","columns":[
+            {"name":"map_id","header":"id","kind":"Id","sql":"INTEGER","required":true,"pk":true},
+            {"name":"map_name","header":"name","kind":"Text","sql":"TEXT","required":true,"pk":false},
+            {"name":"map_filename","header":"fn","kind":"Text","sql":"TEXT","required":true,"pk":false}
+          ]}
+        ]}
+        """;
+
+        using var stream = new MemoryStream(Encoding.UTF8.GetBytes(json));
+        var schema = GameDataSchema.Load(stream);
+        var mapper = new SheetRowMapper(schema);
+        var npcs = schema.GetRequiredSheet("NPCs");
+
+        var row = Row(npcs, ("npc_id", "7"), ("npc_name", "Goblin"));
+
+        var ex = Assert.Throws<FormatException>(() => mapper.MapNpc(row));
+        Assert.Contains("NPCs", ex.Message);
+        Assert.Contains("equipped_items", ex.Message);
+    }
+
+    [Fact]
     public void Ctor_WithMissingConsumedColumn_ThrowsKeyNotFoundException()
     {
         var json = """
