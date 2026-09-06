@@ -43,7 +43,7 @@ internal sealed class MapDocumentViewModel : ViewModelBase, IDisposable
     private string _title;
     private string _tabTitle;
     private string _tabToolTip;
-    private bool _isDirty;
+    private bool _lastNotifiedDirty;
     private bool _canUndo;
     private bool _canRedo;
     private bool _canSave;
@@ -58,7 +58,7 @@ internal sealed class MapDocumentViewModel : ViewModelBase, IDisposable
         _title = BuildTitle();
         _tabTitle = BuildTabTitle();
         _tabToolTip = _controller.Document.Path ?? UntitledName;
-        _isDirty = _session.IsDirty;
+        _lastNotifiedDirty = _session.IsDirty;
         _canSave = _session.IsDirty;
         _controller.StateChanged += OnControllerStateChanged;
         _session.Resized += OnSessionResized;
@@ -441,7 +441,7 @@ internal sealed class MapDocumentViewModel : ViewModelBase, IDisposable
             SetField(ref _title, BuildTitle(), nameof(Title));
             SetField(ref _tabTitle, BuildTabTitle(), nameof(TabTitle));
             SetField(ref _tabToolTip, _controller.Document.Path ?? UntitledName, nameof(TabToolTip));
-            SetField(ref _isDirty, _session.IsDirty, nameof(IsDirty));
+            SetField(ref _lastNotifiedDirty, _session.IsDirty, nameof(IsDirty));
         }
 
         if (flags.HasFlag(EditorRefresh.Commands))
@@ -449,7 +449,7 @@ internal sealed class MapDocumentViewModel : ViewModelBase, IDisposable
             SetField(ref _canUndo, _session.CanUndo, nameof(CanUndo));
             SetField(ref _canRedo, _session.CanRedo, nameof(CanRedo));
             SetField(ref _canSave, _session.IsDirty, nameof(CanSave));
-            SetField(ref _isDirty, _session.IsDirty, nameof(IsDirty));
+            SetField(ref _lastNotifiedDirty, _session.IsDirty, nameof(IsDirty));
         }
 
         if (flags.HasFlag(EditorRefresh.Canvas))

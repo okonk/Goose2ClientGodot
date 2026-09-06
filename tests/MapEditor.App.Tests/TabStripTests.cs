@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
+using Avalonia.Controls.Shapes;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Input;
@@ -14,6 +15,7 @@ using MapEditor.App.Dialogs;
 using MapEditor.App.ViewModels;
 using MapEditor.Core;
 using Xunit;
+using Path = System.IO.Path;
 
 namespace MapEditor.App.Tests;
 
@@ -25,13 +27,13 @@ public class TabStripTests : IDisposable
 
     private ListBox Strip
         => _harness.Window.FindControl<ListBox>("TabStrip")
-           ?? throw new System.InvalidOperationException("missing TabStrip");
+           ?? throw new InvalidOperationException("missing TabStrip");
 
     private ListBoxItem TabFor(MapDocumentViewModel document)
     {
         if (Strip.ContainerFromItem(document) is not ListBoxItem item)
         {
-            throw new System.InvalidOperationException("no tab container for document");
+            throw new InvalidOperationException("no tab container for document");
         }
 
         return item;
@@ -41,10 +43,11 @@ public class TabStripTests : IDisposable
         => tab.GetVisualDescendants().OfType<TextBlock>().First().Text;
 
     private static object? TabTip(ListBoxItem tab)
-        => tab.GetVisualDescendants().OfType<StackPanel>().First().GetValue(ToolTip.TipProperty);
+        => tab.GetVisualDescendants().OfType<StackPanel>().First(panel => panel.Classes.Contains("tabHeader"))
+            .GetValue(ToolTip.TipProperty);
 
     private static StackPanel TabHeader(ListBoxItem tab)
-        => tab.GetVisualDescendants().OfType<StackPanel>().First();
+        => tab.GetVisualDescendants().OfType<StackPanel>().First(panel => panel.Classes.Contains("tabHeader"));
 
     private Point TabPoint(Visual target, Point local)
         => target.TranslatePoint(local, _harness.Window).Value;
@@ -52,8 +55,8 @@ public class TabStripTests : IDisposable
     private static Point PastMidpoint(Visual target)
         => new(target.Bounds.Width / 2 + 5, target.Bounds.Height / 2);
 
-    private static Avalonia.Controls.Shapes.Ellipse TabDirtyDot(ListBoxItem tab)
-        => tab.GetVisualDescendants().OfType<Avalonia.Controls.Shapes.Ellipse>().Single();
+    private static Ellipse TabDirtyDot(ListBoxItem tab)
+        => tab.GetVisualDescendants().OfType<Ellipse>().Single();
 
     private string WriteMap(string name)
     {

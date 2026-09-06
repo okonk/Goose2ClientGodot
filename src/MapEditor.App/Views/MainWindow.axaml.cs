@@ -297,7 +297,7 @@ internal partial class MainWindow : Window
 
     private StackPanel? GetTabHeader(MapDocumentViewModel document)
         => TabStrip.ContainerFromItem(document) is ListBoxItem { } item
-            ? item.GetVisualDescendants().OfType<StackPanel>().FirstOrDefault()
+            ? item.GetVisualDescendants().OfType<StackPanel>().FirstOrDefault(panel => panel.Classes.Contains("tabHeader"))
             : null;
 
     private static bool PressedInsideButton(Visual? source)
@@ -540,7 +540,7 @@ internal partial class MainWindow : Window
                 break;
             case Key.D1 or Key.D2 or Key.D3 or Key.D4 or Key.D5 or Key.D6 or Key.D7 or Key.D8
                 when e.KeyModifiers == PrimaryModifier:
-                ActivateTabByIndex((int)(e.Key - Key.D1 + 1));
+                ActivateTabByIndex(e.Key - Key.D1 + 1);
                 e.Handled = true;
                 break;
             case Key.D9 when e.KeyModifiers == PrimaryModifier:
