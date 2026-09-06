@@ -275,6 +275,17 @@ public class GameDataValidatorTests
     }
 
     [Fact]
+    public void ValidateWarps_WithNonPositiveOpenMapDimensions_ThrowsArgumentOutOfRange()
+    {
+        var validator = new GameDataValidator(GameDataSchema.LoadEmbedded());
+        var rows = new List<WarpRow>();
+        var maps = new Dictionary<int, MapReference>();
+        var open = new Dictionary<int, MapDimensions> { [200] = new MapDimensions(0, 5) };
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => validator.ValidateWarps(rows, maps, open, CurrentMap));
+    }
+
+    [Fact]
     public void ValidateWarps_EmitsIssuesInInputRowOrder()
     {
         var validator = new GameDataValidator(GameDataSchema.LoadEmbedded());

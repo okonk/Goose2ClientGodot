@@ -57,6 +57,10 @@ public sealed class GameDataValidator
         MapDimensions currentMapDimensions)
     {
         RequirePositiveDimensions(currentMapDimensions);
+        foreach (var openDimensions in openMapDimensions.Values)
+        {
+            RequirePositiveDimensions(openDimensions);
+        }
 
         var errors = new List<ValidationIssue>();
         var seenSources = new HashSet<(int MapId, int MapX, int MapY)>();
