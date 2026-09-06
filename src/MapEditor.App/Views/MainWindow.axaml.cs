@@ -882,9 +882,9 @@ internal partial class MainWindow : Window
         }
 
         _commandRunning = true;
-        Canvas.FinishInteraction(commit: true);
         try
         {
+            Canvas.FinishInteraction(commit: true);
             await command();
         }
         catch (OutOfMemoryException)
