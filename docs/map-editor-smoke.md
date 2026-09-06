@@ -27,7 +27,7 @@ git diff --check
 git status --short
 ```
 
-Expected: Core 216 passed, Rendering 171 passed, App 284 passed, Godot 460 passed, and the
+Expected: Core 216 passed, Rendering 171 passed, App 374 passed, Godot 460 passed, and the
 same four suites green in the solution run; Release build 0 errors; `bash -n` clean;
 script tests 62/62; the publisher produces a new `build/map-editor/<BUILD_ID>` release
 directory containing all four archives plus `BUILD-METADATA.txt`; both greps return empty
