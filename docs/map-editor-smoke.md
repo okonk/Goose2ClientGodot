@@ -171,7 +171,7 @@ This proves the artifact runs; the failure is the absent X11 stack, not a build 
 - Headed checklist items 1–7 (folder picker, new-map validation, paint/undo/flags,
   pan/zoom, layer toggles, malformed-input/conflict handling, dirty prompts and native
   shortcuts on Linux/Windows/macOS).
-- Headed checklist item 8 target-host launches: Windows x64, macOS x64, macOS arm64
+- Headed checklist item 10 target-host launches: Windows x64, macOS x64, macOS arm64
   (separate per-host entries; macOS artifacts unsigned/unnotarized).
 - A full headed Linux run on a display-equipped host to confirm the editor window opens.
 
