@@ -48,6 +48,7 @@ internal partial class MainWindow : Window
     private IPointer? _dragPointer;
     private int _dragIndex;
     private AppTheme _theme = AppTheme.Dark;
+    private bool _commandRunning;
     private bool _closeGuardRunning;
     private bool _closeApproved;
     // Breaks ActivateDocument -> SelectedItem -> SelectionChanged -> Activate re-entering itself.
@@ -171,6 +172,13 @@ internal partial class MainWindow : Window
     {
         if (_tabSelectionRunning || TabStrip.SelectedItem is not MapDocumentViewModel document)
         {
+            return;
+        }
+
+        if (_commandRunning)
+        {
+            // The strip already moved its selection on the press; restore agreement with the workspace.
+            SelectTabInStrip(_workspace.ActiveDocument);
             return;
         }
 
@@ -328,15 +336,7 @@ internal partial class MainWindow : Window
         _document = document;
         if (!_tabSelectionRunning)
         {
-            _tabSelectionRunning = true;
-            try
-            {
-                TabStrip.SelectedItem = document;
-            }
-            finally
-            {
-                _tabSelectionRunning = false;
-            }
+            SelectTabInStrip(document);
         }
 
         TabStrip.ScrollIntoView(document);
@@ -352,6 +352,19 @@ internal partial class MainWindow : Window
         SyncReadouts();
         SyncAssetDirectory();
         Title = document.Title;
+    }
+
+    private void SelectTabInStrip(MapDocumentViewModel document)
+    {
+        _tabSelectionRunning = true;
+        try
+        {
+            TabStrip.SelectedItem = document;
+        }
+        finally
+        {
+            _tabSelectionRunning = false;
+        }
     }
 
     internal static KeyGesture BuildShortcut(Key key, KeyModifiers extra, bool isMacOs)
@@ -539,6 +552,11 @@ internal partial class MainWindow : Window
 
     private void CycleTab(int direction)
     {
+        if (_commandRunning)
+        {
+            return;
+        }
+
         var documents = _workspace.Documents;
         if (documents.Count < 2)
         {
@@ -551,6 +569,11 @@ internal partial class MainWindow : Window
 
     private void ActivateTabByIndex(int oneBasedIndex)
     {
+        if (_commandRunning)
+        {
+            return;
+        }
+
         var documents = _workspace.Documents;
         if (oneBasedIndex < 1 || oneBasedIndex > documents.Count)
         {
@@ -805,6 +828,13 @@ internal partial class MainWindow : Window
 
     private async void OnClosing(object? sender, WindowClosingEventArgs e)
     {
+        // A modal command is on screen; its continuation would resume after Closed, so the close must wait.
+        if (_commandRunning)
+        {
+            e.Cancel = true;
+            return;
+        }
+
         Canvas.FinishInteraction(commit: true);
         if (_closeApproved)
         {
@@ -846,6 +876,12 @@ internal partial class MainWindow : Window
 
     private async Task RunCommandAsync(Func<Task> command)
     {
+        if (_commandRunning)
+        {
+            return;
+        }
+
+        _commandRunning = true;
         Canvas.FinishInteraction(commit: true);
         try
         {
@@ -858,6 +894,10 @@ internal partial class MainWindow : Window
         catch (Exception ex)
         {
             await ShowFatalErrorAsync("Error", ex.Message);
+        }
+        finally
+        {
+            _commandRunning = false;
         }
     }
 

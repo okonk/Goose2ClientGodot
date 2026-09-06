@@ -1013,4 +1013,152 @@ public class MainWindowTests : IDisposable
         Assert.Empty(_harness.Dialogs.Errors);
         Assert.False(_harness.Assets.Current.IsAvailable);
     }
+
+    [AvaloniaFact]
+    public async Task TabSwitch_WhileDialogOpen_IsIgnored()
+    {
+        using MainWindowHarness harness = MainWindowHarness.Create();
+        MapDocumentViewModel first = harness.ViewModel;
+        MapDocumentViewModel second = await NewDocumentAsync(harness);
+        harness.Workspace.Activate(first);
+        Dispatcher.UIThread.RunJobs();
+        EditDocument(first);
+
+        var gate = new TaskCompletionSource<DirtyChoice>(TaskCreationOptions.RunContinuationsAsynchronously);
+        harness.Dialogs.DirtyGate = gate;
+
+        ClickTabCloseButton(harness, first);
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal(1, harness.Dialogs.DirtyShown);
+
+        ClickTabHeader(harness, second);
+        Assert.Same(first, harness.Workspace.ActiveDocument);
+        Assert.Same(first, TabStripOf(harness).SelectedItem);
+
+        gate.SetResult(DirtyChoice.Cancel);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Equal(2, harness.Workspace.Documents.Count);
+        ClickTabHeader(harness, second);
+        Assert.Same(second, harness.Workspace.ActiveDocument);
+        Assert.Same(second, TabStripOf(harness).SelectedItem);
+    }
+
+    [AvaloniaFact]
+    public async Task Tab_SelectionWhileCommandRunning_SnapsBackToActiveDocument()
+    {
+        using MainWindowHarness harness = MainWindowHarness.Create();
+        MapDocumentViewModel first = harness.ViewModel;
+        MapDocumentViewModel second = await NewDocumentAsync(harness);
+        harness.Workspace.Activate(first);
+        Dispatcher.UIThread.RunJobs();
+        EditDocument(first);
+
+        var gate = new TaskCompletionSource<DirtyChoice>(TaskCreationOptions.RunContinuationsAsynchronously);
+        harness.Dialogs.DirtyGate = gate;
+
+        ClickTabCloseButton(harness, first);
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal(1, harness.Dialogs.DirtyShown);
+
+        ClickTabHeader(harness, second);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Same(first, harness.Workspace.ActiveDocument);
+        Assert.Same(first, TabStripOf(harness).SelectedItem);
+        Assert.True(TabFor(harness, first).IsSelected);
+        Assert.False(TabFor(harness, second).IsSelected);
+
+        gate.SetResult(DirtyChoice.Cancel);
+        Dispatcher.UIThread.RunJobs();
+    }
+
+    [AvaloniaFact]
+    public void Close_WhileSaveAsDialogOpen_IsRefused()
+    {
+        using MainWindowHarness harness = MainWindowHarness.Create();
+        EditDocument(harness.ViewModel);
+        harness.Dialogs.DirtyResult = DirtyChoice.Discard;
+
+        var gate = new TaskCompletionSource<string?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        harness.Dialogs.SavePickGate = gate;
+
+        harness.Window.FindControl<MenuItem>("SaveAsCommand")!.RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal(1, harness.Dialogs.SavePickShown);
+
+        harness.Window.Close();
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.True(harness.Window.IsVisible);
+        Assert.Equal(0, harness.Dialogs.DirtyShown);
+
+        gate.SetResult(null);
+        Dispatcher.UIThread.RunJobs();
+
+        harness.Window.Close();
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.False(harness.Window.IsVisible);
+    }
+
+    [AvaloniaFact]
+    public void Command_ThatThrows_ClearsTheRunningFlag()
+    {
+        using MainWindowHarness harness = MainWindowHarness.Create();
+        harness.Dialogs.PickOpenException = new InvalidOperationException("pick failed");
+
+        harness.Window.FindControl<MenuItem>("OpenCommand")!.RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+        Dispatcher.UIThread.RunJobs();
+
+        ErrorPresentation error = Assert.Single(harness.Dialogs.Errors);
+        Assert.Equal("Open map", error.Title);
+        Assert.Contains("pick failed", error.Message);
+
+        harness.Dialogs.NewMapResult = new NewMapRequest(100, 100);
+        harness.Window.FindControl<MenuItem>("NewCommand")!.RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Equal(2, harness.Workspace.Documents.Count);
+    }
+
+    private static ListBox TabStripOf(MainWindowHarness harness)
+        => harness.Window.FindControl<ListBox>("TabStrip")
+           ?? throw new InvalidOperationException("missing TabStrip");
+
+    private static ListBoxItem TabFor(MainWindowHarness harness, MapDocumentViewModel document)
+        => TabStripOf(harness).ContainerFromItem(document) is ListBoxItem item
+            ? item
+            : throw new InvalidOperationException("no tab container for document");
+
+    private static void ClickTabHeader(MainWindowHarness harness, MapDocumentViewModel document)
+    {
+        TextBlock label = TabFor(harness, document).GetVisualDescendants().OfType<TextBlock>().First();
+        Point point = label.TranslatePoint(new Point(5, 5), harness.Window).Value;
+        harness.Window.MouseDown(point, MouseButton.Left, RawInputModifiers.None);
+        harness.Window.MouseUp(point, MouseButton.Left, RawInputModifiers.None);
+    }
+
+    private static void ClickTabCloseButton(MainWindowHarness harness, MapDocumentViewModel document)
+    {
+        Button close = TabFor(harness, document).GetVisualDescendants().OfType<Button>().First();
+        Point point = close.TranslatePoint(new Point(8, 8), harness.Window).Value;
+        harness.Window.MouseDown(point, MouseButton.Left, RawInputModifiers.None);
+        harness.Window.MouseUp(point, MouseButton.Left, RawInputModifiers.None);
+    }
+
+    private static async Task<MapDocumentViewModel> NewDocumentAsync(MainWindowHarness harness)
+    {
+        harness.Dialogs.NewMapResult = new NewMapRequest(100, 100);
+        await harness.Workspace.NewAsync();
+        Dispatcher.UIThread.RunJobs();
+        return harness.Workspace.ActiveDocument;
+    }
+
+    private static void EditDocument(MapDocumentViewModel document)
+    {
+        document.Brush = new MapTileLayer(1, 2);
+        document.Session.BeginStroke(MapEditTool.Pencil, 0, 0);
+        Assert.True(document.Session.CompleteStroke());
+    }
 }

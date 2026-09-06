@@ -248,7 +248,7 @@ public class MainWindowCloseTests
     }
 
     [AvaloniaFact]
-    public void Close_WhileAssetPickerPending_CompletingAfterClose_DoesNotPublishContext()
+    public void Close_WhileAssetPickerPending_IsRefusedUntilThePickerCompletes()
     {
         using MainWindowHarness harness = MainWindowHarness.Create();
         string assets = WriteAssetDirectory(harness.TempDirectory);
@@ -264,14 +264,18 @@ public class MainWindowCloseTests
         harness.Window.Close();
         Dispatcher.UIThread.RunJobs();
 
-        Assert.False(harness.Window.IsVisible);
-        Assert.True(harness.Assets.Current.IsDisposed);
+        Assert.True(harness.Window.IsVisible);
 
         gate.SetResult(assets);
         Dispatcher.UIThread.RunJobs();
 
-        Assert.Empty(harness.ViewModel.SheetIds);
-        Assert.Equal(0, harness.ViewModel.SelectedSheet);
+        Assert.True(harness.Assets.Current.IsAvailable);
+        Assert.Empty(harness.Dialogs.Errors);
+
+        harness.Window.Close();
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.False(harness.Window.IsVisible);
         Assert.True(harness.Assets.Current.IsDisposed);
         Assert.Empty(harness.Dialogs.Errors);
     }
