@@ -114,7 +114,7 @@ public class TabStripTests : IDisposable
         Assert.Equal("open.bytes", TabLabel(TabFor(opened)));
         Assert.Equal(Path.GetFullPath(path), opened.TabToolTip);
         Assert.Equal(Path.GetFullPath(path), TabTip(TabFor(opened)));
-        Assert.Equal("Untitled", TabLabel(TabFor(initial)));
+        Assert.Null(Strip.ContainerFromItem(initial));
     }
 
     [AvaloniaFact]

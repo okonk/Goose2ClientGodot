@@ -117,9 +117,9 @@ public class WorkspaceViewModelTests : IDisposable
 
         await OpenDocumentAsync(path);
 
-        Assert.Equal(2, _workspace.Documents.Count);
+        Assert.Equal(1, _workspace.Documents.Count);
         MapDocumentViewModel active = _workspace.ActiveDocument;
-        Assert.Same(_workspace.Documents[1], active);
+        Assert.Same(_workspace.Documents[0], active);
         Assert.Equal(Path.GetFullPath(path), active.Document.Path);
         Assert.Equal(revision, active.Document.Revision);
         Assert.Equal(25, active.Session.Document.Width);
@@ -136,9 +136,52 @@ public class WorkspaceViewModelTests : IDisposable
 
         await OpenDocumentAsync(path);
 
-        Assert.Equal(2, _workspace.Documents.Count);
+        Assert.Equal(1, _workspace.Documents.Count);
         Assert.Same(first, _workspace.ActiveDocument);
-        Assert.Same(_workspace.Documents[1], first);
+        Assert.Same(_workspace.Documents[0], first);
+    }
+
+    [Fact]
+    public async Task Open_SingleDirtyBlank_KeepsTheBlank()
+    {
+        MapDocumentViewModel blank = _workspace.ActiveDocument;
+        Paint(blank.Session, 0, 0, new MapTileLayer(1, 1));
+        Assert.True(blank.Session.IsDirty);
+
+        string path = WriteMap("dirty-blank.bytes");
+        await OpenDocumentAsync(path);
+
+        Assert.Equal(2, _workspace.Documents.Count);
+        Assert.Same(blank, _workspace.Documents[0]);
+        Assert.Same(_workspace.ActiveDocument, _workspace.Documents[1]);
+    }
+
+    [Fact]
+    public async Task Open_MultipleTabs_KeepsTheBlank()
+    {
+        MapDocumentViewModel blank = _workspace.ActiveDocument;
+        await NewDocumentAsync();
+
+        string path = WriteMap("multi-tab.bytes");
+        await OpenDocumentAsync(path);
+
+        Assert.Equal(3, _workspace.Documents.Count);
+        Assert.Same(blank, _workspace.Documents[0]);
+    }
+
+    [Fact]
+    public async Task Open_SingleSavedTab_KeepsIt()
+    {
+        string pathA = WriteMap("a.bytes");
+        await OpenDocumentAsync(pathA);
+        Assert.Equal(1, _workspace.Documents.Count);
+
+        string pathB = WriteMap("b.bytes");
+        await OpenDocumentAsync(pathB);
+
+        Assert.Equal(2, _workspace.Documents.Count);
+        Assert.Equal(Path.GetFullPath(pathA), _workspace.Documents[0].Document.Path);
+        Assert.Equal(Path.GetFullPath(pathB), _workspace.Documents[1].Document.Path);
     }
 
     [Fact]
@@ -519,8 +562,7 @@ public class WorkspaceViewModelTests : IDisposable
         string path = WriteMap("owned.bytes");
         MapDocumentViewModel opened = await OpenDocumentAsync(path);
         MapFileRevision revision = opened.Document.Revision!.Value;
-        MapDocumentViewModel untitled = _workspace.Documents[0];
-        _workspace.Activate(untitled);
+        MapDocumentViewModel untitled = await NewDocumentAsync();
         Paint(untitled.Session, 0, 0, new MapTileLayer(1, 1));
 
         _dialogs.SavePickResult = path;
@@ -532,7 +574,7 @@ public class WorkspaceViewModelTests : IDisposable
         Assert.True(untitled.Session.IsDirty);
         Assert.Null(untitled.Document.Path);
         Assert.Equal(revision, opened.Document.Revision);
-        Assert.Same(opened, _workspace.Documents[1]);
+        Assert.Same(opened, _workspace.Documents[0]);
     }
 
     [Fact]
@@ -540,7 +582,7 @@ public class WorkspaceViewModelTests : IDisposable
     {
         string path = WriteMap("released.bytes");
         MapDocumentViewModel owner = await OpenDocumentAsync(path);
-        MapDocumentViewModel remaining = _workspace.Documents[0];
+        MapDocumentViewModel remaining = await NewDocumentAsync();
 
         Assert.True(await _workspace.CloseAsync(owner));
         Paint(remaining.Session, 0, 0, new MapTileLayer(1, 1));

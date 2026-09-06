@@ -116,8 +116,20 @@ internal sealed class WorkspaceViewModel : ViewModelBase
                 return;
             }
 
+            MapDocumentViewModel? loneBlank = _documents.Count is 1
+                && _documents[0].Document.Path is null
+                && !_documents[0].Session.IsDirty
+                ? _documents[0]
+                : null;
+
             MapDocumentViewModel document = CreateDocument(opened.Document, full, opened.Revision);
             _documents.Add(document);
+
+            if (loneBlank is not null)
+            {
+                await CloseAsync(loneBlank);
+            }
+
             Activate(document);
         }
         catch (OutOfMemoryException)
