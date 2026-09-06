@@ -113,6 +113,24 @@ public class ReplacementPlannerTests
     }
 
     [Fact]
+    public void PlanSpawn_OtherMapDesiredRows_AreNeverInserted()
+    {
+        var planner = Planner();
+        var remote = new[] { new RemoteRow<NpcSpawnRow>(2, new NpcSpawnRow(1, 5, 10, 11)) };
+        var desired = new[]
+        {
+            new NpcSpawnRow(9, 9, 1, 2),
+            new NpcSpawnRow(1, 5, 10, 11),
+            new NpcSpawnRow(2, 5, 20, 21)
+        };
+
+        var plan = planner.PlanSpawnReplacement(remote, desired, 5);
+
+        Assert.Empty(plan.Deletes);
+        Assert.Equal(new[] { new[] { "2", "5", "20", "21" } }, plan.Inserts.Select(i => i.CellValues));
+    }
+
+    [Fact]
     public void PlanSpawn_MultipleUnmatchedDeletes_AreDescending()
     {
         var planner = Planner();
@@ -288,6 +306,24 @@ public class ReplacementPlannerTests
 
         Assert.Equal(new[] { new RowDelete(4) }, plan.Deletes);
         Assert.Empty(plan.Inserts);
+    }
+
+    [Fact]
+    public void PlanWarp_OtherMapDesiredRows_AreNeverInserted()
+    {
+        var planner = Planner();
+        var remote = new[] { new RemoteRow<WarpRow>(2, new WarpRow(5, 10, 11, 1, 12, 13)) };
+        var desired = new[]
+        {
+            new WarpRow(9, 1, 2, 1, 3, 4),
+            new WarpRow(5, 10, 11, 1, 12, 13),
+            new WarpRow(5, 20, 21, 2, 22, 23)
+        };
+
+        var plan = planner.PlanWarpReplacement(remote, desired, 5);
+
+        Assert.Empty(plan.Deletes);
+        Assert.Equal(new[] { new[] { "5", "20", "21", "2", "22", "23" } }, plan.Inserts.Select(i => i.CellValues));
     }
 
     [Fact]
