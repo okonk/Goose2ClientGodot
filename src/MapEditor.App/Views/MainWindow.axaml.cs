@@ -186,7 +186,15 @@ internal partial class MainWindow : Window
     }
 
     // A press on the close button must not select the tab it is about to close.
-    private void OnTabClosePressed(object? sender, PointerPressedEventArgs e) => e.Handled = true;
+    private void OnTabClosePressed(object? sender, PointerPressedEventArgs e)
+    {
+        e.Handled = true;
+        if (sender is Button { DataContext: MapDocumentViewModel document } button &&
+            e.GetCurrentPoint(button).Properties.IsMiddleButtonPressed)
+        {
+            _ = RunCommandAsync(() => _workspace.CloseAsync(document));
+        }
+    }
 
     private void OnTabCloseClicked(object? sender, RoutedEventArgs e)
     {
@@ -538,16 +546,20 @@ internal partial class MainWindow : Window
                 e.Handled = true;
                 break;
             case Key.D1 or Key.D2 or Key.D3 or Key.D4 or Key.D5 or Key.D6 or Key.D7 or Key.D8
-                when e.KeyModifiers == PrimaryModifier:
-                ActivateTabByIndex(e.Key - Key.D1 + 1);
+                 or Key.NumPad1 or Key.NumPad2 or Key.NumPad3 or Key.NumPad4 or Key.NumPad5
+                 or Key.NumPad6 or Key.NumPad7 or Key.NumPad8 when e.KeyModifiers == PrimaryModifier:
+                ActivateTabByIndex(DigitIndex(e.Key));
                 e.Handled = true;
                 break;
-            case Key.D9 when e.KeyModifiers == PrimaryModifier:
+            case Key.D9 or Key.NumPad9 when e.KeyModifiers == PrimaryModifier:
                 ActivateTabByIndex(_workspace.Documents.Count);
                 e.Handled = true;
                 break;
         }
     }
+
+    private static int DigitIndex(Key key)
+        => key <= Key.D8 ? key - Key.D1 + 1 : key - Key.NumPad1 + 1;
 
     private void CycleTab(int direction)
     {
