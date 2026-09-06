@@ -205,6 +205,22 @@ public class GameDataValidatorTests
         Assert.Equal(ValidationCodes.WarpDestinationNumericRange, error.Code);
     }
 
+    [Theory]
+    [InlineData(-1, 0)]
+    [InlineData(0, -1)]
+    public void ValidateWarps_WithNegativeDestinationWithinSqlRange_EmitsNumericRangeOnly(int warpX, int warpY)
+    {
+        var validator = new GameDataValidator(GameDataSchema.LoadEmbedded());
+        var rows = new List<WarpRow> { new(100, 5, 5, 200, warpX, warpY) };
+        var maps = new Dictionary<int, MapReference> { [200] = Map(200) };
+        var open = new Dictionary<int, MapDimensions>();
+
+        var result = validator.ValidateWarps(rows, maps, open, CurrentMap);
+
+        var error = Assert.Single(result.Errors);
+        Assert.Equal(ValidationCodes.WarpDestinationNumericRange, error.Code);
+    }
+
     [Fact]
     public void ValidateWarps_WithDestinationAboveSmallintRange_EmitsNumericRange()
     {

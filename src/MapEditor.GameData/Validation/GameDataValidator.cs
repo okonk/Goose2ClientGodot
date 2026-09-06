@@ -12,16 +12,14 @@ public sealed class GameDataValidator
     private const string WarpXColumn = "warp_x";
     private const string WarpYColumn = "warp_y";
 
-    private readonly int _warpXMin;
     private readonly int _warpXMax;
-    private readonly int _warpYMin;
     private readonly int _warpYMax;
 
     public GameDataValidator(GameDataSchema schema)
     {
         var sheet = schema.GetRequiredSheet(WarptilesSheet);
-        (_warpXMin, _warpXMax) = ResolveRowRange(WarpXColumn, sheet.GetRequiredColumn(WarpXColumn).Sql);
-        (_warpYMin, _warpYMax) = ResolveRowRange(WarpYColumn, sheet.GetRequiredColumn(WarpYColumn).Sql);
+        _warpXMax = ResolveRowRange(WarpXColumn, sheet.GetRequiredColumn(WarpXColumn).Sql).Max;
+        _warpYMax = ResolveRowRange(WarpYColumn, sheet.GetRequiredColumn(WarpYColumn).Sql).Max;
     }
 
     public ValidationResult ValidateSpawns(
@@ -83,11 +81,12 @@ public sealed class GameDataValidator
                 errors.Add(new ValidationIssue(ValidationCodes.WarpDestinationMapNotFound,
                     $"Warp destination map '{row.WarpId}' was not found."));
             }
-            if (row.WarpX < _warpXMin || row.WarpX > _warpXMax || row.WarpY < _warpYMin || row.WarpY > _warpYMax)
+            // Negative destination coordinates block Push, so the lower bound is 0, not the SQL type minimum.
+            if (row.WarpX < 0 || row.WarpX > _warpXMax || row.WarpY < 0 || row.WarpY > _warpYMax)
             {
                 errors.Add(new ValidationIssue(ValidationCodes.WarpDestinationNumericRange,
-                    $"Warp destination ({row.WarpX}, {row.WarpY}) is outside the generated SQL range " +
-                    $"({_warpXMin}..{_warpXMax}, {_warpYMin}..{_warpYMax})."));
+                    $"Warp destination ({row.WarpX}, {row.WarpY}) is outside the allowed range " +
+                    $"(0..{_warpXMax}, 0..{_warpYMax})."));
             }
             if (openMapDimensions.TryGetValue(row.WarpId, out var destination)
                 && !IsWithin(row.WarpX, row.WarpY, destination))
