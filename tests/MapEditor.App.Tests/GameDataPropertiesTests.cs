@@ -30,99 +30,11 @@ public class GameDataPropertiesTests
     private static readonly NpcAppearance Npc2 = new(2, "Duck", 0, 0, new RgbaValue(255, 255, 255, 255), 0, 0, new RgbaValue(255, 255, 255, 255), string.Empty);
 
     [AvaloniaFact]
-    public void SpawnSourceCoordinates_CommitOnFocusLossAsOneMoveCommand()
-    {
-        using MainWindowHarness harness = MainWindowHarness.Create();
-        harness.ViewModel.GameData!.AttachSession(Session());
-        harness.ViewModel.GameData.SelectedSpawn = 0;
-        Dispatcher.UIThread.RunJobs();
-
-        TextBox x = Control<TextBox>(harness, "SpawnSourceX");
-        TextBox y = Control<TextBox>(harness, "SpawnSourceY");
-        Assert.Equal("3", x.Text);
-        Assert.Equal("4", y.Text);
-
-        x.Focus();
-        x.Text = "1";
-        y.Text = "2";
-        harness.Canvas.Focus();
-        Dispatcher.UIThread.RunJobs();
-
-        NpcSpawnRow spawn = harness.ViewModel.GameData.Session!.Edits.Spawns[0];
-        Assert.Equal((1, 2), (spawn.MapX, spawn.MapY));
-        Assert.True(harness.ViewModel.Timeline.CanUndo);
-        Assert.True(harness.ViewModel.Undo());
-        spawn = harness.ViewModel.GameData.Session.Edits.Spawns[0];
-        Assert.Equal((3, 4), (spawn.MapX, spawn.MapY));
-        Assert.False(harness.ViewModel.Timeline.CanUndo);
-    }
-
-    [AvaloniaFact]
-    public void SpawnSourceCoordinates_InvalidText_RetainsFocusAndErrorWithoutMutation()
-    {
-        using MainWindowHarness harness = MainWindowHarness.Create();
-        harness.ViewModel.GameData!.AttachSession(Session());
-        harness.ViewModel.GameData.SelectedSpawn = 0;
-        Dispatcher.UIThread.RunJobs();
-
-        TextBox x = Control<TextBox>(harness, "SpawnSourceX");
-        TextBox y = Control<TextBox>(harness, "SpawnSourceY");
-
-        x.Focus();
-        x.Text = "abc";
-        y.Focus();
-        Dispatcher.UIThread.RunJobs();
-
-        Assert.True(x.IsFocused);
-        Assert.Equal("abc", x.Text);
-        Assert.NotNull(x.BorderBrush);
-        Assert.Null(y.BorderBrush);
-        NpcSpawnRow spawn = harness.ViewModel.GameData.Session!.Edits.Spawns[0];
-        Assert.Equal((3, 4), (spawn.MapX, spawn.MapY));
-        Assert.False(harness.ViewModel.Timeline.CanUndo);
-
-        x.Text = "5";
-        y.Focus();
-        Dispatcher.UIThread.RunJobs();
-
-        Assert.True(y.IsFocused);
-        Assert.Null(x.BorderBrush);
-        spawn = harness.ViewModel.GameData.Session.Edits.Spawns[0];
-        Assert.Equal((5, 4), (spawn.MapX, spawn.MapY));
-    }
-
-    [AvaloniaFact]
-    public void WarpSourceCoordinates_CommitOnFocusLossAsOneMoveCommand()
-    {
-        using MainWindowHarness harness = MainWindowHarness.Create();
-        harness.ViewModel.GameData!.AttachSession(Session());
-        harness.ViewModel.GameData.SelectedWarp = 0;
-        Dispatcher.UIThread.RunJobs();
-
-        TextBox x = Control<TextBox>(harness, "WarpSourceX");
-        TextBox y = Control<TextBox>(harness, "WarpSourceY");
-        Assert.Equal("5", x.Text);
-        Assert.Equal("6", y.Text);
-
-        x.Focus();
-        x.Text = "1";
-        y.Text = "2";
-        harness.Canvas.Focus();
-        Dispatcher.UIThread.RunJobs();
-
-        WarpRow warp = harness.ViewModel.GameData.Session!.Edits.Warps[0];
-        Assert.Equal((1, 2), (warp.MapX, warp.MapY));
-        Assert.True(harness.ViewModel.Timeline.CanUndo);
-        Assert.True(harness.ViewModel.Undo());
-        warp = harness.ViewModel.GameData.Session.Edits.Warps[0];
-        Assert.Equal((5, 6), (warp.MapX, warp.MapY));
-    }
-
-    [AvaloniaFact]
     public void WarpDestinationCoordinates_CommitOnFocusLossAsOneUpdateCommand()
     {
         using MainWindowHarness harness = MainWindowHarness.Create();
         harness.ViewModel.GameData!.AttachSession(Session());
+        Control<ToggleButton>(harness, "WarpTool").IsChecked = true;
         harness.ViewModel.GameData.SelectedWarp = 0;
         Dispatcher.UIThread.RunJobs();
 
@@ -150,6 +62,7 @@ public class GameDataPropertiesTests
     {
         using MainWindowHarness harness = MainWindowHarness.Create();
         harness.ViewModel.GameData!.AttachSession(Session());
+        Control<ToggleButton>(harness, "WarpTool").IsChecked = true;
         harness.ViewModel.GameData.SelectedWarp = 0;
         Dispatcher.UIThread.RunJobs();
 
@@ -334,47 +247,23 @@ public class GameDataPropertiesTests
     }
 
     [AvaloniaFact]
-    public void SessionReplacement_ClearsStalePrefillWhileTheToolIsActive()
+    public void SessionReplacement_ClearsThePickerWhileTheToolIsActive()
     {
         using MainWindowHarness harness = MainWindowHarness.Create();
         harness.ViewModel.GameData!.AttachSession(SessionWithSpawn(3, 4));
         harness.ViewModel.GameData.SelectedSpawn = 0;
         Dispatcher.UIThread.RunJobs();
-        Assert.Equal("3", Control<TextBox>(harness, "SpawnSourceX").Text);
 
         Control<ToggleButton>(harness, "SpawnTool").IsChecked = true;
         Dispatcher.UIThread.RunJobs();
+        Assert.Equal(Npc1, Control<SearchPickerControl<NpcAppearance>>(harness, "SpawnNpcPicker").SelectedItem);
 
         harness.ViewModel.GameData.AttachSession(SessionWithSpawn(9, 9));
         Dispatcher.UIThread.RunJobs();
 
         Assert.Null(harness.ViewModel.GameData.SelectedSpawn);
         Assert.True(Control<StackPanel>(harness, "SpawnProperties").IsVisible);
-        Assert.Equal(string.Empty, Control<TextBox>(harness, "SpawnSourceX").Text);
-        Assert.Equal(string.Empty, Control<TextBox>(harness, "SpawnSourceY").Text);
-    }
-
-    [AvaloniaFact]
-    public void WarpSourceCoordinates_DuplicateSource_SurfacesErrorWithoutMutation()
-    {
-        using MainWindowHarness harness = MainWindowHarness.Create();
-        harness.ViewModel.GameData!.AttachSession(DuplicateWarpSession());
-        harness.ViewModel.GameData.SelectedWarp = 0;
-        Dispatcher.UIThread.RunJobs();
-
-        TextBox x = Control<TextBox>(harness, "WarpSourceX");
-        TextBox y = Control<TextBox>(harness, "WarpSourceY");
-        x.Focus();
-        x.Text = "9";
-        y.Text = "9";
-        harness.Canvas.Focus();
-        Dispatcher.UIThread.RunJobs();
-
-        WarpRow[] warps = harness.ViewModel.GameData.Session!.Edits.Warps.ToArray();
-        Assert.Equal((5, 6), (warps[0].MapX, warps[0].MapY));
-        Assert.Equal((9, 9), (warps[1].MapX, warps[1].MapY));
-        Assert.Single(harness.Dialogs.Errors);
-        Assert.False(harness.ViewModel.Timeline.CanUndo);
+        Assert.True(Control<SearchPickerControl<NpcAppearance>>(harness, "SpawnNpcPicker").SelectedItem == default);
     }
 
     private static T Control<T>(MainWindowHarness harness, string name) where T : Control
@@ -388,16 +277,6 @@ public class GameDataPropertiesTests
             new Dictionary<int, NpcAppearance> { [1] = Npc1, [2] = Npc2 },
             new List<RemoteRow<NpcSpawnRow>> { new(2, new NpcSpawnRow(1, 10, 3, 4)), new(3, new NpcSpawnRow(2, 10, 7, 8)) },
             new List<RemoteRow<WarpRow>> { new(2, new WarpRow(10, 5, 6, 7, 8, 9)) });
-        return new GameDataSyncSession("sheet", 10, data);
-    }
-
-    private static GameDataSyncSession DuplicateWarpSession()
-    {
-        var data = new RemoteGameData(
-            new[] { Map10 },
-            new Dictionary<int, NpcAppearance> { [1] = Npc1 },
-            new List<RemoteRow<NpcSpawnRow>>(),
-            new List<RemoteRow<WarpRow>> { new(2, new WarpRow(10, 5, 6, 7, 8, 9)), new(3, new WarpRow(10, 9, 9, 20, 1, 1)) });
         return new GameDataSyncSession("sheet", 10, data);
     }
 

@@ -58,25 +58,7 @@ internal sealed class DocumentGameDataState : IDisposable, INotifyPropertyChange
     public GameDataTool ActiveTool
     {
         get => _activeTool;
-        set
-        {
-            if (!SetField(ref _activeTool, value))
-            {
-                return;
-            }
-
-            switch (value)
-            {
-                case GameDataTool.Spawn:
-                    ShowSpawnOverlay = true;
-                    ShowWarpOverlay = false;
-                    break;
-                case GameDataTool.Warp:
-                    ShowWarpOverlay = true;
-                    ShowSpawnOverlay = false;
-                    break;
-            }
-        }
+        set => SetField(ref _activeTool, value);
     }
 
     public bool ShowSpawnOverlay

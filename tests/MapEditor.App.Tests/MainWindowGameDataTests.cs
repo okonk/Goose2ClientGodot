@@ -339,8 +339,6 @@ public class MainWindowGameDataTests
         Assert.False(mapPanel.IsVisible);
         Assert.False(warpPanel.IsVisible);
         Assert.IsType<SearchPickerControl<NpcAppearance>>(Control<Control>(harness, "SpawnNpcPicker"));
-        Assert.NotNull(Control<TextBox>(harness, "SpawnSourceX"));
-        Assert.NotNull(Control<TextBox>(harness, "SpawnSourceY"));
         Assert.NotNull(Control<Button>(harness, "SpawnDeleteButton"));
         Assert.False(Control<ToggleButton>(harness, "PencilTool").IsChecked == true);
     }
@@ -359,8 +357,6 @@ public class MainWindowGameDataTests
         Assert.False(mapPanel.IsVisible);
         Assert.False(spawnPanel.IsVisible);
         Assert.IsType<SearchPickerControl<MapReference>>(Control<Control>(harness, "WarpDestinationPicker"));
-        Assert.NotNull(Control<TextBox>(harness, "WarpSourceX"));
-        Assert.NotNull(Control<TextBox>(harness, "WarpSourceY"));
         Assert.NotNull(Control<TextBox>(harness, "WarpDestinationX"));
         Assert.NotNull(Control<TextBox>(harness, "WarpDestinationY"));
         Assert.NotNull(Control<Button>(harness, "WarpUseSelectedTileButton"));
@@ -454,7 +450,7 @@ public class MainWindowGameDataTests
     }
 
     [AvaloniaFact]
-    public void SelectedSpawn_ShowsSpawnPropertiesWithAnOrdinaryTool()
+    public void SelectedSpawn_WithAnOrdinaryTool_KeepsTheMapPanel()
     {
         using MainWindowHarness harness = MainWindowHarness.Create();
         harness.ViewModel.GameData!.AttachSession(Session());
@@ -462,11 +458,49 @@ public class MainWindowGameDataTests
         harness.ViewModel.GameData.SelectedSpawn = 0;
         Dispatcher.UIThread.RunJobs();
 
-        Assert.True(Control<StackPanel>(harness, "SpawnProperties").IsVisible);
+        Assert.True(Control<StackPanel>(harness, "RightPanel").IsVisible);
+        Assert.False(Control<StackPanel>(harness, "SpawnProperties").IsVisible);
+        Assert.False(Control<StackPanel>(harness, "WarpProperties").IsVisible);
+
+        Control<ToggleButton>(harness, "SpawnTool").IsChecked = true;
+        Dispatcher.UIThread.RunJobs();
+
         Assert.False(Control<StackPanel>(harness, "RightPanel").IsVisible);
+        Assert.True(Control<StackPanel>(harness, "SpawnProperties").IsVisible);
         Assert.True(Control<Button>(harness, "SpawnDeleteButton").IsEnabled);
-        Assert.Equal("3", Control<TextBox>(harness, "SpawnSourceX").Text);
-        Assert.Equal("4", Control<TextBox>(harness, "SpawnSourceY").Text);
+    }
+
+    [AvaloniaFact]
+    public void SelectedSpawn_SyncsTheNpcPickerToTheSpawnNpc()
+    {
+        using MainWindowHarness harness = MainWindowHarness.Create();
+        harness.ViewModel.GameData!.AttachSession(Session());
+        Control<ToggleButton>(harness, "SpawnTool").IsChecked = true;
+        Dispatcher.UIThread.RunJobs();
+
+        harness.ViewModel.GameData.SelectedSpawn = 0;
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Equal(Npc1, Control<SearchPickerControl<NpcAppearance>>(harness, "SpawnNpcPicker").SelectedItem);
+    }
+
+    [AvaloniaFact]
+    public void SelectedWarp_SyncsTheDestinationPickerToTheWarpMap()
+    {
+        using MainWindowHarness harness = MainWindowHarness.Create();
+        var data = new RemoteGameData(
+            Maps,
+            new Dictionary<int, NpcAppearance> { [1] = Npc1 },
+            new List<RemoteRow<NpcSpawnRow>>(),
+            new List<RemoteRow<WarpRow>> { new(2, new WarpRow(10, 5, 6, 20, 8, 9)) });
+        harness.ViewModel.GameData!.AttachSession(new GameDataSyncSession("sheet", 10, data));
+        Control<ToggleButton>(harness, "WarpTool").IsChecked = true;
+        Dispatcher.UIThread.RunJobs();
+
+        harness.ViewModel.GameData.SelectedWarp = 0;
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Equal(Map20, Control<SearchPickerControl<MapReference>>(harness, "WarpDestinationPicker").SelectedItem);
     }
 
     [AvaloniaFact]
@@ -488,15 +522,15 @@ public class MainWindowGameDataTests
     }
 
     [AvaloniaFact]
-    public async Task RightPanel_Prefill_UsesTheActiveDocumentRowAfterSwitch()
+    public async Task RightPanel_Picker_UsesTheActiveDocumentRowAfterSwitch()
     {
         using MainWindowHarness harness = MainWindowHarness.Create();
         MapDocumentViewModel first = harness.ViewModel;
         first.GameData!.AttachSession(SessionWithSpawn(3, 4));
         first.GameData.SelectedSpawn = 0;
+        Control<ToggleButton>(harness, "SpawnTool").IsChecked = true;
         Dispatcher.UIThread.RunJobs();
-        Assert.Equal("3", Control<TextBox>(harness, "SpawnSourceX").Text);
-        Assert.Equal("4", Control<TextBox>(harness, "SpawnSourceY").Text);
+        Assert.Equal(Npc1, Control<SearchPickerControl<NpcAppearance>>(harness, "SpawnNpcPicker").SelectedItem);
 
         harness.Dialogs.NewMapResult = new NewMapRequest(100, 100);
         await harness.Workspace.NewAsync();
@@ -504,13 +538,11 @@ public class MainWindowGameDataTests
         second.GameData!.AttachSession(SessionWithSpawn(40, 50));
         second.GameData.SelectedSpawn = 0;
         Dispatcher.UIThread.RunJobs();
-        Assert.Equal("40", Control<TextBox>(harness, "SpawnSourceX").Text);
-        Assert.Equal("50", Control<TextBox>(harness, "SpawnSourceY").Text);
+        Assert.True(Control<SearchPickerControl<NpcAppearance>>(harness, "SpawnNpcPicker").SelectedItem == default);
 
         harness.Workspace.Activate(first);
         Dispatcher.UIThread.RunJobs();
-        Assert.Equal("3", Control<TextBox>(harness, "SpawnSourceX").Text);
-        Assert.Equal("4", Control<TextBox>(harness, "SpawnSourceY").Text);
+        Assert.Equal(Npc1, Control<SearchPickerControl<NpcAppearance>>(harness, "SpawnNpcPicker").SelectedItem);
     }
 
     [AvaloniaFact]

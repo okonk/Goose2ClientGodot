@@ -49,8 +49,6 @@ internal partial class MainWindow : Window
     private MapDocumentViewModel? _dragDocument;
     private IPointer? _dragPointer;
     private int _dragIndex;
-    private int? _spawnPrefillSelection;
-    private long _spawnPrefillVersion = -1;
     private int? _warpPrefillSelection;
     private long _warpPrefillVersion = -1;
     private GameDataSyncSession? _prefillSession;
@@ -81,22 +79,10 @@ internal partial class MainWindow : Window
         WarpDestinationPicker.ItemText = map => $"{map.MapId}  {map.MapName}  {map.MapFilename}";
         SpawnNpcPicker.PropertyChanged += OnSpawnNpcPickerChanged;
         WarpDestinationPicker.PropertyChanged += OnWarpDestinationPickerChanged;
-        SpawnSourceX.LostFocus += OnSpawnSourceFieldLostFocus;
-        SpawnSourceY.LostFocus += OnSpawnSourceFieldLostFocus;
-        SpawnSourceX.KeyDown += OnSpawnSourceFieldKeyDown;
-        SpawnSourceY.KeyDown += OnSpawnSourceFieldKeyDown;
-        WarpSourceX.LostFocus += OnWarpSourceFieldLostFocus;
-        WarpSourceY.LostFocus += OnWarpSourceFieldLostFocus;
-        WarpSourceX.KeyDown += OnWarpSourceFieldKeyDown;
-        WarpSourceY.KeyDown += OnWarpSourceFieldKeyDown;
         WarpDestinationX.LostFocus += OnWarpDestinationFieldLostFocus;
         WarpDestinationY.LostFocus += OnWarpDestinationFieldLostFocus;
         WarpDestinationX.KeyDown += OnWarpDestinationFieldKeyDown;
         WarpDestinationY.KeyDown += OnWarpDestinationFieldKeyDown;
-        SpawnSourceX.PropertyChanged += OnSpawnSourceFieldTextChanged;
-        SpawnSourceY.PropertyChanged += OnSpawnSourceFieldTextChanged;
-        WarpSourceX.PropertyChanged += OnWarpSourceFieldTextChanged;
-        WarpSourceY.PropertyChanged += OnWarpSourceFieldTextChanged;
         WarpDestinationX.PropertyChanged += OnWarpDestinationFieldTextChanged;
         WarpDestinationY.PropertyChanged += OnWarpDestinationFieldTextChanged;
         AddHandler(InputElement.PointerPressedEvent, OnWindowPointerPressed, RoutingStrategies.Tunnel);
@@ -395,8 +381,6 @@ internal partial class MainWindow : Window
         SyncBrushFields();
         SyncReadouts();
         SyncAssetDirectory();
-        _spawnPrefillSelection = null;
-        _spawnPrefillVersion = -1;
         _warpPrefillSelection = null;
         _warpPrefillVersion = -1;
         _prefillSession = document.GameData?.Session;
@@ -846,29 +830,7 @@ internal partial class MainWindow : Window
         SyncUseSelectedTileButton();
     }
 
-    private void OnSpawnSourceFieldLostFocus(object? sender, RoutedEventArgs e) => CommitSpawnSourceFields();
-
-    private void OnWarpSourceFieldLostFocus(object? sender, RoutedEventArgs e) => CommitWarpSourceFields();
-
     private void OnWarpDestinationFieldLostFocus(object? sender, RoutedEventArgs e) => CommitWarpDestinationFields();
-
-    private void OnSpawnSourceFieldKeyDown(object? sender, KeyEventArgs e)
-    {
-        if (e.Key == Key.Enter)
-        {
-            CommitSpawnSourceFields();
-            e.Handled = true;
-        }
-    }
-
-    private void OnWarpSourceFieldKeyDown(object? sender, KeyEventArgs e)
-    {
-        if (e.Key == Key.Enter)
-        {
-            CommitWarpSourceFields();
-            e.Handled = true;
-        }
-    }
 
     private void OnWarpDestinationFieldKeyDown(object? sender, KeyEventArgs e)
     {
@@ -877,36 +839,6 @@ internal partial class MainWindow : Window
             CommitWarpDestinationFields();
             e.Handled = true;
         }
-    }
-
-    private void CommitSpawnSourceFields()
-    {
-        bool xOk = int.TryParse(SpawnSourceX.Text, out int x) && InBounds(x, 0);
-        bool yOk = int.TryParse(SpawnSourceY.Text, out int y) && InBounds(0, y);
-        SpawnSourceX.BorderBrush = xOk ? null : FieldErrorBrush;
-        SpawnSourceY.BorderBrush = yOk ? null : FieldErrorBrush;
-        if (!xOk || !yOk)
-        {
-            (xOk ? SpawnSourceY : SpawnSourceX).Focus();
-            return;
-        }
-
-        Document.CommitSpawnCoordinates(x, y);
-    }
-
-    private void CommitWarpSourceFields()
-    {
-        bool xOk = int.TryParse(WarpSourceX.Text, out int x) && InBounds(x, 0);
-        bool yOk = int.TryParse(WarpSourceY.Text, out int y) && InBounds(0, y);
-        WarpSourceX.BorderBrush = xOk ? null : FieldErrorBrush;
-        WarpSourceY.BorderBrush = yOk ? null : FieldErrorBrush;
-        if (!xOk || !yOk)
-        {
-            (xOk ? WarpSourceY : WarpSourceX).Focus();
-            return;
-        }
-
-        Document.CommitWarpSourceCoordinates(x, y);
     }
 
     private void CommitWarpDestinationFields()
@@ -922,28 +854,6 @@ internal partial class MainWindow : Window
         }
 
         Document.CommitWarpDestinationCoordinates(x, y);
-    }
-
-    private void OnSpawnSourceFieldTextChanged(object? sender, AvaloniaPropertyChangedEventArgs e)
-    {
-        if (e.Property != TextBox.TextProperty)
-        {
-            return;
-        }
-
-        SpawnSourceX.BorderBrush = int.TryParse(SpawnSourceX.Text, out int x) && InBounds(x, 0) ? null : FieldErrorBrush;
-        SpawnSourceY.BorderBrush = int.TryParse(SpawnSourceY.Text, out int y) && InBounds(0, y) ? null : FieldErrorBrush;
-    }
-
-    private void OnWarpSourceFieldTextChanged(object? sender, AvaloniaPropertyChangedEventArgs e)
-    {
-        if (e.Property != TextBox.TextProperty)
-        {
-            return;
-        }
-
-        WarpSourceX.BorderBrush = int.TryParse(WarpSourceX.Text, out int x) && InBounds(x, 0) ? null : FieldErrorBrush;
-        WarpSourceY.BorderBrush = int.TryParse(WarpSourceY.Text, out int y) && InBounds(0, y) ? null : FieldErrorBrush;
     }
 
     private void OnWarpDestinationFieldTextChanged(object? sender, AvaloniaPropertyChangedEventArgs e)
@@ -1285,8 +1195,6 @@ internal partial class MainWindow : Window
         if (!ReferenceEquals(_prefillSession, session))
         {
             _prefillSession = session;
-            _spawnPrefillSelection = null;
-            _spawnPrefillVersion = -1;
             _warpPrefillSelection = null;
             _warpPrefillVersion = -1;
             SpawnNpcPicker.SelectedItem = default;
@@ -1324,33 +1232,17 @@ internal partial class MainWindow : Window
     private void SyncRightPanel()
     {
         DocumentGameDataState state = Document.GameData!;
-        bool showSpawn = state.ActiveTool == GameDataTool.Spawn || state.SelectedSpawn is not null;
-        bool showWarp = state.ActiveTool == GameDataTool.Warp || state.SelectedWarp is not null;
-        bool spawnWasVisible = SpawnProperties.IsVisible;
+        bool showSpawn = state.ActiveTool == GameDataTool.Spawn;
+        bool showWarp = state.ActiveTool == GameDataTool.Warp;
         bool warpWasVisible = WarpProperties.IsVisible;
         RightPanel.IsVisible = !showSpawn && !showWarp;
         SpawnProperties.IsVisible = showSpawn;
         WarpProperties.IsVisible = showWarp;
         SpawnNpcPicker.Items = state.Session?.Npcs.Values.OrderBy(npc => npc.NpcId).ToList() ?? new List<NpcAppearance>();
         WarpDestinationPicker.Items = state.Session?.Maps ?? Array.Empty<MapReference>();
-        if (!showSpawn)
-        {
-            _spawnPrefillSelection = null;
-        }
-
-        if (!showWarp)
-        {
-            _warpPrefillSelection = null;
-        }
-
         if (showSpawn)
         {
-            SyncSpawnProperties(state, spawnWasVisible);
-        }
-        else
-        {
-            _spawnPrefillSelection = null;
-            _spawnPrefillVersion = -1;
+            SyncSpawnProperties(state);
         }
 
         if (showWarp)
@@ -1364,31 +1256,16 @@ internal partial class MainWindow : Window
         }
     }
 
-    private void SyncSpawnProperties(DocumentGameDataState state, bool wasVisible)
+    private void SyncSpawnProperties(DocumentGameDataState state)
     {
         SpawnDeleteButton.IsEnabled = state.SelectedSpawn is not null;
-        long version = state.Session?.Edits.HistoryVersion ?? -1;
-        if (wasVisible && state.SelectedSpawn == _spawnPrefillSelection && version == _spawnPrefillVersion)
-        {
-            return;
-        }
-
-        _spawnPrefillSelection = state.SelectedSpawn;
-        _spawnPrefillVersion = version;
         if (state.SelectedSpawn is { } index && state.Session is { } session && index < session.Edits.Spawns.Count)
         {
             NpcSpawnRow spawn = session.Edits.Spawns[index];
-            SpawnSourceX.Text = spawn.MapX.ToString();
-            SpawnSourceY.Text = spawn.MapY.ToString();
-            SpawnSourceX.BorderBrush = null;
-            SpawnSourceY.BorderBrush = null;
-        }
-        else
-        {
-            SpawnSourceX.Text = string.Empty;
-            SpawnSourceY.Text = string.Empty;
-            SpawnSourceX.BorderBrush = null;
-            SpawnSourceY.BorderBrush = null;
+            if (session.Npcs.TryGetValue(spawn.NpcId, out NpcAppearance npc))
+            {
+                SpawnNpcPicker.SelectedItem = npc;
+            }
         }
     }
 
@@ -1406,21 +1283,17 @@ internal partial class MainWindow : Window
         if (state.SelectedWarp is { } index && state.Session is { } session && index < session.Edits.Warps.Count)
         {
             WarpRow warp = session.Edits.Warps[index];
-            WarpSourceX.Text = warp.MapX.ToString();
-            WarpSourceY.Text = warp.MapY.ToString();
+            if (session.Maps.FirstOrDefault(map => map.MapId == warp.WarpId) is { } destination)
+            {
+                WarpDestinationPicker.SelectedItem = destination;
+            }
             WarpDestinationX.Text = warp.WarpX.ToString();
             WarpDestinationY.Text = warp.WarpY.ToString();
-            WarpSourceX.BorderBrush = null;
-            WarpSourceY.BorderBrush = null;
             WarpDestinationX.BorderBrush = null;
             WarpDestinationY.BorderBrush = null;
         }
         else
         {
-            WarpSourceX.Text = string.Empty;
-            WarpSourceY.Text = string.Empty;
-            WarpSourceX.BorderBrush = null;
-            WarpSourceY.BorderBrush = null;
             WarpDestinationX.Text = state.PendingDestinationX?.ToString() ?? string.Empty;
             WarpDestinationY.Text = state.PendingDestinationY?.ToString() ?? string.Empty;
             WarpDestinationX.BorderBrush = null;

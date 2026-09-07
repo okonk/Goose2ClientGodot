@@ -466,8 +466,6 @@ public class ShortcutTests
         MenuItem undo = Control<MenuItem>(harness, "UndoCommand");
         MenuItem redo = Control<MenuItem>(harness, "RedoCommand");
         StackPanel spawnPanel = Control<StackPanel>(harness, "SpawnProperties");
-        TextBox spawnX = Control<TextBox>(harness, "SpawnSourceX");
-        TextBox spawnY = Control<TextBox>(harness, "SpawnSourceY");
         Button spawnDelete = Control<Button>(harness, "SpawnDeleteButton");
 
         PaintCell(harness);
@@ -475,8 +473,6 @@ public class ShortcutTests
         Assert.Null(vm.FindSpawnAt(5, 6));
         Assert.True(vm.GameData.ShowSpawnOverlay);
         Assert.False(spawnPanel.IsVisible);
-        Assert.Null(spawnX.Text);
-        Assert.Null(spawnY.Text);
         Assert.False(spawnDelete.IsEnabled);
         Assert.True(vm.IsDirty);
         Assert.Contains("*", window.Title);
@@ -497,8 +493,6 @@ public class ShortcutTests
         Assert.Equal(1, vm.FindSpawnAt(5, 6));
         Assert.True(vm.GameData.ShowSpawnOverlay);
         Assert.True(spawnPanel.IsVisible);
-        Assert.Equal("5", spawnX.Text);
-        Assert.Equal("6", spawnY.Text);
         Assert.True(spawnDelete.IsEnabled);
         Assert.Equal(new MapTileLayer(1, 1), vm.Session.Document[0, 0].GetLayer(0));
         Assert.True(vm.IsDirty);
@@ -514,8 +508,6 @@ public class ShortcutTests
         Assert.Null(vm.GameData.SelectedSpawn);
         Assert.Equal(new MapTileLayer(1, 1), vm.Session.Document[0, 0].GetLayer(0));
         Assert.True(spawnPanel.IsVisible);
-        Assert.Equal(string.Empty, spawnX.Text);
-        Assert.Equal(string.Empty, spawnY.Text);
         Assert.False(spawnDelete.IsEnabled);
         Assert.True(vm.IsDirty);
         Assert.Contains("*", window.Title);
@@ -529,8 +521,6 @@ public class ShortcutTests
         Assert.Null(vm.FindSpawnAt(5, 6));
         Assert.True(vm.GameData.ShowSpawnOverlay);
         Assert.True(spawnPanel.IsVisible);
-        Assert.Equal(string.Empty, spawnX.Text);
-        Assert.Equal(string.Empty, spawnY.Text);
         Assert.False(spawnDelete.IsEnabled);
         Assert.False(vm.IsDirty);
         Assert.DoesNotContain("*", window.Title);
@@ -544,8 +534,6 @@ public class ShortcutTests
         Assert.Null(vm.FindSpawnAt(5, 6));
         Assert.True(vm.GameData.ShowSpawnOverlay);
         Assert.True(spawnPanel.IsVisible);
-        Assert.Equal(string.Empty, spawnX.Text);
-        Assert.Equal(string.Empty, spawnY.Text);
         Assert.False(spawnDelete.IsEnabled);
         Assert.True(vm.IsDirty);
         Assert.Contains("*", window.Title);
@@ -561,8 +549,6 @@ public class ShortcutTests
         Assert.Equal(1, vm.FindSpawnAt(5, 6));
         Assert.True(vm.GameData.ShowSpawnOverlay);
         Assert.True(spawnPanel.IsVisible);
-        Assert.Equal(string.Empty, spawnX.Text);
-        Assert.Equal(string.Empty, spawnY.Text);
         Assert.False(spawnDelete.IsEnabled);
         Assert.True(vm.IsDirty);
         Assert.Contains("*", window.Title);
@@ -602,15 +588,17 @@ public class ShortcutTests
         Dispatcher.UIThread.RunJobs();
         Assert.Contains("a", searchBox.Text);
 
-        TextBox sourceX = Control<TextBox>(harness, "SpawnSourceX");
-        sourceX.Focus();
+        Control<ToggleButton>(harness, "WarpTool").IsChecked = true;
+        Dispatcher.UIThread.RunJobs();
+        TextBox destinationX = Control<TextBox>(harness, "WarpDestinationX");
+        destinationX.Focus();
         Dispatcher.UIThread.RunJobs();
 
         PressClipboardAndDeleteKeys(window);
 
         Assert.Null(harness.Workspace.Clipboard.Current);
-        Assert.Single(vm.GameData.Session.Edits.Spawns);
-        Assert.True(sourceX.IsFocused);
+        Assert.Empty(vm.GameData.Session.Edits.Warps);
+        Assert.True(destinationX.IsFocused);
     }
 
     private static void PressClipboardAndDeleteKeys(MainWindow window)

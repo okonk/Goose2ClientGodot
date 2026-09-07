@@ -170,11 +170,13 @@ public class SearchPickerControl<T> : UserControl
         }
 
         int index = -1;
-        if (SelectedItem is { } selected)
+        // T may be a struct, where "no selection" is default(T) rather than null.
+        bool hasSelection = !EqualityComparer<T>.Default.Equals(SelectedItem, default!);
+        if (hasSelection)
         {
             for (int i = 0; i < _results.Items.Count; i++)
             {
-                if (_results.Items[i] is ListBoxItem { Tag: T tag } && Equals(tag, selected))
+                if (_results.Items[i] is ListBoxItem { Tag: T tag } && EqualityComparer<T>.Default.Equals(tag, SelectedItem))
                 {
                     index = i;
                     break;
@@ -183,6 +185,6 @@ public class SearchPickerControl<T> : UserControl
         }
 
         _results.SelectedIndex = index < 0 ? 0 : index;
-        _selectionText.Text = SelectedItem is { } item && ItemText is { } project ? project(item) : "—";
+        _selectionText.Text = hasSelection && ItemText is { } project ? project(SelectedItem) : "—";
     }
 }

@@ -184,11 +184,6 @@
           <StackPanel Spacing="8">
             <TextBlock Text="NPC" Classes="muted" FontSize="11" />
             <controls:SearchPickerControl x:Name="SpawnNpcPicker" x:TypeArguments="rows:NpcAppearance" />
-            <StackPanel Orientation="Horizontal" Spacing="6">
-              <TextBlock Text="Source" Classes="muted" VerticalAlignment="Center" />
-              <TextBox x:Name="SpawnSourceX" Width="58" />
-              <TextBox x:Name="SpawnSourceY" Width="58" />
-            </StackPanel>
             <Button x:Name="SpawnDeleteButton" Content="Delete" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" IsEnabled="False" Click="OnSpawnDelete" />
           </StackPanel>
         </Border>
@@ -199,11 +194,6 @@
           <StackPanel Spacing="8">
             <TextBlock Text="Destination map" Classes="muted" FontSize="11" />
             <controls:SearchPickerControl x:Name="WarpDestinationPicker" x:TypeArguments="rows:MapReference" />
-            <StackPanel Orientation="Horizontal" Spacing="6">
-              <TextBlock Text="Source" Classes="muted" VerticalAlignment="Center" />
-              <TextBox x:Name="WarpSourceX" Width="58" />
-              <TextBox x:Name="WarpSourceY" Width="58" />
-            </StackPanel>
             <StackPanel Orientation="Horizontal" Spacing="6">
               <TextBlock Text="Destination" Classes="muted" VerticalAlignment="Center" />
               <TextBox x:Name="WarpDestinationX" Width="58" />

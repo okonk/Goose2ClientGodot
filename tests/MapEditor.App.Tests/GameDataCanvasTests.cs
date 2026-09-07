@@ -85,30 +85,18 @@ public class GameDataCanvasTests
     }
 
     [AvaloniaFact]
-    public void ActiveTool_Spawn_ShowsSpawnOverlayAndHidesWarpOverlay()
-    {
-        Harness harness = CreateHarness();
-        DocumentGameDataState gameData = harness.ViewModel.GameData!;
-        gameData.ShowSpawnOverlay = false;
-        gameData.ShowWarpOverlay = true;
-
-        gameData.ActiveTool = GameDataTool.Spawn;
-
-        Assert.True(gameData.ShowSpawnOverlay);
-        Assert.False(gameData.ShowWarpOverlay);
-    }
-
-    [AvaloniaFact]
-    public void ActiveTool_Warp_ShowsWarpOverlayAndHidesSpawnOverlay()
+    public void ActiveTool_DoesNotChangeOverlayVisibility()
     {
         Harness harness = CreateHarness();
         DocumentGameDataState gameData = harness.ViewModel.GameData!;
         gameData.ShowSpawnOverlay = true;
-        gameData.ShowWarpOverlay = false;
+        gameData.ShowWarpOverlay = true;
 
+        gameData.ActiveTool = GameDataTool.Spawn;
         gameData.ActiveTool = GameDataTool.Warp;
+        gameData.ActiveTool = GameDataTool.None;
 
-        Assert.False(gameData.ShowSpawnOverlay);
+        Assert.True(gameData.ShowSpawnOverlay);
         Assert.True(gameData.ShowWarpOverlay);
     }
 
