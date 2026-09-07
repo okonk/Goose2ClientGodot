@@ -2,9 +2,13 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
+using Avalonia.Controls.Primitives;
+using Avalonia.VisualTree;
 using Avalonia.Interactivity;
+using Avalonia.Layout;
 using Avalonia.Threading;
 using MapEditor.App.Dialogs;
 using MapEditor.GameData.Rows;
@@ -130,6 +134,45 @@ public class GameDataDialogTests
 
         Assert.False(dialog.IsVisible);
         Assert.Equal(Map30, await result);
+    }
+
+    [AvaloniaFact]
+    public void Spreadsheet_LongUrl_DoesNotGrowTheWindow()
+    {
+        using Owner owner = new();
+        var dialog = new SpreadsheetDialog(null);
+        Task<string?> result = dialog.ShowDialog<string?>(owner.Window);
+        Dispatcher.UIThread.RunJobs();
+
+        double initialWidth = dialog.Bounds.Size.Width;
+        dialog.FindControl<TextBox>("UrlBox")!.Text = "https://docs.google.com/spreadsheets/d/1abcdefghijklmnopqrstuvwxyz0123456789abcdefghijklmnopqrstuv/edit#gid=0";
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Equal(initialWidth, dialog.Bounds.Size.Width);
+        Assert.Equal(456, dialog.Width);
+    }
+
+    [AvaloniaFact]
+    public void Map_ManyMaps_WindowStaysBounded_WithConfirmButtonVisible()
+    {
+        using Owner owner = new();
+        var manyMaps = Enumerable.Range(0, 200)
+            .Select(i => new MapReference(i, $"Map {i}", $"map{i}.bytes"))
+            .ToList();
+        var dialog = new MapReferenceDialog(manyMaps, null, "dungeon.bytes");
+        Task<MapReference?> result = dialog.ShowDialog<MapReference?>(owner.Window);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.InRange(dialog.Bounds.Size.Height, 0, 500);
+
+        ScrollViewer listScroller = dialog.FindControl<ListBox>("MapList")!.GetVisualDescendants().OfType<ScrollViewer>().First();
+        ScrollBar listScrollbar = listScroller.GetVisualDescendants().OfType<ScrollBar>().First(bar => bar.Orientation == Orientation.Vertical);
+        Assert.True(listScrollbar.IsVisible);
+
+        Button confirm = dialog.FindControl<Button>("ConfirmButton")!;
+        Point? confirmBottomRight = confirm.TranslatePoint(confirm.Bounds.BottomRight, dialog);
+        Assert.NotNull(confirmBottomRight);
+        Assert.InRange(confirmBottomRight.Value.Y, 0, dialog.Bounds.Size.Height + 1);
     }
 
     [AvaloniaFact]

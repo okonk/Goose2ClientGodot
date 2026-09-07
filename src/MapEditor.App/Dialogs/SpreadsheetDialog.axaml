@@ -3,7 +3,8 @@
         x:Class="MapEditor.App.Dialogs.SpreadsheetDialog"
         Title="Spreadsheet"
         CanResize="False"
-        SizeToContent="WidthAndHeight"
+        SizeToContent="Height"
+        Width="456"
         WindowStartupLocation="CenterOwner">
   <StackPanel Margin="18" Spacing="16">
     <TextBlock Text="Which spreadsheet holds this map's game data?" TextWrapping="Wrap" />

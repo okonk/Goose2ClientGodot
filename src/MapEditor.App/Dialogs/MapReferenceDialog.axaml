@@ -13,7 +13,7 @@
   </Window.Styles>
   <StackPanel Margin="18" Spacing="16">
     <TextBlock x:Name="Header" TextWrapping="Wrap" />
-    <ListBox x:Name="MapList" MinWidth="420" MinHeight="240" />
+    <ListBox x:Name="MapList" MinWidth="420" Height="240" />
     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
       <Button x:Name="ConfirmButton" Content="Confirm" MinWidth="84" IsDefault="True" Click="OnConfirm" />
       <Button x:Name="CancelButton" Content="Cancel" MinWidth="84" IsCancel="True" Click="OnCancel" />
