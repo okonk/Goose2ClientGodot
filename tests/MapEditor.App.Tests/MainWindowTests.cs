@@ -13,6 +13,7 @@ using Avalonia.Interactivity;
 using Avalonia.Media;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
+using MapEditor.App.Connectivity;
 using MapEditor.App.Controls;
 using MapEditor.App.Dialogs;
 using MapEditor.App.Documents;
@@ -42,19 +43,19 @@ internal sealed class MainWindowHarness : IDisposable
 
     public MainWindow Window { get; }
 
-    private MainWindowHarness()
+    private MainWindowHarness(IGameDataConnectivity? connectivity = null)
     {
         TempDirectory = Directory.CreateTempSubdirectory("map-editor-window-").FullName;
         Settings = new AppSettingsStore(Path.Combine(TempDirectory, "settings.json"));
-        Workspace = new WorkspaceViewModel(Dialogs, new MapFileStore());
+        Workspace = new WorkspaceViewModel(Dialogs, new MapFileStore(), connectivity);
         ViewModel = Workspace.ActiveDocument;
         Assets = new AssetContextController(Workspace, Settings);
         Window = new MainWindow(Dialogs, Settings, Workspace, Assets);
     }
 
-    public static MainWindowHarness Create()
+    public static MainWindowHarness Create(IGameDataConnectivity? connectivity = null)
     {
-        var harness = new MainWindowHarness();
+        var harness = new MainWindowHarness(connectivity);
         harness.Window.Show();
         Dispatcher.UIThread.RunJobs();
         return harness;
@@ -146,7 +147,10 @@ public class MainWindowTests : IDisposable
         Assert.NotNull(Find<Border>("StatusBar"));
         Assert.NotNull(Find<Grid>("Body"));
         Assert.NotNull(Find<DockPanel>("LeftPanel"));
+        Assert.NotNull(Find<Grid>("RightPanelHost"));
         Assert.NotNull(Find<StackPanel>("RightPanel"));
+        Assert.NotNull(Find<StackPanel>("SpawnProperties"));
+        Assert.NotNull(Find<StackPanel>("WarpProperties"));
         Assert.NotNull(Find<Border>("CanvasHost"));
         Assert.NotNull(Find<Grid>("PaletteHost"));
         Assert.NotNull(Find<Border>("PaletteBorder"));
@@ -179,10 +183,15 @@ public class MainWindowTests : IDisposable
         Assert.NotNull(Find<MenuItem>("ViewMenu"));
         Assert.NotNull(Find<MenuItem>("GridMenuItem"));
         Assert.NotNull(Find<MenuItem>("BlockedMenuItem"));
+
+        foreach (string name in new[] { "GameDataMenu", "ConnectCommand", "PullCommand", "PushCommand", "SpawnOverlayMenuItem", "WarpOverlayMenuItem", "PreviewMenuItem" })
+        {
+            Assert.NotNull(Find<MenuItem>(name));
+        }
     }
 
     [AvaloniaFact]
-    public void Layout_ContainsSevenToolTogglesWithPencilActive()
+    public void Layout_ContainsToolTogglesWithPencilActive()
     {
         Assert.True(Find<ToggleButton>("PencilTool").IsChecked);
         Assert.False(Find<ToggleButton>("EraserTool").IsChecked);
@@ -194,7 +203,7 @@ public class MainWindowTests : IDisposable
         Assert.Equal(MapEditTool.Pencil, ViewModel.ActiveTool);
 
         Assert.Equal(
-            new[] { "SelectTool", "MultiSelectTool", "EyedropperTool", "PencilTool", "EraserTool", "FloodFillTool", "BlockedTool" },
+            new[] { "SelectTool", "MultiSelectTool", "EyedropperTool", "PencilTool", "EraserTool", "FloodFillTool", "BlockedTool", "SpawnTool", "WarpTool" },
             Find<Border>("Toolbar").GetVisualDescendants().OfType<ToggleButton>().Select(toggle => toggle.Name).ToArray());
 
         Find<ToggleButton>("EraserTool").IsChecked = true;

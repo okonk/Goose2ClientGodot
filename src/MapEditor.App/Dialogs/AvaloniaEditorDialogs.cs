@@ -4,8 +4,6 @@ using System.IO;
 using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Layout;
-using Avalonia.Media;
 using Avalonia.Platform.Storage;
 using MapEditor.Core;
 using MapEditor.GameData.Rows;
@@ -114,71 +112,10 @@ internal sealed class AvaloniaEditorDialogs : IEditorDialogs
     public Task ShowErrorAsync(ErrorPresentation error) => new ErrorDialog(error.Title, error.Message).ShowDialog(_owner);
 
     public Task<string?> ShowSpreadsheetUrlAsync(string? prefill)
-    {
-        var input = new TextBox
-        {
-            Watermark = "Paste the Google spreadsheet URL",
-            Text = prefill,
-            MinWidth = 420
-        };
-        var ok = new Button { Content = "Pull", MinWidth = 84, IsDefault = true };
-        var cancel = new Button { Content = "Cancel", MinWidth = 84, IsCancel = true };
-        var window = BuildDialogWindow("Spreadsheet", new TextBlock
-        {
-            Text = "Which spreadsheet holds this map's game data?",
-            TextWrapping = TextWrapping.Wrap
-        }, input, ok, cancel);
-        ok.Click += (_, _) => window.Close(input.Text);
-        cancel.Click += (_, _) => window.Close();
-        return window.ShowDialog<string?>(_owner);
-    }
+        => new SpreadsheetDialog(prefill).ShowDialog<string?>(_owner);
 
     public Task<MapReference?> ShowMapConfirmationAsync(IReadOnlyList<MapReference> maps, MapReference? suggested, string documentName)
-    {
-        var list = new ListBox { MinWidth = 420, MinHeight = 240 };
-        int selectedIndex = -1;
-        for (int i = 0; i < maps.Count; i++)
-        {
-            MapReference map = maps[i];
-            bool isSuggested = suggested.HasValue && suggested.Value.Equals(map);
-            list.Items.Add(new ListBoxItem
-            {
-                Content = $"{map.MapId}  {map.MapName}  {map.MapFilename}{(isSuggested ? "  (suggested)" : string.Empty)}",
-                Tag = map
-            });
-            if (isSuggested)
-            {
-                selectedIndex = i;
-            }
-        }
-
-        if (selectedIndex < 0 && maps.Count > 0)
-        {
-            selectedIndex = 0;
-        }
-
-        list.SelectedIndex = selectedIndex;
-        var ok = new Button { Content = "Confirm", MinWidth = 84, IsDefault = true };
-        var cancel = new Button { Content = "Cancel", MinWidth = 84, IsCancel = true };
-        var window = BuildDialogWindow($"Confirm map for '{documentName}'", new TextBlock
-        {
-            Text = "Confirm the spreadsheet row that holds this map's game data.",
-            TextWrapping = TextWrapping.Wrap
-        }, list, ok, cancel);
-        ok.Click += (_, _) =>
-        {
-            if (list.SelectedItem is ListBoxItem { Tag: MapReference reference })
-            {
-                window.Close(reference);
-            }
-            else
-            {
-                window.Close();
-            }
-        };
-        cancel.Click += (_, _) => window.Close();
-        return window.ShowDialog<MapReference?>(_owner);
-    }
+        => new MapReferenceDialog(maps, suggested, documentName).ShowDialog<MapReference?>(_owner);
 
     public Task<SheetDirtyChoice> ShowSheetDirtyAsync(string documentName) => new ChoiceDialog(
             "Unpushed game data",
@@ -201,30 +138,6 @@ internal sealed class AvaloniaEditorDialogs : IEditorDialogs
             "Cancel",
             PushConflictChoice.Cancel)
         .ShowDialog<PushConflictChoice>(_owner);
-
-    private static Window BuildDialogWindow(string title, Control header, Control body, Button ok, Button cancel)
-    {
-        var buttons = new StackPanel
-        {
-            Orientation = Orientation.Horizontal,
-            HorizontalAlignment = HorizontalAlignment.Right,
-            Spacing = 8
-        };
-        buttons.Children.Add(ok);
-        buttons.Children.Add(cancel);
-        var panel = new StackPanel { Margin = new Thickness(18), Spacing = 16 };
-        panel.Children.Add(header);
-        panel.Children.Add(body);
-        panel.Children.Add(buttons);
-        return new Window
-        {
-            Title = title,
-            CanResize = false,
-            SizeToContent = SizeToContent.WidthAndHeight,
-            WindowStartupLocation = WindowStartupLocation.CenterOwner,
-            Content = panel
-        };
-    }
 
     private IStorageProvider StorageProvider => TopLevel.GetTopLevel(_owner)!.StorageProvider;
 

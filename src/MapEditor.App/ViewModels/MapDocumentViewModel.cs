@@ -124,6 +124,11 @@ internal sealed class MapDocumentViewModel : ViewModelBase, IDisposable
                 throw new ArgumentOutOfRangeException(nameof(value));
             }
 
+            if (_gameData is not null)
+            {
+                _gameData.ActiveTool = GameDataTool.None;
+            }
+
             if (value != MapEditTool.MultiSelect && _selectionRectangle is not null)
             {
                 SelectionRectangle = null;

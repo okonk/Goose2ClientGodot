@@ -1,5 +1,7 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:controls="using:MapEditor.App.Controls"
+        xmlns:rows="using:MapEditor.GameData.Rows"
         x:Class="MapEditor.App.MainWindow"
         Title="Goose2 Map Editor — Untitled"
         Width="1200"
@@ -30,6 +32,16 @@
           <MenuItem x:Name="LightThemeMenuItem" Header="Light" Tag="Light" ToggleType="Radio" GroupName="EditorTheme" Click="OnThemeSelected" />
         </MenuItem>
       </MenuItem>
+      <MenuItem x:Name="GameDataMenu" Header="_Game Data">
+        <MenuItem x:Name="ConnectCommand" Header="Connect" Click="OnConnect" />
+        <Separator />
+        <MenuItem x:Name="PullCommand" Header="Pull" Click="OnPull" />
+        <MenuItem x:Name="PushCommand" Header="Push" Click="OnPush" />
+        <Separator />
+        <MenuItem x:Name="SpawnOverlayMenuItem" Header="Spawn overlay" ToggleType="CheckBox" IsChecked="{Binding GameData.ShowSpawnOverlay, Mode=TwoWay}" />
+        <MenuItem x:Name="WarpOverlayMenuItem" Header="Warp overlay" ToggleType="CheckBox" IsChecked="{Binding GameData.ShowWarpOverlay, Mode=TwoWay}" />
+        <MenuItem x:Name="PreviewMenuItem" Header="Preview" ToggleType="CheckBox" IsChecked="{Binding GameData.PreviewMode, Mode=TwoWay}" />
+      </MenuItem>
     </Menu>
     <ListBox x:Name="TabStrip" DockPanel.Dock="Top"
              SelectionMode="Single"
@@ -57,6 +69,7 @@
         <TextBlock x:Name="HoverText" Classes="mono muted" Text="—" />
         <TextBlock x:Name="ZoomText" Classes="mono muted" Text="100%" />
         <TextBlock x:Name="SizeText" Classes="mono muted" Text="100 × 100" />
+        <TextBlock x:Name="PreviewStatusText" Classes="muted" Text="Art preview unavailable" IsVisible="{Binding GameData.PreviewMode}" />
       </StackPanel>
     </Border>
     <Grid x:Name="Body">
@@ -103,11 +116,15 @@
             <ToggleButton x:Name="FloodFillTool" Classes="tool" Tag="FloodFill" Content="{StaticResource IconFloodFill}" ToolTip.Tip="Flood fill (B)" Checked="OnToolChecked" Unchecked="OnToolUnchecked" />
             <Rectangle Classes="toolSeparator" />
             <ToggleButton x:Name="BlockedTool" Classes="tool" Tag="Blocked" Content="{StaticResource IconBlocked}" ToolTip.Tip="Blocked (X)" Checked="OnToolChecked" Unchecked="OnToolUnchecked" />
+            <Rectangle Classes="toolSeparator" />
+            <ToggleButton x:Name="SpawnTool" Classes="tool" Tag="Spawn" Content="{StaticResource IconSpawn}" ToolTip.Tip="Spawn" Checked="OnGameToolChecked" Unchecked="OnGameToolUnchecked" />
+            <ToggleButton x:Name="WarpTool" Classes="tool" Tag="Warp" Content="{StaticResource IconWarp}" ToolTip.Tip="Warp" Checked="OnGameToolChecked" Unchecked="OnGameToolUnchecked" />
           </StackPanel>
         </Border>
         <Border x:Name="CanvasHost" Classes="sunken" Margin="10,8,10,10" ClipToBounds="True" />
       </DockPanel>
-      <StackPanel x:Name="RightPanel" Grid.Column="3" Spacing="0" Margin="12" Background="Transparent">
+      <Grid x:Name="RightPanelHost" Grid.Column="3" Margin="12" Background="Transparent">
+      <StackPanel x:Name="RightPanel" Spacing="0">
         <TextBlock Text="LAYERS" Classes="section" Margin="2,0,0,6" />
         <Border Classes="card">
         <StackPanel>
@@ -161,6 +178,43 @@
           </StackPanel>
         </Border>
       </StackPanel>
+      <StackPanel x:Name="SpawnProperties" Spacing="0" IsVisible="False">
+        <TextBlock Text="SPAWN" Classes="section" Margin="2,0,0,6" />
+        <Border Classes="card" Padding="10,8">
+          <StackPanel Spacing="8">
+            <TextBlock Text="NPC" Classes="muted" FontSize="11" />
+            <controls:SearchPickerControl x:Name="SpawnNpcPicker" x:TypeArguments="rows:NpcAppearance" />
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <TextBlock Text="Source" Classes="muted" VerticalAlignment="Center" />
+              <TextBox x:Name="SpawnSourceX" Width="58" />
+              <TextBox x:Name="SpawnSourceY" Width="58" />
+            </StackPanel>
+            <Button x:Name="SpawnDeleteButton" Content="Delete" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" IsEnabled="False" Click="OnSpawnDelete" />
+          </StackPanel>
+        </Border>
+      </StackPanel>
+      <StackPanel x:Name="WarpProperties" Spacing="0" IsVisible="False">
+        <TextBlock Text="WARP" Classes="section" Margin="2,0,0,6" />
+        <Border Classes="card" Padding="10,8">
+          <StackPanel Spacing="8">
+            <TextBlock Text="Destination map" Classes="muted" FontSize="11" />
+            <controls:SearchPickerControl x:Name="WarpDestinationPicker" x:TypeArguments="rows:MapReference" />
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <TextBlock Text="Source" Classes="muted" VerticalAlignment="Center" />
+              <TextBox x:Name="WarpSourceX" Width="58" />
+              <TextBox x:Name="WarpSourceY" Width="58" />
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <TextBlock Text="Destination" Classes="muted" VerticalAlignment="Center" />
+              <TextBox x:Name="WarpDestinationX" Width="58" />
+              <TextBox x:Name="WarpDestinationY" Width="58" />
+            </StackPanel>
+            <Button x:Name="WarpUseSelectedTileButton" Content="Use Selected Tile" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" IsEnabled="False" Click="OnUseSelectedTile" />
+            <Button x:Name="WarpDeleteButton" Content="Delete" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" IsEnabled="False" Click="OnWarpDelete" />
+          </StackPanel>
+        </Border>
+      </StackPanel>
+    </Grid>
     </Grid>
   </DockPanel>
 </Window>

@@ -46,6 +46,7 @@ internal sealed class FakeEditorDialogs : IEditorDialogs
     public Exception? ShowSheetDirtyException;
     public Exception? ShowPushConflictException;
     public Exception? ShowErrorException;
+    public Task? ShowErrorGate;
     public TaskCompletionSource<DirtyChoice>? DirtyGate;
     public Queue<TaskCompletionSource<DirtyChoice>>? DirtyGates;
     public TaskCompletionSource<string?>? AssetDirectoryPickGate;
@@ -158,7 +159,7 @@ internal sealed class FakeEditorDialogs : IEditorDialogs
             return Task.FromException(exception);
         }
 
-        return Task.CompletedTask;
+        return ShowErrorGate ?? Task.CompletedTask;
     }
 
     public Task<string?> ShowSpreadsheetUrlAsync(string? prefill)

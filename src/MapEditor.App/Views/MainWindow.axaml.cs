@@ -19,6 +19,7 @@ using MapEditor.App.Rendering;
 using MapEditor.App.Settings;
 using MapEditor.App.ViewModels;
 using MapEditor.Core;
+using MapEditor.GameData.Rows;
 using MapEditor.Rendering;
 
 namespace MapEditor.App;
@@ -47,6 +48,8 @@ internal partial class MainWindow : Window
     private MapDocumentViewModel? _dragDocument;
     private IPointer? _dragPointer;
     private int _dragIndex;
+    private int? _spawnPrefillSelection;
+    private int? _warpPrefillSelection;
     private AppTheme _theme = AppTheme.Dark;
     private bool _commandRunning;
     private bool _closeGuardRunning;
@@ -70,6 +73,8 @@ internal partial class MainWindow : Window
         _layerRefs = new[] { Layer0Ref, Layer1Ref, Layer2Ref, Layer3Ref, Layer4Ref };
         _layerRows = new[] { Layer0Row, Layer1Row, Layer2Row, Layer3Row, Layer4Row };
         _layerVisibleChecks = new[] { Layer0VisibleCheck, Layer1VisibleCheck, Layer2VisibleCheck, Layer3VisibleCheck, Layer4VisibleCheck };
+        SpawnNpcPicker.ItemText = npc => $"{npc.NpcId}  {npc.NpcName}";
+        WarpDestinationPicker.ItemText = map => $"{map.MapId}  {map.MapName}  {map.MapFilename}";
         AddHandler(InputElement.PointerPressedEvent, OnWindowPointerPressed, RoutingStrategies.Tunnel);
         AddHandler(InputElement.PointerMovedEvent, OnWindowPointerMoved);
         AddHandler(InputElement.PointerReleasedEvent, OnWindowPointerReleased);
@@ -336,10 +341,12 @@ internal partial class MainWindow : Window
         {
             previous.PropertyChanged -= OnViewModelPropertyChanged;
             previous.CanvasInvalidated -= SyncReadouts;
+            previous.GameData?.Changed -= OnGameDataStateChanged;
         }
 
         document.PropertyChanged += OnViewModelPropertyChanged;
         document.CanvasInvalidated += SyncReadouts;
+        document.GameData?.Changed += OnGameDataStateChanged;
         _document = document;
         if (!_tabSelectionRunning)
         {
@@ -358,6 +365,10 @@ internal partial class MainWindow : Window
         SyncBrushFields();
         SyncReadouts();
         SyncAssetDirectory();
+        _spawnPrefillSelection = null;
+        _warpPrefillSelection = null;
+        SyncGameDataChrome();
+        SyncRightPanel();
         Title = document.Title;
     }
 
@@ -656,10 +667,75 @@ internal partial class MainWindow : Window
     private void OnToolUnchecked(object? sender, RoutedEventArgs e)
     {
         if (sender is ToggleButton { Tag: string tag } &&
+            Document.GameData!.ActiveTool == GameDataTool.None &&
             Enum.TryParse<MapEditTool>(tag, out MapEditTool tool) &&
             tool == Document.ActiveTool)
         {
             ((ToggleButton)sender).IsChecked = true;
+        }
+    }
+
+    private void OnGameToolChecked(object? sender, RoutedEventArgs e)
+    {
+        if (sender is ToggleButton { Tag: string name } && Enum.TryParse(name, out GameDataTool tool))
+        {
+            Document.GameData!.ActiveTool = tool;
+        }
+    }
+
+    private void OnGameToolUnchecked(object? sender, RoutedEventArgs e)
+    {
+        if (sender is ToggleButton { Tag: string name } &&
+            Enum.TryParse(name, out GameDataTool tool) &&
+            Document.GameData!.ActiveTool == tool)
+        {
+            ((ToggleButton)sender).IsChecked = true;
+        }
+    }
+
+    private void OnConnect(object? sender, RoutedEventArgs e)
+        => _ = RunCommandAsync(async () =>
+        {
+            if (_workspace.Commands.IsConnected)
+            {
+                await _workspace.Commands.DisconnectAsync();
+            }
+            else
+            {
+                await _workspace.Commands.ConnectAsync();
+            }
+        });
+
+    private void OnPull(object? sender, RoutedEventArgs e)
+        => _ = RunCommandAsync(() => _workspace.Commands.PullAsync(Document));
+
+    private void OnPush(object? sender, RoutedEventArgs e)
+        => _ = RunCommandAsync(() => _workspace.Commands.PushAsync(Document));
+
+    private void OnUseSelectedTile(object? sender, RoutedEventArgs e)
+    {
+        if (Document.SelectedX is { } x && Document.SelectedY is { } y)
+        {
+            WarpSourceX.Text = x.ToString();
+            WarpSourceY.Text = y.ToString();
+        }
+    }
+
+    private void OnSpawnDelete(object? sender, RoutedEventArgs e)
+    {
+        if (Document.GameData is { SelectedSpawn: { } index, Session: { } session } state && index < session.Edits.Spawns.Count)
+        {
+            session.Edits.RemoveSpawnAt(index);
+            state.SelectedSpawn = null;
+        }
+    }
+
+    private void OnWarpDelete(object? sender, RoutedEventArgs e)
+    {
+        if (Document.GameData is { SelectedWarp: { } index, Session: { } session } state && index < session.Edits.Warps.Count)
+        {
+            session.Edits.RemoveWarpAt(index);
+            state.SelectedWarp = null;
         }
     }
 
@@ -966,13 +1042,95 @@ internal partial class MainWindow : Window
 
     private void SyncToolButtons()
     {
-        PencilTool.IsChecked = Document.ActiveTool == MapEditTool.Pencil;
-        EraserTool.IsChecked = Document.ActiveTool == MapEditTool.Eraser;
-        EyedropperTool.IsChecked = Document.ActiveTool == MapEditTool.Eyedropper;
-        BlockedTool.IsChecked = Document.ActiveTool == MapEditTool.Blocked;
-        SelectTool.IsChecked = Document.ActiveTool == MapEditTool.Select;
-        MultiSelectTool.IsChecked = Document.ActiveTool == MapEditTool.MultiSelect;
-        FloodFillTool.IsChecked = Document.ActiveTool == MapEditTool.FloodFill;
+        GameDataTool gameTool = Document.GameData!.ActiveTool;
+        PencilTool.IsChecked = gameTool == GameDataTool.None && Document.ActiveTool == MapEditTool.Pencil;
+        EraserTool.IsChecked = gameTool == GameDataTool.None && Document.ActiveTool == MapEditTool.Eraser;
+        EyedropperTool.IsChecked = gameTool == GameDataTool.None && Document.ActiveTool == MapEditTool.Eyedropper;
+        BlockedTool.IsChecked = gameTool == GameDataTool.None && Document.ActiveTool == MapEditTool.Blocked;
+        SelectTool.IsChecked = gameTool == GameDataTool.None && Document.ActiveTool == MapEditTool.Select;
+        MultiSelectTool.IsChecked = gameTool == GameDataTool.None && Document.ActiveTool == MapEditTool.MultiSelect;
+        FloodFillTool.IsChecked = gameTool == GameDataTool.None && Document.ActiveTool == MapEditTool.FloodFill;
+        SpawnTool.IsChecked = gameTool == GameDataTool.Spawn;
+        WarpTool.IsChecked = gameTool == GameDataTool.Warp;
+    }
+
+    private void OnGameDataStateChanged()
+    {
+        SyncToolButtons();
+        SyncRightPanel();
+        SyncGameDataChrome();
+    }
+
+    private void SyncGameDataChrome()
+    {
+        ConnectCommand.Header = _workspace.Commands.IsConnected ? "Disconnect" : "Connect";
+        PullCommand.IsEnabled = _workspace.Commands.CanPull;
+        PushCommand.IsEnabled = _workspace.Commands.CanPush(Document);
+    }
+
+    private void SyncRightPanel()
+    {
+        DocumentGameDataState state = Document.GameData!;
+        bool showSpawn = state.ActiveTool == GameDataTool.Spawn || state.SelectedSpawn is not null;
+        bool showWarp = state.ActiveTool == GameDataTool.Warp || state.SelectedWarp is not null;
+        bool spawnWasVisible = SpawnProperties.IsVisible;
+        bool warpWasVisible = WarpProperties.IsVisible;
+        RightPanel.IsVisible = !showSpawn && !showWarp;
+        SpawnProperties.IsVisible = showSpawn;
+        WarpProperties.IsVisible = showWarp;
+        SpawnNpcPicker.Items = state.Session?.Npcs.Values.OrderBy(npc => npc.NpcId).ToList() ?? new List<NpcAppearance>();
+        WarpDestinationPicker.Items = state.Session?.Maps ?? Array.Empty<MapReference>();
+        if (!showSpawn)
+        {
+            _spawnPrefillSelection = null;
+        }
+
+        if (!showWarp)
+        {
+            _warpPrefillSelection = null;
+        }
+
+        if (showSpawn)
+        {
+            SyncSpawnProperties(state, spawnWasVisible);
+        }
+
+        if (showWarp)
+        {
+            SyncWarpProperties(state, warpWasVisible);
+        }
+    }
+
+    private void SyncSpawnProperties(DocumentGameDataState state, bool wasVisible)
+    {
+        SpawnDeleteButton.IsEnabled = state.SelectedSpawn is not null;
+        if (!wasVisible || state.SelectedSpawn != _spawnPrefillSelection)
+        {
+            if (state.SelectedSpawn is { } index && state.Session is { } session && index < session.Edits.Spawns.Count)
+            {
+                _spawnPrefillSelection = index;
+                NpcSpawnRow spawn = session.Edits.Spawns[index];
+                SpawnSourceX.Text = spawn.MapX.ToString();
+                SpawnSourceY.Text = spawn.MapY.ToString();
+            }
+        }
+    }
+
+    private void SyncWarpProperties(DocumentGameDataState state, bool wasVisible)
+    {
+        WarpDeleteButton.IsEnabled = state.SelectedWarp is not null;
+        if (!wasVisible || state.SelectedWarp != _warpPrefillSelection)
+        {
+            if (state.SelectedWarp is { } index && state.Session is { } session && index < session.Edits.Warps.Count)
+            {
+                _warpPrefillSelection = index;
+                WarpRow warp = session.Edits.Warps[index];
+                WarpSourceX.Text = warp.MapX.ToString();
+                WarpSourceY.Text = warp.MapY.ToString();
+                WarpDestinationX.Text = warp.WarpX.ToString();
+                WarpDestinationY.Text = warp.WarpY.ToString();
+            }
+        }
     }
 
     private void SyncLayerRows()
@@ -1011,6 +1169,7 @@ internal partial class MainWindow : Window
             : "—";
         ZoomText.Text = $"{Document.ZoomPercent}%";
         SizeText.Text = $"{Document.MapWidth} × {Document.MapHeight}";
+        WarpUseSelectedTileButton.IsEnabled = Document.SelectedX is not null && Document.SelectedY is not null;
         if (Document.SelectedX is { } selectedX && Document.SelectedY is { } selectedY &&
             selectedX >= 0 && selectedX < Document.MapWidth &&
             selectedY >= 0 && selectedY < Document.MapHeight)

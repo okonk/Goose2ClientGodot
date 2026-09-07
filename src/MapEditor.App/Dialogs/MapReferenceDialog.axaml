@@ -1,0 +1,22 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="MapEditor.App.Dialogs.MapReferenceDialog"
+        Title="Confirm map"
+        CanResize="False"
+        SizeToContent="WidthAndHeight"
+        WindowStartupLocation="CenterOwner">
+  <Window.Styles>
+    <Style Selector="ListBoxItem.suggested">
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Background" Value="{DynamicResource EditorSubtleHoverBrush}" />
+    </Style>
+  </Window.Styles>
+  <StackPanel Margin="18" Spacing="16">
+    <TextBlock x:Name="Header" TextWrapping="Wrap" />
+    <ListBox x:Name="MapList" MinWidth="420" MinHeight="240" />
+    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+      <Button x:Name="ConfirmButton" Content="Confirm" MinWidth="84" IsDefault="True" Click="OnConfirm" />
+      <Button x:Name="CancelButton" Content="Cancel" MinWidth="84" IsCancel="True" Click="OnCancel" />
+    </StackPanel>
+  </StackPanel>
+</Window>
