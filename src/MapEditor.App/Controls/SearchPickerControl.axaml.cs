@@ -14,6 +14,9 @@ public class SearchPickerControl<T> : UserControl
     private readonly ListBox _results;
     private readonly TextBlock _selectionText;
 
+    // AVP1002 suppressed: the value types are generic in T, so a non-generic owner type is
+    // impossible; none of these properties are set from XAML.
+#pragma warning disable AVP1002
     public static readonly StyledProperty<IReadOnlyList<T>> ItemsProperty =
         AvaloniaProperty.Register<SearchPickerControl<T>, IReadOnlyList<T>>(nameof(Items), Array.Empty<T>());
 
@@ -25,6 +28,7 @@ public class SearchPickerControl<T> : UserControl
 
     public static readonly StyledProperty<string> SearchTextProperty =
         AvaloniaProperty.Register<SearchPickerControl<T>, string>(nameof(SearchText), string.Empty);
+#pragma warning restore AVP1002
     public SearchPickerControl()
     {
         Focusable = true;
@@ -37,7 +41,7 @@ public class SearchPickerControl<T> : UserControl
         {
             if (_searchBox.Text != SearchText)
             {
-                SearchText = _searchBox.Text;
+                SearchText = _searchBox.Text ?? string.Empty;
             }
         };
         PropertyChanged += (_, e) =>

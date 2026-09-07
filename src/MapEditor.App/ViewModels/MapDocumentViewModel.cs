@@ -584,12 +584,13 @@ internal sealed class MapDocumentViewModel : ViewModelBase, IDisposable
         int croppedSpawns = 0;
         int croppedWarps = 0;
         int inboundWarps = 0;
-        bool pulled = _gameData is { HasSession: true };
-        if (pulled)
+        bool pulled = false;
+        if (_gameData is { HasSession: true } gameData)
         {
+            pulled = true;
             int offsetX = -window.X;
             int offsetY = -window.Y;
-            int confirmedMapId = _gameData.ConfirmedMapId ?? -1;
+            int confirmedMapId = gameData.ConfirmedMapId ?? -1;
             foreach (NpcSpawnRow spawn in _sheetSession.Spawns)
             {
                 int x = spawn.MapX + offsetX;

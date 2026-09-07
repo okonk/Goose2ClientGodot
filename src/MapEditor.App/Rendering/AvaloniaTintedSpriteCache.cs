@@ -23,7 +23,7 @@ internal sealed class AvaloniaTintedSpriteCache : IDisposable
 
     public bool TryGet(AvaloniaSpriteSheetImage image, in SpriteSourceRect sourceRect, in RgbaValue tint, out TintedFrame frame)
     {
-        frame = default;
+        frame = null!;
         ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(image);
         if (tint.A == 0)
