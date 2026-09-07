@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using Goose2.AssetConverter.Adf;
+using Goose2.AssetConverter.Manifest;
 
 namespace Goose2.AssetConverter.SpriteFrames;
 
@@ -170,6 +171,20 @@ public static class AnimationBatchConverter
             {
                 failed++;
                 failures.Add($"Metadata merge/write failed: {ex.GetType().Name} {ex.Message}");
+            }
+        }
+
+        // 7. Write the static appearance manifest sidecar
+        if (allResources.Any(r => r.Animations.Count > 0))
+        {
+            try
+            {
+                AppearanceManifestFileStore.Write(outRoot, AppearanceManifestBuilder.Build(allResources));
+            }
+            catch (Exception ex)
+            {
+                failed++;
+                failures.Add($"Appearance manifest write failed: {ex.GetType().Name} {ex.Message}");
             }
         }
 

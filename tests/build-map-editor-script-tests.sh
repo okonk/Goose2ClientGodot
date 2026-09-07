@@ -113,6 +113,16 @@ setup() {
     mkdir -p "$ENV/repo/src/MapEditor.App/Packaging/macos"
     cp "$TEMPLATE" "$ENV/repo/src/MapEditor.App/Packaging/macos/Info.plist.template"
   fi
+  cat > "$ENV/oauth.json" <<'EOF'
+{
+  "client": {
+    "client_id": "fake-client-id.apps.googleusercontent.com",
+    "client_secret": "fake-client-secret",
+    "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+    "token_uri": "https://accounts.google.com/o/oauth2/token"
+  }
+}
+EOF
   make_fakes "$ENV"
 }
 
@@ -124,6 +134,14 @@ run() {
     export FAKE_DOTNET_LOG="$env/dotnet.log"
     export FAKE_TOOL_LOG="$env/tools.log"
     export FAKE_GODOT_LOG="$env/godot.log"
+    case "${OAUTH_MODE:-valid}" in
+      valid) export GOOSE2_MAP_EDITOR_GOOGLE_OAUTH_CLIENT="$env/oauth.json" ;;
+      unset) unset GOOSE2_MAP_EDITOR_GOOGLE_OAUTH_CLIENT ;;
+      missing) export GOOSE2_MAP_EDITOR_GOOGLE_OAUTH_CLIENT="$env/does-not-exist.json" ;;
+      relative) export GOOSE2_MAP_EDITOR_GOOGLE_OAUTH_CLIENT="oauth.json" ;;
+      web) export GOOSE2_MAP_EDITOR_GOOGLE_OAUTH_CLIENT="$env/oauth-web.json" ;;
+      invalid) export GOOSE2_MAP_EDITOR_GOOGLE_OAUTH_CLIENT="$env/oauth-invalid.json" ;;
+    esac
     PATH="$env/fake:$PATH"
     cd "$env/repo"
     ./build-map-editor.sh "$@" >"$env/stdout.log" 2>"$env/stderr.log"
@@ -371,6 +389,71 @@ for attempt in 1 2 3 4 5; do
   sleep 1
 done
 check "existing release dir not overwritten" $passed
+echo "== 14. missing/invalid OAuth client JSON fails before any publish =="
+for mode in unset missing relative web invalid; do
+  setup
+  if [ "$mode" = "web" ]; then
+    cat > "$ENV/oauth-web.json" <<'EOF'
+{ "web": { "client_id": "fake", "client_secret": "fake" } }
+EOF
+  fi
+  if [ "$mode" = "invalid" ]; then
+    printf '{ not json\n' > "$ENV/oauth-invalid.json"
+  fi
+  OAUTH_MODE="$mode"
+  run "$ENV" --skip-tests linux-x64
+  rc=$?
+  OAUTH_MODE=valid
+  check "exit nonzero for $mode oauth client" $([ "$rc" -ne 0 ]; echo $?)
+  if [ -f "$ENV/dotnet.log" ]; then
+    ! grep -q '^publish ' "$ENV/dotnet.log"
+  else
+    rc=0
+  fi
+  check "no publish invocation for $mode oauth client" $rc
+  check "no release published for $mode oauth client" $([ -z "$(releases)" ]; echo $?)
+  check "failure names the env var ($mode)" $(grep -q 'GOOSE2_MAP_EDITOR_GOOGLE_OAUTH_CLIENT' "$ENV/stderr.log" 2>/dev/null; echo $?)
+done
+
+echo "== 15. valid OAuth client staged beside every executable, no token directory =="
+setup
+run "$ENV" --skip-tests
+rc=$?
+check "exit 0" $([ "$rc" -eq 0 ]; echo $?)
+rels="$(releases)"
+release="$ENV/repo/build/map-editor/$rels"
+tarball=$(ls "$release" 2>/dev/null | grep -- '\.tar\.gz$' || true)
+zipwin=$(ls "$release" 2>/dev/null | grep -- 'windows-x64\.zip$' || true)
+z64=$(ls "$release" 2>/dev/null | grep -- '-osx-x64\.app\.zip$' || true)
+zarm=$(ls "$release" 2>/dev/null | grep -- '-osx-arm64\.app\.zip$' || true)
+listing=$(tar -tzf "$release/$tarball" 2>/dev/null)
+grep -qx 'map-editor-linux-x64/google-oauth-client.json' <<<"$listing"
+check "linux archive has google-oauth-client.json beside the host" $?
+check "linux archive has exactly one client json" $([ "$(grep -cxF 'map-editor-linux-x64/google-oauth-client.json' <<<"$listing")" -eq 1 ]; echo $?)
+! grep -qiE '(^|/)google-tokens' <<<"$listing"
+check "linux archive has no google-tokens entry" $?
+! grep -qxF 'oauth.json' <<<"$listing"
+check "linux archive does not carry the source under its original name" $?
+winlisting=$(unzip -Z1 "$release/$zipwin" 2>/dev/null)
+grep -qx 'map-editor-windows-x64/google-oauth-client.json' <<<"$winlisting"
+check "windows archive has client json beside the executable" $?
+check "windows archive has exactly one client json" $([ "$(grep -cxF 'map-editor-windows-x64/google-oauth-client.json' <<<"$winlisting")" -eq 1 ]; echo $?)
+! grep -qiE '(^|/)google-tokens' <<<"$winlisting"
+check "windows archive has no google-tokens entry" $?
+macok=0
+for z in "$z64" "$zarm"; do
+  mlisting=$(unzip -Z1 "$release/$z" 2>/dev/null)
+  grep -qx 'Goose2MapEditor.app/Contents/MacOS/google-oauth-client.json' <<<"$mlisting" || macok=1
+  [ "$(grep -cxF 'Goose2MapEditor.app/Contents/MacOS/google-oauth-client.json' <<<"$mlisting")" -eq 1 ] || macok=1
+  grep -qiE '(^|/)google-tokens' <<<"$mlisting" && macok=1
+done
+check "both mac archives have exactly one client json beside the executable" $macok
+mkdir -p "$ENV/extract"
+tar -xzf "$release/$tarball" -C "$ENV/extract"
+cmp -s "$ENV/extract/map-editor-linux-x64/google-oauth-client.json" "$ENV/oauth.json"
+check "archived client json is byte-identical to the source" $?
+
+
 
 echo
 echo "passed: $PASS  failed: $FAIL"

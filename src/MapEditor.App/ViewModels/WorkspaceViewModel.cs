@@ -4,6 +4,7 @@ using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using MapEditor.App.Connectivity;
 using MapEditor.App.Dialogs;
 using MapEditor.App.Documents;
 using MapEditor.Core;
@@ -14,13 +15,16 @@ internal sealed class WorkspaceViewModel : ViewModelBase
 {
     private readonly IEditorDialogs _dialogs;
     private readonly MapFileStore _store;
+    private readonly IGameDataConnectivity? _connectivity;
     private readonly ObservableCollection<MapDocumentViewModel> _documents = new();
     private MapDocumentViewModel _activeDocument;
 
-    internal WorkspaceViewModel(IEditorDialogs dialogs, MapFileStore store)
+    internal WorkspaceViewModel(IEditorDialogs dialogs, MapFileStore store, IGameDataConnectivity? connectivity = null)
     {
         _dialogs = dialogs ?? throw new ArgumentNullException(nameof(dialogs));
         _store = store ?? throw new ArgumentNullException(nameof(store));
+        _connectivity = connectivity;
+        Commands = new GameDataCommandController(connectivity, _dialogs, this);
         Documents = new ReadOnlyObservableCollection<MapDocumentViewModel>(_documents);
         Clipboard = new SharedTileClipboard();
         MapDocumentViewModel initial = CreateDocument(MapDocument.Create(), null, null);
@@ -33,6 +37,10 @@ internal sealed class WorkspaceViewModel : ViewModelBase
     internal MapDocumentViewModel ActiveDocument => _activeDocument;
 
     internal SharedTileClipboard Clipboard { get; }
+
+    internal IGameDataConnectivity? Connectivity => _connectivity;
+
+    internal GameDataCommandController Commands { get; }
 
     internal void Activate(MapDocumentViewModel document)
     {
@@ -149,9 +157,14 @@ internal sealed class WorkspaceViewModel : ViewModelBase
             return false;
         }
 
-        if (document.Session.IsDirty)
+        if (document.Session.IsDirty || document.GameData is { IsDirty: true })
         {
             Activate(document);
+        }
+
+        if (!await ConfirmSheetCloseAsync(document))
+        {
+            return false;
         }
 
         if (!await document.ConfirmCloseAsync())
@@ -173,9 +186,14 @@ internal sealed class WorkspaceViewModel : ViewModelBase
                 continue;
             }
 
-            if (document.Session.IsDirty)
+            if (document.Session.IsDirty || document.GameData is { IsDirty: true })
             {
                 Activate(document);
+            }
+
+            if (!await ConfirmSheetCloseAsync(document))
+            {
+                return false;
             }
 
             if (!await document.ConfirmCloseAsync())
@@ -189,6 +207,33 @@ internal sealed class WorkspaceViewModel : ViewModelBase
         return true;
     }
 
+    // The sheet baseline is settled before the map prompt so a pushed sheet survives a canceled
+    // map save and a discarded sheet never touches the map saved state; discard leaves the rows
+    // dirty because the tab is destroyed rather than reset.
+    private async Task<bool> ConfirmSheetCloseAsync(MapDocumentViewModel document)
+    {
+        if (document.GameData is not { IsDirty: true })
+        {
+            return true;
+        }
+
+        SheetDirtyChoice choice = await _dialogs.ShowSheetDirtyAsync(DocumentName(document));
+        if (choice == SheetDirtyChoice.Cancel)
+        {
+            return false;
+        }
+
+        if (choice == SheetDirtyChoice.Push)
+        {
+            return await Commands.PushAsync(document);
+        }
+
+        return true;
+    }
+
+    private static string DocumentName(MapDocumentViewModel document)
+        => document.Document.Path is { } path ? Path.GetFileName(path) : "Untitled";
+
     internal void Move(int fromIndex, int toIndex)
     {
         _documents.Move(fromIndex, toIndex);
@@ -199,7 +244,9 @@ internal sealed class WorkspaceViewModel : ViewModelBase
         var session = new MapEditSession(map, initiallyDirty: false);
         var editorDocument = new EditorDocument(session, path, revision);
         var controller = new EditorDocumentController(_dialogs, _store, editorDocument, IsPathOwnedElsewhere);
-        return new MapDocumentViewModel(controller, Clipboard);
+        var document = new MapDocumentViewModel(controller, Clipboard);
+        document.AttachGameData(new DocumentGameDataState(document, Commands));
+        return document;
     }
 
     private bool IsPathOwnedElsewhere(EditorDocument asker, string fullPath)

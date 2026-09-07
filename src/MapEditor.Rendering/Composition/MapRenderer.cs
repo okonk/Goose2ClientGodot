@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using MapEditor.Core;
 
 namespace MapEditor.Rendering;
@@ -45,6 +47,21 @@ public sealed class MapRenderer
             requestedReads += (long)ranges.VisibleCells.Width * ranges.VisibleCells.Height;
         }
 
+        RenderRect visibleWorld = viewport.VisibleWorldRect;
+
+        IReadOnlyList<NpcAppearanceGroup>? npcGroups = options.PreviewMode ? options.NpcPreviews : null;
+
+        if (npcGroups is not null)
+        {
+            foreach (NpcAppearanceGroup group in npcGroups)
+            {
+                if (IsEntityCandidate(group, document, visibleWorld))
+                {
+                    requestedReads += group.Parts.Count;
+                }
+            }
+        }
+
         if (requestedReads > MaximumTileReadsPerRender)
         {
             throw new MapRenderWorkLimitException(
@@ -53,75 +70,21 @@ public sealed class MapRenderer
                 $"Render work limit exceeded: {requestedReads} tile reads requested, maximum {MaximumTileReadsPerRender}. Zoom in, hide layers or the blocked overlay, or inspect anomalously large sprite frame metadata.");
         }
 
-        RenderRect visibleWorld = viewport.VisibleWorldRect;
-        SpriteManifest? manifest = _assets.Manifest;
-
-        for (int layer = 0; layer < MapDocument.LayerCount; layer++)
+        for (int layer = 0; layer <= 1; layer++)
         {
-            if (!visibility.IsVisible(layer))
+            if (visibility.IsVisible(layer))
             {
-                continue;
+                EmitMapLayer(layer, document, ranges, viewport, sink);
             }
+        }
 
-            for (int y = ranges.SpriteCandidates.MinY; y <= ranges.SpriteCandidates.MaxY; y++)
+        RenderEntityStage(document, ranges, visibility, npcGroups, viewport, sink);
+
+        for (int layer = 3; layer < MapDocument.LayerCount; layer++)
+        {
+            if (visibility.IsVisible(layer))
             {
-                for (int x = ranges.SpriteCandidates.MinX; x <= ranges.SpriteCandidates.MaxX; x++)
-                {
-                    MapTileLayer tileLayer = document[x, y].GetLayer(layer);
-                    if (tileLayer.Graphic == 0)
-                    {
-                        continue;
-                    }
-
-                    SpriteReference reference = new(tileLayer.Sheet, tileLayer.Graphic);
-                    SpriteSourceRect sourceRect = default;
-                    bool knownFrame = manifest is not null && manifest.TryGetSourceRect(reference, out sourceRect);
-                    RenderRect cell = CellRect(x, y);
-                    bool cellIntersects = Intersects(cell, visibleWorld);
-                    bool spriteIntersects = false;
-                    RenderRect spriteDestination = default;
-
-                    if (knownFrame)
-                    {
-                        spriteDestination = new(
-                            x * ViewportCulling.TileSize + 16 - sourceRect.Width / 2.0,
-                            (y + 1) * ViewportCulling.TileSize - sourceRect.Height,
-                            sourceRect.Width,
-                            sourceRect.Height);
-                        spriteIntersects = Intersects(spriteDestination, visibleWorld);
-                    }
-
-                    if (!spriteIntersects && !cellIntersects)
-                    {
-                        continue;
-                    }
-
-                    SpriteResolution resolution = _assets.Resolve(reference);
-
-                    if (resolution.Status == SpriteResolutionStatus.Ready && spriteIntersects)
-                    {
-                        sink.DrawSprite(new SpriteDrawOperation(
-                            layer,
-                            new MapTileCoordinate(x, y),
-                            reference,
-                            resolution.Image!,
-                            resolution.SourceRect,
-                            viewport.WorldToScreen(spriteDestination),
-                            SpriteSampling.NearestNeighbor));
-                    }
-                    else if (resolution.Status != SpriteResolutionStatus.Ready && cellIntersects)
-                    {
-                        sink.DrawPlaceholder(new PlaceholderDrawOperation(
-                            layer,
-                            new MapTileCoordinate(x, y),
-                            reference,
-                            resolution.Status,
-                            viewport.WorldToScreen(cell),
-                            MapRenderPalette.PlaceholderFill,
-                            MapRenderPalette.PlaceholderStroke,
-                            resolution.Diagnostic ?? string.Empty));
-                    }
-                }
+                EmitMapLayer(layer, document, ranges, viewport, sink);
             }
         }
 
@@ -151,6 +114,22 @@ public sealed class MapRenderer
             DrawGrid(document, viewport, ranges, sink);
         }
 
+        if (options.PreviewMode && npcGroups is not null)
+        {
+            DrawMarkers(options.SpawnMarkers, GameDataMarkerKind.Spawn, document, viewport, sink,
+                new HashSet<int>(npcGroups.Select(group => group.OccurrenceIndex)));
+        }
+        else
+        {
+            DrawMarkers(options.SpawnMarkers, GameDataMarkerKind.Spawn, document, viewport, sink);
+        }
+        DrawMarkers(options.WarpMarkers, GameDataMarkerKind.Warp, document, viewport, sink);
+
+        if (npcGroups is not null)
+        {
+            DrawNpcSpawnAnchors(npcGroups, options.SpawnMarkers, document, viewport, sink);
+        }
+
         if (options.SelectedTile is { } selected)
         {
             DrawTarget(document, viewport, selected, CellOverlayKind.Selected, MapRenderPalette.SelectedStroke, sink);
@@ -178,6 +157,326 @@ public sealed class MapRenderer
                 preview.Blocked ? MapRenderPalette.BlockPreviewFill : MapRenderPalette.UnblockPreviewFill,
                 CellOverlayKind.BlockPreview, sink);
         }
+    }
+
+    private void EmitMapLayer(int layer, MapDocument document, ViewportTileRanges ranges, ViewportTransform viewport, IMapDrawSink sink)
+    {
+        RenderRect visibleWorld = viewport.VisibleWorldRect;
+        SpriteManifest? manifest = _assets.Manifest;
+        for (int y = ranges.SpriteCandidates.MinY; y <= ranges.SpriteCandidates.MaxY; y++)
+        {
+            for (int x = ranges.SpriteCandidates.MinX; x <= ranges.SpriteCandidates.MaxX; x++)
+            {
+                MapTileLayer tileLayer = document[x, y].GetLayer(layer);
+                if (tileLayer.Graphic == 0)
+                {
+                    continue;
+                }
+
+                EmitMapTile(layer, x, y, tileLayer, manifest, viewport, visibleWorld, sink);
+            }
+        }
+    }
+
+    private void EmitMapTile(
+        int layer,
+        int x,
+        int y,
+        MapTileLayer tileLayer,
+        SpriteManifest? manifest,
+        ViewportTransform viewport,
+        RenderRect visibleWorld,
+        IMapDrawSink sink)
+    {
+        SpriteReference reference = new(tileLayer.Sheet, tileLayer.Graphic);
+        SpriteSourceRect sourceRect = default;
+        bool knownFrame = manifest is not null && manifest.TryGetSourceRect(reference, out sourceRect);
+        RenderRect cell = CellRect(x, y);
+        bool cellIntersects = Intersects(cell, visibleWorld);
+        bool spriteIntersects = false;
+        RenderRect spriteDestination = default;
+
+        if (knownFrame)
+        {
+            spriteDestination = new(
+                x * ViewportCulling.TileSize + 16 - sourceRect.Width / 2.0,
+                (y + 1) * ViewportCulling.TileSize - sourceRect.Height,
+                sourceRect.Width,
+                sourceRect.Height);
+            spriteIntersects = Intersects(spriteDestination, visibleWorld);
+        }
+
+        if (!spriteIntersects && !cellIntersects)
+        {
+            return;
+        }
+
+        SpriteResolution resolution = _assets.Resolve(reference);
+
+        if (resolution.Status == SpriteResolutionStatus.Ready && spriteIntersects)
+        {
+            sink.DrawSprite(new SpriteDrawOperation(
+                layer,
+                new MapTileCoordinate(x, y),
+                reference,
+                resolution.Image!,
+                resolution.SourceRect,
+                viewport.WorldToScreen(spriteDestination),
+                SpriteSampling.NearestNeighbor));
+        }
+        else if (resolution.Status != SpriteResolutionStatus.Ready && cellIntersects)
+        {
+            sink.DrawPlaceholder(new PlaceholderDrawOperation(
+                layer,
+                new MapTileCoordinate(x, y),
+                reference,
+                resolution.Status,
+                viewport.WorldToScreen(cell),
+                MapRenderPalette.PlaceholderFill,
+                MapRenderPalette.PlaceholderStroke,
+                resolution.Diagnostic ?? string.Empty));
+        }
+    }
+
+    private void RenderEntityStage(
+        MapDocument document,
+        ViewportTileRanges ranges,
+        MapLayerVisibility visibility,
+        IReadOnlyList<NpcAppearanceGroup>? npcGroups,
+        ViewportTransform viewport,
+        IMapDrawSink sink)
+    {
+        RenderRect visibleWorld = viewport.VisibleWorldRect;
+        SpriteManifest? manifest = _assets.Manifest;
+        List<EntityCandidate> candidates = new();
+        int ordinal = 0;
+
+        if (visibility.IsVisible(2))
+        {
+            for (int y = ranges.SpriteCandidates.MinY; y <= ranges.SpriteCandidates.MaxY; y++)
+            {
+                for (int x = ranges.SpriteCandidates.MinX; x <= ranges.SpriteCandidates.MaxX; x++)
+                {
+                    MapTileLayer tileLayer = document[x, y].GetLayer(2);
+                    if (tileLayer.Graphic == 0)
+                    {
+                        continue;
+                    }
+
+                    candidates.Add(new EntityCandidate(
+                        (y + 1) * ViewportCulling.TileSize,
+                        x * ViewportCulling.TileSize + 16,
+                        EntityKind.MapObject,
+                        ordinal++,
+                        new MapTileCoordinate(x, y),
+                        tileLayer,
+                        null));
+                }
+            }
+        }
+
+        if (npcGroups is not null)
+        {
+            foreach (NpcAppearanceGroup group in npcGroups)
+            {
+                if (!IsEntityCandidate(group, document, visibleWorld))
+                {
+                    continue;
+                }
+
+                candidates.Add(new EntityCandidate(
+                    group.SortAnchorY,
+                    group.SortAnchorX,
+                    EntityKind.Npc,
+                    group.OccurrenceIndex,
+                    new MapTileCoordinate(group.TileX, group.TileY),
+                    null,
+                    group));
+            }
+        }
+
+        candidates.Sort(Comparer<EntityCandidate>.Create((a, b) =>
+            a.AnchorY != b.AnchorY ? a.AnchorY.CompareTo(b.AnchorY)
+            : a.AnchorX != b.AnchorX ? a.AnchorX.CompareTo(b.AnchorX)
+            : a.Kind != b.Kind ? a.Kind.CompareTo(b.Kind)
+            : a.Ordinal.CompareTo(b.Ordinal)));
+
+        foreach (EntityCandidate candidate in candidates)
+        {
+            if (candidate.Group is not null)
+            {
+                EmitNpcGroup(candidate.Group, viewport, sink);
+            }
+            else
+            {
+                EmitMapTile(2, candidate.Tile.X, candidate.Tile.Y, candidate.TileLayer.GetValueOrDefault(), manifest, viewport, visibleWorld, sink);
+            }
+        }
+    }
+
+    private static bool IsEntityCandidate(NpcAppearanceGroup group, MapDocument document, RenderRect visibleWorld)
+    {
+        if (group.TileX < 0 || group.TileX >= document.Width || group.TileY < 0 || group.TileY >= document.Height)
+        {
+            return false;
+        }
+
+        if (Intersects(CellRect(group.TileX, group.TileY), visibleWorld))
+        {
+            return true;
+        }
+
+        foreach (NpcPartDrawOperation part in group.Parts)
+        {
+            if (part.IsReady && Intersects(PartRect(part), visibleWorld))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private void EmitNpcGroup(NpcAppearanceGroup group, ViewportTransform viewport, IMapDrawSink sink)
+    {
+        RenderRect visibleWorld = viewport.VisibleWorldRect;
+        RenderRect cell = CellRect(group.TileX, group.TileY);
+        bool cellIntersects = Intersects(cell, visibleWorld);
+        RenderRect cellScreen = viewport.WorldToScreen(cell);
+
+        foreach (NpcPartDrawOperation part in group.Parts)
+        {
+            if (part.IsReady)
+            {
+                RenderRect destination = PartRect(part);
+                if (!Intersects(destination, visibleWorld))
+                {
+                    continue;
+                }
+
+                SpriteResolution resolution = _assets.Resolve(part.Reference);
+                if (resolution.Status == SpriteResolutionStatus.Ready)
+                {
+                    sink.DrawNpcImage(new NpcImageDrawOperation(
+                        group.OccurrenceIndex,
+                        part.Slot,
+                        part.Reference,
+                        resolution.Image!,
+                        part.SourceRect,
+                        viewport.WorldToScreen(destination),
+                        part.Tint,
+                        SpriteSampling.NearestNeighbor));
+                }
+                else
+                {
+                    sink.DrawNpcPartPlaceholder(new NpcPartPlaceholderDrawOperation(
+                        group.OccurrenceIndex,
+                        part.Slot,
+                        resolution.Status,
+                        cellScreen,
+                        MapRenderPalette.PlaceholderFill,
+                        MapRenderPalette.PlaceholderStroke,
+                        resolution.Diagnostic ?? string.Empty));
+                }
+            }
+            else if (cellIntersects)
+            {
+                sink.DrawNpcPartPlaceholder(new NpcPartPlaceholderDrawOperation(
+                    group.OccurrenceIndex,
+                    part.Slot,
+                    part.Status,
+                    cellScreen,
+                    MapRenderPalette.PlaceholderFill,
+                    MapRenderPalette.PlaceholderStroke,
+                    part.Diagnostic ?? string.Empty));
+            }
+        }
+    }
+
+    private static void DrawNpcSpawnAnchors(
+        IReadOnlyList<NpcAppearanceGroup> groups,
+        IReadOnlyList<GameDataMarkerInput>? spawnMarkers,
+        MapDocument document,
+        ViewportTransform viewport,
+        IMapDrawSink sink)
+    {
+        RenderRect visible = viewport.VisibleWorldRect;
+        foreach (NpcAppearanceGroup group in groups)
+        {
+            if (group.TileX < 0 || group.TileX >= document.Width || group.TileY < 0 || group.TileY >= document.Height)
+            {
+                continue;
+            }
+
+            RenderRect cell = CellRect(group.TileX, group.TileY);
+            if (!Intersects(cell, visible))
+            {
+                continue;
+            }
+
+            bool selected = IsSpawnSelected(spawnMarkers, group.OccurrenceIndex);
+
+            sink.DrawNpcSpawnAnchor(new NpcSpawnAnchorDrawOperation(
+                group.OccurrenceIndex,
+                new MapTileCoordinate(group.TileX, group.TileY),
+                viewport.WorldToScreen(cell),
+                selected,
+                MapRenderPalette.NpcAnchorFill,
+                selected ? MapRenderPalette.NpcAnchorSelectedStroke : MapRenderPalette.NpcAnchorStroke,
+                group.EquipmentDiagnostic));
+        }
+    }
+
+    private static bool IsSpawnSelected(IReadOnlyList<GameDataMarkerInput>? spawnMarkers, int occurrenceIndex)
+    {
+        if (spawnMarkers is null)
+        {
+            return false;
+        }
+
+        foreach (GameDataMarkerInput marker in spawnMarkers)
+        {
+            if (marker.OccurrenceIndex == occurrenceIndex)
+            {
+                return marker.Selected;
+            }
+        }
+
+        return false;
+    }
+
+    private enum EntityKind
+    {
+        MapObject,
+        Npc
+    }
+
+    private readonly struct EntityCandidate
+    {
+        public EntityCandidate(int anchorY, int anchorX, EntityKind kind, int ordinal, MapTileCoordinate tile, MapTileLayer? tileLayer, NpcAppearanceGroup? group)
+        {
+            AnchorY = anchorY;
+            AnchorX = anchorX;
+            Kind = kind;
+            Ordinal = ordinal;
+            Tile = tile;
+            TileLayer = tileLayer;
+            Group = group;
+        }
+
+        public int AnchorY { get; }
+
+        public int AnchorX { get; }
+
+        public EntityKind Kind { get; }
+
+        public int Ordinal { get; }
+
+        public MapTileCoordinate Tile { get; }
+
+        public MapTileLayer? TileLayer { get; }
+
+        public NpcAppearanceGroup? Group { get; }
     }
 
     private static void DrawGrid(MapDocument document, ViewportTransform viewport, ViewportTileRanges ranges, IMapDrawSink sink)
@@ -224,6 +523,49 @@ public sealed class MapRenderer
                 viewport.WorldToScreen(new RenderPoint(left, worldY)),
                 viewport.WorldToScreen(new RenderPoint(right, worldY)),
                 MapRenderPalette.Grid));
+        }
+    }
+
+    private static void DrawMarkers(
+        IReadOnlyList<GameDataMarkerInput>? markers,
+        GameDataMarkerKind kind,
+        MapDocument document,
+        ViewportTransform viewport,
+        IMapDrawSink sink,
+        HashSet<int>? suppressedSpawnOccurrences = null)
+    {
+        if (markers is null)
+        {
+            return;
+        }
+
+        RenderRect visible = viewport.VisibleWorldRect;
+        foreach (GameDataMarkerInput marker in markers)
+        {
+            if (kind == GameDataMarkerKind.Spawn && suppressedSpawnOccurrences?.Contains(marker.OccurrenceIndex) == true)
+            {
+                continue;
+            }
+
+            MapTileCoordinate tile = marker.Tile;
+            if (tile.X < 0 || tile.X >= document.Width || tile.Y < 0 || tile.Y >= document.Height)
+            {
+                continue;
+            }
+
+            RenderRect cell = CellRect(tile.X, tile.Y);
+            if (!Intersects(cell, visible))
+            {
+                continue;
+            }
+
+            sink.DrawGameDataMarker(new GameDataMarkerDrawOperation(
+                kind,
+                marker.OccurrenceIndex,
+                tile,
+                viewport.WorldToScreen(cell),
+                marker.Selected,
+                marker.Diagnostic));
         }
     }
 
@@ -339,6 +681,9 @@ public sealed class MapRenderer
         }
     }
 
+    private static RenderRect PartRect(NpcPartDrawOperation part)
+        => new(part.Destination.X, part.Destination.Y, part.Destination.Width, part.Destination.Height);
+
     private static RenderRect CellRect(int x, int y)
         => new(x * ViewportCulling.TileSize, y * ViewportCulling.TileSize, ViewportCulling.TileSize, ViewportCulling.TileSize);
 
@@ -359,5 +704,8 @@ public sealed class MapRenderer
         public static readonly RenderColor PasteGhostStroke = new(0xFF, 0xBF, 0xBF, 0xBF);
         public static readonly RenderColor BlockPreviewFill = new(0xFF, 0x00, 0x00, 0x60);
         public static readonly RenderColor UnblockPreviewFill = new(0x00, 0xFF, 0x00, 0x60);
+        public static readonly RenderColor NpcAnchorFill = new(0x00, 0xC8, 0xFF, 0x40);
+        public static readonly RenderColor NpcAnchorStroke = new(0x00, 0xC8, 0xFF, 0xFF);
+        public static readonly RenderColor NpcAnchorSelectedStroke = new(0xFF, 0xFF, 0x00, 0xFF);
     }
 }

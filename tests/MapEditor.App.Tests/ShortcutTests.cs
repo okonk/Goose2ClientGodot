@@ -1,16 +1,24 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Input;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 using MapEditor.App.Controls;
 using MapEditor.App.Dialogs;
 using MapEditor.App.ViewModels;
 using MapEditor.Core;
+using MapEditor.GameData.Connectivity;
+using MapEditor.GameData.Replacement;
+using MapEditor.GameData.Rows;
+using MapEditor.GameData.Sync;
 using MapEditor.Rendering;
 using Xunit;
 
@@ -18,6 +26,10 @@ namespace MapEditor.App.Tests;
 
 public class ShortcutTests
 {
+    private static readonly MapReference Map10 = new(10, "Dungeon", "dungeon.bytes");
+    private static readonly MapReference Map20 = new(20, "Cave", "cave.bytes");
+    private static readonly NpcAppearance Npc1 = new(1, "Goose", 0, 0, new RgbaValue(255, 255, 255, 255), 0, 0, new RgbaValue(255, 255, 255, 255), string.Empty);
+
     private static void PaintCell(MainWindowHarness harness)
     {
         MainWindow window = harness.Window;
@@ -34,6 +46,20 @@ public class ShortcutTests
         Dispatcher.UIThread.RunJobs();
         return harness.Workspace.ActiveDocument;
     }
+
+    private static GameDataSyncSession GameDataSession()
+    {
+        var data = new RemoteGameData(
+            new[] { Map10, Map20 },
+            new Dictionary<int, NpcAppearance> { [1] = Npc1 },
+            new List<RemoteRow<NpcSpawnRow>> { new(2, new NpcSpawnRow(1, 10, 3, 4)) },
+            new List<RemoteRow<WarpRow>>());
+        return new GameDataSyncSession("sheet", 10, data);
+    }
+
+    private static T Control<T>(MainWindowHarness harness, string name) where T : Control
+        => harness.Window.FindControl<T>(name)
+           ?? throw new InvalidOperationException($"missing control {name}");
 
     [AvaloniaFact]
     public async Task ControlT_AddsTab()
@@ -426,5 +452,154 @@ public class ShortcutTests
 
         Assert.True(harness.ViewModel.Undo());
         Assert.Equal(new MapTileLayer(0, 0), harness.ViewModel.Session.Document[0, 0].GetLayer(0));
+    }
+
+    [AvaloniaFact]
+    public void UndoRedo_FollowsTheDocumentTimelineAcrossDomains()
+    {
+        using MainWindowHarness harness = MainWindowHarness.Create();
+        MainWindow window = harness.Window;
+        MapDocumentViewModel vm = harness.ViewModel;
+        vm.GameData!.AttachSession(GameDataSession());
+        Dispatcher.UIThread.RunJobs();
+
+        MenuItem undo = Control<MenuItem>(harness, "UndoCommand");
+        MenuItem redo = Control<MenuItem>(harness, "RedoCommand");
+        StackPanel spawnPanel = Control<StackPanel>(harness, "SpawnProperties");
+
+        PaintCell(harness);
+        Assert.Equal(new MapTileLayer(1, 1), vm.Session.Document[0, 0].GetLayer(0));
+        Assert.Null(vm.FindSpawnAt(5, 6));
+        Assert.True(vm.GameData.ShowSpawnOverlay);
+        Assert.False(spawnPanel.IsVisible);
+        Assert.True(vm.IsDirty);
+        Assert.Contains("*", window.Title);
+        Assert.True(undo.IsEnabled);
+        Assert.False(redo.IsEnabled);
+
+        Control<ToggleButton>(harness, "SpawnTool").IsChecked = true;
+        vm.GameData.SelectedNpcId = 1;
+        Point tile = window.Canvas.TranslatePoint(new Point(5 * 32 + 16, 6 * 32 + 16), window).Value;
+        window.MouseDown(tile, MouseButton.Left, RawInputModifiers.None);
+        window.MouseUp(tile, MouseButton.Left, RawInputModifiers.None);
+        Dispatcher.UIThread.RunJobs();
+
+        var spawns = vm.GameData.Session!.Edits.Spawns;
+        Assert.Equal(2, spawns.Count);
+        Assert.Equal(new NpcSpawnRow(1, 10, 5, 6), spawns[1]);
+        Assert.Equal(1, vm.GameData.SelectedSpawn);
+        Assert.Equal(1, vm.FindSpawnAt(5, 6));
+        Assert.True(vm.GameData.ShowSpawnOverlay);
+        Assert.True(spawnPanel.IsVisible);
+        Assert.Equal(new MapTileLayer(1, 1), vm.Session.Document[0, 0].GetLayer(0));
+        Assert.True(vm.IsDirty);
+        Assert.Contains("*", window.Title);
+        Assert.True(undo.IsEnabled);
+        Assert.False(redo.IsEnabled);
+
+        window.KeyPressQwerty(PhysicalKey.Z, RawInputModifiers.Control);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Single(vm.GameData.Session.Edits.Spawns);
+        Assert.Null(vm.FindSpawnAt(5, 6));
+        Assert.Null(vm.GameData.SelectedSpawn);
+        Assert.Equal(new MapTileLayer(1, 1), vm.Session.Document[0, 0].GetLayer(0));
+        Assert.True(spawnPanel.IsVisible);
+        Assert.True(vm.IsDirty);
+        Assert.Contains("*", window.Title);
+        Assert.True(undo.IsEnabled);
+        Assert.True(redo.IsEnabled);
+
+        window.KeyPressQwerty(PhysicalKey.Z, RawInputModifiers.Control);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Equal(new MapTileLayer(0, 0), vm.Session.Document[0, 0].GetLayer(0));
+        Assert.Null(vm.FindSpawnAt(5, 6));
+        Assert.True(vm.GameData.ShowSpawnOverlay);
+        Assert.True(spawnPanel.IsVisible);
+        Assert.False(vm.IsDirty);
+        Assert.DoesNotContain("*", window.Title);
+        Assert.False(undo.IsEnabled);
+        Assert.True(redo.IsEnabled);
+
+        window.KeyPressQwerty(PhysicalKey.Y, RawInputModifiers.Control);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Equal(new MapTileLayer(1, 1), vm.Session.Document[0, 0].GetLayer(0));
+        Assert.Null(vm.FindSpawnAt(5, 6));
+        Assert.True(vm.GameData.ShowSpawnOverlay);
+        Assert.True(spawnPanel.IsVisible);
+        Assert.True(vm.IsDirty);
+        Assert.Contains("*", window.Title);
+        Assert.True(undo.IsEnabled);
+        Assert.True(redo.IsEnabled);
+
+        window.KeyPressQwerty(PhysicalKey.Y, RawInputModifiers.Control);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Equal(new MapTileLayer(1, 1), vm.Session.Document[0, 0].GetLayer(0));
+        Assert.Equal(2, vm.GameData.Session.Edits.Spawns.Count);
+        Assert.Equal(new NpcSpawnRow(1, 10, 5, 6), vm.GameData.Session.Edits.Spawns[1]);
+        Assert.Equal(1, vm.FindSpawnAt(5, 6));
+        Assert.True(vm.GameData.ShowSpawnOverlay);
+        Assert.True(spawnPanel.IsVisible);
+        Assert.True(vm.IsDirty);
+        Assert.Contains("*", window.Title);
+        Assert.True(undo.IsEnabled);
+        Assert.False(redo.IsEnabled);
+    }
+
+    [AvaloniaFact]
+    public void CopyCutPasteDelete_NotInterceptedFromPickerAndPropertyTextFields()
+    {
+        using MainWindowHarness harness = MainWindowHarness.Create();
+        MainWindow window = harness.Window;
+        MapDocumentViewModel vm = harness.ViewModel;
+        vm.GameData!.AttachSession(GameDataSession());
+        Dispatcher.UIThread.RunJobs();
+
+        vm.GameData.ActiveTool = GameDataTool.Spawn;
+        vm.GameData.SelectedSpawn = 0;
+        vm.SelectedX = 2;
+        vm.SelectedY = 3;
+        Dispatcher.UIThread.RunJobs();
+
+        TextBox searchBox = Control<SearchPickerControl<NpcAppearance>>(harness, "SpawnNpcPicker")
+            .GetVisualDescendants().OfType<TextBox>().Single();
+        searchBox.Focus();
+        Dispatcher.UIThread.RunJobs();
+
+        PressClipboardAndDeleteKeys(window);
+
+        Assert.Null(harness.Workspace.Clipboard.Current);
+        Assert.Single(vm.GameData.Session!.Edits.Spawns);
+        Assert.Equal(0, vm.GameData.SelectedSpawn);
+        Assert.False(vm.PasteMode);
+        Assert.True(searchBox.IsFocused);
+
+        window.KeyTextInput("a");
+        Dispatcher.UIThread.RunJobs();
+        Assert.Contains("a", searchBox.Text);
+
+        Control<ToggleButton>(harness, "WarpTool").IsChecked = true;
+        Dispatcher.UIThread.RunJobs();
+        TextBox destinationX = Control<TextBox>(harness, "WarpDestinationX");
+        destinationX.Focus();
+        Dispatcher.UIThread.RunJobs();
+
+        PressClipboardAndDeleteKeys(window);
+
+        Assert.Null(harness.Workspace.Clipboard.Current);
+        Assert.Empty(vm.GameData.Session.Edits.Warps);
+        Assert.True(destinationX.IsFocused);
+    }
+
+    private static void PressClipboardAndDeleteKeys(MainWindow window)
+    {
+        window.KeyPressQwerty(PhysicalKey.C, RawInputModifiers.Control);
+        window.KeyPressQwerty(PhysicalKey.X, RawInputModifiers.Control);
+        window.KeyPressQwerty(PhysicalKey.V, RawInputModifiers.Control);
+        window.KeyPressQwerty(PhysicalKey.Delete, RawInputModifiers.None);
+        Dispatcher.UIThread.RunJobs();
     }
 }

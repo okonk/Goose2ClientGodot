@@ -34,9 +34,56 @@ sdk_rid() {
   esac
 }
 
-for tool in dotnet git tar zip unzip; do
+for tool in dotnet git tar zip unzip python3; do
   command -v "$tool" >/dev/null 2>&1 || die "required tool not found on PATH: $tool"
 done
+
+# The release ships the configured desktop client beside every executable, so a
+# missing or non-desktop JSON must fail before anything is published or renamed.
+OAUTH_CLIENT="${GOOSE2_MAP_EDITOR_GOOGLE_OAUTH_CLIENT:-}"
+
+validate_oauth_client() {
+  if [ -z "$OAUTH_CLIENT" ]; then
+    die "GOOSE2_MAP_EDITOR_GOOGLE_OAUTH_CLIENT must be set to an absolute path to the desktop OAuth client JSON"
+  fi
+  case "$OAUTH_CLIENT" in
+    /*) ;;
+    *) die "GOOSE2_MAP_EDITOR_GOOGLE_OAUTH_CLIENT must be an absolute path, got: $OAUTH_CLIENT" ;;
+  esac
+  [ -f "$OAUTH_CLIENT" ] || die "GOOSE2_MAP_EDITOR_GOOGLE_OAUTH_CLIENT does not point to an existing file: $OAUTH_CLIENT"
+  python3 - "$OAUTH_CLIENT" <<'PY'
+import json, sys
+
+path = sys.argv[1]
+
+def fail(problem):
+    print(f"GOOSE2_MAP_EDITOR_GOOGLE_OAUTH_CLIENT at {path} {problem}", file=sys.stderr)
+    sys.exit(1)
+
+try:
+    with open(path, "r", encoding="utf-8") as handle:
+        data = json.load(handle)
+except Exception:
+    fail("is not valid JSON")
+if not isinstance(data, dict):
+    fail("is not a desktop client file")
+section = None
+for key in ("client", "installed"):
+    if isinstance(data.get(key), dict):
+        section = data[key]
+        break
+if section is None:
+    if "web" in data:
+        fail("is a web client, not a desktop client")
+    fail("is not a desktop client file")
+for field in ("client_id", "client_secret", "auth_uri", "token_uri"):
+    value = section.get(field)
+    if not isinstance(value, str) or not value.strip():
+        fail(f"is missing required field '{field}'")
+PY
+}
+
+validate_oauth_client
 
 SKIP_TESTS=0
 REQUESTED=()
@@ -112,6 +159,20 @@ assert_entry() {
   grep -qxF "$2" <<<"$1" || die "archive is missing required entry: $2"
 }
 
+# Exactly one staged client JSON per app, never under the source's original name.
+assert_single_oauth_client() {
+  local listing="$1" entry="$2" count
+  grep -qxF "$entry" <<<"$listing" || die "archive is missing required entry: $entry"
+  count=$(grep -cxF "$entry" <<<"$listing")
+  [ "$count" -eq 1 ] || die "archive contains $count google-oauth-client.json entries; expected exactly one"
+}
+
+assert_no_token_directory() {
+  if grep -qiE '(^|/)google-tokens(/|$)' <<<"$1"; then
+    die "archive contains a google-tokens entry; refusing to publish"
+  fi
+}
+
 assert_no_godot_or_assets() {
   if grep -qiE '(^|/)godot' <<<"$1"; then
     die "archive contains a Godot binary; refusing to publish"
@@ -131,6 +192,7 @@ for rid in "${RIDS[@]}"; do
       top="map-editor-linux-x64"
       mkdir -p "$dist_dir/$top"
       cp -a "$out/." "$dist_dir/$top/"
+      cp "$OAUTH_CLIENT" "$dist_dir/$top/google-oauth-client.json"
       [ -x "$dist_dir/$top/MapEditor.App" ] || die "linux-x64 app host missing or not executable"
       archive="$STAGE/archives/map-editor-${BUILD_ID}-linux-x64.tar.gz"
       tar -czf "$archive" -C "$dist_dir" "$top"
@@ -138,6 +200,8 @@ for rid in "${RIDS[@]}"; do
       assert_entry "$listing" "$top/MapEditor.App"
       assert_entry "$listing" "$top/MapEditor.App.deps.json"
       assert_entry "$listing" "$top/MapEditor.App.runtimeconfig.json"
+      assert_single_oauth_client "$listing" "$top/google-oauth-client.json"
+      assert_no_token_directory "$listing"
       if ! tar -tvzf "$archive" | grep -E '^-rwx' | awk '{print $NF}' | grep -qx "$top/MapEditor.App"; then
         die "linux-x64 app host lost executable mode inside the archive"
       fi
@@ -147,6 +211,7 @@ for rid in "${RIDS[@]}"; do
       top="map-editor-windows-x64"
       mkdir -p "$dist_dir/$top"
       cp -a "$out/." "$dist_dir/$top/"
+      cp "$OAUTH_CLIENT" "$dist_dir/$top/google-oauth-client.json"
       [ -f "$dist_dir/$top/MapEditor.App.exe" ] || die "windows-x64 app host missing"
       archive="$STAGE/archives/map-editor-${BUILD_ID}-windows-x64.zip"
       (cd "$dist_dir" && zip -q -r -X "$archive" "$top")
@@ -155,6 +220,8 @@ for rid in "${RIDS[@]}"; do
       assert_entry "$listing" "$top/MapEditor.App.exe"
       assert_entry "$listing" "$top/MapEditor.App.deps.json"
       assert_entry "$listing" "$top/MapEditor.App.runtimeconfig.json"
+      assert_single_oauth_client "$listing" "$top/google-oauth-client.json"
+      assert_no_token_directory "$listing"
       assert_no_godot_or_assets "$listing"
       ;;
     osx-x64|osx-arm64)
@@ -165,6 +232,7 @@ for rid in "${RIDS[@]}"; do
       mv "$bundle/Contents/MacOS/MapEditor.App.deps.json" "$bundle/Contents/MacOS/$MAC_BUNDLE.deps.json"
       mv "$bundle/Contents/MacOS/MapEditor.App.runtimeconfig.json" "$bundle/Contents/MacOS/$MAC_BUNDLE.runtimeconfig.json"
       sed "s/__CFBUNDLE_EXECUTABLE__/$MAC_BUNDLE/" "$INFO_PLIST_TEMPLATE" > "$bundle/Contents/Info.plist"
+      cp "$OAUTH_CLIENT" "$bundle/Contents/MacOS/google-oauth-client.json"
       [ -x "$bundle/Contents/MacOS/$MAC_BUNDLE" ] || die "$rid app host missing or not executable"
       archive="$STAGE/archives/${MAC_BUNDLE}-${BUILD_ID}-${rid}.app.zip"
       (cd "$dist_dir" && zip -q -r -X "$archive" "$MAC_BUNDLE.app")
@@ -174,6 +242,8 @@ for rid in "${RIDS[@]}"; do
       assert_entry "$listing" "$MAC_BUNDLE.app/Contents/MacOS/$MAC_BUNDLE.deps.json"
       assert_entry "$listing" "$MAC_BUNDLE.app/Contents/MacOS/$MAC_BUNDLE.runtimeconfig.json"
       assert_entry "$listing" "$MAC_BUNDLE.app/Contents/Info.plist"
+      assert_single_oauth_client "$listing" "$MAC_BUNDLE.app/Contents/MacOS/google-oauth-client.json"
+      assert_no_token_directory "$listing"
       extract="$STAGE/inspect/$rid"
       mkdir -p "$extract"
       unzip -q -o "$archive" -d "$extract"

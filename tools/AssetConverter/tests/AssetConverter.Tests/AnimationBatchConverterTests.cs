@@ -32,6 +32,57 @@ public class AnimationBatchConverterTests
             Assert.Contains("Body-1,115,3205,24,48", firstFrame);
             var heights = File.ReadAllText(Path.Combine(outRoot, "Assets/Resources/AnimationHeights.txt"));
             Assert.Contains("Body-1-walk-no-equip-left,48", heights);
+
+            var manifestPath = Path.Combine(outRoot, "Assets/Sprites/appearance-manifest.json");
+            Assert.True(File.Exists(manifestPath));
+            using var manifest = System.Text.Json.JsonDocument.Parse(File.ReadAllText(manifestPath));
+            Assert.Equal(1, manifest.RootElement.GetProperty("version").GetInt32());
+            var body1 = manifest.RootElement.GetProperty("parts").GetProperty("Body").GetProperty("1");
+            Assert.Equal(115, body1.GetProperty("noEquip")[0].GetInt32());
+            Assert.Equal(3205, body1.GetProperty("noEquip")[1].GetInt32());
+        }
+        finally
+        {
+            if (Directory.Exists(outRoot)) Directory.Delete(outRoot, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Convert_WithExtraResources_MonsterBodyAppearsBesideIllutiaBodyWithoutCountChanges()
+    {
+        var outRoot = Path.Combine(Path.GetTempPath(), "ac_anim_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var monster = new CompiledSpriteFramesResource(
+                AnimationType.Body,
+                10101,
+                AnimationNaming.ResourceRelativePath(AnimationType.Body, 10101),
+                new[]
+                {
+                    SpriteFramesAnimationSpec.FromFrames(
+                        "idle-no-equip-down", 20001, "res://Assets/Sprites/sheets/20001.png",
+                        new[] { new Frame(700123, 0, 0, 48, 64) }),
+                },
+                new Dictionary<string, AnimationFrameInfo>(),
+                new Dictionary<string, int>(),
+                Array.Empty<string>());
+
+            var result = AnimationBatchConverter.Convert(
+                Paths.IllutiaData,
+                Paths.CompiledEnc,
+                outRoot,
+                only: ca => ca.Type == AnimationType.Body && ca.Id == 1,
+                extraResources: new[] { monster });
+
+            Assert.Equal(1, result.ResourcesWritten);
+            Assert.Equal(0, result.Failed);
+
+            var manifestPath = Path.Combine(outRoot, "Assets/Sprites/appearance-manifest.json");
+            using var manifest = System.Text.Json.JsonDocument.Parse(File.ReadAllText(manifestPath));
+            var bodies = manifest.RootElement.GetProperty("parts").GetProperty("Body");
+            Assert.Equal(115, bodies.GetProperty("1").GetProperty("noEquip")[0].GetInt32());
+            Assert.Equal(20001, bodies.GetProperty("10101").GetProperty("noEquip")[0].GetInt32());
+            Assert.Equal(700123, bodies.GetProperty("10101").GetProperty("noEquip")[1].GetInt32());
         }
         finally
         {

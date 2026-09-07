@@ -1,11 +1,19 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
+using MapEditor.App.Connectivity;
 using MapEditor.App.Dialogs;
 using MapEditor.App.Documents;
 using MapEditor.App.Tests.Fakes;
+using MapEditor.App.ViewModels;
 using MapEditor.Core;
+using MapEditor.GameData.Connectivity;
+using MapEditor.GameData.Replacement;
+using MapEditor.GameData.Rows;
+using MapEditor.GameData.Sync;
 using Xunit;
 
 namespace MapEditor.App.Tests;
@@ -353,37 +361,6 @@ public class EditorDocumentControllerTests : IDisposable
     }
 
     [Fact]
-    public void UndoRedo_ToggleAvailabilityAndNotifyOncePerEffectiveChange()
-    {
-        Paint(_controller.Document.Session, 0, 0, new MapTileLayer(2, 5));
-        int stateChanges = 0;
-        _controller.StateChanged += () => stateChanges++;
-
-        Assert.True(_controller.Undo());
-        Assert.False(_controller.Document.Session.CanUndo);
-        Assert.True(_controller.Document.Session.CanRedo);
-        Assert.Equal(1, stateChanges);
-
-        Assert.True(_controller.Redo());
-        Assert.True(_controller.Document.Session.CanUndo);
-        Assert.False(_controller.Document.Session.CanRedo);
-        Assert.Equal(2, stateChanges);
-
-        Assert.False(_controller.Redo());
-        Assert.Equal(2, stateChanges);
-    }
-
-    [Fact]
-    public void Undo_WithoutHistory_DoesNotNotify()
-    {
-        int stateChanges = 0;
-        _controller.StateChanged += () => stateChanges++;
-
-        Assert.False(_controller.Undo());
-        Assert.Equal(0, stateChanges);
-    }
-
-    [Fact]
     public async Task ConfirmClose_CleanDocument_ApprovesWithoutPrompt()
     {
         _dialogs.SavePickResult = MapPath("close-clean.bytes");
@@ -465,5 +442,429 @@ public class EditorDocumentControllerTests : IDisposable
         ErrorPresentation error = Assert.Single(_dialogs.Errors);
         Assert.Equal("Save map", error.Title);
         Assert.Contains("dialog failed", error.Message);
+    }
+
+    private static readonly MapReference CloseMap10 = new(10, "Dungeon", "dungeon.bytes");
+    private static readonly MapReference CloseMap20 = new(20, "Cave", "cave.bytes");
+    private static readonly IReadOnlyList<MapReference> CloseMaps = new[] { CloseMap10, CloseMap20 };
+    private static readonly string CloseSheetUrl = "https://docs.google.com/spreadsheets/d/abc123";
+    private static readonly NpcAppearance CloseNpc1 = new(1, "Goose", 0, 0, new RgbaValue(255, 255, 255, 255), 0, 0, new RgbaValue(255, 255, 255, 255), string.Empty);
+
+    private static RemoteGameData CloseData()
+        => new(
+            CloseMaps,
+            new Dictionary<int, NpcAppearance> { [1] = CloseNpc1 },
+            new List<RemoteRow<NpcSpawnRow>> { new(2, new NpcSpawnRow(1, 10, 3, 4)) },
+            new List<RemoteRow<WarpRow>>());
+
+    private static void MakeMapDirty(MapDocumentViewModel document)
+    {
+        document.Session.SelectedTileLayer = new MapTileLayer(1, 2);
+        document.Session.BeginStroke(MapEditTool.Pencil, 0, 0);
+        Assert.True(document.Session.CompleteStroke());
+    }
+
+    [Fact]
+    public async Task TabClose_CleanSheetAndCleanMap_ClosesWithoutPrompts()
+    {
+        using var rig = new SheetCloseRig();
+        MapDocumentViewModel document = await rig.PullAsync(rig.Workspace.ActiveDocument);
+
+        Assert.True(await rig.Workspace.CloseAsync(document));
+
+        Assert.DoesNotContain(document, rig.Workspace.Documents);
+        Assert.Equal(0, rig.Dialogs.SheetDirtyShown);
+        Assert.Equal(0, rig.Dialogs.DirtyShown);
+        Assert.Empty(rig.Gateway.Calls);
+    }
+
+    [Fact]
+    public async Task TabClose_DirtySheet_PushSucceeds_ClosesTabAndCleansSheet()
+    {
+        using var rig = new SheetCloseRig();
+        MapDocumentViewModel document = await rig.PullAsync(rig.Workspace.ActiveDocument);
+        document.GameData!.Session.Edits.AddSpawn(new NpcSpawnRow(1, 10, 5, 5));
+        rig.Dialogs.SheetDirtyResult = SheetDirtyChoice.Push;
+
+        Assert.True(await rig.Workspace.CloseAsync(document));
+
+        Assert.DoesNotContain(document, rig.Workspace.Documents);
+        Assert.Equal(1, rig.Dialogs.SheetDirtyShown);
+        Assert.Equal(0, rig.Dialogs.DirtyShown);
+        Assert.Equal(new[] { "ReadOwnedRowsAsync", "ReplaceOwnedRowsAsync" }, rig.Gateway.Calls.Select(call => call.Method));
+    }
+
+    [Fact]
+    public async Task TabClose_DirtySheet_Discard_ClosesWithoutPushingOrSaving()
+    {
+        using var rig = new SheetCloseRig();
+        MapDocumentViewModel document = await rig.PullAsync(rig.Workspace.ActiveDocument);
+        EditorDocument editorDocument = document.Document;
+        document.GameData!.Session.Edits.AddSpawn(new NpcSpawnRow(1, 10, 5, 5));
+        rig.Dialogs.SheetDirtyResult = SheetDirtyChoice.Discard;
+
+        Assert.True(await rig.Workspace.CloseAsync(document));
+
+        Assert.DoesNotContain(document, rig.Workspace.Documents);
+        Assert.Empty(rig.Gateway.Calls);
+        Assert.Equal(0, rig.Dialogs.DirtyShown);
+        Assert.Null(editorDocument.Path);
+        Assert.Null(editorDocument.Revision);
+    }
+
+    [Fact]
+    public async Task TabClose_DirtySheet_Cancel_KeepsTabOpenAndDirty()
+    {
+        using var rig = new SheetCloseRig();
+        MapDocumentViewModel document = await rig.PullAsync(rig.Workspace.ActiveDocument);
+        document.GameData!.Session.Edits.AddSpawn(new NpcSpawnRow(1, 10, 5, 5));
+        rig.Dialogs.SheetDirtyResult = SheetDirtyChoice.Cancel;
+
+        Assert.False(await rig.Workspace.CloseAsync(document));
+
+        Assert.Contains(document, rig.Workspace.Documents);
+        Assert.Same(document, rig.Workspace.ActiveDocument);
+        Assert.True(document.GameData.IsDirty);
+        Assert.Empty(rig.Gateway.Calls);
+        Assert.Equal(0, rig.Dialogs.DirtyShown);
+    }
+
+    [Fact]
+    public async Task TabClose_SheetPromptRunsBeforeMapPrompt()
+    {
+        using var rig = new SheetCloseRig();
+        MapDocumentViewModel document = await rig.PullAsync(rig.Workspace.ActiveDocument);
+        document.GameData!.Session.Edits.AddSpawn(new NpcSpawnRow(1, 10, 5, 5));
+        MakeMapDirty(document);
+        var sheetGate = new TaskCompletionSource<SheetDirtyChoice>(TaskCreationOptions.RunContinuationsAsynchronously);
+        rig.Dialogs.SheetDirtyGate = sheetGate;
+
+        Task<bool> closing = rig.Workspace.CloseAsync(document);
+        await Until(() => rig.Dialogs.SheetDirtyShown == 1);
+
+        Assert.Equal(0, rig.Dialogs.DirtyShown);
+        sheetGate.SetResult(SheetDirtyChoice.Discard);
+        rig.Dialogs.DirtyResult = DirtyChoice.Discard;
+
+        Assert.True(await closing);
+        Assert.DoesNotContain(document, rig.Workspace.Documents);
+        Assert.Equal(1, rig.Dialogs.DirtyShown);
+    }
+
+    [Fact]
+    public async Task TabClose_PushSucceedsThenMapSaveCanceled_KeepsTabOpenSheetCleanMapDirty()
+    {
+        using var rig = new SheetCloseRig();
+        MapDocumentViewModel document = await rig.PullAsync(rig.Workspace.ActiveDocument);
+        rig.Dialogs.SavePickResult = rig.MapPath("baseline.bytes");
+        await document.SaveAsAsync();
+        document.GameData!.Session.Edits.AddSpawn(new NpcSpawnRow(1, 10, 5, 5));
+        MakeMapDirty(document);
+        string path = document.Document.Path!;
+        MapFileRevision revision = document.Document.Revision!.Value;
+        rig.Dialogs.SheetDirtyResult = SheetDirtyChoice.Push;
+        rig.Dialogs.DirtyResult = DirtyChoice.Cancel;
+
+        Assert.False(await rig.Workspace.CloseAsync(document));
+
+        Assert.Contains(document, rig.Workspace.Documents);
+        Assert.False(document.GameData.IsDirty);
+        Assert.True(document.Session.IsDirty);
+        Assert.Equal(path, document.Document.Path);
+        Assert.Equal(revision, document.Document.Revision);
+        Assert.Equal(1, rig.Dialogs.DirtyShown);
+    }
+
+    [Fact]
+    public async Task TabClose_PushRejectedByValidation_KeepsTabOpenAndDirtyWithoutMapPrompt()
+    {
+        using var rig = new SheetCloseRig();
+        MapDocumentViewModel document = await rig.PullAsync(rig.Workspace.ActiveDocument);
+        document.GameData!.Session.Edits.AddSpawn(new NpcSpawnRow(999, 10, 5, 5));
+        MakeMapDirty(document);
+        rig.Dialogs.SheetDirtyResult = SheetDirtyChoice.Push;
+        rig.Dialogs.DirtyResult = DirtyChoice.Discard;
+
+        Assert.False(await rig.Workspace.CloseAsync(document));
+
+        Assert.Contains(document, rig.Workspace.Documents);
+        Assert.True(document.GameData.IsDirty);
+        Assert.True(document.Session.IsDirty);
+        Assert.Equal(0, rig.Dialogs.DirtyShown);
+        Assert.Single(rig.Dialogs.Errors);
+    }
+
+    [Fact]
+    public async Task TabClose_PushConflictCanceled_KeepsTabOpenAndDirtyWithoutMapPrompt()
+    {
+        using var rig = new SheetCloseRig();
+        MapDocumentViewModel document = await rig.PullAsync(rig.Workspace.ActiveDocument);
+        document.GameData!.Session.Edits.AddSpawn(new NpcSpawnRow(1, 10, 5, 5));
+        MakeMapDirty(document);
+        rig.Gateway.EnqueueOwnedSpawns(new[] { new NpcSpawnRow(1, 10, 8, 8) });
+        rig.Dialogs.SheetDirtyResult = SheetDirtyChoice.Push;
+        rig.Dialogs.PushConflictResult = PushConflictChoice.Cancel;
+        rig.Dialogs.DirtyResult = DirtyChoice.Discard;
+
+        Assert.False(await rig.Workspace.CloseAsync(document));
+
+        Assert.Contains(document, rig.Workspace.Documents);
+        Assert.True(document.GameData.IsDirty);
+        Assert.True(document.Session.IsDirty);
+        Assert.Equal(1, rig.Dialogs.PushConflictShown);
+        Assert.Equal(0, rig.Dialogs.DirtyShown);
+    }
+
+    [Fact]
+    public async Task TabClose_PushAmbiguous_KeepsTabOpenAndDirtyWithoutMapPrompt()
+    {
+        using var rig = new SheetCloseRig();
+        MapDocumentViewModel document = await rig.PullAsync(rig.Workspace.ActiveDocument);
+        document.GameData!.Session.Edits.AddSpawn(new NpcSpawnRow(1, 10, 5, 5));
+        MakeMapDirty(document);
+        rig.Gateway.ReplaceFailure = new InvalidOperationException("socket reset");
+        rig.Dialogs.SheetDirtyResult = SheetDirtyChoice.Push;
+        rig.Dialogs.DirtyResult = DirtyChoice.Discard;
+
+        Assert.False(await rig.Workspace.CloseAsync(document));
+
+        Assert.Contains(document, rig.Workspace.Documents);
+        Assert.True(document.GameData.IsDirty);
+        Assert.True(document.Session.IsDirty);
+        Assert.Equal(0, rig.Dialogs.DirtyShown);
+        Assert.Single(rig.Dialogs.Errors);
+    }
+
+    [Fact]
+    public async Task TabClose_DiscardSheet_DoesNotMarkMapSaved()
+    {
+        using var rig = new SheetCloseRig();
+        MapDocumentViewModel document = await rig.PullAsync(rig.Workspace.ActiveDocument);
+        rig.Dialogs.SavePickResult = rig.MapPath("saved.bytes");
+        await document.SaveAsAsync();
+        document.GameData!.Session.Edits.AddSpawn(new NpcSpawnRow(1, 10, 5, 5));
+        MakeMapDirty(document);
+        string path = document.Document.Path!;
+        MapFileRevision revision = document.Document.Revision!.Value;
+        rig.Dialogs.SheetDirtyResult = SheetDirtyChoice.Discard;
+        rig.Dialogs.DirtyResult = DirtyChoice.Discard;
+
+        Assert.True(await rig.Workspace.CloseAsync(document));
+
+        Assert.DoesNotContain(document, rig.Workspace.Documents);
+        Assert.Equal(path, document.Document.Path);
+        Assert.Equal(revision, document.Document.Revision);
+        Assert.Empty(rig.Gateway.Calls);
+    }
+
+    [Fact]
+    public async Task TabClose_DiscardMap_DoesNotMarkSheetPushed()
+    {
+        using var rig = new SheetCloseRig();
+        MapDocumentViewModel document = await rig.PullAsync(rig.Workspace.ActiveDocument);
+        document.GameData!.Session.Edits.AddSpawn(new NpcSpawnRow(1, 10, 5, 5));
+        DocumentGameDataState sheetState = document.GameData!;
+        MakeMapDirty(document);
+        rig.Dialogs.SheetDirtyResult = SheetDirtyChoice.Discard;
+        rig.Dialogs.DirtyResult = DirtyChoice.Discard;
+
+        Assert.True(await rig.Workspace.CloseAsync(document));
+
+        Assert.DoesNotContain(document, rig.Workspace.Documents);
+        Assert.True(sheetState.IsDirty);
+        Assert.Empty(rig.Gateway.Calls);
+    }
+
+    [Fact]
+    public async Task CloseAll_MixedDirtyTabs_PromptsSheetFirstPerTabInWorkspaceOrder()
+    {
+        using var rig = new SheetCloseRig();
+        MapDocumentViewModel first = await rig.PullAsync(rig.Workspace.ActiveDocument);
+        first.GameData!.Session.Edits.AddSpawn(new NpcSpawnRow(1, 10, 5, 5));
+        MapDocumentViewModel second = await rig.NewDocumentAsync();
+        MakeMapDirty(second);
+        var sheetGate = new TaskCompletionSource<SheetDirtyChoice>(TaskCreationOptions.RunContinuationsAsynchronously);
+        rig.Dialogs.SheetDirtyGate = sheetGate;
+        rig.Dialogs.DirtyResult = DirtyChoice.Discard;
+
+        Task<bool> closing = rig.Workspace.CloseAllAsync();
+        await Until(() => rig.Dialogs.SheetDirtyShown == 1);
+
+        Assert.Same(first, rig.Workspace.ActiveDocument);
+        Assert.Equal(0, rig.Dialogs.DirtyShown);
+        sheetGate.SetResult(SheetDirtyChoice.Discard);
+
+        Assert.True(await closing);
+        Assert.Single(rig.Workspace.Documents);
+        Assert.DoesNotContain(first, rig.Workspace.Documents);
+        Assert.DoesNotContain(second, rig.Workspace.Documents);
+        Assert.Equal(1, rig.Dialogs.SheetDirtyShown);
+        Assert.Equal(1, rig.Dialogs.DirtyShown);
+        Assert.Empty(rig.Gateway.Calls);
+    }
+
+    [Fact]
+    public async Task MapSave_NeverPerformsPullOrPush()
+    {
+        using var rig = new SheetCloseRig();
+        MapDocumentViewModel document = await rig.PullAsync(rig.Workspace.ActiveDocument);
+        rig.Dialogs.SavePickResult = rig.MapPath("save1.bytes");
+        await document.SaveAsAsync();
+        document.GameData!.Session.Edits.AddSpawn(new NpcSpawnRow(1, 10, 5, 5));
+        int callsBefore = rig.Gateway.Calls.Count;
+
+        await document.SaveAsync();
+
+        Assert.Equal(callsBefore, rig.Gateway.Calls.Count);
+        Assert.True(document.GameData.IsDirty);
+        Assert.False(document.Session.IsDirty);
+    }
+
+    [Fact]
+    public async Task MapSaveAs_NeverPerformsPullOrPush()
+    {
+        using var rig = new SheetCloseRig();
+        MapDocumentViewModel document = await rig.PullAsync(rig.Workspace.ActiveDocument);
+        document.GameData!.Session.Edits.AddSpawn(new NpcSpawnRow(1, 10, 5, 5));
+        rig.Dialogs.SavePickResult = rig.MapPath("save2.bytes");
+
+        await document.SaveAsAsync();
+
+        Assert.Empty(rig.Gateway.Calls);
+        Assert.True(document.GameData.IsDirty);
+        Assert.False(document.Session.IsDirty);
+    }
+
+    [Fact]
+    public async Task SheetPush_NeverTouchesMapFileStoreOrSavedState()
+    {
+        using var rig = new SheetCloseRig();
+        MapDocumentViewModel document = await rig.PullAsync(rig.Workspace.ActiveDocument);
+        rig.Dialogs.SavePickResult = rig.MapPath("pushed.bytes");
+        await document.SaveAsAsync();
+        string path = document.Document.Path!;
+        MapFileRevision revision = document.Document.Revision!.Value;
+        byte[] savedBytes = File.ReadAllBytes(path);
+        document.GameData!.Session.Edits.AddSpawn(new NpcSpawnRow(1, 10, 5, 5));
+
+        Assert.True(await rig.Workspace.Commands.PushAsync(document));
+
+        Assert.Equal(revision, document.Document.Revision);
+        Assert.Equal(savedBytes, File.ReadAllBytes(path));
+        Assert.False(document.Session.IsDirty);
+        Assert.False(document.GameData.IsDirty);
+        Assert.Equal(new[] { "ReadOwnedRowsAsync", "ReplaceOwnedRowsAsync" }, rig.Gateway.Calls.Select(call => call.Method));
+    }
+
+    private static async Task Until(Func<bool> condition)
+    {
+        for (int i = 0; i < 1000 && !condition(); i++)
+        {
+            await Task.Delay(1);
+        }
+    }
+
+    private sealed class SheetCloseRig : IDisposable
+    {
+        private readonly string _directory = Directory.CreateTempSubdirectory("map-editor-sheet-close-").FullName;
+
+        public FakeEditorDialogs Dialogs { get; } = new();
+
+        public MapFileStore Store { get; } = new();
+
+        public RecordingGateway Gateway { get; } = new();
+
+        public GameDataSyncCoordinator Coordinator { get; }
+
+        public ScriptedConnectivity Connectivity { get; }
+
+        public WorkspaceViewModel Workspace { get; }
+
+        public SheetCloseRig()
+        {
+            Coordinator = new GameDataSyncCoordinator(Gateway, (_, _) => Task.CompletedTask);
+            Connectivity = new ScriptedConnectivity { IsConnected = true, Coordinator = Coordinator };
+            Workspace = new WorkspaceViewModel(Dialogs, Store, Connectivity);
+        }
+
+        public void Dispose() => Directory.Delete(_directory, true);
+
+        public string MapPath(string name) => Path.Combine(_directory, name);
+
+        public async Task<MapDocumentViewModel> PullAsync(MapDocumentViewModel document)
+        {
+            Dialogs.SpreadsheetUrlResult = CloseSheetUrl;
+            Dialogs.MapConfirmationResult = CloseMap10;
+            Assert.True(await Workspace.Commands.PullAsync(document));
+            return document;
+        }
+
+        public async Task<MapDocumentViewModel> NewDocumentAsync()
+        {
+            Dialogs.NewMapResult = new NewMapRequest(10, 10);
+            await Workspace.NewAsync();
+            return Workspace.ActiveDocument;
+        }
+    }
+
+    private sealed class RecordingGateway : IGameDataGateway
+    {
+        public sealed record Call(string Method);
+
+        public List<Call> Calls { get; } = new();
+
+        public Exception? ReplaceFailure;
+
+        private IReadOnlyList<NpcSpawnRow> _ownedSpawns = new[] { new NpcSpawnRow(1, 10, 3, 4) };
+
+        public RecordingGateway EnqueueOwnedSpawns(IReadOnlyList<NpcSpawnRow> spawns)
+        {
+            _ownedSpawns = spawns;
+            return this;
+        }
+
+        public Task<IReadOnlyList<MapReference>> ReadMapsAsync(string spreadsheetId, CancellationToken cancellationToken)
+            => Task.FromResult(CloseMaps);
+
+        public Task<RemoteGameData> ReadGameDataAsync(string spreadsheetId, int mapId, CancellationToken cancellationToken)
+            => Task.FromResult(CloseData());
+
+        public Task<RemoteOwnedRows> ReadOwnedRowsAsync(string spreadsheetId, int mapId, CancellationToken cancellationToken)
+        {
+            Calls.Add(new Call("ReadOwnedRowsAsync"));
+            return Task.FromResult(new RemoteOwnedRows(
+                _ownedSpawns.Select((row, index) => new RemoteRow<NpcSpawnRow>(index + 2, row)).ToList(),
+                new List<RemoteRow<WarpRow>>()));
+        }
+
+        public Task ReplaceOwnedRowsAsync(string spreadsheetId, ReplacementPlan spawnPlan, ReplacementPlan warpPlan, CancellationToken cancellationToken)
+        {
+            Calls.Add(new Call("ReplaceOwnedRowsAsync"));
+            return ReplaceFailure is { } failure ? Task.FromException(failure) : Task.CompletedTask;
+        }
+    }
+
+    private sealed class ScriptedConnectivity : IGameDataConnectivity
+    {
+        public bool IsConnected { get; set; }
+
+        public GameDataSyncCoordinator? Coordinator { get; set; }
+
+        public SpreadsheetReference? RememberedSpreadsheet { get; set; }
+
+        public bool TryRememberSpreadsheet(string? pastedUrl)
+        {
+            if (!SpreadsheetReferenceParser.TryParse(pastedUrl, out SpreadsheetReference reference))
+            {
+                return false;
+            }
+
+            RememberedSpreadsheet = reference;
+            return true;
+        }
+
+        public Task ConnectAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+
+        public Task DisconnectAsync(CancellationToken cancellationToken) => Task.CompletedTask;
     }
 }

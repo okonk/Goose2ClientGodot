@@ -16,6 +16,7 @@ using MapEditor.App.Tests.Fakes;
 using MapEditor.App.Tests.Fixtures;
 using MapEditor.App.ViewModels;
 using MapEditor.Core;
+using MapEditor.GameData.Rows;
 using MapEditor.Rendering;
 using Xunit;
 
@@ -38,7 +39,8 @@ public class AvaloniaMapDrawSinkTests
         using Bitmap bitmap = new(new MemoryStream(AssetFixture.PngSheet.Create(64, 64)));
         using AvaloniaSpriteSheetImage image = new(bitmap);
         RecordingMapDrawTarget target = new();
-        AvaloniaMapDrawSink sink = new(target);
+        using AvaloniaTintedSpriteCache cache = new();
+        AvaloniaMapDrawSink sink = new(target, cache);
         SpriteDrawOperation operation = new(
             2,
             new MapTileCoordinate(3, 4),
@@ -64,7 +66,8 @@ public class AvaloniaMapDrawSinkTests
     {
         CountingSpriteSheetImage foreign = new(32, 32);
         RecordingMapDrawTarget target = new();
-        AvaloniaMapDrawSink sink = new(target);
+        using AvaloniaTintedSpriteCache cache = new();
+        AvaloniaMapDrawSink sink = new(target, cache);
         SpriteDrawOperation operation = new(
             0,
             new MapTileCoordinate(0, 0),
@@ -83,7 +86,8 @@ public class AvaloniaMapDrawSinkTests
     public void DrawPlaceholder_DrawsFillStrokeAndBothDiagonalsWithExactColors()
     {
         RecordingMapDrawTarget target = new();
-        AvaloniaMapDrawSink sink = new(target);
+        using AvaloniaTintedSpriteCache cache = new();
+        AvaloniaMapDrawSink sink = new(target, cache);
         RenderColor fill = new(FillRed, FillGreen, FillBlue, FillAlpha);
         RenderColor stroke = new(StrokeRed, StrokeGreen, StrokeBlue, StrokeAlpha);
         PlaceholderDrawOperation operation = new(
@@ -123,7 +127,8 @@ public class AvaloniaMapDrawSinkTests
     public void DrawCellOverlay_DrawsFillAndStrokeExactlyAsReceived()
     {
         RecordingMapDrawTarget target = new();
-        AvaloniaMapDrawSink sink = new(target);
+        using AvaloniaTintedSpriteCache cache = new();
+        AvaloniaMapDrawSink sink = new(target, cache);
         RenderColor fill = new(0x00, 0x00, 0x60, 0x40);
         RenderColor stroke = new(0xFF, 0xFF, 0xFF, 0x00);
         CellOverlayDrawOperation operation = new(
@@ -148,7 +153,8 @@ public class AvaloniaMapDrawSinkTests
     public void DrawGridLine_DrawsLineWithExactColorAndEndpoints()
     {
         RecordingMapDrawTarget target = new();
-        AvaloniaMapDrawSink sink = new(target);
+        using AvaloniaTintedSpriteCache cache = new();
+        AvaloniaMapDrawSink sink = new(target, cache);
         GridLineDrawOperation operation = new(new RenderPoint(0, 32), new RenderPoint(300, 32), new RenderColor(0xFF, 0xFF, 0x30, 0xFF));
 
         sink.DrawGridLine(operation);
@@ -160,6 +166,65 @@ public class AvaloniaMapDrawSinkTests
         Assert.Equal(Color.FromArgb(0xFF, 0xFF, 0xFF, 0x30), Assert.IsType<SolidColorBrush>(line.Pen.Brush).Color);
         Assert.Empty(target.Rectangles);
         Assert.Empty(target.Images);
+    }
+
+    [AvaloniaFact]
+    public void DrawNpcImage_TintedDrawsCachedFrameWithLocalSourceRectAndNoOverlay()
+    {
+        using Bitmap sheet = new(new MemoryStream(AssetFixture.PngSheet.Create(64, 64)));
+        using AvaloniaSpriteSheetImage image = new(sheet);
+        using AvaloniaTintedSpriteCache cache = new();
+        RecordingMapDrawTarget target = new();
+        AvaloniaMapDrawSink sink = new(target, cache);
+        NpcImageDrawOperation operation = new(
+            0,
+            NpcPartSlot.Body,
+            new SpriteReference(1000, 100),
+            image,
+            new SpriteSourceRect(32, 0, 32, 32),
+            new RenderRect(16, 64, 32, 32),
+            new RgbaValue(200, 100, 50, 128),
+            SpriteSampling.NearestNeighbor);
+
+        sink.DrawNpcImage(operation);
+        sink.DrawNpcImage(operation);
+
+        Assert.Equal(2, target.Images.Count);
+        RecordingMapDrawTarget.ImageDraw draw = target.Images[0];
+        Assert.NotSame(sheet, draw.Image);
+        Assert.Equal(new Rect(0, 0, 32, 32), draw.Source);
+        Assert.Equal(new Rect(16, 64, 32, 32), draw.Destination);
+        Assert.Same(draw.Image, target.Images[1].Image);
+        Assert.Empty(target.Rectangles);
+        Assert.Empty(target.Lines);
+    }
+
+    [AvaloniaFact]
+    public void DrawNpcImage_ZeroAlphaDrawsTheSheetFrameWithTheSheetSourceRect()
+    {
+        using Bitmap sheet = new(new MemoryStream(AssetFixture.PngSheet.Create(64, 64)));
+        using AvaloniaSpriteSheetImage image = new(sheet);
+        using AvaloniaTintedSpriteCache cache = new();
+        RecordingMapDrawTarget target = new();
+        AvaloniaMapDrawSink sink = new(target, cache);
+        NpcImageDrawOperation operation = new(
+            0,
+            NpcPartSlot.Body,
+            new SpriteReference(1000, 100),
+            image,
+            new SpriteSourceRect(32, 0, 32, 32),
+            new RenderRect(16, 64, 32, 32),
+            new RgbaValue(200, 100, 50, 0),
+            SpriteSampling.NearestNeighbor);
+
+        sink.DrawNpcImage(operation);
+
+        Assert.Single(target.Images);
+        RecordingMapDrawTarget.ImageDraw draw = target.Images[0];
+        Assert.Same(sheet, draw.Image);
+        Assert.Equal(new Rect(32, 0, 32, 32), draw.Source);
+        Assert.Equal(new Rect(16, 64, 32, 32), draw.Destination);
+        Assert.Empty(target.Rectangles);
     }
 
     [AvaloniaFact]

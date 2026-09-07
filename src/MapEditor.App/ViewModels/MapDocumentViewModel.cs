@@ -1,9 +1,13 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
+using MapEditor.App.Dialogs;
 using MapEditor.App.Documents;
 using MapEditor.Core;
+using MapEditor.GameData.Editing;
+using MapEditor.GameData.Rows;
 
 namespace MapEditor.App.ViewModels;
 
@@ -24,6 +28,9 @@ internal sealed class MapDocumentViewModel : ViewModelBase, IDisposable
     private readonly EditorDocumentController _controller;
     private readonly SharedTileClipboard _clipboard;
     private MapEditSession _session;
+    private SheetEditSession _sheetSession;
+    private DocumentEditTimeline _timeline;
+    private DocumentGameDataState? _gameData;
 
     private MapEditTool _activeTool = MapEditTool.Pencil;
     private IReadOnlyList<int> _sheetIds = Array.Empty<int>();
@@ -47,12 +54,15 @@ internal sealed class MapDocumentViewModel : ViewModelBase, IDisposable
     private bool _canUndo;
     private bool _canRedo;
     private bool _canSave;
+    private string? _previewStatus;
 
     public MapDocumentViewModel(EditorDocumentController controller, SharedTileClipboard clipboard)
     {
         _controller = controller ?? throw new ArgumentNullException(nameof(controller));
         _clipboard = clipboard ?? throw new ArgumentNullException(nameof(clipboard));
         _session = _controller.Document.Session;
+        _sheetSession = new SheetEditSession(Array.Empty<NpcSpawnRow>(), Array.Empty<WarpRow>());
+        _timeline = new DocumentEditTimeline(_session, _sheetSession);
         _mapWidth = _session.Document.Width;
         _mapHeight = _session.Document.Height;
         _title = BuildTitle();
@@ -71,13 +81,40 @@ internal sealed class MapDocumentViewModel : ViewModelBase, IDisposable
         _clipboard.Changed -= OnClipboardChanged;
         _controller.StateChanged -= OnControllerStateChanged;
         _session.Resized -= OnSessionResized;
+        _timeline.Detach();
+        if (_gameData is not null)
+        {
+            _gameData.Changed -= OnGameDataChanged;
+            _gameData.Dispose();
+            _gameData = null;
+        }
     }
 
     public event Action? CanvasInvalidated;
 
     public event Action? PaletteInvalidated;
 
+    public event Action<ErrorPresentation>? GameDataError;
+
     public MapEditSession Session => _controller.Document.Session;
+
+    internal SheetEditSession SheetSession => _sheetSession;
+
+    internal DocumentEditTimeline Timeline => _timeline;
+
+    internal DocumentGameDataState? GameData => _gameData;
+
+    internal void AttachGameData(DocumentGameDataState state)
+    {
+        _gameData = state ?? throw new ArgumentNullException(nameof(state));
+        _gameData.Changed += OnGameDataChanged;
+    }
+
+    internal void AttachSheetSession(SheetEditSession session)
+    {
+        _sheetSession = session ?? throw new ArgumentNullException(nameof(session));
+        _timeline = _timeline.CreateForNewSheetSession(_sheetSession);
+    }
 
     internal EditorDocument Document => _controller.Document;
 
@@ -89,6 +126,11 @@ internal sealed class MapDocumentViewModel : ViewModelBase, IDisposable
             if (value < MapEditTool.Pencil || value > MapEditTool.FloodFill)
             {
                 throw new ArgumentOutOfRangeException(nameof(value));
+            }
+
+            if (_gameData is not null)
+            {
+                _gameData.ActiveTool = GameDataTool.None;
             }
 
             if (value != MapEditTool.MultiSelect && _selectionRectangle is not null)
@@ -251,7 +293,12 @@ internal sealed class MapDocumentViewModel : ViewModelBase, IDisposable
 
     public bool CanSave => _canSave;
 
-    public TileClipboard? Clipboard => _clipboard.Current;
+    public string? PreviewStatus => _previewStatus;
+
+    internal void SetPreviewStatus(string? status)
+        => SetField(ref _previewStatus, status, nameof(PreviewStatus));
+
+    public TileClipboard? Clipboard => _clipboard.Current?.Tiles;
 
     public bool PasteMode
     {
@@ -269,7 +316,7 @@ internal sealed class MapDocumentViewModel : ViewModelBase, IDisposable
     {
         get
         {
-            if (!_pasteMode || _clipboard.Current is not { } clip || HoverX is not { } x || HoverY is not { } y)
+            if (!_pasteMode || _clipboard.Current is not { Kind: EditorClipboardKind.Tiles, Tiles: { } clip } || HoverX is not { } x || HoverY is not { } y)
             {
                 return null;
             }
@@ -280,16 +327,60 @@ internal sealed class MapDocumentViewModel : ViewModelBase, IDisposable
 
     public void CopySelection()
     {
+        if (_gameData is { ActiveTool: GameDataTool.Spawn or GameDataTool.Warp } state && state.Session is { } session)
+        {
+            if (state.ActiveTool == GameDataTool.Spawn)
+            {
+                if (state.SelectedSpawn is { } spawnIndex && spawnIndex < session.Edits.Spawns.Count)
+                {
+                    NpcSpawnRow row = session.Edits.Spawns[spawnIndex];
+                    _clipboard.Current = EditorClipboardPayload.FromSpawn(row.NpcId, session.SpreadsheetId);
+                }
+                return;
+            }
+
+            if (state.SelectedWarp is { } warpIndex && warpIndex < session.Edits.Warps.Count)
+            {
+                WarpRow row = session.Edits.Warps[warpIndex];
+                _clipboard.Current = EditorClipboardPayload.FromWarp(row.WarpId, row.WarpX, row.WarpY, session.SpreadsheetId);
+            }
+            return;
+        }
+
         if (SelectionRectangle is not { } rect)
         {
             return;
         }
 
-        _clipboard.Current = TileClipboard.Capture(_session.Document, _session.SelectedLayers, rect);
+        _clipboard.Current = EditorClipboardPayload.FromTiles(TileClipboard.Capture(_session.Document, _session.SelectedLayers, rect));
     }
 
     public void CutSelection()
     {
+        if (_gameData is { ActiveTool: GameDataTool.Spawn or GameDataTool.Warp } state && state.Session is { } session)
+        {
+            if (state.ActiveTool == GameDataTool.Spawn)
+            {
+                if (state.SelectedSpawn is { } spawnIndex && spawnIndex < session.Edits.Spawns.Count)
+                {
+                    NpcSpawnRow row = session.Edits.Spawns[spawnIndex];
+                    _clipboard.Current = EditorClipboardPayload.FromSpawn(row.NpcId, session.SpreadsheetId);
+                    state.SelectedSpawn = null;
+                    session.Edits.RemoveSpawnAt(spawnIndex);
+                }
+                return;
+            }
+
+            if (state.SelectedWarp is { } warpIndex && warpIndex < session.Edits.Warps.Count)
+            {
+                WarpRow row = session.Edits.Warps[warpIndex];
+                _clipboard.Current = EditorClipboardPayload.FromWarp(row.WarpId, row.WarpX, row.WarpY, session.SpreadsheetId);
+                state.SelectedWarp = null;
+                session.Edits.RemoveWarpAt(warpIndex);
+            }
+            return;
+        }
+
         CopySelection();
         DeleteSelection();
     }
@@ -326,7 +417,7 @@ internal sealed class MapDocumentViewModel : ViewModelBase, IDisposable
 
     public void BeginPasteMode()
     {
-        if (_clipboard.Current is not null)
+        if (_clipboard.Current is { Kind: EditorClipboardKind.Tiles })
         {
             PasteMode = true;
             Refresh(EditorRefresh.Canvas);
@@ -342,10 +433,20 @@ internal sealed class MapDocumentViewModel : ViewModelBase, IDisposable
         }
     }
 
+    public void PasteSelection()
+    {
+        if (_clipboard.Current is { Kind: EditorClipboardKind.Spawn or EditorClipboardKind.Warp } payload)
+        {
+            PasteGameData(payload);
+            return;
+        }
+
+        BeginPasteMode();
+    }
+
     public void ApplyPasteAt(int x, int y)
     {
-        TileClipboard? clip = _clipboard.Current;
-        if (clip is null)
+        if (_clipboard.Current is not { Kind: EditorClipboardKind.Tiles, Tiles: { } clip })
         {
             return;
         }
@@ -404,35 +505,456 @@ internal sealed class MapDocumentViewModel : ViewModelBase, IDisposable
 
     public bool Undo()
     {
-        if (!_controller.Undo())
+        if (!_timeline.Undo())
         {
             return false;
         }
 
-        Refresh(EditorRefresh.Canvas);
+        Refresh(EditorRefresh.Canvas | EditorRefresh.Commands | EditorRefresh.Title);
         return true;
     }
 
     public bool Redo()
     {
-        if (!_controller.Redo())
+        if (!_timeline.Redo())
         {
             return false;
         }
 
-        Refresh(EditorRefresh.Canvas);
+        Refresh(EditorRefresh.Canvas | EditorRefresh.Commands | EditorRefresh.Title);
         return true;
+    }
+
+    internal void CompleteStroke()
+    {
+        _session.CompleteStroke();
+    }
+
+    internal void CancelStroke()
+    {
+        _session.CancelStroke();
     }
 
     public void ResizeMap(MapTileRectangle window)
     {
-        if (!_session.ApplyResize(window))
+        MapDocument document = _session.Document;
+        bool mapChanges = window.X != 0 || window.Y != 0 || window.Width != document.Width || window.Height != document.Height;
+        if (!mapChanges)
         {
             return;
         }
 
+        MapResizePlan plan = PlanResize(window);
+        bool sheetChanges = plan.HasPulledData &&
+            (!RowsEqual(_sheetSession.Spawns, plan.NewSpawns) || !RowsEqual(_sheetSession.Warps, plan.NewWarps));
+        if (sheetChanges)
+        {
+            _timeline.ApplyCompound(
+                session => session.ApplyResize(window),
+                session => session.ReplaceAll(plan.NewSpawns, plan.NewWarps));
+        }
+        else
+        {
+            _session.ApplyResize(window);
+        }
+
         Refresh(EditorRefresh.Canvas | EditorRefresh.Commands | EditorRefresh.Title);
     }
+
+    // The forward transform is the core-emitted (-X, -Y) offset; a row survives only if its
+    // shifted position stays inside the new half-open bounds.
+    internal MapResizePlan PlanResize(MapTileRectangle window)
+    {
+        MapDocument document = _session.Document;
+        int croppedTiles = 0;
+        for (int y = 0; y < document.Height; y++)
+        {
+            for (int x = 0; x < document.Width; x++)
+            {
+                bool inside = x >= window.X && x < window.X + window.Width && y >= window.Y && y < window.Y + window.Height;
+                if (!inside && !document[x, y].IsEmpty)
+                {
+                    croppedTiles++;
+                }
+            }
+        }
+
+        var newSpawns = new List<NpcSpawnRow>();
+        var newWarps = new List<WarpRow>();
+        int croppedSpawns = 0;
+        int croppedWarps = 0;
+        int inboundWarps = 0;
+        bool pulled = false;
+        if (_gameData is { HasSession: true } gameData)
+        {
+            pulled = true;
+            int offsetX = -window.X;
+            int offsetY = -window.Y;
+            int confirmedMapId = gameData.ConfirmedMapId ?? -1;
+            foreach (NpcSpawnRow spawn in _sheetSession.Spawns)
+            {
+                int x = spawn.MapX + offsetX;
+                int y = spawn.MapY + offsetY;
+                if (x < 0 || x >= window.Width || y < 0 || y >= window.Height)
+                {
+                    croppedSpawns++;
+                    continue;
+                }
+
+                newSpawns.Add(spawn with { MapX = x, MapY = y });
+            }
+
+            foreach (WarpRow warp in _sheetSession.Warps)
+            {
+                int x = warp.MapX + offsetX;
+                int y = warp.MapY + offsetY;
+                int destinationX = warp.WarpX;
+                int destinationY = warp.WarpY;
+                bool self = warp.WarpId == confirmedMapId;
+                if (self)
+                {
+                    destinationX += offsetX;
+                    destinationY += offsetY;
+                }
+
+                if (x < 0 || x >= window.Width || y < 0 || y >= window.Height)
+                {
+                    croppedWarps++;
+                    continue;
+                }
+
+                if (self && (destinationX < 0 || destinationX >= window.Width || destinationY < 0 || destinationY >= window.Height))
+                {
+                    inboundWarps++;
+                }
+
+                newWarps.Add(warp with { MapX = x, MapY = y, WarpX = destinationX, WarpY = destinationY });
+            }
+        }
+
+        return new MapResizePlan(window, croppedTiles, croppedSpawns, croppedWarps, inboundWarps, pulled, newSpawns, newWarps);
+    }
+
+    private static bool RowsEqual<T>(IReadOnlyList<T> left, IReadOnlyList<T> right) where T : struct
+    {
+        if (left.Count != right.Count)
+        {
+            return false;
+        }
+
+        for (int i = 0; i < left.Count; i++)
+        {
+            if (!left[i].Equals(right[i]))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    internal int? FindSpawnAt(int x, int y)
+    {
+        if (_gameData?.Session is not { Edits: { } edits })
+        {
+            return null;
+        }
+
+        var spawns = edits.Spawns;
+        for (int i = 0; i < spawns.Count; i++)
+        {
+            if (spawns[i].MapX == x && spawns[i].MapY == y)
+            {
+                return i;
+            }
+        }
+
+        return null;
+    }
+
+    internal int? FindWarpAt(int x, int y)
+    {
+        if (_gameData?.Session is not { Edits: { } edits })
+        {
+            return null;
+        }
+
+        var warps = edits.Warps;
+        for (int i = 0; i < warps.Count; i++)
+        {
+            if (warps[i].MapX == x && warps[i].MapY == y)
+            {
+                return i;
+            }
+        }
+
+        return null;
+    }
+
+    internal void SelectSpawn(int index)
+    {
+        if (_gameData is not { Session: { Edits: { } edits } } state || index < 0 || index >= edits.Spawns.Count)
+        {
+            return;
+        }
+
+        state.SelectedSpawn = index;
+    }
+
+    internal void SelectWarp(int index)
+    {
+        if (_gameData is not { Session: { Edits: { } edits } } state || index < 0 || index >= edits.Warps.Count)
+        {
+            return;
+        }
+
+        state.SelectedWarp = index;
+    }
+
+    internal void AddSpawnAt(int x, int y)
+    {
+        if (_gameData is not { Session: { } session } state || !InBounds(x, y))
+        {
+            return;
+        }
+
+        if (state.SelectedNpcId is not { } npcId || !session.Npcs.ContainsKey(npcId))
+        {
+            RaiseGameDataError(new ErrorPresentation("Add spawn", "Select an NPC in the properties panel before placing a spawn."));
+            return;
+        }
+
+        int index = session.Edits.Spawns.Count;
+        session.Edits.AddSpawn(new NpcSpawnRow(npcId, session.MapId, x, y));
+        state.SelectedSpawn = index;
+    }
+
+    internal void AddWarpAt(int x, int y)
+    {
+        if (_gameData is not { Session: { } session } state || !InBounds(x, y))
+        {
+            return;
+        }
+
+        if (state.SelectedDestinationMapId is not { } mapId || !session.Maps.Any(map => map.MapId == mapId))
+        {
+            RaiseGameDataError(new ErrorPresentation("Add warp", "Select a destination map in the properties panel before placing a warp."));
+            return;
+        }
+
+        if (state.PendingDestinationX is not { } destinationX || state.PendingDestinationY is not { } destinationY)
+        {
+            RaiseGameDataError(new ErrorPresentation("Add warp", "Set the destination coordinates before placing a warp."));
+            return;
+        }
+
+        if (FindWarpAt(x, y) is not null)
+        {
+            RaiseGameDataError(new ErrorPresentation("Add warp", $"Warp source tile ({x}, {y}) is already defined."));
+            return;
+        }
+
+        int index = session.Edits.Warps.Count;
+        session.Edits.AddWarp(new WarpRow(session.MapId, x, y, mapId, destinationX, destinationY));
+        state.SelectedWarp = index;
+    }
+
+    internal void MoveSpawnTo(int index, int x, int y)
+    {
+        if (_gameData?.Session is not { Edits: { } edits } state || index < 0 || index >= edits.Spawns.Count || !InBounds(x, y))
+        {
+            return;
+        }
+
+        edits.MoveSpawn(index, x, y);
+    }
+
+    internal void MoveWarpSourceTo(int index, int x, int y)
+    {
+        if (_gameData?.Session is not { Edits: { } edits } state || index < 0 || index >= edits.Warps.Count || !InBounds(x, y))
+        {
+            return;
+        }
+
+        WarpRow row = edits.Warps[index];
+        if (row.MapX == x && row.MapY == y)
+        {
+            return;
+        }
+
+        for (int i = 0; i < edits.Warps.Count; i++)
+        {
+            if (i != index && edits.Warps[i].MapX == x && edits.Warps[i].MapY == y)
+            {
+                RaiseGameDataError(new ErrorPresentation("Move warp", $"Warp source tile ({x}, {y}) is already defined."));
+                return;
+            }
+        }
+
+        edits.MoveWarpSource(index, x, y);
+    }
+
+    internal void CommitSpawnNpc(int npcId)
+    {
+        if (_gameData is not { Session: { } session } state)
+        {
+            return;
+        }
+
+        state.SelectedNpcId = npcId;
+        if (state.SelectedSpawn is not { } index || index >= session.Edits.Spawns.Count)
+        {
+            return;
+        }
+
+        if (!session.Npcs.ContainsKey(npcId))
+        {
+            return;
+        }
+
+        NpcSpawnRow row = session.Edits.Spawns[index];
+        if (row.NpcId == npcId)
+        {
+            return;
+        }
+
+        session.Edits.UpdateSpawn(index, row with { NpcId = npcId });
+    }
+
+    internal void CommitWarpDestinationMap(int mapId)
+    {
+        if (_gameData is not { Session: { } session } state)
+        {
+            return;
+        }
+
+        state.SelectedDestinationMapId = mapId;
+        if (state.SelectedWarp is not { } index || index >= session.Edits.Warps.Count)
+        {
+            return;
+        }
+
+        if (!session.Maps.Any(map => map.MapId == mapId))
+        {
+            return;
+        }
+
+        WarpRow row = session.Edits.Warps[index];
+        if (row.WarpId == mapId)
+        {
+            return;
+        }
+
+        session.Edits.UpdateWarp(index, row with { WarpId = mapId });
+    }
+
+    internal void CommitWarpDestinationCoordinates(int x, int y)
+    {
+        if (_gameData is not { Session: { Edits: { } edits } } state)
+        {
+            return;
+        }
+
+        state.PendingDestinationX = x;
+        state.PendingDestinationY = y;
+        if (state.SelectedWarp is not { } index || index >= edits.Warps.Count)
+        {
+            return;
+        }
+
+        WarpRow row = edits.Warps[index];
+        if (row.WarpX == x && row.WarpY == y)
+        {
+            return;
+        }
+
+        edits.UpdateWarp(index, row with { WarpX = x, WarpY = y });
+    }
+
+    internal void RemoveSelectedSpawn()
+    {
+        if (_gameData is not { Session: { Edits: { } edits } } state || state.SelectedSpawn is not { } index)
+        {
+            return;
+        }
+
+        state.SelectedSpawn = null;
+        if (index >= edits.Spawns.Count)
+        {
+            return;
+        }
+
+        edits.RemoveSpawnAt(index);
+    }
+
+    internal void RemoveSelectedWarp()
+    {
+        if (_gameData is not { Session: { Edits: { } edits } } state || state.SelectedWarp is not { } index)
+        {
+            return;
+        }
+
+        state.SelectedWarp = null;
+        if (index >= edits.Warps.Count)
+        {
+            return;
+        }
+
+        edits.RemoveWarpAt(index);
+    }
+
+    internal void RemoveSelectedGameData()
+    {
+        if (_gameData?.SelectedSpawn is not null)
+        {
+            RemoveSelectedSpawn();
+        }
+        else
+        {
+            RemoveSelectedWarp();
+        }
+    }
+
+    private bool InBounds(int x, int y)
+    {
+        MapDocument document = _session.Document;
+        return x >= 0 && x < document.Width && y >= 0 && y < document.Height;
+    }
+
+    private void PasteGameData(EditorClipboardPayload payload)
+    {
+        if (_gameData is not { Session: { } session } state)
+        {
+            RaiseGameDataError(new ErrorPresentation("Paste game data", "Paste requires a pulled game data session."));
+            return;
+        }
+
+        if (SelectedX is not { } x || SelectedY is not { } y || !InBounds(x, y))
+        {
+            RaiseGameDataError(new ErrorPresentation("Paste game data", "Paste requires a selected map tile."));
+            return;
+        }
+
+        if (!string.Equals(payload.SourceSpreadsheetId, session.SpreadsheetId, StringComparison.Ordinal))
+        {
+            RaiseGameDataError(new ErrorPresentation("Paste game data", "Paste requires the same spreadsheet."));
+            return;
+        }
+
+        if (payload.Kind == EditorClipboardKind.Spawn)
+        {
+            int spawnIndex = session.Edits.Spawns.Count;
+            session.Edits.AddSpawn(new NpcSpawnRow(payload.SpawnNpcId!.Value, session.MapId, x, y));
+            state.SelectedSpawn = spawnIndex;
+            return;
+        }
+
+        int index = session.Edits.Warps.Count;
+        session.Edits.AddWarp(new WarpRow(session.MapId, x, y, payload.WarpDestinationMapId!.Value, payload.WarpDestinationX!.Value, payload.WarpDestinationY!.Value));
+        state.SelectedWarp = index;
+    }
+
+    private void RaiseGameDataError(ErrorPresentation error) => GameDataError?.Invoke(error);
 
     public void Refresh(EditorRefresh flags)
     {
@@ -446,8 +968,8 @@ internal sealed class MapDocumentViewModel : ViewModelBase, IDisposable
 
         if (flags.HasFlag(EditorRefresh.Commands))
         {
-            SetField(ref _canUndo, _session.CanUndo, nameof(CanUndo));
-            SetField(ref _canRedo, _session.CanRedo, nameof(CanRedo));
+            SetField(ref _canUndo, _timeline.CanUndo, nameof(CanUndo));
+            SetField(ref _canRedo, _timeline.CanRedo, nameof(CanRedo));
             SetField(ref _canSave, _session.IsDirty, nameof(CanSave));
             SetField(ref _lastNotifiedDirty, _session.IsDirty, nameof(IsDirty));
         }
@@ -468,9 +990,15 @@ internal sealed class MapDocumentViewModel : ViewModelBase, IDisposable
         Refresh(EditorRefresh.Title | EditorRefresh.Commands);
     }
 
+    private void OnGameDataChanged()
+    {
+        Refresh(EditorRefresh.Title | EditorRefresh.Commands);
+    }
+
     private void OnClipboardChanged()
     {
         OnPropertyChanged(nameof(Clipboard));
+        Refresh(EditorRefresh.Commands);
     }
 
     private void OnSessionResized(MapResizeTransform transform)
@@ -482,6 +1010,11 @@ internal sealed class MapDocumentViewModel : ViewModelBase, IDisposable
         HoverY = null;
         SelectionRectangle = ShiftRect(SelectionRectangle, transform);
         CancelPasteMode();
+        if (_gameData is not null)
+        {
+            _gameData.SelectedSpawn = null;
+            _gameData.SelectedWarp = null;
+        }
     }
 
     private static (int? X, int? Y) ShiftPoint(int? x, int? y, in MapResizeTransform transform)

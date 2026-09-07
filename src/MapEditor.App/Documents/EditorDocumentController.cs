@@ -96,28 +96,6 @@ internal sealed class EditorDocumentController
         }
     }
 
-    internal bool Undo()
-    {
-        if (!_current.Session.Undo())
-        {
-            return false;
-        }
-
-        NotifyStateChanged();
-        return true;
-    }
-
-    internal bool Redo()
-    {
-        if (!_current.Session.Redo())
-        {
-            return false;
-        }
-
-        NotifyStateChanged();
-        return true;
-    }
-
     // The caller owns re-entrancy (the window's close guard); this must not be
     // called concurrently with itself.
     internal async Task<bool> ConfirmCloseAsync()

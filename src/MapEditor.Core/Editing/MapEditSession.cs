@@ -26,9 +26,14 @@ public sealed class MapEditSession
         _document = document ?? throw new ArgumentNullException(nameof(document));
         _savedStateId = initiallyDirty ? null : 0;
         _history = new MapEditHistory(retainedHistoryCapBytes);
+        _history.HistoryChanged += OnHistoryChanged;
     }
 
     public MapDocument Document => _document;
+
+    public long HistoryVersion => _history.HistoryVersion;
+
+    public event Action? HistoryChanged;
 
     public long RetainedHistoryCapBytes => _history.CapBytes;
 
@@ -445,6 +450,12 @@ public sealed class MapEditSession
 
         _savedStateId = _currentStateId;
     }
+
+    public void DiscardRedo() => _history.DiscardRedo();
+
+    public void ClearHistory() => _history.Clear();
+
+    private void OnHistoryChanged() => HistoryChanged?.Invoke();
 
     public void SetRetainedHistoryCap(long bytes)
     {

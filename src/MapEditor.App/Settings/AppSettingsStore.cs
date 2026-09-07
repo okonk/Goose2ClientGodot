@@ -61,13 +61,18 @@ public sealed class AppSettingsStore
             throw new AppSettingsException(_path, $"assetDirectory must be an absolute path, got '{assetDirectory}'.");
         }
 
-        return new AppSettings(assetDirectory, ParseTheme(file?.Theme));
+        return new AppSettings(assetDirectory, ParseTheme(file?.Theme), file?.SpreadsheetUrl);
     }
 
     public void Save(AppSettings settings)
     {
         var json = JsonSerializer.Serialize(
-            new SettingsFile { AssetDirectory = settings.AssetDirectory, Theme = settings.Theme.ToString() },
+            new SettingsFile
+            {
+                AssetDirectory = settings.AssetDirectory,
+                Theme = settings.Theme.ToString(),
+                SpreadsheetUrl = settings.SpreadsheetUrl
+            },
             SerializerOptions);
         var directory = Path.GetDirectoryName(Path.GetFullPath(_path))!;
         var temp = Path.Combine(directory, TempPrefix + Guid.NewGuid().ToString("N") + TempSuffix);
@@ -128,6 +133,8 @@ public sealed class AppSettingsStore
         public string? AssetDirectory { get; set; }
 
         public string? Theme { get; set; }
+
+        public string? SpreadsheetUrl { get; set; }
     }
 
     private sealed class SystemFileOperations : ISettingsFileOperations

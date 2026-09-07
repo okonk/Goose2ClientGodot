@@ -22,4 +22,16 @@ public sealed class RecordingMapDrawSink : IMapDrawSink
 
     public void DrawGridLine(in GridLineDrawOperation operation)
         => _calls.Add(operation);
+
+    public void DrawGameDataMarker(in GameDataMarkerDrawOperation operation)
+        => _calls.Add(operation);
+
+    public void DrawNpcImage(in NpcImageDrawOperation operation)
+        => _calls.Add(operation);
+
+    public void DrawNpcPartPlaceholder(in NpcPartPlaceholderDrawOperation operation)
+        => _calls.Add(operation);
+
+    public void DrawNpcSpawnAnchor(in NpcSpawnAnchorDrawOperation operation)
+        => _calls.Add(operation);
 }

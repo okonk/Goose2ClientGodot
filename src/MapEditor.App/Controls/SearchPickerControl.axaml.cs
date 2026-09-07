@@ -1,0 +1,186 @@
+using System;
+using System.Collections.Generic;
+using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Input;
+using Avalonia.Interactivity;
+using Avalonia.Markup.Xaml;
+using Avalonia.Media;
+
+namespace MapEditor.App.Controls;
+
+public class SearchPickerControl<T> : UserControl
+{
+    private readonly TextBox _searchBox;
+    private readonly ListBox _results;
+
+    // AVP1002 suppressed: the value types are generic in T, so a non-generic owner type is
+    // impossible; none of these properties are set from XAML.
+#pragma warning disable AVP1002
+    public static readonly StyledProperty<IReadOnlyList<T>> ItemsProperty =
+        AvaloniaProperty.Register<SearchPickerControl<T>, IReadOnlyList<T>>(nameof(Items), Array.Empty<T>());
+
+    public static readonly StyledProperty<Func<T, string>> ItemTextProperty =
+        AvaloniaProperty.Register<SearchPickerControl<T>, Func<T, string>>(nameof(ItemText));
+
+    public static readonly StyledProperty<T?> SelectedItemProperty =
+        AvaloniaProperty.Register<SearchPickerControl<T>, T?>(nameof(SelectedItem));
+
+    public static readonly StyledProperty<string> SearchTextProperty =
+        AvaloniaProperty.Register<SearchPickerControl<T>, string>(nameof(SearchText), string.Empty);
+#pragma warning restore AVP1002
+    public SearchPickerControl()
+    {
+        Focusable = true;
+        var root = (StackPanel)AvaloniaXamlLoader.Load(new Uri("avares://MapEditor.App/Controls/SearchPickerControl.axaml"), null);
+        Content = root;
+        _searchBox = root.FindControl<TextBox>("SearchBox")!;
+        _results = root.FindControl<ListBox>("Results")!;
+        _searchBox.TextChanged += (_, _) =>
+        {
+            if (_searchBox.Text != SearchText)
+            {
+                SearchText = _searchBox.Text ?? string.Empty;
+            }
+        };
+        PropertyChanged += (_, e) =>
+        {
+            if (e.Property == ItemsProperty || e.Property == ItemTextProperty)
+            {
+                Rebuild();
+            }
+            else if (e.Property == SearchTextProperty)
+            {
+                if (_searchBox.Text != SearchText)
+                {
+                    _searchBox.Text = SearchText ?? string.Empty;
+                }
+
+                Rebuild();
+            }
+            else if (e.Property == SelectedItemProperty)
+            {
+                SyncListSelection();
+            }
+        };
+        AddHandler(KeyDownEvent, OnKeyDown, RoutingStrategies.Tunnel);
+    }
+
+    public IReadOnlyList<T> Items
+    {
+        get => GetValue(ItemsProperty);
+        set => SetValue(ItemsProperty, value);
+    }
+
+    public Func<T, string> ItemText
+    {
+        get => GetValue(ItemTextProperty);
+        set => SetValue(ItemTextProperty, value);
+    }
+
+    public T? SelectedItem
+    {
+        get => GetValue(SelectedItemProperty);
+        set => SetValue(SelectedItemProperty, value);
+    }
+
+    public string SearchText
+    {
+        get => GetValue(SearchTextProperty);
+        set => SetValue(SearchTextProperty, value);
+    }
+
+    protected override void OnGotFocus(GotFocusEventArgs e)
+    {
+        base.OnGotFocus(e);
+        if (ReferenceEquals(e.Source, this) && !_searchBox.IsFocused)
+        {
+            _searchBox.Focus();
+        }
+    }
+
+    private void OnKeyDown(object? sender, KeyEventArgs e)
+    {
+        switch (e.Key)
+        {
+            case Key.Enter:
+                if (_results.SelectedItem is ListBoxItem { Tag: T item })
+                {
+                    SelectedItem = item;
+                    e.Handled = true;
+                }
+                break;
+            case Key.Escape:
+                if (SearchText.Length > 0)
+                {
+                    SearchText = string.Empty;
+                    e.Handled = true;
+                }
+                break;
+            case Key.Up:
+                if (_results.Items.Count > 0)
+                {
+                    _results.SelectedIndex = Math.Max(0, _results.SelectedIndex - 1);
+                    e.Handled = true;
+                }
+                break;
+            case Key.Down:
+                if (_results.Items.Count > 0)
+                {
+                    _results.SelectedIndex = Math.Min(_results.Items.Count - 1, _results.SelectedIndex + 1);
+                    e.Handled = true;
+                }
+                break;
+        }
+    }
+
+    private void Rebuild()
+    {
+        string search = SearchText ?? string.Empty;
+        Func<T, string> project = ItemText ?? (item => item?.ToString() ?? string.Empty);
+        _results.Items.Clear();
+        foreach (T item in Items ?? Array.Empty<T>())
+        {
+            string text = project(item);
+            if (text.Contains(search, StringComparison.OrdinalIgnoreCase))
+            {
+                // A TextBlock (rather than a raw string) so long names ellipsize instead of
+                // clipping against the narrow properties panel.
+                _results.Items.Add(new ListBoxItem
+                {
+                    Content = new TextBlock { Text = text, TextTrimming = TextTrimming.CharacterEllipsis },
+                    Tag = item,
+                    [ToolTip.TipProperty] = text
+                });
+            }
+        }
+
+        SyncListSelection();
+    }
+
+    private void SyncListSelection()
+    {
+        if (_results.Items.Count == 0)
+        {
+            _results.SelectedIndex = -1;
+            return;
+        }
+
+        int index = -1;
+        // T may be a struct, where "no selection" is default(T) rather than null.
+        bool hasSelection = !EqualityComparer<T>.Default.Equals(SelectedItem, default!);
+        if (hasSelection)
+        {
+            for (int i = 0; i < _results.Items.Count; i++)
+            {
+                if (_results.Items[i] is ListBoxItem { Tag: T tag } && EqualityComparer<T>.Default.Equals(tag, SelectedItem))
+                {
+                    index = i;
+                    break;
+                }
+            }
+        }
+
+        _results.SelectedIndex = index < 0 ? 0 : index;
+    }
+}

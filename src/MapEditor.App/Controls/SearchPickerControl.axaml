@@ -1,0 +1,7 @@
+<StackPanel xmlns="https://github.com/avaloniaui"
+            xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+            Spacing="4">
+  <TextBox x:Name="SearchBox" Watermark="Search" />
+  <ListBox x:Name="Results" MinHeight="120" MaxHeight="200"
+           ScrollViewer.HorizontalScrollBarVisibility="Disabled" />
+</StackPanel>

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
@@ -9,6 +10,7 @@ using Avalonia.Rendering;
 using MapEditor.App.Rendering;
 using MapEditor.App.ViewModels;
 using MapEditor.Core;
+using MapEditor.GameData.Rows;
 using MapEditor.Rendering;
 
 namespace MapEditor.App.Controls;
@@ -22,9 +24,12 @@ internal sealed class MapCanvas : Control, ICustomHitTest
     private bool _panning;
     private bool _spaceDown;
     private RectDrag? _rectDrag;
+    private MarkerDrag? _markerDrag;
     private IPointer? _capturedPointer;
     private Point _lastPanPosition;
     private Window? _hoverWindow;
+
+    private readonly record struct MarkerDrag(GameDataMarkerKind Kind, int Index, MapTileCoordinate Current);
 
     public MapCanvas(MapDocumentViewModel viewModel, AssetContextController assets)
     {
@@ -33,6 +38,7 @@ internal sealed class MapCanvas : Control, ICustomHitTest
         Focusable = true;
         RenderOptions.SetBitmapInterpolationMode(this, BitmapInterpolationMode.None);
         _viewModel.CanvasInvalidated += OnCanvasInvalidated;
+        _viewModel.GameData?.Changed += OnGameDataChanged;
         SizeChanged += OnSizeChanged;
     }
 
@@ -42,16 +48,15 @@ internal sealed class MapCanvas : Control, ICustomHitTest
 
     public void FinishInteraction(bool commit)
     {
-        MapEditSession session = _viewModel.Session;
-        if (session.HasActiveStroke)
+        if (_viewModel.Session.HasActiveStroke)
         {
             if (commit)
             {
-                session.CompleteStroke();
+                _viewModel.CompleteStroke();
             }
             else
             {
-                session.CancelStroke();
+                _viewModel.CancelStroke();
             }
         }
 
@@ -67,6 +72,18 @@ internal sealed class MapCanvas : Control, ICustomHitTest
             else
             {
                 CancelRectDrag();
+            }
+        }
+
+        if (_markerDrag is not null)
+        {
+            if (commit)
+            {
+                CommitMarkerDrag();
+            }
+            else
+            {
+                CancelMarkerDrag();
             }
         }
 
@@ -90,8 +107,9 @@ internal sealed class MapCanvas : Control, ICustomHitTest
 
     internal void RenderMap(IMapDrawTarget target)
     {
+        AssetContext context = _assets.Current;
         using IDisposable clip = target.PushClip(new Rect(Bounds.Size));
-        _assets.Current.Renderer.Render(BuildRenderRequest(), new AvaloniaMapDrawSink(target));
+        context.Renderer.Render(BuildRenderRequest(), new AvaloniaMapDrawSink(target, context.TintCache));
     }
 
     public override void Render(DrawingContext context)
@@ -114,7 +132,7 @@ internal sealed class MapCanvas : Control, ICustomHitTest
         InvalidateVisual();
     }
 
-    internal bool IsGestureActive => _stroking || _panning || _rectDrag is not null;
+    internal bool IsGestureActive => _stroking || _panning || _rectDrag is not null || _markerDrag is not null;
 
     protected override void OnPointerPressed(PointerPressedEventArgs e)
     {
@@ -222,6 +240,17 @@ internal sealed class MapCanvas : Control, ICustomHitTest
             return;
         }
 
+        if (_markerDrag is { } markerDrag)
+        {
+            if (TileAt(position) is { } markerTile)
+            {
+                _markerDrag = markerDrag with { Current = markerTile };
+                Invalidate();
+            }
+
+            return;
+        }
+
         if (_stroking)
         {
             MapTileCoordinate? tile = TileAt(position);
@@ -270,10 +299,11 @@ internal sealed class MapCanvas : Control, ICustomHitTest
 
         if (_stroking)
         {
-            _viewModel.Session.CompleteStroke();
+            _viewModel.CompleteStroke();
             _stroking = false;
         }
 
+        CommitMarkerDrag();
         CommitRectDrag();
         _panning = false;
         e.Pointer.Capture(null);
@@ -292,9 +322,10 @@ internal sealed class MapCanvas : Control, ICustomHitTest
 
         if (_stroking)
         {
-            _viewModel.Session.CompleteStroke();
+            _viewModel.CompleteStroke();
         }
 
+        CancelMarkerDrag();
         CancelRectDrag();
         _stroking = false;
         _panning = false;
@@ -357,6 +388,13 @@ internal sealed class MapCanvas : Control, ICustomHitTest
 
     private void BeginToolPress(Point position, KeyModifiers modifiers)
     {
+        DocumentGameDataState? gameData = _viewModel.GameData;
+        if (gameData is { ActiveTool: GameDataTool.Spawn or GameDataTool.Warp })
+        {
+            BeginGameDataPress(position, gameData);
+            return;
+        }
+
         switch (_viewModel.ActiveTool)
         {
             case MapEditTool.Select:
@@ -434,6 +472,73 @@ internal sealed class MapCanvas : Control, ICustomHitTest
         Invalidate();
     }
 
+    private void BeginGameDataPress(Point position, DocumentGameDataState state)
+    {
+        MapTileCoordinate? tile = TileAt(position);
+        if (tile is not { } target)
+        {
+            return;
+        }
+
+        bool spawnTool = state.ActiveTool == GameDataTool.Spawn;
+        int? index = spawnTool ? _viewModel.FindSpawnAt(target.X, target.Y) : _viewModel.FindWarpAt(target.X, target.Y);
+        if (index is { } hit)
+        {
+            if (spawnTool)
+            {
+                _viewModel.SelectSpawn(hit);
+                _markerDrag = new MarkerDrag(GameDataMarkerKind.Spawn, hit, target);
+            }
+            else
+            {
+                _viewModel.SelectWarp(hit);
+                _markerDrag = new MarkerDrag(GameDataMarkerKind.Warp, hit, target);
+            }
+
+            return;
+        }
+
+        if (spawnTool)
+        {
+            _viewModel.AddSpawnAt(target.X, target.Y);
+        }
+        else
+        {
+            _viewModel.AddWarpAt(target.X, target.Y);
+        }
+    }
+
+    private void CommitMarkerDrag()
+    {
+        if (_markerDrag is not { } drag)
+        {
+            return;
+        }
+
+        _markerDrag = null;
+        if (drag.Kind == GameDataMarkerKind.Spawn)
+        {
+            _viewModel.MoveSpawnTo(drag.Index, drag.Current.X, drag.Current.Y);
+        }
+        else
+        {
+            _viewModel.MoveWarpSourceTo(drag.Index, drag.Current.X, drag.Current.Y);
+        }
+
+        Invalidate();
+    }
+
+    private void CancelMarkerDrag()
+    {
+        if (_markerDrag is null)
+        {
+            return;
+        }
+
+        _markerDrag = null;
+        Invalidate();
+    }
+
     private void BeginStroke(Point position)
     {
         MapTileCoordinate? tile = TileAt(position);
@@ -471,6 +576,23 @@ internal sealed class MapCanvas : Control, ICustomHitTest
 
     private void OnCanvasInvalidated() => Invalidate();
 
+    private void OnGameDataChanged()
+    {
+        if (_markerDrag is { } drag)
+        {
+            DocumentGameDataState? state = _viewModel.GameData;
+            bool selected = drag.Kind == GameDataMarkerKind.Spawn
+                ? state?.SelectedSpawn is not null
+                : state?.SelectedWarp is not null;
+            if (!selected)
+            {
+                CancelMarkerDrag();
+            }
+        }
+
+        Invalidate();
+    }
+
     private MapRenderRequest BuildRenderRequest()
     {
         MapEditSession session = _viewModel.Session;
@@ -493,7 +615,94 @@ internal sealed class MapCanvas : Control, ICustomHitTest
             selected,
             SelectionRectangle: _viewModel.SelectionRectangle,
             PasteGhost: _viewModel.PasteGhost,
-            BlockPreview: blockPreview);
+            BlockPreview: blockPreview,
+            SpawnMarkers: BuildSpawnMarkers(),
+            WarpMarkers: BuildWarpMarkers(),
+            PreviewMode: _viewModel.GameData?.PreviewMode ?? false,
+            NpcPreviews: BuildNpcPreviews());
         return new MapRenderRequest(session.Document, _viewport, options);
+    }
+
+    private IReadOnlyList<GameDataMarkerInput>? BuildSpawnMarkers()
+    {
+        DocumentGameDataState? state = _viewModel.GameData;
+        if (state is null || !state.ShowSpawnOverlay || state.Session is not { Edits: { } edits })
+        {
+            return null;
+        }
+
+        var spawns = edits.Spawns;
+        var markers = new GameDataMarkerInput[spawns.Count];
+        for (int i = 0; i < spawns.Count; i++)
+        {
+            NpcSpawnRow spawn = spawns[i];
+            MapTileCoordinate tile = new(spawn.MapX, spawn.MapY);
+            if (_markerDrag is { } drag && drag.Kind == GameDataMarkerKind.Spawn && drag.Index == i)
+            {
+                tile = drag.Current;
+            }
+
+            markers[i] = new GameDataMarkerInput(i, tile, state.SelectedSpawn == i, $"npc {spawn.NpcId}");
+        }
+
+        return markers;
+    }
+
+    private IReadOnlyList<GameDataMarkerInput>? BuildWarpMarkers()
+    {
+        DocumentGameDataState? state = _viewModel.GameData;
+        if (state is null || !state.ShowWarpOverlay || state.Session is not { Edits: { } edits })
+        {
+            return null;
+        }
+
+        var warps = edits.Warps;
+        var markers = new GameDataMarkerInput[warps.Count];
+        for (int i = 0; i < warps.Count; i++)
+        {
+            WarpRow warp = warps[i];
+            MapTileCoordinate tile = new(warp.MapX, warp.MapY);
+            if (_markerDrag is { } drag && drag.Kind == GameDataMarkerKind.Warp && drag.Index == i)
+            {
+                tile = drag.Current;
+            }
+
+            markers[i] = new GameDataMarkerInput(i, tile, state.SelectedWarp == i, $"map {warp.WarpId} ({warp.WarpX}, {warp.WarpY})");
+        }
+
+        return markers;
+    }
+
+    private IReadOnlyList<NpcAppearanceGroup>? BuildNpcPreviews()
+    {
+        DocumentGameDataState? state = _viewModel.GameData;
+        if (state is null || !state.PreviewMode || !state.ShowSpawnOverlay || state.Session is not { Edits: { } edits })
+        {
+            return null;
+        }
+
+        if (_assets.Current.Appearance is not { } catalog)
+        {
+            return null;
+        }
+
+        NpcAppearanceComposer composer = new(catalog);
+        IReadOnlyDictionary<int, NpcAppearance> npcs = state.Session.Npcs;
+        var spawns = edits.Spawns;
+        var groups = new NpcAppearanceGroup[spawns.Count];
+        for (int i = 0; i < spawns.Count; i++)
+        {
+            NpcSpawnRow spawn = spawns[i];
+            MapTileCoordinate tile = new(spawn.MapX, spawn.MapY);
+            if (_markerDrag is { } drag && drag.Kind == GameDataMarkerKind.Spawn && drag.Index == i)
+            {
+                tile = drag.Current;
+            }
+
+            NpcAppearance? appearance = npcs.TryGetValue(spawn.NpcId, out NpcAppearance found) ? found : null;
+            groups[i] = composer.Compose(appearance ?? default, i, tile.X, tile.Y);
+        }
+
+        return groups;
     }
 }

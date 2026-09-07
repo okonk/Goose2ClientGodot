@@ -1,16 +1,26 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Input;
+using Avalonia.Interactivity;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
+using MapEditor.App.Connectivity;
 using MapEditor.App.Dialogs;
+using MapEditor.App.Tests.Fakes;
 using MapEditor.App.ViewModels;
 using MapEditor.Core;
+using MapEditor.GameData.Connectivity;
+using MapEditor.GameData.Replacement;
+using MapEditor.GameData.Rows;
+using MapEditor.GameData.Sync;
 using Xunit;
 
 namespace MapEditor.App.Tests;
@@ -410,5 +420,309 @@ public class MainWindowCloseTests
 
         Assert.False(harness.Window.IsVisible);
         Assert.Equal(2, counter.Count);
+    }
+
+    private static readonly MapReference SheetMap10 = new(10, "Dungeon", "dungeon.bytes");
+    private static readonly MapReference SheetMap20 = new(20, "Cave", "cave.bytes");
+    private static readonly IReadOnlyList<MapReference> SheetMaps = new[] { SheetMap10, SheetMap20 };
+    private static readonly string SheetUrl = "https://docs.google.com/spreadsheets/d/abc123";
+    private static readonly NpcAppearance SheetNpc1 = new(1, "Goose", 0, 0, new RgbaValue(255, 255, 255, 255), 0, 0, new RgbaValue(255, 255, 255, 255), string.Empty);
+
+    private static RemoteGameData SheetData()
+        => new(
+            SheetMaps,
+            new Dictionary<int, NpcAppearance> { [1] = SheetNpc1 },
+            new List<RemoteRow<NpcSpawnRow>> { new(2, new NpcSpawnRow(1, 10, 3, 4)) },
+            new List<RemoteRow<WarpRow>>());
+
+    [AvaloniaFact]
+    public async Task Close_DirtySheetOnly_PushSucceeds_ClosesWithoutMapPrompt()
+    {
+        var rig = new SheetCloseRig();
+        using MainWindowHarness harness = MainWindowHarness.Create(rig.Connectivity);
+        rig.Dialogs = harness.Dialogs;
+        MapDocumentViewModel doc = harness.ViewModel;
+        await rig.PullAsync(harness.Workspace, doc);
+        doc.GameData!.Session.Edits.AddSpawn(new NpcSpawnRow(1, 10, 5, 5));
+        harness.Dialogs.SheetDirtyResult = SheetDirtyChoice.Push;
+
+        harness.Window.Close();
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.False(harness.Window.IsVisible);
+        Assert.Equal(1, harness.Dialogs.SheetDirtyShown);
+        Assert.Equal(0, harness.Dialogs.DirtyShown);
+        Assert.Equal(new[] { "ReadOwnedRowsAsync", "ReplaceOwnedRowsAsync" }, rig.Gateway.Calls.Select(call => call.Method));
+    }
+
+    [AvaloniaFact]
+    public async Task Close_DirtySheetOnly_Discard_ClosesWithoutPushing()
+    {
+        var rig = new SheetCloseRig();
+        using MainWindowHarness harness = MainWindowHarness.Create(rig.Connectivity);
+        rig.Dialogs = harness.Dialogs;
+        MapDocumentViewModel doc = harness.ViewModel;
+        await rig.PullAsync(harness.Workspace, doc);
+        doc.GameData!.Session.Edits.AddSpawn(new NpcSpawnRow(1, 10, 5, 5));
+        harness.Dialogs.SheetDirtyResult = SheetDirtyChoice.Discard;
+
+        harness.Window.Close();
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.False(harness.Window.IsVisible);
+        Assert.Equal(1, harness.Dialogs.SheetDirtyShown);
+        Assert.Equal(0, harness.Dialogs.DirtyShown);
+        Assert.Empty(rig.Gateway.Calls);
+        Assert.Null(doc.Document.Path);
+    }
+
+    [AvaloniaFact]
+    public async Task Close_DirtySheetOnly_Cancel_StaysOpenAndDirty()
+    {
+        var rig = new SheetCloseRig();
+        using MainWindowHarness harness = MainWindowHarness.Create(rig.Connectivity);
+        rig.Dialogs = harness.Dialogs;
+        MapDocumentViewModel doc = harness.ViewModel;
+        await rig.PullAsync(harness.Workspace, doc);
+        doc.GameData!.Session.Edits.AddSpawn(new NpcSpawnRow(1, 10, 5, 5));
+        harness.Dialogs.SheetDirtyResult = SheetDirtyChoice.Cancel;
+
+        harness.Window.Close();
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.True(harness.Window.IsVisible);
+        Assert.Equal(1, harness.Dialogs.SheetDirtyShown);
+        Assert.Equal(0, harness.Dialogs.DirtyShown);
+        Assert.True(doc.GameData.IsDirty);
+        Assert.Empty(rig.Gateway.Calls);
+        harness.Dialogs.SheetDirtyResult = SheetDirtyChoice.Discard;
+    }
+
+    [AvaloniaFact]
+    public async Task Close_DirtySheetAndMap_PromptsSheetBeforeMap()
+    {
+        var rig = new SheetCloseRig();
+        using MainWindowHarness harness = MainWindowHarness.Create(rig.Connectivity);
+        rig.Dialogs = harness.Dialogs;
+        MapDocumentViewModel doc = harness.ViewModel;
+        await rig.PullAsync(harness.Workspace, doc);
+        doc.GameData!.Session.Edits.AddSpawn(new NpcSpawnRow(1, 10, 5, 5));
+        MakeDirty(doc);
+        var sheetGate = new TaskCompletionSource<SheetDirtyChoice>(TaskCreationOptions.RunContinuationsAsynchronously);
+        harness.Dialogs.SheetDirtyGate = sheetGate;
+
+        harness.Window.Close();
+        await Until(() => harness.Dialogs.SheetDirtyShown == 1);
+        Assert.Equal(0, harness.Dialogs.DirtyShown);
+
+        sheetGate.SetResult(SheetDirtyChoice.Discard);
+        harness.Dialogs.DirtyResult = DirtyChoice.Discard;
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.False(harness.Window.IsVisible);
+        Assert.Equal(1, harness.Dialogs.DirtyShown);
+    }
+
+    [AvaloniaFact]
+    public async Task Close_DirtySheetAndMap_PushSucceedsThenSaveCanceled_KeepsOpenSheetCleanMapDirty()
+    {
+        var rig = new SheetCloseRig();
+        using MainWindowHarness harness = MainWindowHarness.Create(rig.Connectivity);
+        rig.Dialogs = harness.Dialogs;
+        MapDocumentViewModel doc = harness.ViewModel;
+        await rig.PullAsync(harness.Workspace, doc);
+        harness.Dialogs.SavePickResult = Path.Combine(harness.TempDirectory, "sheet-close-saved.bytes");
+        await doc.SaveAsAsync();
+        doc.GameData!.Session.Edits.AddSpawn(new NpcSpawnRow(1, 10, 5, 5));
+        MakeDirty(doc);
+        string path = doc.Document.Path!;
+        MapFileRevision revision = doc.Document.Revision!.Value;
+        harness.Dialogs.SheetDirtyResult = SheetDirtyChoice.Push;
+        harness.Dialogs.DirtyResult = DirtyChoice.Cancel;
+
+        harness.Window.Close();
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.True(harness.Window.IsVisible);
+        Assert.False(doc.GameData.IsDirty);
+        Assert.True(doc.Session.IsDirty);
+        Assert.Equal(path, doc.Document.Path);
+        Assert.Equal(revision, doc.Document.Revision);
+        Assert.Equal(1, harness.Dialogs.DirtyShown);
+        harness.Dialogs.DirtyResult = DirtyChoice.Discard;
+    }
+
+    [AvaloniaFact]
+    public async Task Close_DirtySheetAndMap_PushFails_KeepsOpenAndDirtyWithoutMapPrompt()
+    {
+        var rig = new SheetCloseRig();
+        using MainWindowHarness harness = MainWindowHarness.Create(rig.Connectivity);
+        rig.Dialogs = harness.Dialogs;
+        MapDocumentViewModel doc = harness.ViewModel;
+        await rig.PullAsync(harness.Workspace, doc);
+        doc.GameData!.Session.Edits.AddSpawn(new NpcSpawnRow(999, 10, 5, 5));
+        MakeDirty(doc);
+        harness.Dialogs.SheetDirtyResult = SheetDirtyChoice.Push;
+        harness.Dialogs.DirtyResult = DirtyChoice.Discard;
+
+        harness.Window.Close();
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.True(harness.Window.IsVisible);
+        Assert.True(doc.GameData.IsDirty);
+        Assert.True(doc.Session.IsDirty);
+        Assert.Equal(0, harness.Dialogs.DirtyShown);
+        Assert.Single(harness.Dialogs.Errors);
+        harness.Dialogs.SheetDirtyResult = SheetDirtyChoice.Discard;
+        harness.Dialogs.DirtyResult = DirtyChoice.Discard;
+    }
+
+    [AvaloniaFact]
+    public async Task Close_DuplicateClosingWhileSheetPromptPending_SinglePromptAndNoRecursion()
+    {
+        var rig = new SheetCloseRig();
+        using MainWindowHarness harness = MainWindowHarness.Create(rig.Connectivity);
+        rig.Dialogs = harness.Dialogs;
+        MapDocumentViewModel doc = harness.ViewModel;
+        await rig.PullAsync(harness.Workspace, doc);
+        doc.GameData!.Session.Edits.AddSpawn(new NpcSpawnRow(1, 10, 5, 5));
+        var gate = new TaskCompletionSource<SheetDirtyChoice>(TaskCreationOptions.RunContinuationsAsynchronously);
+        harness.Dialogs.SheetDirtyGate = gate;
+
+        var counter = new ClosingCounter(harness.Window);
+        harness.Window.Close();
+        harness.Window.Close();
+        harness.Window.Close();
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.True(harness.Window.IsVisible);
+        Assert.Equal(1, harness.Dialogs.SheetDirtyShown);
+        Assert.Equal(3, counter.Count);
+
+        gate.SetResult(SheetDirtyChoice.Discard);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.False(harness.Window.IsVisible);
+        Assert.Equal(4, counter.Count);
+    }
+
+    [AvaloniaFact]
+    public async Task Close_WhileTabCloseSheetPromptPending_IsRefusedUntilThePromptCompletes()
+    {
+        var rig = new SheetCloseRig();
+        using MainWindowHarness harness = MainWindowHarness.Create(rig.Connectivity);
+        rig.Dialogs = harness.Dialogs;
+        MapDocumentViewModel doc = harness.ViewModel;
+        await rig.PullAsync(harness.Workspace, doc);
+        doc.GameData!.Session.Edits.AddSpawn(new NpcSpawnRow(1, 10, 5, 5));
+        DocumentGameDataState sheetState = doc.GameData!;
+        var gate = new TaskCompletionSource<SheetDirtyChoice>(TaskCreationOptions.RunContinuationsAsynchronously);
+        harness.Dialogs.SheetDirtyGate = gate;
+
+        ListBox tabStrip = harness.Window.FindControl<ListBox>("TabStrip")
+                         ?? throw new InvalidOperationException("missing TabStrip");
+        ListBoxItem tab = tabStrip.ContainerFromItem(doc) as ListBoxItem
+                         ?? throw new InvalidOperationException("missing tab container");
+        Button close = tab.GetVisualDescendants().OfType<Button>().Single(button => button.Classes.Contains("tabClose"));
+        close.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Equal(1, harness.Dialogs.SheetDirtyShown);
+
+        harness.Window.Close();
+        Dispatcher.UIThread.RunJobs();
+        Assert.True(harness.Window.IsVisible);
+        Assert.Equal(1, harness.Dialogs.SheetDirtyShown);
+
+        gate.SetResult(SheetDirtyChoice.Discard);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.True(harness.Window.IsVisible);
+        Assert.DoesNotContain(doc, harness.Workspace.Documents);
+        Assert.True(sheetState.IsDirty);
+    }
+
+    private static async Task Until(Func<bool> condition)
+    {
+        for (int i = 0; i < 1000 && !condition(); i++)
+        {
+            await Task.Delay(1);
+        }
+    }
+
+    private sealed class SheetCloseRig
+    {
+        public FakeEditorDialogs Dialogs { get; set; }
+
+        public RecordingGateway Gateway { get; } = new();
+
+        public GameDataSyncCoordinator Coordinator { get; }
+
+        public ScriptedConnectivity Connectivity { get; }
+
+        public SheetCloseRig(FakeEditorDialogs? dialogs = null)
+        {
+            Dialogs = dialogs ?? new FakeEditorDialogs();
+            Coordinator = new GameDataSyncCoordinator(Gateway, (_, _) => Task.CompletedTask);
+            Connectivity = new ScriptedConnectivity { IsConnected = true, Coordinator = Coordinator };
+        }
+
+        public async Task PullAsync(WorkspaceViewModel workspace, MapDocumentViewModel document)
+        {
+            Dialogs.SpreadsheetUrlResult = SheetUrl;
+            Dialogs.MapConfirmationResult = SheetMap10;
+            Assert.True(await workspace.Commands.PullAsync(document));
+        }
+    }
+
+    private sealed class RecordingGateway : IGameDataGateway
+    {
+        public sealed record Call(string Method);
+
+        public List<Call> Calls { get; } = new();
+
+        public Task<IReadOnlyList<MapReference>> ReadMapsAsync(string spreadsheetId, CancellationToken cancellationToken)
+            => Task.FromResult(SheetMaps);
+
+        public Task<RemoteGameData> ReadGameDataAsync(string spreadsheetId, int mapId, CancellationToken cancellationToken)
+            => Task.FromResult(SheetData());
+
+        public Task<RemoteOwnedRows> ReadOwnedRowsAsync(string spreadsheetId, int mapId, CancellationToken cancellationToken)
+        {
+            Calls.Add(new Call("ReadOwnedRowsAsync"));
+            return Task.FromResult(new RemoteOwnedRows(
+                new List<RemoteRow<NpcSpawnRow>> { new(2, new NpcSpawnRow(1, 10, 3, 4)) },
+                new List<RemoteRow<WarpRow>>()));
+        }
+
+        public Task ReplaceOwnedRowsAsync(string spreadsheetId, ReplacementPlan spawnPlan, ReplacementPlan warpPlan, CancellationToken cancellationToken)
+        {
+            Calls.Add(new Call("ReplaceOwnedRowsAsync"));
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class ScriptedConnectivity : IGameDataConnectivity
+    {
+        public bool IsConnected { get; set; }
+
+        public GameDataSyncCoordinator? Coordinator { get; set; }
+
+        public SpreadsheetReference? RememberedSpreadsheet { get; set; }
+
+        public bool TryRememberSpreadsheet(string? pastedUrl)
+        {
+            if (!SpreadsheetReferenceParser.TryParse(pastedUrl, out SpreadsheetReference reference))
+            {
+                return false;
+            }
+
+            RememberedSpreadsheet = reference;
+            return true;
+        }
+
+        public Task ConnectAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+
+        public Task DisconnectAsync(CancellationToken cancellationToken) => Task.CompletedTask;
     }
 }

@@ -13,7 +13,8 @@ public class ToolbarIconTests
     private static readonly string[] ToolNames =
     {
         "SelectTool", "MultiSelectTool", "EyedropperTool",
-        "PencilTool", "EraserTool", "FloodFillTool", "BlockedTool"
+        "PencilTool", "EraserTool", "FloodFillTool", "BlockedTool",
+        "SpawnTool", "WarpTool"
     };
 
     private static Path IconOf(MainWindowHarness harness, string name)

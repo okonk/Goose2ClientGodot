@@ -8,12 +8,14 @@ namespace MapEditor.App.Dialogs;
 public partial class ResizeMapDialog : Window
 {
     private readonly MapDocument _document;
+    private readonly Func<MapTileRectangle, MapResizePlan> _plan;
     private readonly int _oldWidth;
     private readonly int _oldHeight;
 
-    public ResizeMapDialog(MapDocument document)
+    internal ResizeMapDialog(MapDocument document, Func<MapTileRectangle, MapResizePlan> plan)
     {
         _document = document ?? throw new ArgumentNullException(nameof(document));
+        _plan = plan ?? throw new ArgumentNullException(nameof(plan));
         _oldWidth = document.Width;
         _oldHeight = document.Height;
         InitializeComponent();
@@ -34,9 +36,8 @@ public partial class ResizeMapDialog : Window
         RefreshReadout();
     }
 
-    internal MapTileRectangle? TryBuildWindow(out int discardedTiles)
+    internal MapTileRectangle? TryBuildWindow()
     {
-        discardedTiles = 0;
         if (!TryParseOffset(WestBox.Text, out int west) || !TryParseOffset(NorthBox.Text, out int north) ||
             !TryParseOffset(EastBox.Text, out int east) || !TryParseOffset(SouthBox.Text, out int south))
         {
@@ -50,9 +51,7 @@ public partial class ResizeMapDialog : Window
             return null;
         }
 
-        var window = new MapTileRectangle(-west, -north, width, height);
-        discardedTiles = CountDiscarded(window);
-        return window;
+        return new MapTileRectangle(-west, -north, width, height);
     }
 
     internal void ApplyWidth(int width)
@@ -118,11 +117,20 @@ public partial class ResizeMapDialog : Window
 
     private void RefreshReadout()
     {
-        if (TryBuildWindow(out int discarded) is { } window)
+        if (TryBuildWindow() is { } window)
         {
+            MapResizePlan plan = _plan(window);
             SizeText.Text = $"{_oldWidth} × {_oldHeight} → {window.Width} × {window.Height}";
-            DiscardText.Text = $"⚠ Discards {discarded} non-empty tiles";
-            DiscardText.IsVisible = discarded > 0;
+            DiscardText.Text = $"⚠ Discards {plan.CroppedTiles} non-empty tiles";
+            DiscardText.IsVisible = plan.CroppedTiles > 0;
+            SheetText.Text = $"⚠ Crops {plan.CroppedSpawns} spawn and {plan.CroppedWarps} warp rows";
+            SheetText.IsVisible = plan.HasPulledData && (plan.CroppedSpawns > 0 || plan.CroppedWarps > 0);
+            // The document holds only rows sourced from this map, so external inbound warps
+            // cannot be counted; the warning is shown for every pulled resize.
+            InboundOtherText.Text = "⚠ Inbound warps from other maps are not updated by this resize";
+            InboundOtherText.IsVisible = plan.HasPulledData;
+            InboundText.Text = $"⚠ {plan.InboundWarps} self-warp destination(s) leave the map";
+            InboundText.IsVisible = plan.HasPulledData && plan.InboundWarps > 0;
             ResizeButton.IsEnabled = true;
         }
         else
@@ -131,40 +139,9 @@ public partial class ResizeMapDialog : Window
         }
     }
 
-    private int CountDiscarded(MapTileRectangle window)
-    {
-        if (window.ClipTo(_oldWidth, _oldHeight) is not { } keep)
-        {
-            return CountNonEmpty(0, 0, _oldWidth, _oldHeight);
-        }
-
-        // Disjoint bands: full-width top/bottom, then left/right restricted to the kept row span.
-        return CountNonEmpty(0, 0, _oldWidth, keep.Y)
-             + CountNonEmpty(0, keep.Y + keep.Height, _oldWidth, _oldHeight - (keep.Y + keep.Height))
-             + CountNonEmpty(0, keep.Y, keep.X, keep.Height)
-             + CountNonEmpty(keep.X + keep.Width, keep.Y, _oldWidth - (keep.X + keep.Width), keep.Height);
-    }
-
-    private int CountNonEmpty(int x, int y, int width, int height)
-    {
-        int count = 0;
-        for (int tileY = y; tileY < y + height; tileY++)
-        {
-            for (int tileX = x; tileX < x + width; tileX++)
-            {
-                if (!_document[tileX, tileY].IsEmpty)
-                {
-                    count++;
-                }
-            }
-        }
-
-        return count;
-    }
-
     private void OnResizeClicked(object? sender, RoutedEventArgs e)
     {
-        if (TryBuildWindow(out _) is { } window)
+        if (TryBuildWindow() is { } window)
         {
             Close(window);
         }

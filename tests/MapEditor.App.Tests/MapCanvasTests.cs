@@ -848,6 +848,78 @@ public class MapCanvasTests
         Assert.False(harness.ViewModel.Session.CanUndo);
     }
 
+    [AvaloniaFact]
+    public async Task CompletedGesture_CreatesTimelineEntry_RatherThanBypassingCoordination()
+    {
+        Harness harness = CreateSmallMapAsync();
+        MapDocument document = harness.ViewModel.Session.Document;
+        DocumentEditTimeline timeline = harness.ViewModel.Timeline;
+        harness.ViewModel.Brush = new MapTileLayer(7, 42);
+
+        Assert.False(timeline.CanUndo);
+
+        harness.Window.MouseDown(new Point(Cell / 2, Cell / 2), MouseButton.Left, RawInputModifiers.None);
+        Assert.False(timeline.CanUndo);
+        harness.Window.MouseUp(new Point(Cell / 2, Cell / 2), MouseButton.Left, RawInputModifiers.None);
+
+        Assert.Equal(new MapTileLayer(7, 42), document[0, 0].GetLayer(0));
+        Assert.True(timeline.CanUndo);
+
+        Assert.True(timeline.Undo());
+        Assert.Equal(new MapTileLayer(0, 0), document[0, 0].GetLayer(0));
+        Assert.True(timeline.CanRedo);
+
+        Assert.True(timeline.Redo());
+        Assert.Equal(new MapTileLayer(7, 42), document[0, 0].GetLayer(0));
+        Assert.False(timeline.CanRedo);
+        Assert.True(timeline.CanUndo);
+    }
+
+    [AvaloniaFact]
+    public async Task CanceledGesture_CreatesNoTimelineEntry_AndRestoresThroughCoordination()
+    {
+        Harness harness = CreateSmallMapAsync();
+        MapEditSession session = harness.ViewModel.Session;
+        MapDocument document = session.Document;
+        DocumentEditTimeline timeline = harness.ViewModel.Timeline;
+        harness.ViewModel.Brush = new MapTileLayer(5, 5);
+        long versionBefore = session.HistoryVersion;
+
+        harness.Window.MouseDown(new Point(Cell / 2, Cell / 2), MouseButton.Left, RawInputModifiers.None);
+        Assert.Equal(new MapTileLayer(5, 5), document[0, 0].GetLayer(0));
+        harness.Window.KeyPressQwerty(PhysicalKey.Escape, RawInputModifiers.None);
+
+        Assert.Equal(new MapTileLayer(0, 0), document[0, 0].GetLayer(0));
+        Assert.Equal(versionBefore, session.HistoryVersion);
+        Assert.False(timeline.CanUndo);
+        Assert.False(timeline.CanRedo);
+    }
+
+    [AvaloniaFact]
+    public async Task BlockedDragCommitAndEscape_CoordinateThroughTheTimeline()
+    {
+        Harness harness = CreateSmallMapAsync();
+        harness.ViewModel.ActiveTool = MapEditTool.Blocked;
+        MapDocument document = harness.ViewModel.Session.Document;
+        DocumentEditTimeline timeline = harness.ViewModel.Timeline;
+
+        harness.Window.MouseDown(new Point(Cell / 2, Cell / 2), MouseButton.Left, RawInputModifiers.None);
+        harness.Window.MouseMove(new Point(Cell * 2 + Cell / 2, Cell * 2 + Cell / 2), RawInputModifiers.None);
+        harness.Window.MouseUp(new Point(Cell * 2 + Cell / 2, Cell * 2 + Cell / 2), MouseButton.Left, RawInputModifiers.None);
+        Assert.True(document[0, 0].IsBlocked);
+        Assert.True(timeline.CanUndo);
+
+        Assert.True(timeline.Undo());
+        Assert.False(document[0, 0].IsBlocked);
+
+        harness.Window.MouseDown(new Point(Cell / 2, Cell / 2), MouseButton.Left, RawInputModifiers.None);
+        harness.Window.MouseMove(new Point(Cell * 2 + Cell / 2, Cell * 2 + Cell / 2), RawInputModifiers.None);
+        harness.Window.KeyPressQwerty(PhysicalKey.Escape, RawInputModifiers.None);
+        Assert.False(document[0, 0].IsBlocked);
+        Assert.True(timeline.CanRedo);
+        Assert.False(timeline.CanUndo);
+    }
+
     private static int CountRectanglesWithFill(Harness harness, Color fill)
     {
         RecordingMapDrawTarget target = new();

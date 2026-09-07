@@ -2,9 +2,12 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Platform.Storage;
 using MapEditor.Core;
+using MapEditor.GameData.Rows;
+using MapEditor.GameData.Sync;
 
 namespace MapEditor.App.Dialogs;
 
@@ -25,7 +28,7 @@ internal sealed class AvaloniaEditorDialogs : IEditorDialogs
 
     public Task<NewMapRequest?> ShowNewMapAsync() => new NewMapDialog().ShowDialog<NewMapRequest?>(_owner);
 
-    public Task<MapTileRectangle?> ShowResizeMapAsync(MapDocument document) => new ResizeMapDialog(document).ShowDialog<MapTileRectangle?>(_owner);
+    public Task<MapTileRectangle?> ShowResizeMapAsync(MapDocument document, Func<MapTileRectangle, MapResizePlan> plan) => new ResizeMapDialog(document, plan).ShowDialog<MapTileRectangle?>(_owner);
 
     public Task<DirtyChoice> ShowDirtyAsync(string displayName) => new ChoiceDialog(
             "Unsaved changes",
@@ -107,6 +110,34 @@ internal sealed class AvaloniaEditorDialogs : IEditorDialogs
     }
 
     public Task ShowErrorAsync(ErrorPresentation error) => new ErrorDialog(error.Title, error.Message).ShowDialog(_owner);
+
+    public Task<string?> ShowSpreadsheetUrlAsync(string? prefill)
+        => new SpreadsheetDialog(prefill).ShowDialog<string?>(_owner);
+
+    public Task<MapReference?> ShowMapConfirmationAsync(IReadOnlyList<MapReference> maps, MapReference? suggested, string documentName)
+        => new MapReferenceDialog(maps, suggested, documentName).ShowDialog<MapReference?>(_owner);
+
+    public Task<SheetDirtyChoice> ShowSheetDirtyAsync(string documentName) => new ChoiceDialog(
+            "Unpushed game data",
+            $"Push local game data changes for '{documentName}' before continuing?",
+            "Push",
+            SheetDirtyChoice.Push,
+            "Discard",
+            SheetDirtyChoice.Discard,
+            "Cancel",
+            SheetDirtyChoice.Cancel)
+        .ShowDialog<SheetDirtyChoice>(_owner);
+
+    public Task<PushConflictChoice> ShowPushConflictAsync(string documentName) => new ChoiceDialog(
+            "Remote game data changed",
+            $"The spreadsheet rows for '{documentName}' changed after this tab pulled them. What should happen?",
+            "Overwrite",
+            PushConflictChoice.Overwrite,
+            "Pull Instead",
+            PushConflictChoice.PullInstead,
+            "Cancel",
+            PushConflictChoice.Cancel)
+        .ShowDialog<PushConflictChoice>(_owner);
 
     private IStorageProvider StorageProvider => TopLevel.GetTopLevel(_owner)!.StorageProvider;
 

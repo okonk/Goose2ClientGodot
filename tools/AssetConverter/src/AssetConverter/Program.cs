@@ -83,6 +83,7 @@ if (args.Length >= 1 && args[0] == "animations")
         Paths.IllutiaData, Paths.CompiledEnc, outRoot, includeEffects: true);
 
     Console.WriteLine($"Wrote {result.ResourcesWritten} animation resources, {result.Failed} failures -> {outRoot}");
+    Console.WriteLine($"Appearance manifest: {Path.Combine(outRoot, AppearanceManifestFileStore.RelativePath)}");
     foreach (var w in result.Warnings) Console.WriteLine($"  WARN {w}");
     foreach (var f in result.Failures) Console.WriteLine($"  FAIL {f}");
     return;
@@ -199,6 +200,7 @@ if (args.Length >= 1 && args[0] == "all")
     foreach (var f in aspBatch.Failures.Concat(aspMaps.Failures).Concat(fx.Failures))
         Console.WriteLine($"  FAIL {f}");
     Console.WriteLine($"Manifest: {manifestPath}");
+    Console.WriteLine($"Appearance manifest: {Path.Combine(repoRoot, AppearanceManifestFileStore.RelativePath)}");
     return;
 }
 
