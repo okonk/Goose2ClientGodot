@@ -1,6 +1,9 @@
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using MapEditor.Core;
+using MapEditor.GameData.Rows;
+using MapEditor.GameData.Sync;
 
 namespace MapEditor.App.Dialogs;
 
@@ -15,6 +18,13 @@ internal enum ExternalChangeChoice
 {
     Overwrite,
     SaveAs,
+    Cancel
+}
+
+internal enum SheetDirtyChoice
+{
+    Push,
+    Discard,
     Cancel
 }
 
@@ -37,4 +47,12 @@ internal interface IEditorDialogs
     Task<string?> PickAssetDirectoryAsync();
 
     Task ShowErrorAsync(ErrorPresentation error);
+
+    Task<string?> ShowSpreadsheetUrlAsync(string? prefill);
+
+    Task<MapReference?> ShowMapConfirmationAsync(IReadOnlyList<MapReference> maps, MapReference? suggested, string documentName);
+
+    Task<SheetDirtyChoice> ShowSheetDirtyAsync(string documentName);
+
+    Task<PushConflictChoice> ShowPushConflictAsync(string documentName);
 }

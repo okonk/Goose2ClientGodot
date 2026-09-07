@@ -3,12 +3,16 @@ using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.IO;
+using System.Threading;
 using System.Threading.Tasks;
+using MapEditor.App.Connectivity;
 using MapEditor.App.Dialogs;
 using MapEditor.App.Documents;
 using MapEditor.App.Tests.Fakes;
 using MapEditor.App.ViewModels;
 using MapEditor.Core;
+using MapEditor.GameData.Connectivity;
+using MapEditor.GameData.Sync;
 using Xunit;
 
 namespace MapEditor.App.Tests;
@@ -65,6 +69,74 @@ public class WorkspaceViewModelTests : IDisposable
         _dialogs.OpenPickResult = path;
         await _workspace.OpenAsync();
         return _workspace.ActiveDocument;
+    }
+
+    private async Task<MapDocumentViewModel> NewDocumentAsync(WorkspaceViewModel workspace)
+    {
+        _dialogs.NewMapResult = new NewMapRequest(10, 10);
+        await workspace.NewAsync();
+        return workspace.ActiveDocument;
+    }
+
+    [Fact]
+    public async Task New_EveryTabGetsItsOwnGameDataState()
+    {
+        MapDocumentViewModel a = await NewDocumentAsync();
+        MapDocumentViewModel b = await NewDocumentAsync();
+
+        Assert.NotNull(a.GameData);
+        Assert.NotNull(b.GameData);
+        Assert.NotSame(a.GameData, b.GameData);
+        Assert.Null(a.GameData.Session);
+        Assert.Null(b.GameData.Session);
+        Assert.False(a.GameData.IsDirty);
+        Assert.False(b.GameData.IsDirty);
+    }
+
+    [Fact]
+    public async Task Open_EveryTabGetsItsOwnGameDataState()
+    {
+        string path = WriteMap("game-state.bytes");
+        MapDocumentViewModel opened = await OpenDocumentAsync(path);
+        MapDocumentViewModel fresh = await NewDocumentAsync();
+
+        Assert.NotNull(opened.GameData);
+        Assert.NotNull(fresh.GameData);
+        Assert.NotSame(opened.GameData, fresh.GameData);
+        Assert.Null(opened.GameData.Session);
+    }
+
+    [Fact]
+    public async Task Tabs_ShareOneConnectivityAndController_WithDistinctGameDataState()
+    {
+        var scripted = new ScriptedConnectivity { IsConnected = true };
+        var workspace = new WorkspaceViewModel(_dialogs, _store, scripted);
+        MapDocumentViewModel a = await NewDocumentAsync(workspace);
+        MapDocumentViewModel b = await NewDocumentAsync(workspace);
+
+        Assert.Same(scripted, workspace.Connectivity);
+        Assert.NotSame(a.GameData, b.GameData);
+        Assert.Same(workspace.Commands, workspace.Commands);
+        Assert.True(workspace.Commands.IsConnected);
+    }
+
+    [Fact]
+    public async Task DisposedTab_StopsReceivingSharedControllerCallbacks()
+    {
+        var scripted = new ScriptedConnectivity();
+        var workspace = new WorkspaceViewModel(_dialogs, _store, scripted);
+        MapDocumentViewModel first = await NewDocumentAsync(workspace);
+        MapDocumentViewModel second = await NewDocumentAsync(workspace);
+        int firstChanges = 0;
+        int secondChanges = 0;
+        first.GameData.Changed += () => firstChanges++;
+        second.GameData.Changed += () => secondChanges++;
+
+        Assert.True(await workspace.CloseAsync(first));
+        Assert.True(await workspace.Commands.ConnectAsync());
+
+        Assert.Equal(0, firstChanges);
+        Assert.Equal(1, secondChanges);
     }
 
     [Fact]
@@ -594,5 +666,28 @@ public class WorkspaceViewModelTests : IDisposable
         Assert.False(remaining.Session.IsDirty);
         MapFileRevision revision = _store.Open(path).Revision;
         Assert.Equal(revision, remaining.Document.Revision);
+    }
+
+    private sealed class ScriptedConnectivity : IGameDataConnectivity
+    {
+        public bool IsConnected { get; set; }
+
+        public GameDataSyncCoordinator? Coordinator { get; set; }
+
+        public SpreadsheetReference? RememberedSpreadsheet { get; set; }
+
+        public bool TryRememberSpreadsheet(string? pastedUrl) => false;
+
+        public Task ConnectAsync(CancellationToken cancellationToken)
+        {
+            IsConnected = true;
+            return Task.CompletedTask;
+        }
+
+        public Task DisconnectAsync(CancellationToken cancellationToken)
+        {
+            IsConnected = false;
+            return Task.CompletedTask;
+        }
     }
 }

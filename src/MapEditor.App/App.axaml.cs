@@ -40,7 +40,8 @@ public partial class App : Application
     {
         AppSettingsStore store = settings ?? new AppSettingsStore(SettingsPathResolver.Resolve());
         IEditorDialogs surface = dialogs ?? new EditorDialogsProxy();
-        var workspace = new WorkspaceViewModel(surface, new MapFileStore());
+        var connectivity = new GameDataConnectivity(store, connectionFactory, gatewayFactory);
+        var workspace = new WorkspaceViewModel(surface, new MapFileStore(), new GameDataConnectivityBridge(connectivity));
         var assets = new AssetContextController(workspace, store);
         var window = new MainWindow(surface, store, workspace, assets);
         if (surface is EditorDialogsProxy proxy)
@@ -48,7 +49,6 @@ public partial class App : Application
             proxy.Target = new AvaloniaEditorDialogs(window);
         }
 
-        var connectivity = new GameDataConnectivity(store, connectionFactory, gatewayFactory);
         return new ComposedEditor(window, surface, store, workspace, assets, connectivity);
     }
 }

@@ -181,6 +181,28 @@ public class AppStartupTests : IDisposable
     }
 
     [AvaloniaFact]
+    public void ComposedGraph_InjectsTheComposedConnectivityIntoTheWorkspace()
+    {
+        var dialogs = new FakeEditorDialogs();
+        string settingsPath = Path.Combine(_directory, "workspace-connectivity.json");
+        var settings = new AppSettingsStore(settingsPath);
+        settings.Save(new AppSettings(null, AppTheme.Dark, "https://docs.google.com/spreadsheets/d/injected1"));
+
+        var composed = App.ComposeMainWindow(dialogs, settings);
+
+        var workspaceConnectivity = composed.Workspace.Connectivity;
+        Assert.NotNull(workspaceConnectivity);
+        var remembered = workspaceConnectivity.RememberedSpreadsheet;
+        Assert.True(remembered.HasValue);
+        Assert.Equal("injected1", remembered.Value.Id);
+        Assert.True(workspaceConnectivity.TryRememberSpreadsheet("https://docs.google.com/spreadsheets/d/injected2"));
+        Assert.Equal("https://docs.google.com/spreadsheets/d/injected2", composed.Connectivity.RememberedSpreadsheet!.Value.CanonicalUrl);
+        Assert.NotNull(composed.Workspace.Commands);
+        Assert.NotNull(composed.Workspace.ActiveDocument.GameData);
+        Assert.False(composed.Workspace.ActiveDocument.GameData.HasSession);
+    }
+
+    [AvaloniaFact]
     public void ComposedGraph_WithRecordingFactories_StartsWithZeroConnectivityCalls()
     {
         var dialogs = new FakeEditorDialogs();

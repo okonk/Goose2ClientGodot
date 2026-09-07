@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using MapEditor.App.Dialogs;
 using MapEditor.Core;
+using MapEditor.GameData.Rows;
+using MapEditor.GameData.Sync;
 
 namespace MapEditor.App.Tests.Fakes;
 
@@ -18,11 +20,31 @@ internal sealed class FakeEditorDialogs : IEditorDialogs
     public string? AssetDirectoryPickResult { get; set; }
     public int AssetDirectoryPickShown;
     public string? LastSaveSuggestedName;
+    public string? SpreadsheetUrlResult;
+    public int SpreadsheetUrlShown;
+    public string? LastSpreadsheetUrlPrefill;
+    public MapReference? MapConfirmationResult;
+    public int MapConfirmationShown;
+    public IReadOnlyList<MapReference>? LastMapConfirmationMaps;
+    public MapReference? LastMapConfirmationSuggested;
+    public string? LastMapConfirmationDocumentName;
+    public SheetDirtyChoice SheetDirtyResult = SheetDirtyChoice.Cancel;
+    public int SheetDirtyShown;
+    public string? LastSheetDirtyDocumentName;
+    public Queue<SheetDirtyChoice>? SheetDirtyChoices;
+    public PushConflictChoice PushConflictResult = PushConflictChoice.Cancel;
+    public int PushConflictShown;
+    public string? LastPushConflictDocumentName;
+    public Queue<PushConflictChoice>? PushConflictChoices;
     public Exception? ShowNewMapException;
     public Exception? PickOpenException;
     public Exception? PickAssetDirectoryException;
     public Exception? PickSaveException;
     public Exception? ShowDirtyException;
+    public Exception? ShowSpreadsheetUrlException;
+    public Exception? ShowMapConfirmationException;
+    public Exception? ShowSheetDirtyException;
+    public Exception? ShowPushConflictException;
     public Exception? ShowErrorException;
     public TaskCompletionSource<DirtyChoice>? DirtyGate;
     public Queue<TaskCompletionSource<DirtyChoice>>? DirtyGates;
@@ -137,5 +159,61 @@ internal sealed class FakeEditorDialogs : IEditorDialogs
         }
 
         return Task.CompletedTask;
+    }
+
+    public Task<string?> ShowSpreadsheetUrlAsync(string? prefill)
+    {
+        SpreadsheetUrlShown++;
+        LastSpreadsheetUrlPrefill = prefill;
+        if (ShowSpreadsheetUrlException is { } exception)
+        {
+            return Task.FromException<string?>(exception);
+        }
+
+        return Task.FromResult(SpreadsheetUrlResult);
+    }
+
+    public Task<MapReference?> ShowMapConfirmationAsync(IReadOnlyList<MapReference> maps, MapReference? suggested, string documentName)
+    {
+        MapConfirmationShown++;
+        LastMapConfirmationMaps = maps;
+        LastMapConfirmationSuggested = suggested;
+        LastMapConfirmationDocumentName = documentName;
+        if (ShowMapConfirmationException is { } exception)
+        {
+            return Task.FromException<MapReference?>(exception);
+        }
+
+        return Task.FromResult(MapConfirmationResult);
+    }
+
+    public Task<SheetDirtyChoice> ShowSheetDirtyAsync(string documentName)
+    {
+        SheetDirtyShown++;
+        LastSheetDirtyDocumentName = documentName;
+        if (ShowSheetDirtyException is { } exception)
+        {
+            return Task.FromException<SheetDirtyChoice>(exception);
+        }
+
+        SheetDirtyChoice choice = SheetDirtyChoices is { Count: > 0 } queue
+            ? queue.Dequeue()
+            : SheetDirtyResult;
+        return Task.FromResult(choice);
+    }
+
+    public Task<PushConflictChoice> ShowPushConflictAsync(string documentName)
+    {
+        PushConflictShown++;
+        LastPushConflictDocumentName = documentName;
+        if (ShowPushConflictException is { } exception)
+        {
+            return Task.FromException<PushConflictChoice>(exception);
+        }
+
+        PushConflictChoice choice = PushConflictChoices is { Count: > 0 } queue
+            ? queue.Dequeue()
+            : PushConflictResult;
+        return Task.FromResult(choice);
     }
 }

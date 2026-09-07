@@ -1,6 +1,9 @@
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using MapEditor.Core;
+using MapEditor.GameData.Rows;
+using MapEditor.GameData.Sync;
 
 namespace MapEditor.App.Dialogs;
 
@@ -31,4 +34,13 @@ internal sealed class EditorDialogsProxy : IEditorDialogs
     public Task<string?> PickAssetDirectoryAsync() => Target.PickAssetDirectoryAsync();
 
     public Task ShowErrorAsync(ErrorPresentation error) => Target.ShowErrorAsync(error);
+
+    public Task<string?> ShowSpreadsheetUrlAsync(string? prefill) => Target.ShowSpreadsheetUrlAsync(prefill);
+
+    public Task<MapReference?> ShowMapConfirmationAsync(IReadOnlyList<MapReference> maps, MapReference? suggested, string documentName)
+        => Target.ShowMapConfirmationAsync(maps, suggested, documentName);
+
+    public Task<SheetDirtyChoice> ShowSheetDirtyAsync(string documentName) => Target.ShowSheetDirtyAsync(documentName);
+
+    public Task<PushConflictChoice> ShowPushConflictAsync(string documentName) => Target.ShowPushConflictAsync(documentName);
 }

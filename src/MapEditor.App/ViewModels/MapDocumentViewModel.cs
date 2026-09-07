@@ -28,6 +28,7 @@ internal sealed class MapDocumentViewModel : ViewModelBase, IDisposable
     private MapEditSession _session;
     private SheetEditSession _sheetSession;
     private DocumentEditTimeline _timeline;
+    private DocumentGameDataState? _gameData;
 
     private MapEditTool _activeTool = MapEditTool.Pencil;
     private IReadOnlyList<int> _sheetIds = Array.Empty<int>();
@@ -78,6 +79,12 @@ internal sealed class MapDocumentViewModel : ViewModelBase, IDisposable
         _controller.StateChanged -= OnControllerStateChanged;
         _session.Resized -= OnSessionResized;
         _timeline.Detach();
+        if (_gameData is not null)
+        {
+            _gameData.Changed -= OnGameDataChanged;
+            _gameData.Dispose();
+            _gameData = null;
+        }
     }
 
     public event Action? CanvasInvalidated;
@@ -89,6 +96,14 @@ internal sealed class MapDocumentViewModel : ViewModelBase, IDisposable
     internal SheetEditSession SheetSession => _sheetSession;
 
     internal DocumentEditTimeline Timeline => _timeline;
+
+    internal DocumentGameDataState? GameData => _gameData;
+
+    internal void AttachGameData(DocumentGameDataState state)
+    {
+        _gameData = state ?? throw new ArgumentNullException(nameof(state));
+        _gameData.Changed += OnGameDataChanged;
+    }
 
     internal void AttachSheetSession(SheetEditSession session)
     {
@@ -492,6 +507,11 @@ internal sealed class MapDocumentViewModel : ViewModelBase, IDisposable
     }
 
     private void OnControllerStateChanged()
+    {
+        Refresh(EditorRefresh.Title | EditorRefresh.Commands);
+    }
+
+    private void OnGameDataChanged()
     {
         Refresh(EditorRefresh.Title | EditorRefresh.Commands);
     }

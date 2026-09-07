@@ -4,6 +4,7 @@ using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using MapEditor.App.Connectivity;
 using MapEditor.App.Dialogs;
 using MapEditor.App.Documents;
 using MapEditor.Core;
@@ -14,13 +15,16 @@ internal sealed class WorkspaceViewModel : ViewModelBase
 {
     private readonly IEditorDialogs _dialogs;
     private readonly MapFileStore _store;
+    private readonly IGameDataConnectivity? _connectivity;
     private readonly ObservableCollection<MapDocumentViewModel> _documents = new();
     private MapDocumentViewModel _activeDocument;
 
-    internal WorkspaceViewModel(IEditorDialogs dialogs, MapFileStore store)
+    internal WorkspaceViewModel(IEditorDialogs dialogs, MapFileStore store, IGameDataConnectivity? connectivity = null)
     {
         _dialogs = dialogs ?? throw new ArgumentNullException(nameof(dialogs));
         _store = store ?? throw new ArgumentNullException(nameof(store));
+        _connectivity = connectivity;
+        Commands = new GameDataCommandController(connectivity, _dialogs, this);
         Documents = new ReadOnlyObservableCollection<MapDocumentViewModel>(_documents);
         Clipboard = new SharedTileClipboard();
         MapDocumentViewModel initial = CreateDocument(MapDocument.Create(), null, null);
@@ -33,6 +37,10 @@ internal sealed class WorkspaceViewModel : ViewModelBase
     internal MapDocumentViewModel ActiveDocument => _activeDocument;
 
     internal SharedTileClipboard Clipboard { get; }
+
+    internal IGameDataConnectivity? Connectivity => _connectivity;
+
+    internal GameDataCommandController Commands { get; }
 
     internal void Activate(MapDocumentViewModel document)
     {
@@ -199,7 +207,9 @@ internal sealed class WorkspaceViewModel : ViewModelBase
         var session = new MapEditSession(map, initiallyDirty: false);
         var editorDocument = new EditorDocument(session, path, revision);
         var controller = new EditorDocumentController(_dialogs, _store, editorDocument, IsPathOwnedElsewhere);
-        return new MapDocumentViewModel(controller, Clipboard);
+        var document = new MapDocumentViewModel(controller, Clipboard);
+        document.AttachGameData(new DocumentGameDataState(document, Commands));
+        return document;
     }
 
     private bool IsPathOwnedElsewhere(EditorDocument asker, string fullPath)
