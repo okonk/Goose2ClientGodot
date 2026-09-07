@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
+using MapEditor.App.Dialogs;
 using MapEditor.App.Documents;
 using MapEditor.Core;
 using MapEditor.GameData.Editing;
@@ -90,6 +92,8 @@ internal sealed class MapDocumentViewModel : ViewModelBase, IDisposable
     public event Action? CanvasInvalidated;
 
     public event Action? PaletteInvalidated;
+
+    public event Action<ErrorPresentation>? GameDataError;
 
     public MapEditSession Session => _controller.Document.Session;
 
@@ -482,6 +486,279 @@ internal sealed class MapDocumentViewModel : ViewModelBase, IDisposable
         Refresh(EditorRefresh.Canvas | EditorRefresh.Commands | EditorRefresh.Title);
     }
 
+    internal int? FindSpawnAt(int x, int y)
+    {
+        if (_gameData?.Session is not { Edits: { } edits })
+        {
+            return null;
+        }
+
+        var spawns = edits.Spawns;
+        for (int i = 0; i < spawns.Count; i++)
+        {
+            if (spawns[i].MapX == x && spawns[i].MapY == y)
+            {
+                return i;
+            }
+        }
+
+        return null;
+    }
+
+    internal int? FindWarpAt(int x, int y)
+    {
+        if (_gameData?.Session is not { Edits: { } edits })
+        {
+            return null;
+        }
+
+        var warps = edits.Warps;
+        for (int i = 0; i < warps.Count; i++)
+        {
+            if (warps[i].MapX == x && warps[i].MapY == y)
+            {
+                return i;
+            }
+        }
+
+        return null;
+    }
+
+    internal void SelectSpawn(int index)
+    {
+        if (_gameData is not { Session: { Edits: { } edits } } state || index < 0 || index >= edits.Spawns.Count)
+        {
+            return;
+        }
+
+        state.SelectedSpawn = index;
+    }
+
+    internal void SelectWarp(int index)
+    {
+        if (_gameData is not { Session: { Edits: { } edits } } state || index < 0 || index >= edits.Warps.Count)
+        {
+            return;
+        }
+
+        state.SelectedWarp = index;
+    }
+
+    internal void AddSpawnAt(int x, int y)
+    {
+        if (_gameData is not { Session: { } session } state || !InBounds(x, y))
+        {
+            return;
+        }
+
+        if (state.SelectedNpcId is not { } npcId || !session.Npcs.ContainsKey(npcId))
+        {
+            return;
+        }
+
+        int index = session.Edits.Spawns.Count;
+        session.Edits.AddSpawn(new NpcSpawnRow(npcId, session.MapId, x, y));
+        state.SelectedSpawn = index;
+    }
+
+    internal void AddWarpAt(int x, int y)
+    {
+        if (_gameData is not { Session: { } session } state || !InBounds(x, y))
+        {
+            return;
+        }
+
+        if (state.SelectedDestinationMapId is not { } mapId || !session.Maps.Any(map => map.MapId == mapId))
+        {
+            return;
+        }
+
+        if (state.PendingDestinationX is not { } destinationX || state.PendingDestinationY is not { } destinationY)
+        {
+            return;
+        }
+
+        if (FindWarpAt(x, y) is not null)
+        {
+            RaiseGameDataError(new ErrorPresentation("Add warp", $"Warp source tile ({x}, {y}) is already defined."));
+            return;
+        }
+
+        int index = session.Edits.Warps.Count;
+        session.Edits.AddWarp(new WarpRow(session.MapId, x, y, mapId, destinationX, destinationY));
+        state.SelectedWarp = index;
+    }
+
+    internal void MoveSpawnTo(int index, int x, int y)
+    {
+        if (_gameData?.Session is not { Edits: { } edits } state || index < 0 || index >= edits.Spawns.Count || !InBounds(x, y))
+        {
+            return;
+        }
+
+        edits.MoveSpawn(index, x, y);
+    }
+
+    internal void MoveWarpSourceTo(int index, int x, int y)
+    {
+        if (_gameData?.Session is not { Edits: { } edits } state || index < 0 || index >= edits.Warps.Count || !InBounds(x, y))
+        {
+            return;
+        }
+
+        WarpRow row = edits.Warps[index];
+        if (row.MapX == x && row.MapY == y)
+        {
+            return;
+        }
+
+        for (int i = 0; i < edits.Warps.Count; i++)
+        {
+            if (i != index && edits.Warps[i].MapX == x && edits.Warps[i].MapY == y)
+            {
+                RaiseGameDataError(new ErrorPresentation("Move warp", $"Warp source tile ({x}, {y}) is already defined."));
+                return;
+            }
+        }
+
+        edits.MoveWarpSource(index, x, y);
+    }
+
+    internal void CommitSpawnNpc(int npcId)
+    {
+        if (_gameData is not { Session: { } session } state)
+        {
+            return;
+        }
+
+        state.SelectedNpcId = npcId;
+        if (state.SelectedSpawn is not { } index || index >= session.Edits.Spawns.Count)
+        {
+            return;
+        }
+
+        if (!session.Npcs.ContainsKey(npcId))
+        {
+            return;
+        }
+
+        NpcSpawnRow row = session.Edits.Spawns[index];
+        if (row.NpcId == npcId)
+        {
+            return;
+        }
+
+        session.Edits.UpdateSpawn(index, row with { NpcId = npcId });
+    }
+
+    internal void CommitSpawnCoordinates(int x, int y)
+        => MoveSpawnTo(_gameData?.SelectedSpawn ?? -1, x, y);
+
+    internal void CommitWarpDestinationMap(int mapId)
+    {
+        if (_gameData is not { Session: { } session } state)
+        {
+            return;
+        }
+
+        state.SelectedDestinationMapId = mapId;
+        if (state.SelectedWarp is not { } index || index >= session.Edits.Warps.Count)
+        {
+            return;
+        }
+
+        if (!session.Maps.Any(map => map.MapId == mapId))
+        {
+            return;
+        }
+
+        WarpRow row = session.Edits.Warps[index];
+        if (row.WarpId == mapId)
+        {
+            return;
+        }
+
+        session.Edits.UpdateWarp(index, row with { WarpId = mapId });
+    }
+
+    internal void CommitWarpSourceCoordinates(int x, int y)
+        => MoveWarpSourceTo(_gameData?.SelectedWarp ?? -1, x, y);
+
+    internal void CommitWarpDestinationCoordinates(int x, int y)
+    {
+        if (_gameData is not { Session: { Edits: { } edits } } state)
+        {
+            return;
+        }
+
+        state.PendingDestinationX = x;
+        state.PendingDestinationY = y;
+        if (state.SelectedWarp is not { } index || index >= edits.Warps.Count)
+        {
+            return;
+        }
+
+        WarpRow row = edits.Warps[index];
+        if (row.WarpX == x && row.WarpY == y)
+        {
+            return;
+        }
+
+        edits.UpdateWarp(index, row with { WarpX = x, WarpY = y });
+    }
+
+    internal void RemoveSelectedSpawn()
+    {
+        if (_gameData is not { Session: { Edits: { } edits } } state || state.SelectedSpawn is not { } index)
+        {
+            return;
+        }
+
+        state.SelectedSpawn = null;
+        if (index >= edits.Spawns.Count)
+        {
+            return;
+        }
+
+        edits.RemoveSpawnAt(index);
+    }
+
+    internal void RemoveSelectedWarp()
+    {
+        if (_gameData is not { Session: { Edits: { } edits } } state || state.SelectedWarp is not { } index)
+        {
+            return;
+        }
+
+        state.SelectedWarp = null;
+        if (index >= edits.Warps.Count)
+        {
+            return;
+        }
+
+        edits.RemoveWarpAt(index);
+    }
+
+    internal void RemoveSelectedGameData()
+    {
+        if (_gameData?.SelectedSpawn is not null)
+        {
+            RemoveSelectedSpawn();
+        }
+        else
+        {
+            RemoveSelectedWarp();
+        }
+    }
+
+    private bool InBounds(int x, int y)
+    {
+        MapDocument document = _session.Document;
+        return x >= 0 && x < document.Width && y >= 0 && y < document.Height;
+    }
+
+    private void RaiseGameDataError(ErrorPresentation error) => GameDataError?.Invoke(error);
+
     public void Refresh(EditorRefresh flags)
     {
         if (flags.HasFlag(EditorRefresh.Title))
@@ -535,6 +812,11 @@ internal sealed class MapDocumentViewModel : ViewModelBase, IDisposable
         HoverY = null;
         SelectionRectangle = ShiftRect(SelectionRectangle, transform);
         CancelPasteMode();
+        if (_gameData is not null)
+        {
+            _gameData.SelectedSpawn = null;
+            _gameData.SelectedWarp = null;
+        }
     }
 
     private static (int? X, int? Y) ShiftPoint(int? x, int? y, in MapResizeTransform transform)

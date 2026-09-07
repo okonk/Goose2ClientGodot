@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using MapEditor.Core;
 
 namespace MapEditor.Rendering;
@@ -151,6 +152,9 @@ public sealed class MapRenderer
             DrawGrid(document, viewport, ranges, sink);
         }
 
+        DrawMarkers(options.SpawnMarkers, GameDataMarkerKind.Spawn, document, viewport, sink);
+        DrawMarkers(options.WarpMarkers, GameDataMarkerKind.Warp, document, viewport, sink);
+
         if (options.SelectedTile is { } selected)
         {
             DrawTarget(document, viewport, selected, CellOverlayKind.Selected, MapRenderPalette.SelectedStroke, sink);
@@ -224,6 +228,43 @@ public sealed class MapRenderer
                 viewport.WorldToScreen(new RenderPoint(left, worldY)),
                 viewport.WorldToScreen(new RenderPoint(right, worldY)),
                 MapRenderPalette.Grid));
+        }
+    }
+
+    private static void DrawMarkers(
+        IReadOnlyList<GameDataMarkerInput>? markers,
+        GameDataMarkerKind kind,
+        MapDocument document,
+        ViewportTransform viewport,
+        IMapDrawSink sink)
+    {
+        if (markers is null)
+        {
+            return;
+        }
+
+        RenderRect visible = viewport.VisibleWorldRect;
+        foreach (GameDataMarkerInput marker in markers)
+        {
+            MapTileCoordinate tile = marker.Tile;
+            if (tile.X < 0 || tile.X >= document.Width || tile.Y < 0 || tile.Y >= document.Height)
+            {
+                continue;
+            }
+
+            RenderRect cell = CellRect(tile.X, tile.Y);
+            if (!Intersects(cell, visible))
+            {
+                continue;
+            }
+
+            sink.DrawGameDataMarker(new GameDataMarkerDrawOperation(
+                kind,
+                marker.OccurrenceIndex,
+                tile,
+                viewport.WorldToScreen(cell),
+                marker.Selected,
+                marker.Diagnostic));
         }
     }
 

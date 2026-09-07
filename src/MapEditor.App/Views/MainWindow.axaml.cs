@@ -20,6 +20,7 @@ using MapEditor.App.Settings;
 using MapEditor.App.ViewModels;
 using MapEditor.Core;
 using MapEditor.GameData.Rows;
+using MapEditor.GameData.Sync;
 using MapEditor.Rendering;
 
 namespace MapEditor.App;
@@ -49,7 +50,10 @@ internal partial class MainWindow : Window
     private IPointer? _dragPointer;
     private int _dragIndex;
     private int? _spawnPrefillSelection;
+    private long _spawnPrefillVersion = -1;
     private int? _warpPrefillSelection;
+    private long _warpPrefillVersion = -1;
+    private GameDataSyncSession? _prefillSession;
     private AppTheme _theme = AppTheme.Dark;
     private bool _commandRunning;
     private bool _closeGuardRunning;
@@ -75,6 +79,26 @@ internal partial class MainWindow : Window
         _layerVisibleChecks = new[] { Layer0VisibleCheck, Layer1VisibleCheck, Layer2VisibleCheck, Layer3VisibleCheck, Layer4VisibleCheck };
         SpawnNpcPicker.ItemText = npc => $"{npc.NpcId}  {npc.NpcName}";
         WarpDestinationPicker.ItemText = map => $"{map.MapId}  {map.MapName}  {map.MapFilename}";
+        SpawnNpcPicker.PropertyChanged += OnSpawnNpcPickerChanged;
+        WarpDestinationPicker.PropertyChanged += OnWarpDestinationPickerChanged;
+        SpawnSourceX.LostFocus += OnSpawnSourceFieldLostFocus;
+        SpawnSourceY.LostFocus += OnSpawnSourceFieldLostFocus;
+        SpawnSourceX.KeyDown += OnSpawnSourceFieldKeyDown;
+        SpawnSourceY.KeyDown += OnSpawnSourceFieldKeyDown;
+        WarpSourceX.LostFocus += OnWarpSourceFieldLostFocus;
+        WarpSourceY.LostFocus += OnWarpSourceFieldLostFocus;
+        WarpSourceX.KeyDown += OnWarpSourceFieldKeyDown;
+        WarpSourceY.KeyDown += OnWarpSourceFieldKeyDown;
+        WarpDestinationX.LostFocus += OnWarpDestinationFieldLostFocus;
+        WarpDestinationY.LostFocus += OnWarpDestinationFieldLostFocus;
+        WarpDestinationX.KeyDown += OnWarpDestinationFieldKeyDown;
+        WarpDestinationY.KeyDown += OnWarpDestinationFieldKeyDown;
+        SpawnSourceX.PropertyChanged += OnSpawnSourceFieldTextChanged;
+        SpawnSourceY.PropertyChanged += OnSpawnSourceFieldTextChanged;
+        WarpSourceX.PropertyChanged += OnWarpSourceFieldTextChanged;
+        WarpSourceY.PropertyChanged += OnWarpSourceFieldTextChanged;
+        WarpDestinationX.PropertyChanged += OnWarpDestinationFieldTextChanged;
+        WarpDestinationY.PropertyChanged += OnWarpDestinationFieldTextChanged;
         AddHandler(InputElement.PointerPressedEvent, OnWindowPointerPressed, RoutingStrategies.Tunnel);
         AddHandler(InputElement.PointerMovedEvent, OnWindowPointerMoved);
         AddHandler(InputElement.PointerReleasedEvent, OnWindowPointerReleased);
@@ -97,6 +121,8 @@ internal partial class MainWindow : Window
         foreach (MapDocumentViewModel document in _workspace.Documents)
         {
             _views[document] = CreateView(document);
+            document.PropertyChanged += OnAnyDocumentPropertyChanged;
+            document.GameDataError += OnDocumentGameDataError;
         }
 
         ActivateDocument(_workspace.ActiveDocument);
@@ -136,6 +162,8 @@ internal partial class MainWindow : Window
             foreach (MapDocumentViewModel document in e.NewItems)
             {
                 _views[document] = CreateView(document);
+                document.PropertyChanged += OnAnyDocumentPropertyChanged;
+                document.GameDataError += OnDocumentGameDataError;
             }
         }
 
@@ -160,6 +188,8 @@ internal partial class MainWindow : Window
                 }
 
                 view.Palette.UnbindScrollBar();
+                document.PropertyChanged -= OnAnyDocumentPropertyChanged;
+                document.GameDataError -= OnDocumentGameDataError;
                 _views.Remove(document);
             }
         }
@@ -366,7 +396,10 @@ internal partial class MainWindow : Window
         SyncReadouts();
         SyncAssetDirectory();
         _spawnPrefillSelection = null;
+        _spawnPrefillVersion = -1;
         _warpPrefillSelection = null;
+        _warpPrefillVersion = -1;
+        _prefillSession = document.GameData?.Session;
         SyncGameDataChrome();
         SyncRightPanel();
         Title = document.Title;
@@ -513,7 +546,14 @@ internal partial class MainWindow : Window
                 e.Handled = true;
                 break;
             case Key.Delete:
-                Document.DeleteSelection();
+                if (Document.GameData!.SelectedSpawn is not null || Document.GameData!.SelectedWarp is not null)
+                {
+                    Document.RemoveSelectedGameData();
+                }
+                else
+                {
+                    Document.DeleteSelection();
+                }
                 e.Handled = true;
                 break;
             case Key.Add or Key.OemPlus:
@@ -714,30 +754,215 @@ internal partial class MainWindow : Window
 
     private void OnUseSelectedTile(object? sender, RoutedEventArgs e)
     {
-        if (Document.SelectedX is { } x && Document.SelectedY is { } y)
+        if (ResolveUseSelectedTileSource() is not { SelectedX: { } x, SelectedY: { } y })
         {
-            WarpSourceX.Text = x.ToString();
-            WarpSourceY.Text = y.ToString();
+            return;
+        }
+
+        WarpDestinationX.Text = x.ToString();
+        WarpDestinationY.Text = y.ToString();
+        Document.CommitWarpDestinationCoordinates(x, y);
+    }
+
+    private MapDocumentViewModel? ResolveUseSelectedTileSource()
+    {
+        DocumentGameDataState state = Document.GameData!;
+        if (state.SelectedDestinationMapId is not { } mapId || state.Session is not { } session)
+        {
+            return null;
+        }
+
+        MapDocumentViewModel? match = null;
+        foreach (MapDocumentViewModel candidate in _workspace.Documents)
+        {
+            if (candidate.GameData?.Session is not { } candidateSession ||
+                !string.Equals(candidateSession.SpreadsheetId, session.SpreadsheetId, StringComparison.Ordinal) ||
+                candidateSession.MapId != mapId)
+            {
+                continue;
+            }
+
+            if (candidate.SelectedX is not { } x || candidate.SelectedY is not { } y ||
+                x < 0 || x >= candidate.MapWidth || y < 0 || y >= candidate.MapHeight)
+            {
+                continue;
+            }
+
+            if (match is not null)
+            {
+                return null;
+            }
+
+            match = candidate;
+        }
+
+        return match;
+    }
+
+    private void SyncUseSelectedTileButton()
+        => WarpUseSelectedTileButton.IsEnabled = ResolveUseSelectedTileSource() is not null;
+
+    private void OnAnyDocumentPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is nameof(MapDocumentViewModel.SelectedX) or nameof(MapDocumentViewModel.SelectedY))
+        {
+            SyncUseSelectedTileButton();
         }
     }
 
-    private void OnSpawnDelete(object? sender, RoutedEventArgs e)
+    private void OnDocumentGameDataError(ErrorPresentation error) => _ = _dialogs.ShowErrorAsync(error);
+
+    private void OnSpawnNpcPickerChanged(object? sender, AvaloniaPropertyChangedEventArgs e)
     {
-        if (Document.GameData is { SelectedSpawn: { } index, Session: { } session } state && index < session.Edits.Spawns.Count)
+        if (e.Property != SearchPickerControl<NpcAppearance>.SelectedItemProperty)
         {
-            session.Edits.RemoveSpawnAt(index);
-            state.SelectedSpawn = null;
+            return;
+        }
+
+        NpcAppearance selected = SpawnNpcPicker.SelectedItem;
+        int? npcId = selected == default ? null : selected.NpcId;
+        Document.GameData!.SelectedNpcId = npcId;
+        if (npcId is { } id)
+        {
+            Document.CommitSpawnNpc(id);
         }
     }
 
-    private void OnWarpDelete(object? sender, RoutedEventArgs e)
+    private void OnWarpDestinationPickerChanged(object? sender, AvaloniaPropertyChangedEventArgs e)
     {
-        if (Document.GameData is { SelectedWarp: { } index, Session: { } session } state && index < session.Edits.Warps.Count)
+        if (e.Property != SearchPickerControl<MapReference>.SelectedItemProperty)
         {
-            session.Edits.RemoveWarpAt(index);
-            state.SelectedWarp = null;
+            return;
+        }
+
+        MapReference selected = WarpDestinationPicker.SelectedItem;
+        int? mapId = selected == default ? null : selected.MapId;
+        Document.GameData!.SelectedDestinationMapId = mapId;
+        if (mapId is { } id)
+        {
+            Document.CommitWarpDestinationMap(id);
+        }
+
+        SyncUseSelectedTileButton();
+    }
+
+    private void OnSpawnSourceFieldLostFocus(object? sender, RoutedEventArgs e) => CommitSpawnSourceFields();
+
+    private void OnWarpSourceFieldLostFocus(object? sender, RoutedEventArgs e) => CommitWarpSourceFields();
+
+    private void OnWarpDestinationFieldLostFocus(object? sender, RoutedEventArgs e) => CommitWarpDestinationFields();
+
+    private void OnSpawnSourceFieldKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter)
+        {
+            CommitSpawnSourceFields();
+            e.Handled = true;
         }
     }
+
+    private void OnWarpSourceFieldKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter)
+        {
+            CommitWarpSourceFields();
+            e.Handled = true;
+        }
+    }
+
+    private void OnWarpDestinationFieldKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter)
+        {
+            CommitWarpDestinationFields();
+            e.Handled = true;
+        }
+    }
+
+    private void CommitSpawnSourceFields()
+    {
+        bool xOk = int.TryParse(SpawnSourceX.Text, out int x) && InBounds(x, 0);
+        bool yOk = int.TryParse(SpawnSourceY.Text, out int y) && InBounds(0, y);
+        SpawnSourceX.BorderBrush = xOk ? null : FieldErrorBrush;
+        SpawnSourceY.BorderBrush = yOk ? null : FieldErrorBrush;
+        if (!xOk || !yOk)
+        {
+            (xOk ? SpawnSourceY : SpawnSourceX).Focus();
+            return;
+        }
+
+        Document.CommitSpawnCoordinates(x, y);
+    }
+
+    private void CommitWarpSourceFields()
+    {
+        bool xOk = int.TryParse(WarpSourceX.Text, out int x) && InBounds(x, 0);
+        bool yOk = int.TryParse(WarpSourceY.Text, out int y) && InBounds(0, y);
+        WarpSourceX.BorderBrush = xOk ? null : FieldErrorBrush;
+        WarpSourceY.BorderBrush = yOk ? null : FieldErrorBrush;
+        if (!xOk || !yOk)
+        {
+            (xOk ? WarpSourceY : WarpSourceX).Focus();
+            return;
+        }
+
+        Document.CommitWarpSourceCoordinates(x, y);
+    }
+
+    private void CommitWarpDestinationFields()
+    {
+        bool xOk = int.TryParse(WarpDestinationX.Text, out int x) && x >= 0;
+        bool yOk = int.TryParse(WarpDestinationY.Text, out int y) && y >= 0;
+        WarpDestinationX.BorderBrush = xOk ? null : FieldErrorBrush;
+        WarpDestinationY.BorderBrush = yOk ? null : FieldErrorBrush;
+        if (!xOk || !yOk)
+        {
+            (xOk ? WarpDestinationY : WarpDestinationX).Focus();
+            return;
+        }
+
+        Document.CommitWarpDestinationCoordinates(x, y);
+    }
+
+    private void OnSpawnSourceFieldTextChanged(object? sender, AvaloniaPropertyChangedEventArgs e)
+    {
+        if (e.Property != TextBox.TextProperty)
+        {
+            return;
+        }
+
+        SpawnSourceX.BorderBrush = int.TryParse(SpawnSourceX.Text, out int x) && InBounds(x, 0) ? null : FieldErrorBrush;
+        SpawnSourceY.BorderBrush = int.TryParse(SpawnSourceY.Text, out int y) && InBounds(0, y) ? null : FieldErrorBrush;
+    }
+
+    private void OnWarpSourceFieldTextChanged(object? sender, AvaloniaPropertyChangedEventArgs e)
+    {
+        if (e.Property != TextBox.TextProperty)
+        {
+            return;
+        }
+
+        WarpSourceX.BorderBrush = int.TryParse(WarpSourceX.Text, out int x) && InBounds(x, 0) ? null : FieldErrorBrush;
+        WarpSourceY.BorderBrush = int.TryParse(WarpSourceY.Text, out int y) && InBounds(0, y) ? null : FieldErrorBrush;
+    }
+
+    private void OnWarpDestinationFieldTextChanged(object? sender, AvaloniaPropertyChangedEventArgs e)
+    {
+        if (e.Property != TextBox.TextProperty)
+        {
+            return;
+        }
+
+        WarpDestinationX.BorderBrush = int.TryParse(WarpDestinationX.Text, out int x) && x >= 0 ? null : FieldErrorBrush;
+        WarpDestinationY.BorderBrush = int.TryParse(WarpDestinationY.Text, out int y) && y >= 0 ? null : FieldErrorBrush;
+    }
+
+    private bool InBounds(int x, int y)
+        => x >= 0 && x < Document.MapWidth && y >= 0 && y < Document.MapHeight;
+
+    private void OnSpawnDelete(object? sender, RoutedEventArgs e) => Document.RemoveSelectedSpawn();
+
+    private void OnWarpDelete(object? sender, RoutedEventArgs e) => Document.RemoveSelectedWarp();
 
     private void OnWindowPointerPressed(object? sender, PointerPressedEventArgs e)
     {
@@ -1056,6 +1281,18 @@ internal partial class MainWindow : Window
 
     private void OnGameDataStateChanged()
     {
+        GameDataSyncSession? session = Document.GameData?.Session;
+        if (!ReferenceEquals(_prefillSession, session))
+        {
+            _prefillSession = session;
+            _spawnPrefillSelection = null;
+            _spawnPrefillVersion = -1;
+            _warpPrefillSelection = null;
+            _warpPrefillVersion = -1;
+            SpawnNpcPicker.SelectedItem = default;
+            WarpDestinationPicker.SelectedItem = default;
+        }
+
         SyncToolButtons();
         SyncRightPanel();
         SyncGameDataChrome();
@@ -1094,42 +1331,84 @@ internal partial class MainWindow : Window
         {
             SyncSpawnProperties(state, spawnWasVisible);
         }
+        else
+        {
+            _spawnPrefillSelection = null;
+            _spawnPrefillVersion = -1;
+        }
 
         if (showWarp)
         {
             SyncWarpProperties(state, warpWasVisible);
+        }
+        else
+        {
+            _warpPrefillSelection = null;
+            _warpPrefillVersion = -1;
         }
     }
 
     private void SyncSpawnProperties(DocumentGameDataState state, bool wasVisible)
     {
         SpawnDeleteButton.IsEnabled = state.SelectedSpawn is not null;
-        if (!wasVisible || state.SelectedSpawn != _spawnPrefillSelection)
+        long version = state.Session?.Edits.HistoryVersion ?? -1;
+        if (wasVisible && state.SelectedSpawn == _spawnPrefillSelection && version == _spawnPrefillVersion)
         {
-            if (state.SelectedSpawn is { } index && state.Session is { } session && index < session.Edits.Spawns.Count)
-            {
-                _spawnPrefillSelection = index;
-                NpcSpawnRow spawn = session.Edits.Spawns[index];
-                SpawnSourceX.Text = spawn.MapX.ToString();
-                SpawnSourceY.Text = spawn.MapY.ToString();
-            }
+            return;
+        }
+
+        _spawnPrefillSelection = state.SelectedSpawn;
+        _spawnPrefillVersion = version;
+        if (state.SelectedSpawn is { } index && state.Session is { } session && index < session.Edits.Spawns.Count)
+        {
+            NpcSpawnRow spawn = session.Edits.Spawns[index];
+            SpawnSourceX.Text = spawn.MapX.ToString();
+            SpawnSourceY.Text = spawn.MapY.ToString();
+            SpawnSourceX.BorderBrush = null;
+            SpawnSourceY.BorderBrush = null;
+        }
+        else
+        {
+            SpawnSourceX.Text = string.Empty;
+            SpawnSourceY.Text = string.Empty;
+            SpawnSourceX.BorderBrush = null;
+            SpawnSourceY.BorderBrush = null;
         }
     }
 
     private void SyncWarpProperties(DocumentGameDataState state, bool wasVisible)
     {
         WarpDeleteButton.IsEnabled = state.SelectedWarp is not null;
-        if (!wasVisible || state.SelectedWarp != _warpPrefillSelection)
+        long version = state.Session?.Edits.HistoryVersion ?? -1;
+        if (wasVisible && state.SelectedWarp == _warpPrefillSelection && version == _warpPrefillVersion)
         {
-            if (state.SelectedWarp is { } index && state.Session is { } session && index < session.Edits.Warps.Count)
-            {
-                _warpPrefillSelection = index;
-                WarpRow warp = session.Edits.Warps[index];
-                WarpSourceX.Text = warp.MapX.ToString();
-                WarpSourceY.Text = warp.MapY.ToString();
-                WarpDestinationX.Text = warp.WarpX.ToString();
-                WarpDestinationY.Text = warp.WarpY.ToString();
-            }
+            return;
+        }
+
+        _warpPrefillSelection = state.SelectedWarp;
+        _warpPrefillVersion = version;
+        if (state.SelectedWarp is { } index && state.Session is { } session && index < session.Edits.Warps.Count)
+        {
+            WarpRow warp = session.Edits.Warps[index];
+            WarpSourceX.Text = warp.MapX.ToString();
+            WarpSourceY.Text = warp.MapY.ToString();
+            WarpDestinationX.Text = warp.WarpX.ToString();
+            WarpDestinationY.Text = warp.WarpY.ToString();
+            WarpSourceX.BorderBrush = null;
+            WarpSourceY.BorderBrush = null;
+            WarpDestinationX.BorderBrush = null;
+            WarpDestinationY.BorderBrush = null;
+        }
+        else
+        {
+            WarpSourceX.Text = string.Empty;
+            WarpSourceY.Text = string.Empty;
+            WarpSourceX.BorderBrush = null;
+            WarpSourceY.BorderBrush = null;
+            WarpDestinationX.Text = state.PendingDestinationX?.ToString() ?? string.Empty;
+            WarpDestinationY.Text = state.PendingDestinationY?.ToString() ?? string.Empty;
+            WarpDestinationX.BorderBrush = null;
+            WarpDestinationY.BorderBrush = null;
         }
     }
 
@@ -1169,7 +1448,7 @@ internal partial class MainWindow : Window
             : "—";
         ZoomText.Text = $"{Document.ZoomPercent}%";
         SizeText.Text = $"{Document.MapWidth} × {Document.MapHeight}";
-        WarpUseSelectedTileButton.IsEnabled = Document.SelectedX is not null && Document.SelectedY is not null;
+        WarpUseSelectedTileButton.IsEnabled = ResolveUseSelectedTileSource() is not null;
         if (Document.SelectedX is { } selectedX && Document.SelectedY is { } selectedY &&
             selectedX >= 0 && selectedX < Document.MapWidth &&
             selectedY >= 0 && selectedY < Document.MapHeight)

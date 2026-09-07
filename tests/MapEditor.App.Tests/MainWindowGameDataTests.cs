@@ -305,10 +305,12 @@ public class MainWindowGameDataTests
     }
 
     [AvaloniaFact]
-    public void UseSelectedTile_CopiesTheCanvasSelectionIntoTheWarpSource()
+    public void UseSelectedTile_CopiesTheCanvasSelectionIntoTheWarpDestination()
     {
         using MainWindowHarness harness = MainWindowHarness.Create();
-        Control<ToggleButton>(harness, "WarpTool").IsChecked = true;
+        harness.ViewModel.GameData!.AttachSession(Session());
+        Dispatcher.UIThread.RunJobs();
+        Control<SearchPickerControl<MapReference>>(harness, "WarpDestinationPicker").SelectedItem = Map10;
         Button useSelected = Control<Button>(harness, "WarpUseSelectedTileButton");
 
         Assert.False(useSelected.IsEnabled);
@@ -320,8 +322,8 @@ public class MainWindowGameDataTests
 
         useSelected.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
 
-        Assert.Equal("3", Control<TextBox>(harness, "WarpSourceX").Text);
-        Assert.Equal("4", Control<TextBox>(harness, "WarpSourceY").Text);
+        Assert.Equal("3", Control<TextBox>(harness, "WarpDestinationX").Text);
+        Assert.Equal("4", Control<TextBox>(harness, "WarpDestinationY").Text);
     }
 
     [AvaloniaFact]

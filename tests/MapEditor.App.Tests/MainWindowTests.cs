@@ -43,6 +43,8 @@ internal sealed class MainWindowHarness : IDisposable
 
     public MainWindow Window { get; }
 
+    public MapCanvas Canvas => Window.Canvas;
+
     private MainWindowHarness(IGameDataConnectivity? connectivity = null)
     {
         TempDirectory = Directory.CreateTempSubdirectory("map-editor-window-").FullName;

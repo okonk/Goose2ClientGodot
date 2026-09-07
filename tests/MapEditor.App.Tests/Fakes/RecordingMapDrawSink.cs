@@ -22,4 +22,7 @@ public sealed class RecordingMapDrawSink : IMapDrawSink
 
     public void DrawGridLine(in GridLineDrawOperation operation)
         => _calls.Add(operation);
+
+    public void DrawGameDataMarker(in GameDataMarkerDrawOperation operation)
+        => _calls.Add(operation);
 }

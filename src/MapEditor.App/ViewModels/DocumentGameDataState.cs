@@ -7,7 +7,6 @@ using MapEditor.GameData.Editing;
 using MapEditor.GameData.Sync;
 
 namespace MapEditor.App.ViewModels;
-
 internal enum GameDataTool
 {
     None,
@@ -28,6 +27,10 @@ internal sealed class DocumentGameDataState : IDisposable, INotifyPropertyChange
     private bool _previewMode;
     private int? _selectedSpawn;
     private int? _selectedWarp;
+    private int? _selectedNpcId;
+    private int? _selectedDestinationMapId;
+    private int? _pendingDestinationX;
+    private int? _pendingDestinationY;
 
     internal DocumentGameDataState(MapDocumentViewModel document, GameDataCommandController controller)
     {
@@ -114,6 +117,30 @@ internal sealed class DocumentGameDataState : IDisposable, INotifyPropertyChange
         }
     }
 
+    public int? SelectedNpcId
+    {
+        get => _selectedNpcId;
+        set => SetField(ref _selectedNpcId, value);
+    }
+
+    public int? SelectedDestinationMapId
+    {
+        get => _selectedDestinationMapId;
+        set => SetField(ref _selectedDestinationMapId, value);
+    }
+
+    public int? PendingDestinationX
+    {
+        get => _pendingDestinationX;
+        set => SetField(ref _pendingDestinationX, value);
+    }
+
+    public int? PendingDestinationY
+    {
+        get => _pendingDestinationY;
+        set => SetField(ref _pendingDestinationY, value);
+    }
+
     internal void AttachSession(GameDataSyncSession session)
     {
         if (_disposed)
@@ -128,6 +155,10 @@ internal sealed class DocumentGameDataState : IDisposable, INotifyPropertyChange
         _document.AttachSheetSession(_subscribedEdits);
         _selectedSpawn = null;
         _selectedWarp = null;
+        _selectedNpcId = null;
+        _selectedDestinationMapId = null;
+        _pendingDestinationX = null;
+        _pendingDestinationY = null;
         RaiseChanged();
     }
 
@@ -156,7 +187,23 @@ internal sealed class DocumentGameDataState : IDisposable, INotifyPropertyChange
         }
     }
 
-    private void OnEditsHistoryChanged() => RaiseChanged();
+    private void OnEditsHistoryChanged()
+    {
+        if (_session is { } session)
+        {
+            if (_selectedSpawn is { } spawn && spawn >= session.Edits.Spawns.Count)
+            {
+                SetField(ref _selectedSpawn, null);
+            }
+
+            if (_selectedWarp is { } warp && warp >= session.Edits.Warps.Count)
+            {
+                SetField(ref _selectedWarp, null);
+            }
+        }
+
+        RaiseChanged();
+    }
 
     private void OnControllerStateChanged() => RaiseChanged();
 

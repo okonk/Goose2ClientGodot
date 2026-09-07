@@ -34,6 +34,8 @@ public sealed class RecordingMapDrawSink : IMapDrawSink
 
     public void DrawGridLine(in GridLineDrawOperation operation) => Record(operation);
 
+    public void DrawGameDataMarker(in GameDataMarkerDrawOperation operation) => Record(operation);
+
     private void Record(object operation)
     {
         if (_failure is not null)

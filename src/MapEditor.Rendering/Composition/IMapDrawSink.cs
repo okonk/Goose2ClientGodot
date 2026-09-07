@@ -9,4 +9,6 @@ public interface IMapDrawSink
     void DrawCellOverlay(in CellOverlayDrawOperation operation);
 
     void DrawGridLine(in GridLineDrawOperation operation);
+
+    void DrawGameDataMarker(in GameDataMarkerDrawOperation operation);
 }

@@ -9,6 +9,12 @@ internal sealed class AvaloniaMapDrawSink : IMapDrawSink
 {
     private const double StrokeWidth = 1.0;
 
+    internal static readonly Color SpawnMarkerFill = Color.FromArgb(0x80, 0xFF, 0xA0, 0x40);
+    internal static readonly Color SpawnMarkerStroke = Color.FromArgb(0xFF, 0xFF, 0xA0, 0x40);
+    internal static readonly Color WarpMarkerFill = Color.FromArgb(0x80, 0x40, 0xC0, 0xFF);
+    internal static readonly Color WarpMarkerStroke = Color.FromArgb(0xFF, 0x40, 0xC0, 0xFF);
+    internal static readonly Color SelectedMarkerStroke = Colors.White;
+
     private readonly IMapDrawTarget _target;
 
     public AvaloniaMapDrawSink(IMapDrawTarget target)
@@ -47,6 +53,15 @@ internal sealed class AvaloniaMapDrawSink : IMapDrawSink
             ToPen(operation.Color),
             new Point(operation.Start.X, operation.Start.Y),
             new Point(operation.End.X, operation.End.Y));
+    }
+
+    public void DrawGameDataMarker(in GameDataMarkerDrawOperation operation)
+    {
+        Color fill = operation.Kind == GameDataMarkerKind.Spawn ? SpawnMarkerFill : WarpMarkerFill;
+        Color stroke = operation.Selected
+            ? SelectedMarkerStroke
+            : operation.Kind == GameDataMarkerKind.Spawn ? SpawnMarkerStroke : WarpMarkerStroke;
+        _target.DrawRectangle(new SolidColorBrush(fill), new Pen(new SolidColorBrush(stroke), StrokeWidth), ToRect(operation.DestinationRect));
     }
 
     private static Rect ToRect(RenderRect rect)

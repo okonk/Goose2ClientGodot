@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace MapEditor.Rendering;
 
@@ -14,6 +15,12 @@ public enum CellOverlayKind
     Hovered,
     PasteGhost,
     BlockPreview
+}
+
+public enum GameDataMarkerKind
+{
+    Spawn,
+    Warp
 }
 
 public readonly record struct SpriteDrawOperation(
@@ -41,6 +48,14 @@ public readonly record struct CellOverlayDrawOperation(
     RenderRect DestinationRect,
     RenderColor FillColor,
     RenderColor StrokeColor);
+
+public readonly record struct GameDataMarkerDrawOperation(
+    GameDataMarkerKind Kind,
+    int OccurrenceIndex,
+    MapTileCoordinate Tile,
+    RenderRect DestinationRect,
+    bool Selected,
+    string Diagnostic);
 
 public readonly record struct GridLineDrawOperation(
     RenderPoint Start,
