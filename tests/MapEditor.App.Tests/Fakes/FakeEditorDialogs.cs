@@ -12,6 +12,7 @@ internal sealed class FakeEditorDialogs : IEditorDialogs
 {
     public NewMapRequest? NewMapResult;
     public MapTileRectangle? ResizeMapResult;
+    public Func<MapTileRectangle, MapResizePlan>? LastResizePlan;
     public DirtyChoice DirtyResult = DirtyChoice.Cancel;
     public ExternalChangeChoice ExternalChangeResult = ExternalChangeChoice.Cancel;
     public Queue<ExternalChangeChoice>? ExternalChangeChoices;
@@ -49,6 +50,7 @@ internal sealed class FakeEditorDialogs : IEditorDialogs
     public Task? ShowErrorGate;
     public TaskCompletionSource<DirtyChoice>? DirtyGate;
     public Queue<TaskCompletionSource<DirtyChoice>>? DirtyGates;
+    public TaskCompletionSource<SheetDirtyChoice>? SheetDirtyGate;
     public TaskCompletionSource<string?>? AssetDirectoryPickGate;
     public TaskCompletionSource<string?>? SavePickGate;
 
@@ -71,9 +73,10 @@ internal sealed class FakeEditorDialogs : IEditorDialogs
         return Task.FromResult(NewMapResult);
     }
 
-    public Task<MapTileRectangle?> ShowResizeMapAsync(MapDocument document)
+    public Task<MapTileRectangle?> ShowResizeMapAsync(MapDocument document, Func<MapTileRectangle, MapResizePlan> plan)
     {
         ResizeMapShown++;
+        LastResizePlan = plan;
         return Task.FromResult(ResizeMapResult);
     }
 
@@ -195,6 +198,11 @@ internal sealed class FakeEditorDialogs : IEditorDialogs
         if (ShowSheetDirtyException is { } exception)
         {
             return Task.FromException<SheetDirtyChoice>(exception);
+        }
+
+        if (SheetDirtyGate is { } gate)
+        {
+            return gate.Task;
         }
 
         SheetDirtyChoice choice = SheetDirtyChoices is { Count: > 0 } queue

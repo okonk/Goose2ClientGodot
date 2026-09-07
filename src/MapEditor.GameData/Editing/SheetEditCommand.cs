@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using MapEditor.GameData.Rows;
 
 namespace MapEditor.GameData.Editing;
 
@@ -110,6 +111,52 @@ internal sealed class SheetUpdateCommand<T> : SheetEditCommand
     internal override void Replay(bool reverse)
     {
         _rows[_index] = reverse ? _beforeRow : _afterRow;
+    }
+}
+
+internal sealed class SheetBulkPairCommand : SheetEditCommand
+{
+    private readonly IList<NpcSpawnRow> _spawns;
+    private readonly IList<WarpRow> _warps;
+    private readonly NpcSpawnRow[] _beforeSpawns;
+    private readonly WarpRow[] _beforeWarps;
+    private readonly NpcSpawnRow[] _afterSpawns;
+    private readonly WarpRow[] _afterWarps;
+
+    internal SheetBulkPairCommand(
+        IList<NpcSpawnRow> spawns,
+        IList<WarpRow> warps,
+        NpcSpawnRow[] beforeSpawns,
+        WarpRow[] beforeWarps,
+        NpcSpawnRow[] afterSpawns,
+        WarpRow[] afterWarps,
+        int beforeStateId,
+        int afterStateId)
+        : base(beforeStateId, afterStateId)
+    {
+        _spawns = spawns;
+        _warps = warps;
+        _beforeSpawns = beforeSpawns;
+        _beforeWarps = beforeWarps;
+        _afterSpawns = afterSpawns;
+        _afterWarps = afterWarps;
+    }
+
+    internal override void Replay(bool reverse)
+    {
+        NpcSpawnRow[] spawnTarget = reverse ? _beforeSpawns : _afterSpawns;
+        WarpRow[] warpTarget = reverse ? _beforeWarps : _afterWarps;
+        _spawns.Clear();
+        foreach (NpcSpawnRow row in spawnTarget)
+        {
+            _spawns.Add(row);
+        }
+
+        _warps.Clear();
+        foreach (WarpRow row in warpTarget)
+        {
+            _warps.Add(row);
+        }
     }
 }
 

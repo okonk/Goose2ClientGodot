@@ -244,6 +244,38 @@ public sealed class SheetEditSession
         Push(new SheetBulkCommand<WarpRow>(_warps, before, after, beforeStateId, afterStateId));
     }
 
+    public bool ReplaceAll(IReadOnlyList<NpcSpawnRow> spawns, IReadOnlyList<WarpRow> warps)
+    {
+        if (spawns is null)
+        {
+            throw new ArgumentNullException(nameof(spawns));
+        }
+
+        if (warps is null)
+        {
+            throw new ArgumentNullException(nameof(warps));
+        }
+
+        NpcSpawnRow[] beforeSpawns = _spawns.ToArray();
+        WarpRow[] beforeWarps = _warps.ToArray();
+        NpcSpawnRow[] afterSpawns = spawns.ToArray();
+        WarpRow[] afterWarps = warps.ToArray();
+        if (RowsEqual(beforeSpawns, afterSpawns) && RowsEqual(beforeWarps, afterWarps))
+        {
+            return false;
+        }
+
+        int beforeStateId = _currentStateId;
+        int afterStateId = _nextStateId++;
+        _spawns.Clear();
+        _spawns.AddRange(afterSpawns);
+        _warps.Clear();
+        _warps.AddRange(afterWarps);
+        _currentStateId = afterStateId;
+        Push(new SheetBulkPairCommand(_spawns, _warps, beforeSpawns, beforeWarps, afterSpawns, afterWarps, beforeStateId, afterStateId));
+        return true;
+    }
+
     public bool Undo()
     {
         if (_undo.Count == 0)

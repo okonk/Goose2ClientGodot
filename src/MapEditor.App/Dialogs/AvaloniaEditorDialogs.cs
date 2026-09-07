@@ -28,7 +28,7 @@ internal sealed class AvaloniaEditorDialogs : IEditorDialogs
 
     public Task<NewMapRequest?> ShowNewMapAsync() => new NewMapDialog().ShowDialog<NewMapRequest?>(_owner);
 
-    public Task<MapTileRectangle?> ShowResizeMapAsync(MapDocument document) => new ResizeMapDialog(document).ShowDialog<MapTileRectangle?>(_owner);
+    public Task<MapTileRectangle?> ShowResizeMapAsync(MapDocument document, Func<MapTileRectangle, MapResizePlan> plan) => new ResizeMapDialog(document, plan).ShowDialog<MapTileRectangle?>(_owner);
 
     public Task<DirtyChoice> ShowDirtyAsync(string displayName) => new ChoiceDialog(
             "Unsaved changes",

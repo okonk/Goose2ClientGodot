@@ -157,9 +157,14 @@ internal sealed class WorkspaceViewModel : ViewModelBase
             return false;
         }
 
-        if (document.Session.IsDirty)
+        if (document.Session.IsDirty || document.GameData is { IsDirty: true })
         {
             Activate(document);
+        }
+
+        if (!await ConfirmSheetCloseAsync(document))
+        {
+            return false;
         }
 
         if (!await document.ConfirmCloseAsync())
@@ -181,9 +186,14 @@ internal sealed class WorkspaceViewModel : ViewModelBase
                 continue;
             }
 
-            if (document.Session.IsDirty)
+            if (document.Session.IsDirty || document.GameData is { IsDirty: true })
             {
                 Activate(document);
+            }
+
+            if (!await ConfirmSheetCloseAsync(document))
+            {
+                return false;
             }
 
             if (!await document.ConfirmCloseAsync())
@@ -196,6 +206,33 @@ internal sealed class WorkspaceViewModel : ViewModelBase
 
         return true;
     }
+
+    // The sheet baseline is settled before the map prompt so a pushed sheet survives a canceled
+    // map save and a discarded sheet never touches the map saved state; discard leaves the rows
+    // dirty because the tab is destroyed rather than reset.
+    private async Task<bool> ConfirmSheetCloseAsync(MapDocumentViewModel document)
+    {
+        if (document.GameData is not { IsDirty: true })
+        {
+            return true;
+        }
+
+        SheetDirtyChoice choice = await _dialogs.ShowSheetDirtyAsync(DocumentName(document));
+        if (choice == SheetDirtyChoice.Cancel)
+        {
+            return false;
+        }
+
+        if (choice == SheetDirtyChoice.Push)
+        {
+            return await Commands.PushAsync(document);
+        }
+
+        return true;
+    }
+
+    private static string DocumentName(MapDocumentViewModel document)
+        => document.Document.Path is { } path ? Path.GetFileName(path) : "Untitled";
 
     internal void Move(int fromIndex, int toIndex)
     {

@@ -21,7 +21,7 @@ internal sealed class EditorDialogsProxy : IEditorDialogs
 
     public Task<NewMapRequest?> ShowNewMapAsync() => Target.ShowNewMapAsync();
 
-    public Task<MapTileRectangle?> ShowResizeMapAsync(MapDocument document) => Target.ShowResizeMapAsync(document);
+    public Task<MapTileRectangle?> ShowResizeMapAsync(MapDocument document, Func<MapTileRectangle, MapResizePlan> plan) => Target.ShowResizeMapAsync(document, plan);
 
     public Task<DirtyChoice> ShowDirtyAsync(string displayName) => Target.ShowDirtyAsync(displayName);
 

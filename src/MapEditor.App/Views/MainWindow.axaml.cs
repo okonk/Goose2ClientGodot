@@ -667,7 +667,7 @@ internal partial class MainWindow : Window
     private void OnResize(object? sender, RoutedEventArgs e)
         => _ = RunCommandAsync(async () =>
         {
-            MapTileRectangle? window = await _dialogs.ShowResizeMapAsync(Document.Session.Document);
+            MapTileRectangle? window = await _dialogs.ShowResizeMapAsync(Document.Session.Document, Document.PlanResize);
             if (window is { } value)
             {
                 Document.ResizeMap(value);

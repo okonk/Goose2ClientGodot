@@ -34,7 +34,7 @@ internal interface IEditorDialogs
 {
     Task<NewMapRequest?> ShowNewMapAsync();
 
-    Task<MapTileRectangle?> ShowResizeMapAsync(MapDocument document);
+    Task<MapTileRectangle?> ShowResizeMapAsync(MapDocument document, Func<MapTileRectangle, MapResizePlan> plan);
 
     Task<DirtyChoice> ShowDirtyAsync(string displayName);
 

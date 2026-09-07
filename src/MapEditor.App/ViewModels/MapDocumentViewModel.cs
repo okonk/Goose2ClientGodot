@@ -532,12 +532,119 @@ internal sealed class MapDocumentViewModel : ViewModelBase, IDisposable
 
     public void ResizeMap(MapTileRectangle window)
     {
-        if (!_session.ApplyResize(window))
+        MapDocument document = _session.Document;
+        bool mapChanges = window.X != 0 || window.Y != 0 || window.Width != document.Width || window.Height != document.Height;
+        if (!mapChanges)
         {
             return;
         }
 
+        MapResizePlan plan = PlanResize(window);
+        bool sheetChanges = plan.HasPulledData &&
+            (!RowsEqual(_sheetSession.Spawns, plan.NewSpawns) || !RowsEqual(_sheetSession.Warps, plan.NewWarps));
+        if (sheetChanges)
+        {
+            _timeline.ApplyCompound(
+                session => session.ApplyResize(window),
+                session => session.ReplaceAll(plan.NewSpawns, plan.NewWarps));
+        }
+        else
+        {
+            _session.ApplyResize(window);
+        }
+
         Refresh(EditorRefresh.Canvas | EditorRefresh.Commands | EditorRefresh.Title);
+    }
+
+    // The forward transform is the core-emitted (-X, -Y) offset; a row survives only if its
+    // shifted position stays inside the new half-open bounds.
+    internal MapResizePlan PlanResize(MapTileRectangle window)
+    {
+        MapDocument document = _session.Document;
+        int croppedTiles = 0;
+        for (int y = 0; y < document.Height; y++)
+        {
+            for (int x = 0; x < document.Width; x++)
+            {
+                bool inside = x >= window.X && x < window.X + window.Width && y >= window.Y && y < window.Y + window.Height;
+                if (!inside && !document[x, y].IsEmpty)
+                {
+                    croppedTiles++;
+                }
+            }
+        }
+
+        var newSpawns = new List<NpcSpawnRow>();
+        var newWarps = new List<WarpRow>();
+        int croppedSpawns = 0;
+        int croppedWarps = 0;
+        int inboundWarps = 0;
+        bool pulled = _gameData is { HasSession: true };
+        if (pulled)
+        {
+            int offsetX = -window.X;
+            int offsetY = -window.Y;
+            int confirmedMapId = _gameData.ConfirmedMapId ?? -1;
+            foreach (NpcSpawnRow spawn in _sheetSession.Spawns)
+            {
+                int x = spawn.MapX + offsetX;
+                int y = spawn.MapY + offsetY;
+                if (x < 0 || x >= window.Width || y < 0 || y >= window.Height)
+                {
+                    croppedSpawns++;
+                    continue;
+                }
+
+                newSpawns.Add(spawn with { MapX = x, MapY = y });
+            }
+
+            foreach (WarpRow warp in _sheetSession.Warps)
+            {
+                int x = warp.MapX + offsetX;
+                int y = warp.MapY + offsetY;
+                int destinationX = warp.WarpX;
+                int destinationY = warp.WarpY;
+                bool self = warp.WarpId == confirmedMapId;
+                if (self)
+                {
+                    destinationX += offsetX;
+                    destinationY += offsetY;
+                }
+
+                if (x < 0 || x >= window.Width || y < 0 || y >= window.Height)
+                {
+                    croppedWarps++;
+                    continue;
+                }
+
+                if (self && (destinationX < 0 || destinationX >= window.Width || destinationY < 0 || destinationY >= window.Height))
+                {
+                    inboundWarps++;
+                }
+
+                newWarps.Add(warp with { MapX = x, MapY = y, WarpX = destinationX, WarpY = destinationY });
+            }
+        }
+
+        return new MapResizePlan(window, croppedTiles, croppedSpawns, croppedWarps, inboundWarps, pulled, newSpawns, newWarps);
+    }
+
+    private static bool RowsEqual<T>(IReadOnlyList<T> left, IReadOnlyList<T> right) where T : struct
+    {
+        if (left.Count != right.Count)
+        {
+            return false;
+        }
+
+        for (int i = 0; i < left.Count; i++)
+        {
+            if (!left[i].Equals(right[i]))
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     internal int? FindSpawnAt(int x, int y)
