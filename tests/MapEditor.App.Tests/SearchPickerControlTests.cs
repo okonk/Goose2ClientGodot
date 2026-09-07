@@ -64,7 +64,10 @@ public class SearchPickerControlTests
     }
 
     private static string[] VisibleTexts(Harness harness)
-        => harness.List.Items.OfType<ListBoxItem>().Select(entry => (string)entry.Content).ToArray();
+        => harness.List.Items.OfType<ListBoxItem>().Select(RowText).ToArray();
+
+    // Rows carry an ellipsizing TextBlock rather than a bare string.
+    private static string RowText(ListBoxItem entry) => ((TextBlock)entry.Content!).Text ?? string.Empty;
 
     private static void Type(Harness harness, string text)
     {

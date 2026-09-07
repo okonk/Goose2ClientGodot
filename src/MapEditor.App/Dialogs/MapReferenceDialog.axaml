@@ -4,19 +4,15 @@
         Title="Confirm map"
         CanResize="False"
         SizeToContent="WidthAndHeight"
+        Background="{DynamicResource EditorPanelBrush}"
         WindowStartupLocation="CenterOwner">
-  <Window.Styles>
-    <Style Selector="ListBoxItem.suggested">
-      <Setter Property="FontWeight" Value="SemiBold" />
-      <Setter Property="Background" Value="{DynamicResource EditorSubtleHoverBrush}" />
-    </Style>
-  </Window.Styles>
-  <StackPanel Margin="18" Spacing="16">
-    <TextBlock x:Name="Header" TextWrapping="Wrap" />
-    <ListBox x:Name="MapList" MinWidth="420" Height="240" />
+  <StackPanel Margin="18" Spacing="14">
+    <TextBlock x:Name="Header" TextWrapping="Wrap" MaxWidth="440" />
+    <ListBox x:Name="MapList" MinWidth="440" Height="260"
+             ScrollViewer.HorizontalScrollBarVisibility="Disabled" />
     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
-      <Button x:Name="ConfirmButton" Content="Confirm" MinWidth="84" IsDefault="True" Click="OnConfirm" />
       <Button x:Name="CancelButton" Content="Cancel" MinWidth="84" IsCancel="True" Click="OnCancel" />
+      <Button x:Name="ConfirmButton" Classes="accent" Content="Confirm" MinWidth="84" IsDefault="True" Click="OnConfirm" />
     </StackPanel>
   </StackPanel>
 </Window>

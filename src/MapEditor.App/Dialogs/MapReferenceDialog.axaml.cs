@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Markup.Xaml;
+using Avalonia.Media;
 using MapEditor.GameData.Rows;
 
 namespace MapEditor.App.Dialogs;
@@ -18,14 +19,19 @@ internal partial class MapReferenceDialog : Window
         {
             MapReference map = maps[i];
             bool isSuggested = suggested is { } candidate && candidate.Equals(map);
+            string text = $"{map.MapId}  {map.MapName}  {map.MapFilename}";
+            if (isSuggested)
+            {
+                text = $"{text}  (suggested)";
+            }
+
             var item = new ListBoxItem
             {
-                Content = $"{map.MapId}  {map.MapName}  {map.MapFilename}",
+                Content = new TextBlock { Text = text, TextTrimming = TextTrimming.CharacterEllipsis },
                 Tag = map
             };
             if (isSuggested)
             {
-                item.Content = $"{item.Content}  (suggested)";
                 item.Classes.Add("suggested");
                 selectedIndex = i;
             }

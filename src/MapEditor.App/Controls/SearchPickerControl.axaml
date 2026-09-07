@@ -2,6 +2,7 @@
             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
             Spacing="4">
   <TextBox x:Name="SearchBox" Watermark="Search" />
-  <ListBox x:Name="Results" MinHeight="120" />
+  <ListBox x:Name="Results" MinHeight="120"
+           ScrollViewer.HorizontalScrollBarVisibility="Disabled" />
   <TextBlock x:Name="SelectionText" Classes="muted" FontSize="11" Text="—" TextTrimming="CharacterEllipsis" />
 </StackPanel>

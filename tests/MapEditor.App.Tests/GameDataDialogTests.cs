@@ -23,6 +23,9 @@ public class GameDataDialogTests
     private static readonly MapReference Map30 = new(30, "Tower", "tower.bytes");
     private static readonly IReadOnlyList<MapReference> Maps = new[] { Map10, Map20, Map30 };
 
+    // Rows carry an ellipsizing TextBlock rather than a bare string.
+    private static string RowText(ListBoxItem entry) => ((TextBlock)entry.Content!).Text ?? string.Empty;
+
     private sealed class Owner : IDisposable
     {
         public Window Window { get; } = new();
@@ -114,9 +117,9 @@ public class GameDataDialogTests
         ListBox list = dialog.FindControl<ListBox>("MapList")!;
         ListBoxItem[] entries = list.Items.OfType<ListBoxItem>().ToArray();
         Assert.Equal(3, entries.Length);
-        Assert.Contains("(suggested)", (string)entries[1].Content);
+        Assert.Contains("(suggested)", RowText(entries[1]));
         Assert.Contains("suggested", entries[1].Classes);
-        Assert.DoesNotContain("(suggested)", (string)entries[0].Content);
+        Assert.DoesNotContain("(suggested)", RowText(entries[0]));
         Assert.Equal(1, list.SelectedIndex);
     }
 

@@ -19,6 +19,10 @@
           <Color x:Key="EditorMutedTextColor">#FF9AA3B2</Color>
           <Color x:Key="EditorDangerColor">#FFFF6B6B</Color>
           <Color x:Key="EditorSubtleHoverColor">#14FFFFFF</Color>
+          <!-- Selection reads as an accent-tinted surface, not a saturated fill. -->
+          <Color x:Key="EditorSelectedColor">#FF23324A</Color>
+          <Color x:Key="EditorSelectedHoverColor">#FF2A3C58</Color>
+          <Color x:Key="EditorSelectedTextColor">#FFDCE7FF</Color>
           <Color x:Key="EditorArtboardColor">#FF16181D</Color>
           <Color x:Key="SystemAccentColor">#FF4C8DFF</Color>
           <Color x:Key="SystemAccentColorDark1">#FF3C7BEB</Color>
@@ -41,6 +45,9 @@
           <Color x:Key="EditorMutedTextColor">#FF5F6875</Color>
           <Color x:Key="EditorDangerColor">#FFC0392B</Color>
           <Color x:Key="EditorSubtleHoverColor">#12000000</Color>
+          <Color x:Key="EditorSelectedColor">#FFDDE8FC</Color>
+          <Color x:Key="EditorSelectedHoverColor">#FFCEDEFA</Color>
+          <Color x:Key="EditorSelectedTextColor">#FF14315E</Color>
           <!-- Sprites and grid lines are authored for a dark ground, so the artboard stays dark in both themes. -->
           <Color x:Key="EditorArtboardColor">#FF16181D</Color>
           <Color x:Key="SystemAccentColor">#FF2F6FED</Color>
@@ -65,6 +72,9 @@
       <SolidColorBrush x:Key="EditorMutedTextBrush" Color="{DynamicResource EditorMutedTextColor}" />
       <SolidColorBrush x:Key="EditorDangerBrush" Color="{DynamicResource EditorDangerColor}" />
       <SolidColorBrush x:Key="EditorSubtleHoverBrush" Color="{DynamicResource EditorSubtleHoverColor}" />
+      <SolidColorBrush x:Key="EditorSelectedBrush" Color="{DynamicResource EditorSelectedColor}" />
+      <SolidColorBrush x:Key="EditorSelectedHoverBrush" Color="{DynamicResource EditorSelectedHoverColor}" />
+      <SolidColorBrush x:Key="EditorSelectedTextBrush" Color="{DynamicResource EditorSelectedTextColor}" />
       <SolidColorBrush x:Key="EditorArtboardBrush" Color="{DynamicResource EditorArtboardColor}" />
       <SolidColorBrush x:Key="ThemeAccentBrush" Color="{DynamicResource EditorAccentColor}" />
       <SolidColorBrush x:Key="SystemAccentColorBrush" Color="{DynamicResource EditorAccentColor}" />
@@ -221,6 +231,50 @@
     <Setter Property="Margin" Value="0,0,10,0" />
   </Style>
 
+  <!-- Lists (map picker, warp destination picker, confirm dialogs).
+       Rows are transparent until hovered or selected; selection is an accent-tinted
+       surface with an accent rail rather than a saturated full-bleed fill. -->
+  <Style Selector="ListBox">
+    <Setter Property="Background" Value="{DynamicResource EditorElevatedBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource EditorBorderBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="6" />
+    <Setter Property="Padding" Value="3" />
+  </Style>
+  <Style Selector="ListBox ListBoxItem">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Foreground" Value="{DynamicResource EditorTextBrush}" />
+    <Setter Property="BorderBrush" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="3,0,0,0" />
+    <Setter Property="CornerRadius" Value="4" />
+    <!-- Left padding absorbs the 3px rail so text does not shift on selection. -->
+    <Setter Property="Padding" Value="7,5,8,5" />
+    <Setter Property="Margin" Value="0,1" />
+    <Setter Property="MinHeight" Value="0" />
+  </Style>
+  <Style Selector="ListBox ListBoxItem:pointerover /template/ ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource EditorSubtleHoverBrush}" />
+    <Setter Property="TextElement.Foreground" Value="{DynamicResource EditorTextBrush}" />
+  </Style>
+  <Style Selector="ListBox ListBoxItem:selected /template/ ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource EditorSelectedBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource EditorAccentBrush}" />
+    <Setter Property="TextElement.Foreground" Value="{DynamicResource EditorSelectedTextBrush}" />
+  </Style>
+  <Style Selector="ListBox ListBoxItem:selected:pointerover /template/ ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource EditorSelectedHoverBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource EditorAccentBrush}" />
+    <Setter Property="TextElement.Foreground" Value="{DynamicResource EditorSelectedTextBrush}" />
+  </Style>
+  <!-- A row the editor pre-picked for the user: accent text, no fill of its own. -->
+  <Style Selector="ListBox ListBoxItem.suggested">
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="Foreground" Value="{DynamicResource EditorAccentBrush}" />
+  </Style>
+  <Style Selector="ListBox ListBoxItem.suggested:selected /template/ ContentPresenter">
+    <Setter Property="TextElement.Foreground" Value="{DynamicResource EditorSelectedTextBrush}" />
+  </Style>
+
   <!-- Tab strip: flat against the chrome band, no ListBox border of its own. -->
   <Style Selector="ListBox#TabStrip">
     <Setter Property="Background" Value="{DynamicResource EditorPanelBrush}" />
@@ -231,6 +285,7 @@
   <Style Selector="ListBox#TabStrip ListBoxItem">
     <Setter Property="Background" Value="Transparent" />
     <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="CornerRadius" Value="0" />
     <Setter Property="Padding" Value="0" />
     <Setter Property="Margin" Value="0" />
   </Style>
@@ -239,6 +294,8 @@
   </Style>
   <Style Selector="ListBox#TabStrip ListBoxItem:selected /template/ ContentPresenter">
     <Setter Property="Background" Value="{DynamicResource EditorElevatedBrush}" />
+    <Setter Property="BorderBrush" Value="Transparent" />
+    <Setter Property="TextElement.Foreground" Value="{DynamicResource EditorTextBrush}" />
   </Style>
   <Style Selector="Button.tabClose">
     <Setter Property="Theme" Value="{StaticResource TabCloseButton}" />

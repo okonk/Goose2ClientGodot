@@ -5,6 +5,7 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Markup.Xaml;
+using Avalonia.Media;
 
 namespace MapEditor.App.Controls;
 
@@ -145,7 +146,14 @@ public class SearchPickerControl<T> : UserControl
             string text = project(item);
             if (text.Contains(search, StringComparison.OrdinalIgnoreCase))
             {
-                _results.Items.Add(new ListBoxItem { Content = text, Tag = item });
+                // A TextBlock (rather than a raw string) so long names ellipsize instead of
+                // clipping against the narrow properties panel.
+                _results.Items.Add(new ListBoxItem
+                {
+                    Content = new TextBlock { Text = text, TextTrimming = TextTrimming.CharacterEllipsis },
+                    Tag = item,
+                    [ToolTip.TipProperty] = text
+                });
             }
         }
 
