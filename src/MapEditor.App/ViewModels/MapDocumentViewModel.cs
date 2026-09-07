@@ -744,7 +744,7 @@ internal sealed class MapDocumentViewModel : ViewModelBase, IDisposable
 
         if (state.PendingDestinationX is not { } destinationX || state.PendingDestinationY is not { } destinationY)
         {
-            RaiseGameDataError(new ErrorPresentation("Add warp", "Set the destination coordinates, or use 'Use Selected Tile', before placing a warp."));
+            RaiseGameDataError(new ErrorPresentation("Add warp", "Set the destination coordinates before placing a warp."));
             return;
         }
 
@@ -821,9 +821,6 @@ internal sealed class MapDocumentViewModel : ViewModelBase, IDisposable
         session.Edits.UpdateSpawn(index, row with { NpcId = npcId });
     }
 
-    internal void CommitSpawnCoordinates(int x, int y)
-        => MoveSpawnTo(_gameData?.SelectedSpawn ?? -1, x, y);
-
     internal void CommitWarpDestinationMap(int mapId)
     {
         if (_gameData is not { Session: { } session } state)
@@ -850,9 +847,6 @@ internal sealed class MapDocumentViewModel : ViewModelBase, IDisposable
 
         session.Edits.UpdateWarp(index, row with { WarpId = mapId });
     }
-
-    internal void CommitWarpSourceCoordinates(int x, int y)
-        => MoveWarpSourceTo(_gameData?.SelectedWarp ?? -1, x, y);
 
     internal void CommitWarpDestinationCoordinates(int x, int y)
     {

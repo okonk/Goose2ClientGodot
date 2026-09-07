@@ -332,6 +332,19 @@ public class SheetRowMapperTests
     }
 
     [Fact]
+    public void ToCells_Warp_DestinationAtSmallintMax_WritesSchemaMaximum()
+    {
+        var schema = GameDataSchema.LoadEmbedded();
+        var mapper = new SheetRowMapper(schema);
+        var warptiles = schema.GetRequiredSheet("Warptiles");
+
+        var row = new WarpRow(1, 2, 3, 9, 32766, 0);
+        var cells = mapper.ToCells(row);
+
+        Assert.Equal("32767", cells[warptiles.GetColumnIndex("warp_x")]);
+    }
+
+    [Fact]
     public void ToCells_Result_CannotBeCastToArray()
     {
         var schema = GameDataSchema.LoadEmbedded();

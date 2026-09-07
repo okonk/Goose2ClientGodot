@@ -18,8 +18,10 @@ public sealed class GameDataValidator
     public GameDataValidator(GameDataSchema schema)
     {
         var sheet = schema.GetRequiredSheet(WarptilesSheet);
-        _warpXMax = ResolveRowRange(WarpXColumn, sheet.GetRequiredColumn(WarpXColumn).Sql).Max;
-        _warpYMax = ResolveRowRange(WarpYColumn, sheet.GetRequiredColumn(WarpYColumn).Sql).Max;
+        // SheetRowMapper writes domain + 1 to the sheet, so the writable domain maximum is the
+        // schema maximum minus one (e.g. SMALLINT 32767 on the sheet is 32766 in the domain).
+        _warpXMax = ResolveRowRange(WarpXColumn, sheet.GetRequiredColumn(WarpXColumn).Sql).Max - 1;
+        _warpYMax = ResolveRowRange(WarpYColumn, sheet.GetRequiredColumn(WarpYColumn).Sql).Max - 1;
     }
 
     public ValidationResult ValidateSpawns(

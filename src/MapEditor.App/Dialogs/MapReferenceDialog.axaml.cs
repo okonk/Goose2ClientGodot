@@ -28,7 +28,8 @@ internal partial class MapReferenceDialog : Window
             var item = new ListBoxItem
             {
                 Content = new TextBlock { Text = text, TextTrimming = TextTrimming.CharacterEllipsis },
-                Tag = map
+                Tag = map,
+                [ToolTip.TipProperty] = text
             };
             if (isSuggested)
             {

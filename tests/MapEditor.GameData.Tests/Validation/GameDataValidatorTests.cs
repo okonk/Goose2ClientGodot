@@ -236,6 +236,33 @@ public class GameDataValidatorTests
     }
 
     [Fact]
+    public void ValidateWarps_WithDestinationThatWouldWriteBeyondSmallintMax_EmitsNumericRange()
+    {
+        var validator = new GameDataValidator(GameDataSchema.LoadEmbedded());
+        var rows = new List<WarpRow> { new(100, 5, 5, 200, 32767, 0) };
+        var maps = new Dictionary<int, MapReference> { [200] = Map(200) };
+        var open = new Dictionary<int, MapDimensions>();
+
+        var result = validator.ValidateWarps(rows, maps, open, CurrentMap);
+
+        var error = Assert.Single(result.Errors);
+        Assert.Equal(ValidationCodes.WarpDestinationNumericRange, error.Code);
+    }
+
+    [Fact]
+    public void ValidateWarps_WithDestinationAtMaximumWritableValue_Passes()
+    {
+        var validator = new GameDataValidator(GameDataSchema.LoadEmbedded());
+        var rows = new List<WarpRow> { new(100, 5, 5, 200, 32766, 32766) };
+        var maps = new Dictionary<int, MapReference> { [200] = Map(200) };
+        var open = new Dictionary<int, MapDimensions>();
+
+        var result = validator.ValidateWarps(rows, maps, open, CurrentMap);
+
+        Assert.Empty(result.Errors);
+    }
+
+    [Fact]
     public void ValidateWarps_WithOpenDestinationOutOfBounds_EmitsDestinationOutOfBounds()
     {
         var validator = new GameDataValidator(GameDataSchema.LoadEmbedded());
