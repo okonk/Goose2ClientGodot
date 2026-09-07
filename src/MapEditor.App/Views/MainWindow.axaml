@@ -198,7 +198,6 @@
               <TextBox x:Name="WarpDestinationX" Width="58" />
               <TextBox x:Name="WarpDestinationY" Width="58" />
             </StackPanel>
-            <Button x:Name="WarpUseSelectedTileButton" Content="Use Selected Tile" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" IsEnabled="False" Click="OnUseSelectedTile" />
           </StackPanel>
         </Border>
       </StackPanel>

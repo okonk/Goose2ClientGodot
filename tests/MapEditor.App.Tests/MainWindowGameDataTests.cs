@@ -6,7 +6,9 @@ using System.Threading;
 using System.Threading.Tasks;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
+using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
+using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Threading;
 using MapEditor.App.Connectivity;
@@ -358,7 +360,6 @@ public class MainWindowGameDataTests
         Assert.IsType<SearchPickerControl<MapReference>>(Control<Control>(harness, "WarpDestinationPicker"));
         Assert.NotNull(Control<TextBox>(harness, "WarpDestinationX"));
         Assert.NotNull(Control<TextBox>(harness, "WarpDestinationY"));
-        Assert.NotNull(Control<Button>(harness, "WarpUseSelectedTileButton"));
     }
 
     [AvaloniaFact]
@@ -386,28 +387,6 @@ public class MainWindowGameDataTests
         Assert.False(warp.IsChecked == true);
         Assert.Equal(GameDataTool.Spawn, harness.ViewModel.GameData.ActiveTool);
         Assert.True(Control<StackPanel>(harness, "SpawnProperties").IsVisible);
-    }
-
-    [AvaloniaFact]
-    public void UseSelectedTile_CopiesTheCanvasSelectionIntoTheWarpDestination()
-    {
-        using MainWindowHarness harness = MainWindowHarness.Create();
-        harness.ViewModel.GameData!.AttachSession(Session());
-        Dispatcher.UIThread.RunJobs();
-        Control<SearchPickerControl<MapReference>>(harness, "WarpDestinationPicker").SelectedItem = Map10;
-        Button useSelected = Control<Button>(harness, "WarpUseSelectedTileButton");
-
-        Assert.False(useSelected.IsEnabled);
-
-        harness.ViewModel.SelectedX = 3;
-        harness.ViewModel.SelectedY = 4;
-        Dispatcher.UIThread.RunJobs();
-        Assert.True(useSelected.IsEnabled);
-
-        useSelected.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
-
-        Assert.Equal("3", Control<TextBox>(harness, "WarpDestinationX").Text);
-        Assert.Equal("4", Control<TextBox>(harness, "WarpDestinationY").Text);
     }
 
     [AvaloniaFact]
