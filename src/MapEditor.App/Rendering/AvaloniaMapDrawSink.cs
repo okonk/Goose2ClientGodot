@@ -64,6 +64,39 @@ internal sealed class AvaloniaMapDrawSink : IMapDrawSink
         _target.DrawRectangle(new SolidColorBrush(fill), new Pen(new SolidColorBrush(stroke), StrokeWidth), ToRect(operation.DestinationRect));
     }
 
+    public void DrawNpcImage(in NpcImageDrawOperation operation)
+    {
+        if (operation.Image is not AvaloniaSpriteSheetImage image)
+        {
+            throw new ArgumentException("Sprite image must be an AvaloniaSpriteSheetImage.", nameof(operation));
+        }
+
+        Rect destination = new(operation.DestinationRect.X, operation.DestinationRect.Y, operation.DestinationRect.Width, operation.DestinationRect.Height);
+        _target.DrawImage(
+            image.Bitmap,
+            new Rect(operation.SourceRect.X, operation.SourceRect.Y, operation.SourceRect.Width, operation.SourceRect.Height),
+            destination);
+
+        if (operation.Tint.A > 0)
+        {
+            _target.DrawRectangle(ToBrush(new RenderColor((byte)operation.Tint.R, (byte)operation.Tint.G, (byte)operation.Tint.B, (byte)operation.Tint.A)), null, destination);
+        }
+    }
+
+    public void DrawNpcPartPlaceholder(in NpcPartPlaceholderDrawOperation operation)
+    {
+        Rect rect = ToRect(operation.DestinationRect);
+        Pen stroke = ToPen(operation.StrokeColor);
+        _target.DrawRectangle(ToBrush(operation.FillColor), stroke, rect);
+        _target.DrawLine(stroke, new Point(rect.Left, rect.Top), new Point(rect.Right, rect.Bottom));
+        _target.DrawLine(stroke, new Point(rect.Right, rect.Top), new Point(rect.Left, rect.Bottom));
+    }
+
+    public void DrawNpcSpawnAnchor(in NpcSpawnAnchorDrawOperation operation)
+    {
+        _target.DrawRectangle(ToBrush(operation.FillColor), ToPen(operation.StrokeColor), ToRect(operation.DestinationRect));
+    }
+
     private static Rect ToRect(RenderRect rect)
         => new(rect.X, rect.Y, rect.Width, rect.Height);
 

@@ -14,7 +14,8 @@ public sealed record MapRenderOptions(
     BlockPreview? BlockPreview = null,
     IReadOnlyList<GameDataMarkerInput>? SpawnMarkers = null,
     IReadOnlyList<GameDataMarkerInput>? WarpMarkers = null,
-    bool PreviewMode = false)
+    bool PreviewMode = false,
+    IReadOnlyList<NpcAppearanceGroup>? NpcPreviews = null)
 {
     public static MapRenderOptions Default { get; } = new(MapLayerVisibility.All, false, false, null, null);
 }

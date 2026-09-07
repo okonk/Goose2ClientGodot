@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using MapEditor.GameData.Rows;
 
 namespace MapEditor.Rendering;
 
@@ -61,6 +62,34 @@ public readonly record struct GridLineDrawOperation(
     RenderPoint Start,
     RenderPoint End,
     RenderColor Color);
+
+public readonly record struct NpcImageDrawOperation(
+    int OccurrenceIndex,
+    NpcPartSlot Slot,
+    SpriteReference Reference,
+    ISpriteSheetImage Image,
+    SpriteSourceRect SourceRect,
+    RenderRect DestinationRect,
+    RgbaValue Tint,
+    SpriteSampling Sampling);
+
+public readonly record struct NpcPartPlaceholderDrawOperation(
+    int OccurrenceIndex,
+    NpcPartSlot Slot,
+    SpriteResolutionStatus Reason,
+    RenderRect DestinationRect,
+    RenderColor FillColor,
+    RenderColor StrokeColor,
+    string Diagnostic);
+
+public readonly record struct NpcSpawnAnchorDrawOperation(
+    int OccurrenceIndex,
+    MapTileCoordinate Tile,
+    RenderRect DestinationRect,
+    bool Selected,
+    RenderColor FillColor,
+    RenderColor StrokeColor,
+    string? Diagnostic);
 
 public sealed class MapRenderWorkLimitException : Exception
 {
