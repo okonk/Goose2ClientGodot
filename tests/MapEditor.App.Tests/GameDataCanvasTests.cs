@@ -66,7 +66,7 @@ public class GameDataCanvasTests
     }
 
     [AvaloniaFact]
-    public async Task SpawnTool_ClickEmptyTile_WithoutSelectedNpc_DoesNothing()
+    public async Task SpawnTool_ClickEmptyTile_WithoutSelectedNpc_SurfacesErrorWithoutMutation()
     {
         Harness harness = CreateHarness();
         MapDocumentViewModel viewModel = harness.ViewModel;
@@ -79,8 +79,37 @@ public class GameDataCanvasTests
 
         Assert.Single(viewModel.GameData.Session!.Edits.Spawns);
         Assert.Null(viewModel.GameData.SelectedSpawn);
-        Assert.Empty(harness.Errors);
+        var error = Assert.Single(harness.Errors);
+        Assert.Contains("Select an NPC", error.Message);
         Assert.False(viewModel.Timeline.CanUndo);
+    }
+
+    [AvaloniaFact]
+    public void ActiveTool_Spawn_ShowsSpawnOverlayAndHidesWarpOverlay()
+    {
+        Harness harness = CreateHarness();
+        DocumentGameDataState gameData = harness.ViewModel.GameData!;
+        gameData.ShowSpawnOverlay = false;
+        gameData.ShowWarpOverlay = true;
+
+        gameData.ActiveTool = GameDataTool.Spawn;
+
+        Assert.True(gameData.ShowSpawnOverlay);
+        Assert.False(gameData.ShowWarpOverlay);
+    }
+
+    [AvaloniaFact]
+    public void ActiveTool_Warp_ShowsWarpOverlayAndHidesSpawnOverlay()
+    {
+        Harness harness = CreateHarness();
+        DocumentGameDataState gameData = harness.ViewModel.GameData!;
+        gameData.ShowSpawnOverlay = true;
+        gameData.ShowWarpOverlay = false;
+
+        gameData.ActiveTool = GameDataTool.Warp;
+
+        Assert.False(gameData.ShowSpawnOverlay);
+        Assert.True(gameData.ShowWarpOverlay);
     }
 
     [AvaloniaFact]
@@ -246,7 +275,7 @@ public class GameDataCanvasTests
     }
 
     [AvaloniaFact]
-    public async Task WarpTool_ClickEmptyTile_WithoutDestinationMap_DoesNothing()
+    public async Task WarpTool_ClickEmptyTile_WithoutDestinationMap_SurfacesErrorWithoutMutation()
     {
         Harness harness = CreateHarness();
         MapDocumentViewModel viewModel = harness.ViewModel;
@@ -261,7 +290,8 @@ public class GameDataCanvasTests
 
         Assert.Empty(viewModel.GameData.Session!.Edits.Warps);
         Assert.Null(viewModel.GameData.SelectedWarp);
-        Assert.Empty(harness.Errors);
+        var error = Assert.Single(harness.Errors);
+        Assert.Contains("destination map", error.Message);
     }
 
     [AvaloniaFact]
@@ -301,6 +331,23 @@ public class GameDataCanvasTests
 
         Assert.Single(viewModel.GameData.Session!.Edits.Warps);
         Assert.Single(harness.Errors);
+        Assert.False(viewModel.Timeline.CanUndo);
+    }
+
+    [AvaloniaFact]
+    public async Task WarpTool_ClickEmptyTile_WithoutDestinationCoordinates_SurfacesErrorWithoutMutation()
+    {
+        Harness harness = CreateHarness();
+        MapDocumentViewModel viewModel = harness.ViewModel;
+        viewModel.GameData!.AttachSession(Session());
+        viewModel.GameData.ActiveTool = GameDataTool.Warp;
+        viewModel.GameData.SelectedDestinationMapId = 20;
+
+        viewModel.AddWarpAt(1, 1);
+
+        Assert.Empty(viewModel.GameData.Session!.Edits.Warps);
+        var error = Assert.Single(harness.Errors);
+        Assert.Contains("destination coordinates", error.Message);
         Assert.False(viewModel.Timeline.CanUndo);
     }
 

@@ -71,7 +71,7 @@ public class SheetRowMapperTests
 
         var row = Row(spawns, ("npc_id", "7"), ("map_id", "1"), ("map_x", "2"), ("map_y", "3"));
 
-        Assert.Equal(new NpcSpawnRow(7, 1, 2, 3), mapper.MapSpawn(row));
+        Assert.Equal(new NpcSpawnRow(7, 1, 1, 2), mapper.MapSpawn(row));
     }
 
     [Fact]
@@ -89,7 +89,7 @@ public class SheetRowMapperTests
             ("warp_x", "10"),
             ("warp_y", "11"));
 
-        Assert.Equal(new WarpRow(1, 2, 3, 9, 10, 11), mapper.MapWarp(row));
+        Assert.Equal(new WarpRow(1, 1, 2, 9, 9, 10), mapper.MapWarp(row));
     }
 
     [Fact]
@@ -162,7 +162,7 @@ public class SheetRowMapperTests
         var spawns = schema.GetRequiredSheet("NPC Spawns");
         var spawn = mapper.MapSpawn(
             Row(spawns, ("map_y", "3"), ("npc_id", "7"), ("map_x", "2"), ("map_id", "1")));
-        Assert.Equal(new NpcSpawnRow(7, 1, 2, 3), spawn);
+        Assert.Equal(new NpcSpawnRow(7, 1, 1, 2), spawn);
 
         var warptiles = schema.GetRequiredSheet("Warptiles");
         var warp = mapper.MapWarp(
@@ -173,7 +173,7 @@ public class SheetRowMapperTests
                 ("map_y", "3"),
                 ("warp_x", "10"),
                 ("map_x", "2")));
-        Assert.Equal(new WarpRow(1, 2, 3, 9, 10, 11), warp);
+        Assert.Equal(new WarpRow(1, 1, 2, 9, 9, 10), warp);
     }
 
     [Fact]
@@ -290,7 +290,7 @@ public class SheetRowMapperTests
         withExtras[full.Length] = "junk";
         withExtras[full.Length + 1] = "more junk";
 
-        Assert.Equal(new NpcSpawnRow(7, 1, 2, 3), mapper.MapSpawn(withExtras));
+        Assert.Equal(new NpcSpawnRow(7, 1, 1, 2), mapper.MapSpawn(withExtras));
     }
 
     [Fact]
@@ -306,8 +306,8 @@ public class SheetRowMapperTests
         Assert.Equal(spawns.Columns.Count, cells.Count);
         Assert.Equal("7", cells[spawns.GetColumnIndex("npc_id")]);
         Assert.Equal("1", cells[spawns.GetColumnIndex("map_id")]);
-        Assert.Equal("2", cells[spawns.GetColumnIndex("map_x")]);
-        Assert.Equal("3", cells[spawns.GetColumnIndex("map_y")]);
+        Assert.Equal("3", cells[spawns.GetColumnIndex("map_x")]);
+        Assert.Equal("4", cells[spawns.GetColumnIndex("map_y")]);
         Assert.Equal(row, mapper.MapSpawn(cells));
     }
 
@@ -323,11 +323,11 @@ public class SheetRowMapperTests
 
         Assert.Equal(warptiles.Columns.Count, cells.Count);
         Assert.Equal("1", cells[warptiles.GetColumnIndex("map_id")]);
-        Assert.Equal("2", cells[warptiles.GetColumnIndex("map_x")]);
-        Assert.Equal("3", cells[warptiles.GetColumnIndex("map_y")]);
+        Assert.Equal("3", cells[warptiles.GetColumnIndex("map_x")]);
+        Assert.Equal("4", cells[warptiles.GetColumnIndex("map_y")]);
         Assert.Equal("9", cells[warptiles.GetColumnIndex("warp_id")]);
-        Assert.Equal("10", cells[warptiles.GetColumnIndex("warp_x")]);
-        Assert.Equal("11", cells[warptiles.GetColumnIndex("warp_y")]);
+        Assert.Equal("11", cells[warptiles.GetColumnIndex("warp_x")]);
+        Assert.Equal("12", cells[warptiles.GetColumnIndex("warp_y")]);
         Assert.Equal(row, mapper.MapWarp(cells));
     }
 
@@ -398,8 +398,8 @@ public class SheetRowMapperTests
         Assert.Equal(spawns.Columns.Count, cells.Count);
         Assert.Equal("7", cells[spawns.GetColumnIndex("npc_id")]);
         Assert.Equal("1", cells[spawns.GetColumnIndex("map_id")]);
-        Assert.Equal("2", cells[spawns.GetColumnIndex("map_x")]);
-        Assert.Equal("3", cells[spawns.GetColumnIndex("map_y")]);
+        Assert.Equal("3", cells[spawns.GetColumnIndex("map_x")]);
+        Assert.Equal("4", cells[spawns.GetColumnIndex("map_y")]);
     }
 
     [Fact]

@@ -720,6 +720,7 @@ internal sealed class MapDocumentViewModel : ViewModelBase, IDisposable
 
         if (state.SelectedNpcId is not { } npcId || !session.Npcs.ContainsKey(npcId))
         {
+            RaiseGameDataError(new ErrorPresentation("Add spawn", "Select an NPC in the properties panel before placing a spawn."));
             return;
         }
 
@@ -737,11 +738,13 @@ internal sealed class MapDocumentViewModel : ViewModelBase, IDisposable
 
         if (state.SelectedDestinationMapId is not { } mapId || !session.Maps.Any(map => map.MapId == mapId))
         {
+            RaiseGameDataError(new ErrorPresentation("Add warp", "Select a destination map in the properties panel before placing a warp."));
             return;
         }
 
         if (state.PendingDestinationX is not { } destinationX || state.PendingDestinationY is not { } destinationY)
         {
+            RaiseGameDataError(new ErrorPresentation("Add warp", "Set the destination coordinates, or use 'Use Selected Tile', before placing a warp."));
             return;
         }
 

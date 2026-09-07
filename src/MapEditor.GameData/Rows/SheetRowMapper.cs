@@ -114,22 +114,23 @@ public sealed class SheetRowMapper
 
     public NpcSpawnRow MapSpawn(IReadOnlyList<string?> cells)
     {
+        // Sheet coordinates are 1-indexed; tile coordinates are 0-indexed.
         return new NpcSpawnRow(
             ReadInt(_spawnNpcId, cells),
             ReadInt(_spawnMapId, cells),
-            ReadInt(_spawnMapX, cells),
-            ReadInt(_spawnMapY, cells));
+            ReadInt(_spawnMapX, cells) - 1,
+            ReadInt(_spawnMapY, cells) - 1);
     }
 
     public WarpRow MapWarp(IReadOnlyList<string?> cells)
     {
         return new WarpRow(
             ReadInt(_warpMapId, cells),
-            ReadInt(_warpMapX, cells),
-            ReadInt(_warpMapY, cells),
+            ReadInt(_warpMapX, cells) - 1,
+            ReadInt(_warpMapY, cells) - 1,
             ReadInt(_warpId, cells),
-            ReadInt(_warpX, cells),
-            ReadInt(_warpY, cells));
+            ReadInt(_warpX, cells) - 1,
+            ReadInt(_warpY, cells) - 1);
     }
 
     public IReadOnlyList<string?> ToCells(NpcSpawnRow row)
@@ -137,8 +138,8 @@ public sealed class SheetRowMapper
         var cells = new string?[_spawnNpcId.Sheet.Columns.Count];
         cells[_spawnNpcId.Index] = Format(row.NpcId);
         cells[_spawnMapId.Index] = Format(row.MapId);
-        cells[_spawnMapX.Index] = Format(row.MapX);
-        cells[_spawnMapY.Index] = Format(row.MapY);
+        cells[_spawnMapX.Index] = Format(row.MapX + 1);
+        cells[_spawnMapY.Index] = Format(row.MapY + 1);
         return new ReadOnlyCollection<string?>(cells);
     }
 
@@ -146,11 +147,11 @@ public sealed class SheetRowMapper
     {
         var cells = new string?[_warpMapId.Sheet.Columns.Count];
         cells[_warpMapId.Index] = Format(row.MapId);
-        cells[_warpMapX.Index] = Format(row.MapX);
-        cells[_warpMapY.Index] = Format(row.MapY);
+        cells[_warpMapX.Index] = Format(row.MapX + 1);
+        cells[_warpMapY.Index] = Format(row.MapY + 1);
         cells[_warpId.Index] = Format(row.WarpId);
-        cells[_warpX.Index] = Format(row.WarpX);
-        cells[_warpY.Index] = Format(row.WarpY);
+        cells[_warpX.Index] = Format(row.WarpX + 1);
+        cells[_warpY.Index] = Format(row.WarpY + 1);
         return new ReadOnlyCollection<string?>(cells);
     }
 

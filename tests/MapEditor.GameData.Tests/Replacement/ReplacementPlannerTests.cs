@@ -55,7 +55,7 @@ public class ReplacementPlannerTests
 
         Assert.Equal(new[] { new RowDelete(2) }, plan.Deletes);
         Assert.Single(plan.Inserts);
-        Assert.Equal(new[] { "1", "5", "99", "99" }, plan.Inserts[0].CellValues);
+        Assert.Equal(new[] { "1", "5", "100", "100" }, plan.Inserts[0].CellValues);
     }
 
     [Fact]
@@ -73,7 +73,7 @@ public class ReplacementPlannerTests
 
         Assert.Empty(plan.Deletes);
         Assert.Equal(
-            new[] { new[] { "1", "5", "10", "11" } },
+            new[] { new[] { "1", "5", "11", "12" } },
             plan.Inserts.Select(i => i.CellValues));
     }
 
@@ -128,7 +128,7 @@ public class ReplacementPlannerTests
         var plan = planner.PlanSpawnReplacement(remote, desired, 5);
 
         Assert.Empty(plan.Deletes);
-        Assert.Equal(new[] { new[] { "2", "5", "20", "21" } }, plan.Inserts.Select(i => i.CellValues));
+        Assert.Equal(new[] { new[] { "2", "5", "21", "22" } }, plan.Inserts.Select(i => i.CellValues));
     }
 
     [Fact]
@@ -170,9 +170,9 @@ public class ReplacementPlannerTests
         Assert.Equal(
             new[]
             {
-                new[] { "2", "5", "20", "21" },
-                new[] { "3", "5", "30", "31" },
-                new[] { "4", "5", "40", "41" }
+                new[] { "2", "5", "21", "22" },
+                new[] { "3", "5", "31", "32" },
+                new[] { "4", "5", "41", "42" }
             },
             plan.Inserts.Select(i => i.CellValues));
     }
@@ -206,8 +206,8 @@ public class ReplacementPlannerTests
         Assert.Equal(spawns.Columns.Count, cells.Count);
         Assert.Equal("7", cells[spawns.GetColumnIndex("npc_id")]);
         Assert.Equal("5", cells[spawns.GetColumnIndex("map_id")]);
-        Assert.Equal("2", cells[spawns.GetColumnIndex("map_x")]);
-        Assert.Equal("3", cells[spawns.GetColumnIndex("map_y")]);
+        Assert.Equal("3", cells[spawns.GetColumnIndex("map_x")]);
+        Assert.Equal("4", cells[spawns.GetColumnIndex("map_y")]);
     }
 
     [Fact]
@@ -251,7 +251,7 @@ public class ReplacementPlannerTests
 
         Assert.Equal(new[] { new RowDelete(2) }, plan.Deletes);
         Assert.Single(plan.Inserts);
-        Assert.Equal(new[] { "5", "10", "11", "1", "99", "99" }, plan.Inserts[0].CellValues);
+        Assert.Equal(new[] { "5", "11", "12", "1", "100", "100" }, plan.Inserts[0].CellValues);
     }
 
     [Fact]
@@ -269,7 +269,7 @@ public class ReplacementPlannerTests
 
         Assert.Empty(plan.Deletes);
         Assert.Equal(
-            new[] { new[] { "5", "10", "11", "1", "12", "13" } },
+            new[] { new[] { "5", "11", "12", "1", "13", "14" } },
             plan.Inserts.Select(i => i.CellValues));
     }
 
@@ -324,7 +324,7 @@ public class ReplacementPlannerTests
         var plan = planner.PlanWarpReplacement(remote, desired, 5);
 
         Assert.Empty(plan.Deletes);
-        Assert.Equal(new[] { new[] { "5", "20", "21", "2", "22", "23" } }, plan.Inserts.Select(i => i.CellValues));
+        Assert.Equal(new[] { new[] { "5", "21", "22", "2", "23", "24" } }, plan.Inserts.Select(i => i.CellValues));
     }
 
     [Fact]
@@ -365,9 +365,9 @@ public class ReplacementPlannerTests
         Assert.Equal(
             new[]
             {
-                new[] { "5", "20", "21", "2", "22", "23" },
-                new[] { "5", "30", "31", "3", "32", "33" },
-                new[] { "5", "40", "41", "4", "42", "43" }
+                new[] { "5", "21", "22", "2", "23", "24" },
+                new[] { "5", "31", "32", "3", "33", "34" },
+                new[] { "5", "41", "42", "4", "43", "44" }
             },
             plan.Inserts.Select(i => i.CellValues));
     }
@@ -400,11 +400,11 @@ public class ReplacementPlannerTests
         var warptiles = schema.GetRequiredSheet("Warptiles");
         Assert.Equal(warptiles.Columns.Count, cells.Count);
         Assert.Equal("5", cells[warptiles.GetColumnIndex("map_id")]);
-        Assert.Equal("2", cells[warptiles.GetColumnIndex("map_x")]);
-        Assert.Equal("3", cells[warptiles.GetColumnIndex("map_y")]);
+        Assert.Equal("3", cells[warptiles.GetColumnIndex("map_x")]);
+        Assert.Equal("4", cells[warptiles.GetColumnIndex("map_y")]);
         Assert.Equal("9", cells[warptiles.GetColumnIndex("warp_id")]);
-        Assert.Equal("10", cells[warptiles.GetColumnIndex("warp_x")]);
-        Assert.Equal("11", cells[warptiles.GetColumnIndex("warp_y")]);
+        Assert.Equal("11", cells[warptiles.GetColumnIndex("warp_x")]);
+        Assert.Equal("12", cells[warptiles.GetColumnIndex("warp_y")]);
     }
 
     [Fact]

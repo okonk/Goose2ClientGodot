@@ -96,13 +96,13 @@ public class GoogleSheetsGatewayTests
             new[]
             {
                 HeaderRow("NPC Spawns"),
-                Row("NPC Spawns", ("npc_id", "10"), ("map_id", "1"), ("map_x", "5"), ("map_y", "6"))
+                Row("NPC Spawns", ("npc_id", "10"), ("map_id", "1"), ("map_x", "6"), ("map_y", "7"))
             }),
         ("'Warptiles'!A1:F",
             new[]
             {
                 HeaderRow("Warptiles"),
-                Row("Warptiles", ("map_id", "1"), ("map_x", "1"), ("map_y", "1"), ("warp_id", "2"), ("warp_x", "2"), ("warp_y", "2"))
+                Row("Warptiles", ("map_id", "1"), ("map_x", "2"), ("map_y", "2"), ("warp_id", "2"), ("warp_x", "3"), ("warp_y", "3"))
             }));
 
     [Fact]
@@ -189,17 +189,17 @@ public class GoogleSheetsGatewayTests
                     new[]
                     {
                         HeaderRow("NPC Spawns"),
-                        Row("NPC Spawns", ("npc_id", "10"), ("map_id", "1"), ("map_x", "1"), ("map_y", "1")),
+                        Row("NPC Spawns", ("npc_id", "10"), ("map_id", "1"), ("map_x", "2"), ("map_y", "2")),
                         new object?[4],
-                        Row("NPC Spawns", ("npc_id", "11"), ("map_id", "1"), ("map_x", "2"), ("map_y", "2")),
-                        Row("NPC Spawns", ("npc_id", "12"), ("map_id", "2"), ("map_x", "3"), ("map_y", "3"))
+                        Row("NPC Spawns", ("npc_id", "11"), ("map_id", "1"), ("map_x", "3"), ("map_y", "3")),
+                        Row("NPC Spawns", ("npc_id", "12"), ("map_id", "2"), ("map_x", "4"), ("map_y", "4"))
                     }),
                 ("'Warptiles'!A1:F",
                     new[]
                     {
                         HeaderRow("Warptiles"),
-                        Row("Warptiles", ("map_id", "1"), ("map_x", "1"), ("map_y", "1"), ("warp_id", "2"), ("warp_x", "2"), ("warp_y", "2")),
-                        Row("Warptiles", ("map_id", "2"), ("map_x", "3"), ("map_y", "3"), ("warp_id", "1"), ("warp_x", "4"), ("warp_y", "4"))
+                        Row("Warptiles", ("map_id", "1"), ("map_x", "2"), ("map_y", "2"), ("warp_id", "2"), ("warp_x", "3"), ("warp_y", "3")),
+                        Row("Warptiles", ("map_id", "2"), ("map_x", "4"), ("map_y", "4"), ("warp_id", "1"), ("warp_x", "5"), ("warp_y", "5"))
                     }))
         };
 
