@@ -237,4 +237,28 @@ public class SearchPickerControlTests
         window.Close();
         Dispatcher.UIThread.RunJobs();
     }
+
+    [AvaloniaFact]
+    public void ManyItems_PickerDesiredHeightStaysBounded()
+    {
+        var items = Enumerable.Range(1, 50).Select(i => Make(i, $"Npc {i}", $"npc_{i}.bytes")).ToList();
+        var picker = new SearchPickerControl<Item>
+        {
+            Items = items,
+            ItemText = item => $"{item.Id}  {item.Name}  {item.Filename}"
+        };
+        var window = new Window
+        {
+            Content = new StackPanel { Children = { picker } },
+            Width = 400,
+            Height = 400
+        };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.True(picker.DesiredSize.Height < 400, $"picker desired height is {picker.DesiredSize.Height}");
+
+        window.Close();
+        Dispatcher.UIThread.RunJobs();
+    }
 }
