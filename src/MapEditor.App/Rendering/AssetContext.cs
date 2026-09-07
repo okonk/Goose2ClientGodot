@@ -6,11 +6,18 @@ namespace MapEditor.App.Rendering;
 
 internal sealed class AssetContext : IDisposable
 {
-    private AssetContext(SpriteAssetCache cache, MapRenderer renderer, IReadOnlyList<int> sheetIds)
+    private AssetContext(
+        SpriteAssetCache cache,
+        MapRenderer renderer,
+        IReadOnlyList<int> sheetIds,
+        AppearanceAssetCatalog? appearance,
+        AppearanceAvailability appearanceAvailability)
     {
         Cache = cache;
         Renderer = renderer;
         SheetIds = sheetIds;
+        Appearance = appearance;
+        AppearanceAvailability = appearanceAvailability;
     }
 
     public SpriteAssetCache Cache { get; }
@@ -19,6 +26,10 @@ internal sealed class AssetContext : IDisposable
 
     public IReadOnlyList<int> SheetIds { get; }
 
+    public AppearanceAssetCatalog? Appearance { get; }
+
+    public AppearanceAvailability AppearanceAvailability { get; }
+
     public bool IsAvailable => Cache.IsAvailable;
 
     public bool IsDisposed => Cache.IsDisposed;
@@ -26,14 +37,31 @@ internal sealed class AssetContext : IDisposable
     public static AssetContext CreateUnavailable()
     {
         SpriteAssetCache cache = SpriteAssetCache.CreateUnavailable();
-        return new(cache, new MapRenderer(cache), Array.Empty<int>());
+        return new(
+            cache,
+            new MapRenderer(cache),
+            Array.Empty<int>(),
+            null,
+            AppearanceAvailability.Unavailable("Sprite assets are unavailable; load an asset directory to resolve appearance previews."));
     }
 
     public static AssetContext Create(string assetDirectory, ISpriteSheetLoader loader)
     {
         SpriteAssetCache cache = SpriteAssetCache.Open(assetDirectory, loader);
         IReadOnlyList<int> sheetIds = TileSheetFilter.Apply(cache.Manifest!.SheetIds, TileSheetFilter.Load(assetDirectory));
-        return new(cache, new MapRenderer(cache), sheetIds);
+        AppearanceAssetCatalog? appearance = null;
+        AppearanceAvailability availability;
+        try
+        {
+            appearance = new AppearanceAssetCatalog(AppearanceManifest.Load(assetDirectory), cache);
+            availability = AppearanceAvailability.Available;
+        }
+        catch (AppearanceManifestException ex)
+        {
+            availability = AppearanceAvailability.Unavailable(ex.Message);
+        }
+
+        return new(cache, new MapRenderer(cache), sheetIds, appearance, availability);
     }
 
     public SpriteResolution Resolve(SpriteReference reference)

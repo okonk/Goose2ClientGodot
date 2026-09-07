@@ -3,11 +3,13 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using Avalonia.Headless.XUnit;
 using MapEditor.App.Dialogs;
 using MapEditor.App.Documents;
 using MapEditor.App.Rendering;
 using MapEditor.App.Settings;
 using MapEditor.App.Tests.Fakes;
+using MapEditor.App.Tests.Fixtures;
 using MapEditor.App.ViewModels;
 using MapEditor.Core;
 using MapEditor.Rendering;
@@ -21,6 +23,13 @@ public class AssetContextControllerTests : IDisposable
         { "tileSize": 32, "sheets": {
           "1": { "10": [0, 0, 32, 32], "11": [32, 0, 32, 32] },
           "2": { "20": [0, 0, 32, 32] }
+        } }
+        """;
+
+    private const string AppearanceSidecarJson = """
+        { "version": 1, "parts": {
+          "Body": { "1": { "noEquip": [1, 10], "equip": [2, 20] } },
+          "Hair": {}, "Eyes": {}, "Chest": {}, "Helm": {}, "Legs": {}, "Feet": {}, "Hand": {}
         } }
         """;
 
@@ -110,6 +119,92 @@ public class AssetContextControllerTests : IDisposable
         Assert.Empty(controller.Current.SheetIds);
         Assert.Empty(controller.Current.GetFrames(1));
         Assert.True(controller.Current.IsDisposed == false);
+    }
+
+    [Fact]
+    public void InitialContext_AppearanceIsUnavailableWithActionableDiagnostic()
+    {
+        using AssetContextController controller = CreateController();
+        AssetContext context = controller.Current;
+
+        Assert.Null(context.Appearance);
+        Assert.False(context.AppearanceAvailability.IsAvailable);
+        Assert.False(string.IsNullOrEmpty(context.AppearanceAvailability.Diagnostic));
+    }
+
+    [AvaloniaFact]
+    public void TryOpen_MissingAppearanceSidecar_OpensDirectoryAndKeepsMapResolutionAvailable()
+    {
+        using AssetContextController controller = CreateController();
+        string assetDirectory = WriteAssetDirectory("assets-no-appearance", TwoSheetJson);
+        File.WriteAllBytes(Path.Combine(assetDirectory, "sheets", "1.png"), AssetFixture.PngSheet.Create(64, 64));
+
+        bool opened = controller.TryOpen(assetDirectory);
+
+        Assert.True(opened);
+        AssetContext context = controller.Current;
+        Assert.True(context.IsAvailable);
+        Assert.Null(context.Appearance);
+        Assert.False(context.AppearanceAvailability.IsAvailable);
+        Assert.False(string.IsNullOrEmpty(context.AppearanceAvailability.Diagnostic));
+        Assert.Equal(new[] { 1, 2 }, context.SheetIds);
+        Assert.Equal(new[] { 1, 2 }, _viewModel.SheetIds);
+        Assert.Equal(2, context.GetFrames(1).Count);
+        Assert.Equal(SpriteResolutionStatus.Ready, context.Resolve(new SpriteReference(1, 10)).Status);
+        Assert.Equal(Path.GetFullPath(assetDirectory), new AppSettingsStore(_settingsPath).Load().AssetDirectory);
+    }
+
+    [Fact]
+    public void TryOpen_MalformedAppearanceSidecar_PublishesUsableContextAndUpdatesSettings()
+    {
+        using AssetContextController controller = CreateController();
+        string oldDirectory = WriteAssetDirectory("assets-old", TwoSheetJson);
+        Assert.True(controller.TryOpen(oldDirectory));
+        AssetContext oldContext = controller.Current;
+        WriteSettings(oldDirectory);
+        string badDirectory = WriteAssetDirectory("assets-bad-appearance", TwoSheetJson);
+        File.WriteAllText(Path.Combine(badDirectory, "appearance-manifest.json"), "not json");
+
+        bool opened = controller.TryOpen(badDirectory);
+
+        Assert.True(opened);
+        Assert.NotSame(oldContext, controller.Current);
+        Assert.True(oldContext.IsDisposed);
+        AssetContext context = controller.Current;
+        Assert.True(context.IsAvailable);
+        Assert.Null(context.Appearance);
+        Assert.False(context.AppearanceAvailability.IsAvailable);
+        Assert.False(string.IsNullOrEmpty(context.AppearanceAvailability.Diagnostic));
+        Assert.Equal(new[] { 1, 2 }, context.SheetIds);
+        Assert.Equal(new[] { 1, 2 }, _viewModel.SheetIds);
+        Assert.Equal(2, context.GetFrames(1).Count);
+        Assert.Equal(Path.GetFullPath(badDirectory), new AppSettingsStore(_settingsPath).Load().AssetDirectory);
+    }
+
+    [AvaloniaFact]
+    public void TryOpen_ValidAppearanceSidecar_ResolvesPartsThroughTheSharedMapCache()
+    {
+        using AssetContextController controller = CreateController();
+        string assetDirectory = WriteAssetDirectory("assets-appearance", TwoSheetJson);
+        File.WriteAllBytes(Path.Combine(assetDirectory, "sheets", "1.png"), AssetFixture.PngSheet.Create(64, 64));
+        File.WriteAllBytes(Path.Combine(assetDirectory, "sheets", "2.png"), AssetFixture.PngSheet.Create(64, 64));
+        File.WriteAllText(Path.Combine(assetDirectory, "appearance-manifest.json"), AppearanceSidecarJson);
+
+        bool opened = controller.TryOpen(assetDirectory);
+
+        Assert.True(opened);
+        AssetContext context = controller.Current;
+        Assert.True(context.AppearanceAvailability.IsAvailable);
+        Assert.Null(context.AppearanceAvailability.Diagnostic);
+        Assert.NotNull(context.Appearance);
+        Assert.Same(context.Cache, context.Appearance!.Cache);
+        Assert.True(context.Appearance.TryResolve(AppearancePartKind.Body, 1, 3, out SpriteResolution noEquip));
+        Assert.Equal(SpriteResolutionStatus.Ready, noEquip.Status);
+        Assert.Equal(new SpriteReference(1, 10), noEquip.Reference);
+        Assert.True(context.Appearance.TryResolve(AppearancePartKind.Body, 1, 0, out SpriteResolution equip));
+        Assert.Equal(new SpriteReference(2, 20), equip.Reference);
+        Assert.Same(noEquip.Image, context.Resolve(new SpriteReference(1, 10)).Image);
+        controller.Dispose();
     }
 
     [Fact]
