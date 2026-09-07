@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
@@ -106,8 +107,9 @@ internal sealed class MapCanvas : Control, ICustomHitTest
 
     internal void RenderMap(IMapDrawTarget target)
     {
+        AssetContext context = _assets.Current;
         using IDisposable clip = target.PushClip(new Rect(Bounds.Size));
-        _assets.Current.Renderer.Render(BuildRenderRequest(), new AvaloniaMapDrawSink(target));
+        context.Renderer.Render(BuildRenderRequest(), new AvaloniaMapDrawSink(target, context.TintCache));
     }
 
     public override void Render(DrawingContext context)
@@ -616,7 +618,8 @@ internal sealed class MapCanvas : Control, ICustomHitTest
             BlockPreview: blockPreview,
             SpawnMarkers: BuildSpawnMarkers(),
             WarpMarkers: BuildWarpMarkers(),
-            PreviewMode: _viewModel.GameData?.PreviewMode ?? false);
+            PreviewMode: _viewModel.GameData?.PreviewMode ?? false,
+            NpcPreviews: BuildNpcPreviews());
         return new MapRenderRequest(session.Document, _viewport, options);
     }
 
@@ -668,5 +671,38 @@ internal sealed class MapCanvas : Control, ICustomHitTest
         }
 
         return markers;
+    }
+
+    private IReadOnlyList<NpcAppearanceGroup>? BuildNpcPreviews()
+    {
+        DocumentGameDataState? state = _viewModel.GameData;
+        if (state is null || !state.PreviewMode || !state.ShowSpawnOverlay || state.Session is not { Edits: { } edits })
+        {
+            return null;
+        }
+
+        if (_assets.Current.Appearance is not { } catalog)
+        {
+            return null;
+        }
+
+        NpcAppearanceComposer composer = new(catalog);
+        IReadOnlyDictionary<int, NpcAppearance> npcs = state.Session.Npcs;
+        var spawns = edits.Spawns;
+        var groups = new NpcAppearanceGroup[spawns.Count];
+        for (int i = 0; i < spawns.Count; i++)
+        {
+            NpcSpawnRow spawn = spawns[i];
+            MapTileCoordinate tile = new(spawn.MapX, spawn.MapY);
+            if (_markerDrag is { } drag && drag.Kind == GameDataMarkerKind.Spawn && drag.Index == i)
+            {
+                tile = drag.Current;
+            }
+
+            NpcAppearance? appearance = npcs.TryGetValue(spawn.NpcId, out NpcAppearance found) ? found : null;
+            groups[i] = composer.Compose(appearance ?? default, i, tile.X, tile.Y);
+        }
+
+        return groups;
     }
 }

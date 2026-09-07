@@ -1303,6 +1303,22 @@ internal partial class MainWindow : Window
         ConnectCommand.Header = _workspace.Commands.IsConnected ? "Disconnect" : "Connect";
         PullCommand.IsEnabled = _workspace.Commands.CanPull;
         PushCommand.IsEnabled = _workspace.Commands.CanPush(Document);
+        SyncPreviewStatus();
+    }
+
+    private void SyncPreviewStatus()
+    {
+        DocumentGameDataState state = Document.GameData!;
+        if (!state.PreviewMode)
+        {
+            Document.SetPreviewStatus(null);
+            return;
+        }
+
+        AppearanceAvailability availability = _assets.Current.AppearanceAvailability;
+        Document.SetPreviewStatus(availability.IsAvailable
+            ? "Art preview active"
+            : $"Art preview unavailable: {availability.Diagnostic}");
     }
 
     private void SyncRightPanel()
@@ -1476,5 +1492,6 @@ internal partial class MainWindow : Window
     private void SyncAssetDirectory()
     {
         AssetDirectoryText.Text = _assets.Current.IsAvailable ? _assets.Current.Cache.AssetDirectory : "—";
+        SyncPreviewStatus();
     }
 }

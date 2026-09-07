@@ -54,6 +54,7 @@ internal sealed class MapDocumentViewModel : ViewModelBase, IDisposable
     private bool _canUndo;
     private bool _canRedo;
     private bool _canSave;
+    private string? _previewStatus;
 
     public MapDocumentViewModel(EditorDocumentController controller, SharedTileClipboard clipboard)
     {
@@ -291,6 +292,11 @@ internal sealed class MapDocumentViewModel : ViewModelBase, IDisposable
     public bool CanRedo => _canRedo;
 
     public bool CanSave => _canSave;
+
+    public string? PreviewStatus => _previewStatus;
+
+    internal void SetPreviewStatus(string? status)
+        => SetField(ref _previewStatus, status, nameof(PreviewStatus));
 
     public TileClipboard? Clipboard => _clipboard.Current?.Tiles;
 

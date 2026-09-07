@@ -18,6 +18,7 @@ internal sealed class AssetContext : IDisposable
         SheetIds = sheetIds;
         Appearance = appearance;
         AppearanceAvailability = appearanceAvailability;
+        TintCache = new AvaloniaTintedSpriteCache();
     }
 
     public SpriteAssetCache Cache { get; }
@@ -29,6 +30,8 @@ internal sealed class AssetContext : IDisposable
     public AppearanceAssetCatalog? Appearance { get; }
 
     public AppearanceAvailability AppearanceAvailability { get; }
+
+    public AvaloniaTintedSpriteCache TintCache { get; }
 
     public bool IsAvailable => Cache.IsAvailable;
 
@@ -71,5 +74,8 @@ internal sealed class AssetContext : IDisposable
         => Cache.Manifest?.GetFrames(sheet) ?? Array.Empty<SpriteFrame>();
 
     public void Dispose()
-        => Cache.Dispose();
+    {
+        Cache.Dispose();
+        TintCache.Dispose();
+    }
 }

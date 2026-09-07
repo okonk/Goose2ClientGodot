@@ -69,7 +69,7 @@
         <TextBlock x:Name="HoverText" Classes="mono muted" Text="—" />
         <TextBlock x:Name="ZoomText" Classes="mono muted" Text="100%" />
         <TextBlock x:Name="SizeText" Classes="mono muted" Text="100 × 100" />
-        <TextBlock x:Name="PreviewStatusText" Classes="muted" Text="Art preview unavailable" IsVisible="{Binding GameData.PreviewMode}" />
+        <TextBlock x:Name="PreviewStatusText" Classes="muted" Text="{Binding PreviewStatus}" IsVisible="{Binding GameData.PreviewMode}" />
       </StackPanel>
     </Border>
     <Grid x:Name="Body">

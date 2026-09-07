@@ -1,6 +1,7 @@
 using System;
 using Avalonia;
 using Avalonia.Media;
+using Avalonia.Media.Imaging;
 using MapEditor.Rendering;
 
 namespace MapEditor.App.Rendering;
@@ -16,9 +17,13 @@ internal sealed class AvaloniaMapDrawSink : IMapDrawSink
     internal static readonly Color SelectedMarkerStroke = Colors.White;
 
     private readonly IMapDrawTarget _target;
+    private readonly AvaloniaTintedSpriteCache _tintCache;
 
-    public AvaloniaMapDrawSink(IMapDrawTarget target)
-        => _target = target ?? throw new ArgumentNullException(nameof(target));
+    public AvaloniaMapDrawSink(IMapDrawTarget target, AvaloniaTintedSpriteCache tintCache)
+    {
+        _target = target ?? throw new ArgumentNullException(nameof(target));
+        _tintCache = tintCache ?? throw new ArgumentNullException(nameof(tintCache));
+    }
 
     public void DrawSprite(in SpriteDrawOperation operation)
     {
@@ -71,16 +76,19 @@ internal sealed class AvaloniaMapDrawSink : IMapDrawSink
             throw new ArgumentException("Sprite image must be an AvaloniaSpriteSheetImage.", nameof(operation));
         }
 
-        Rect destination = new(operation.DestinationRect.X, operation.DestinationRect.Y, operation.DestinationRect.Width, operation.DestinationRect.Height);
-        _target.DrawImage(
-            image.Bitmap,
-            new Rect(operation.SourceRect.X, operation.SourceRect.Y, operation.SourceRect.Width, operation.SourceRect.Height),
-            destination);
-
+        Bitmap bitmap = image.Bitmap;
+        SpriteSourceRect sourceRect = operation.SourceRect;
         if (operation.Tint.A > 0)
         {
-            _target.DrawRectangle(ToBrush(new RenderColor((byte)operation.Tint.R, (byte)operation.Tint.G, (byte)operation.Tint.B, (byte)operation.Tint.A)), null, destination);
+            _tintCache.TryGet(image, operation.SourceRect, operation.Tint, out AvaloniaTintedSpriteCache.TintedFrame frame);
+            bitmap = frame.Bitmap;
+            sourceRect = frame.SourceRect;
         }
+
+        _target.DrawImage(
+            bitmap,
+            new Rect(sourceRect.X, sourceRect.Y, sourceRect.Width, sourceRect.Height),
+            new Rect(operation.DestinationRect.X, operation.DestinationRect.Y, operation.DestinationRect.Width, operation.DestinationRect.Height));
     }
 
     public void DrawNpcPartPlaceholder(in NpcPartPlaceholderDrawOperation operation)

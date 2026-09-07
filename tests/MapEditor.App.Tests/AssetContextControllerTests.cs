@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Avalonia.Headless.XUnit;
+using Avalonia.Media.Imaging;
 using MapEditor.App.Dialogs;
 using MapEditor.App.Documents;
 using MapEditor.App.Rendering;
@@ -11,6 +12,7 @@ using MapEditor.App.Settings;
 using MapEditor.App.Tests.Fakes;
 using MapEditor.App.Tests.Fixtures;
 using MapEditor.App.ViewModels;
+using MapEditor.GameData.Rows;
 using MapEditor.Core;
 using MapEditor.Rendering;
 using Xunit;
@@ -329,6 +331,25 @@ public class AssetContextControllerTests : IDisposable
         Assert.True(first.IsDisposed);
         Assert.False(second.IsDisposed);
         Assert.Equal(Path.GetFullPath(secondDirectory), new AppSettingsStore(_settingsPath).Load().AssetDirectory);
+    }
+
+    [AvaloniaFact]
+    public void TryOpen_SecondSuccess_DisposesReplacedTintCacheFrames()
+    {
+        using AssetContextController controller = CreateController();
+        string firstDirectory = WriteAssetDirectory("assets-tint-first", TwoSheetJson);
+        File.WriteAllBytes(Path.Combine(firstDirectory, "sheets", "1.png"), AssetFixture.PngSheet.Create(64, 64));
+        Assert.True(controller.TryOpen(firstDirectory));
+        AssetContext first = controller.Current;
+        AvaloniaSpriteSheetImage image = (AvaloniaSpriteSheetImage)first.Resolve(new SpriteReference(1, 10)).Image!;
+        first.TintCache.TryGet(image, new SpriteSourceRect(0, 0, 32, 32), new RgbaValue(200, 100, 50, 128), out AvaloniaTintedSpriteCache.TintedFrame frame);
+        string secondDirectory = WriteAssetDirectory("assets-tint-second", TwoSheetJson);
+
+        bool opened = controller.TryOpen(secondDirectory);
+
+        Assert.True(opened);
+        Assert.True(first.IsDisposed);
+        Assert.ThrowsAny<Exception>(() => frame.Bitmap.PixelSize);
     }
 
     [Fact]

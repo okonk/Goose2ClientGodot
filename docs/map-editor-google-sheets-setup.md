@@ -151,3 +151,59 @@ leaving the team or when a machine is compromised.
   (a throwaway project + sheet shared with a throwaway test account). Never point
   experiments at production game data, and revoke/delete the disposable project
   afterwards.
+
+## 11. NPC preview — manual smoke path
+
+Preview rendering is a read-only overlay: it never mutates rows, history, dirty state,
+selection, or sync command enablement, and it degrades to the normal spawn marker when
+appearance assets are unavailable. Verify each step below in a headed editor; after every
+failure case, confirm the map is still fully editable and that **Save**, **Pull**, **Push**,
+undo/redo, and the dirty indicator behave exactly as before the failure.
+
+1. **Converter generation.** From `tools/AssetConverter/src/AssetConverter` run
+   `dotnet run -- all` (or `dotnet run -- animations` to regenerate only the appearance
+   sidecar). It writes `Assets/Sprites/appearance-manifest.json` next to `manifest.json`
+   and the sheet PNGs.
+2. **Asset-directory open.** Launch the editor and open the `Assets/Sprites` directory.
+   Map tiles, palette, and previews all come from this one directory; a single shared
+   appearance catalog is used by every open tab.
+3. **Normal/preview toggle.** With the spawn tool, place two spawns on the same NPC.
+   Toggle *Preview* in the menu. Normal mode draws the compact marker on each spawn tile;
+   preview mode draws the composed NPC art at the same (marker) tile and the status bar
+   reads `Art preview active`. Toggling back and forth must not change the rows, history,
+   dirty state, or any sync command.
+4. **Male/female underwear.** Spawn an NPC with body 1 (male) and one with body 11
+   (female). The male shows legs part 3; the female shows legs part 4 and chest part 8.
+5. **Monster.** Spawn an NPC with body 100; the monster body frame renders in its place.
+6. **Tinted equipment.** Spawn an NPC with a non-zero body tint and an equipped item with
+   its own tint. The tint blends into the part pixels (it is a color tint, not opacity):
+   transparent pixels stay transparent and the source alpha is preserved.
+7. **Overlap selection.** Place two spawns on the same tile (or on overlapping art) and
+   switch to preview mode. Clicking selects the spawn occurrence by its anchor/marker
+   tile identity, not by sprite pixels, so the preview art does not interfere with
+   selection. When multiple spawns share a tile, clicking always selects the first
+   occurrence at that tile; drag the first marker to a free tile and the second
+   occurrence's anchor becomes clickable in its place.
+8. **Layer-2 crossing / Y order.** Put a layer-2 object and an NPC on crossing tiles. The
+   entity stage Y-sorts by bottom-center anchor, so the lower NPC draws over the object
+   and the higher one behind it; moving the NPC's marker across the object's row flips
+   the order.
+9. **Missing sidecar.** Delete `appearance-manifest.json` and reopen the directory.
+   Preview mode falls back to the normal markers (no anchors, no art), the preference
+   stays checked, and the status bar shows `Art preview unavailable: …` nonmodally.
+   Map tiles and all editing keep working; nothing is marked dirty by the fallback.
+10. **Malformed sidecar.** Write garbage (or a wrong `version`) into
+    `appearance-manifest.json` and reopen. Same fallback as the missing sidecar, with the
+    parse diagnostic in the status text; the map manifest and sheet PNGs remain fully
+    usable.
+11. **Missing part.** Point an NPC at a part id absent from the sidecar (e.g. an unknown
+    hair id). The remaining parts still render, the missing slot shows a placeholder box,
+    and the spawn anchor is present and clickable.
+12. **Missing PNG.** Delete the sheet PNG a part references and reopen. That part shows a
+    placeholder; the other parts and the anchor render and select normally.
+13. **Save while previews fail.** With the sidecar missing or malformed, save the map.
+    The save succeeds, the dirty indicator clears, and the preview fallback state is
+    unchanged.
+14. **Restoration.** Reopen the directory with a valid sidecar and PNGs. Preview mode
+    immediately renders the composed art again (the preference was never cleared), and
+    the status returns to `Art preview active`.

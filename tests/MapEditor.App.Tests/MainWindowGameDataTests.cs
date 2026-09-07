@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -214,7 +215,9 @@ public class MainWindowGameDataTests
 
         preview.IsChecked = true;
         Assert.True(first.GameData!.PreviewMode);
+        Assert.True(preview.IsChecked == true);
         Assert.True(status.IsVisible);
+        Assert.StartsWith("Art preview unavailable:", status.Text);
         Assert.True(spawnOverlay.IsChecked == true);
         Assert.True(spawnOverlay.IsEnabled);
 
@@ -229,6 +232,93 @@ public class MainWindowGameDataTests
         Dispatcher.UIThread.RunJobs();
         Assert.True(preview.IsChecked == true);
         Assert.True(status.IsVisible);
+        Assert.StartsWith("Art preview unavailable:", status.Text);
+    }
+
+    [AvaloniaFact]
+    public void PreviewToggle_WithAvailableAppearanceAssets_ShowsActiveStatus()
+    {
+        using MainWindowHarness harness = MainWindowHarness.Create();
+        string assetDirectory = WriteAppearanceAssetDirectory(harness);
+        Assert.True(harness.Assets.TryOpen(assetDirectory));
+        harness.ViewModel.GameData!.AttachSession(Session());
+        Dispatcher.UIThread.RunJobs();
+        MenuItem preview = Item(harness, "PreviewMenuItem");
+        TextBlock status = Control<TextBlock>(harness, "PreviewStatusText");
+
+        preview.IsChecked = true;
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.True(harness.ViewModel.GameData.PreviewMode);
+        Assert.True(status.IsVisible);
+        Assert.Equal("Art preview active", status.Text);
+
+        preview.IsChecked = false;
+        Dispatcher.UIThread.RunJobs();
+        Assert.False(status.IsVisible);
+    }
+
+    [AvaloniaFact]
+    public void PreviewToggle_DoesNotMutateRowsHistoryDirtySelectionOrSyncCommands()
+    {
+        var gateway = new ScriptedGateway().EnqueueMaps(Maps).EnqueueMaps(Maps).EnqueueGameData(SessionData());
+        var connectivity = new ScriptedConnectivity
+        {
+            IsConnected = true,
+            Coordinator = new GameDataSyncCoordinator(gateway, (_, _) => Task.CompletedTask)
+        };
+        using MainWindowHarness harness = MainWindowHarness.Create(connectivity);
+        harness.Dialogs.SpreadsheetUrlResult = SheetUrl;
+        harness.Dialogs.MapConfirmationResult = Map10;
+        Item(harness, "PullCommand").RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+        Dispatcher.UIThread.RunJobs();
+
+        MapDocumentViewModel document = harness.ViewModel;
+        document.GameData!.SelectedNpcId = 2;
+        document.AddSpawnAt(3, 2);
+        NpcSpawnRow[] rows = document.GameData.Session!.Edits.Spawns.ToArray();
+        bool canUndo = document.CanUndo;
+        bool canRedo = document.CanRedo;
+        bool dirty = document.IsDirty;
+        bool canSave = document.CanSave;
+        bool canPull = Item(harness, "PullCommand").IsEnabled;
+        bool canPush = Item(harness, "PushCommand").IsEnabled;
+        int? selectedSpawn = document.GameData.SelectedSpawn;
+        TileClipboard? clipboard = document.Clipboard;
+
+        MenuItem preview = Item(harness, "PreviewMenuItem");
+        preview.IsChecked = true;
+        Dispatcher.UIThread.RunJobs();
+        preview.IsChecked = false;
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Equal(rows, document.GameData.Session.Edits.Spawns.ToArray());
+        Assert.Equal(canUndo, document.CanUndo);
+        Assert.Equal(canRedo, document.CanRedo);
+        Assert.Equal(dirty, document.IsDirty);
+        Assert.Equal(canSave, document.CanSave);
+        Assert.Equal(canPull, Item(harness, "PullCommand").IsEnabled);
+        Assert.Equal(canPush, Item(harness, "PushCommand").IsEnabled);
+        Assert.Equal(selectedSpawn, document.GameData.SelectedSpawn);
+        Assert.Same(clipboard, document.Clipboard);
+        Assert.False(document.GameData.PreviewMode);
+    }
+
+    private static string WriteAppearanceAssetDirectory(MainWindowHarness harness)
+    {
+        string directory = Path.Combine(harness.TempDirectory, "appearance-assets");
+        Directory.CreateDirectory(Path.Combine(directory, "sheets"));
+        File.WriteAllText(Path.Combine(directory, "manifest.json"), """
+            { "tileSize": 32, "sheets": { "1": { "10": [0, 0, 32, 32] } } }
+            """);
+        File.WriteAllText(Path.Combine(directory, "appearance-manifest.json"), """
+            { "version": 1, "parts": {
+              "Body": { "1": { "noEquip": [1, 10] } },
+              "Hair": {}, "Eyes": {}, "Chest": {}, "Helm": {}, "Legs": {}, "Feet": {}, "Hand": {}
+            } }
+            """);
+        File.WriteAllBytes(Path.Combine(directory, "sheets", "1.png"), MapEditor.App.Tests.Fixtures.AssetFixture.PngSheet.Create(32, 32));
+        return directory;
     }
 
     [AvaloniaFact]
