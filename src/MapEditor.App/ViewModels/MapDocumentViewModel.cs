@@ -111,9 +111,8 @@ internal sealed class MapDocumentViewModel : ViewModelBase, IDisposable
 
     internal void AttachSheetSession(SheetEditSession session)
     {
-        _timeline.Detach();
         _sheetSession = session ?? throw new ArgumentNullException(nameof(session));
-        _timeline = new DocumentEditTimeline(_session, _sheetSession);
+        _timeline = _timeline.CreateForNewSheetSession(_sheetSession);
     }
 
     internal EditorDocument Document => _controller.Document;

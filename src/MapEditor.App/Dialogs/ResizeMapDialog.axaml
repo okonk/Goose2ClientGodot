@@ -37,6 +37,7 @@
         <TextBlock Name="SizeText" Classes="mono"/>
         <TextBlock Name="DiscardText" Foreground="{DynamicResource EditorDangerBrush}" IsVisible="False"/>
         <TextBlock Name="SheetText" Foreground="{DynamicResource EditorDangerBrush}" IsVisible="False"/>
+        <TextBlock Name="InboundOtherText" Foreground="{DynamicResource EditorDangerBrush}" IsVisible="False"/>
         <TextBlock Name="InboundText" Foreground="{DynamicResource EditorDangerBrush}" IsVisible="False"/>
         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
             <Button Name="ResizeButton" Classes="accent" Content="Resize" MinWidth="84" IsDefault="True"/>

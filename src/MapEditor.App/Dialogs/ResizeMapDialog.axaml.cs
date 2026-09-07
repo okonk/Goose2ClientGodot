@@ -125,7 +125,11 @@ public partial class ResizeMapDialog : Window
             DiscardText.IsVisible = plan.CroppedTiles > 0;
             SheetText.Text = $"⚠ Crops {plan.CroppedSpawns} spawn and {plan.CroppedWarps} warp rows";
             SheetText.IsVisible = plan.HasPulledData && (plan.CroppedSpawns > 0 || plan.CroppedWarps > 0);
-            InboundText.Text = $"⚠ {plan.InboundWarps} inbound warp destination(s) leave the map";
+            // The document holds only rows sourced from this map, so external inbound warps
+            // cannot be counted; the warning is shown for every pulled resize.
+            InboundOtherText.Text = "⚠ Inbound warps from other maps are not updated by this resize";
+            InboundOtherText.IsVisible = plan.HasPulledData;
+            InboundText.Text = $"⚠ {plan.InboundWarps} self-warp destination(s) leave the map";
             InboundText.IsVisible = plan.HasPulledData && plan.InboundWarps > 0;
             ResizeButton.IsEnabled = true;
         }

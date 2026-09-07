@@ -296,8 +296,34 @@ public class GameDataResizeTests : IDisposable
         Assert.Contains("60", dialog.DiscardText.Text);
         Assert.True(dialog.SheetText.IsVisible);
         Assert.Contains("1 spawn", dialog.SheetText.Text);
+        Assert.True(dialog.InboundOtherText.IsVisible);
+        Assert.Equal("⚠ Inbound warps from other maps are not updated by this resize", dialog.InboundOtherText.Text);
         Assert.True(dialog.InboundText.IsVisible);
-        Assert.Contains("1 inbound", dialog.InboundText.Text);
+        Assert.Contains("1 self-warp", dialog.InboundText.Text);
+    }
+
+    [AvaloniaFact]
+    public void ResizeDialog_PulledState_WithNoSelfWarpLeaving_StillWarnsAboutInboundWarps()
+    {
+        var viewModel = CreateViewModel(10, 8, Session(
+            Array.Empty<NpcSpawnRow>(),
+            new[]
+            {
+                new WarpRow(10, 2, 2, 20, 9, 7),
+                new WarpRow(10, 3, 3, 30, 9, 7)
+            }));
+        FillDocument(viewModel, 10, 8);
+
+        var dialog = new ResizeMapDialog(viewModel.Session.Document, viewModel.PlanResize);
+        dialog.EastBox.Text = "-2";
+        dialog.EastBox.RaiseEvent(new TextChangedEventArgs(TextBox.TextChangedEvent));
+        dialog.SouthBox.Text = "-2";
+        dialog.SouthBox.RaiseEvent(new TextChangedEventArgs(TextBox.TextChangedEvent));
+
+        Assert.Equal(new MapTileRectangle(0, 0, 8, 6), dialog.TryBuildWindow());
+        Assert.True(dialog.InboundOtherText.IsVisible);
+        Assert.Equal("⚠ Inbound warps from other maps are not updated by this resize", dialog.InboundOtherText.Text);
+        Assert.False(dialog.InboundText.IsVisible);
     }
 
     [AvaloniaFact]

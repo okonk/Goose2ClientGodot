@@ -167,8 +167,10 @@ public class ResizeMapDialogTests
         Assert.True(dialog.SheetText.IsVisible);
         Assert.Contains("3", dialog.SheetText.Text);
         Assert.Contains("1", dialog.SheetText.Text);
+        Assert.True(dialog.InboundOtherText.IsVisible);
+        Assert.Equal("⚠ Inbound warps from other maps are not updated by this resize", dialog.InboundOtherText.Text);
         Assert.True(dialog.InboundText.IsVisible);
-        Assert.Contains("2", dialog.InboundText.Text);
+        Assert.Contains("2 self-warp", dialog.InboundText.Text);
     }
 
     [AvaloniaFact]
@@ -178,6 +180,7 @@ public class ResizeMapDialogTests
         CropBothAxes(dialog);
 
         Assert.False(dialog.SheetText.IsVisible);
+        Assert.False(dialog.InboundOtherText.IsVisible);
         Assert.False(dialog.InboundText.IsVisible);
     }
 

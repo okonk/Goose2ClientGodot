@@ -23,6 +23,50 @@ internal sealed class DocumentEditTimeline
         _sheet.HistoryChanged += OnSheetHistoryChanged;
     }
 
+    private DocumentEditTimeline(MapEditSession map, SheetEditSession sheet, long mapInBandVersion, IReadOnlyList<TimelineEntry> undo, IReadOnlyList<TimelineEntry> redo)
+    {
+        _map = map ?? throw new ArgumentNullException(nameof(map));
+        _sheet = sheet ?? throw new ArgumentNullException(nameof(sheet));
+        _mapState.CurrentVersion = map.HistoryVersion;
+        _mapState.InBandVersion = mapInBandVersion;
+        _sheetState.CurrentVersion = sheet.HistoryVersion;
+        _undo.AddRange(undo);
+        _redo.AddRange(redo);
+        _map.HistoryChanged += OnMapHistoryChanged;
+        _sheet.HistoryChanged += OnSheetHistoryChanged;
+    }
+
+    public DocumentEditTimeline CreateForNewSheetSession(SheetEditSession newSheet)
+    {
+        if (newSheet is null)
+        {
+            throw new ArgumentNullException(nameof(newSheet));
+        }
+
+        Detach();
+        // Map-only entries reference only the map session's history, which survives the swap;
+        // sheet and compound entries reference the old sheet session's history versions.
+        var carriedUndo = new List<TimelineEntry>();
+        foreach (TimelineEntry entry in _undo)
+        {
+            if (entry.IsMap && !entry.IsSheet)
+            {
+                carriedUndo.Add(entry);
+            }
+        }
+
+        var carriedRedo = new List<TimelineEntry>();
+        foreach (TimelineEntry entry in _redo)
+        {
+            if (entry.IsMap && !entry.IsSheet)
+            {
+                carriedRedo.Add(entry);
+            }
+        }
+
+        return new DocumentEditTimeline(_map, newSheet, _mapState.InBandVersion, carriedUndo, carriedRedo);
+    }
+
     public bool CanUndo => _undo.Count > 0;
 
     public bool CanRedo => _redo.Count > 0;

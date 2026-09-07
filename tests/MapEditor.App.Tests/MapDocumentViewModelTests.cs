@@ -808,7 +808,7 @@ public class MapDocumentViewModelTests : IDisposable
     }
 
     [Fact]
-    public void AttachSheetSession_ReplacesTimelineSubscriptionTargetAndDiscardsStaleEntries()
+    public void AttachSheetSession_ReplacesTimelineSubscriptionTargetAndCarriesMapEntries()
     {
         var stale = new SheetEditSession(Array.Empty<NpcSpawnRow>(), Array.Empty<WarpRow>());
         _viewModel.AttachSheetSession(stale);
@@ -822,24 +822,112 @@ public class MapDocumentViewModelTests : IDisposable
         _viewModel.AttachSheetSession(fresh);
 
         Assert.Same(fresh, _viewModel.SheetSession);
-        Assert.False(_viewModel.Timeline.CanUndo);
-        Assert.False(_viewModel.Timeline.CanRedo);
         Assert.Empty(fresh.Spawns);
+        Assert.Single(stale.Spawns);
 
+        // The pre-swap map edit survives the swap; the pre-swap sheet edit does not.
+        Assert.True(_viewModel.Timeline.CanUndo);
+        Assert.False(_viewModel.Timeline.CanRedo);
+        Assert.True(_viewModel.Timeline.Undo());
+        Assert.Equal(new MapTileLayer(0, 0), session.Document[0, 0].GetLayer(0));
+        Assert.Single(stale.Spawns);
+
+        Assert.True(_viewModel.Timeline.Redo());
+        Assert.Equal(new MapTileLayer(1, 2), session.Document[0, 0].GetLayer(0));
+
+        // The old session is fully detached: its edits are no longer recorded.
         stale.AddSpawn(new NpcSpawnRow(2, 10, 7, 8));
-        Assert.False(_viewModel.Timeline.CanUndo);
-
-        fresh.AddSpawn(new NpcSpawnRow(3, 20, 9, 10));
         Assert.True(_viewModel.Timeline.CanUndo);
         Assert.True(_viewModel.Timeline.Undo());
-        Assert.Empty(fresh.Spawns);
+        Assert.Equal(new MapTileLayer(0, 0), session.Document[0, 0].GetLayer(0));
         Assert.Equal(2, stale.Spawns.Count);
+        Assert.False(_viewModel.Timeline.CanUndo);
+        Assert.True(_viewModel.Timeline.Redo());
+        Assert.Equal(new MapTileLayer(1, 2), session.Document[0, 0].GetLayer(0));
 
+        // Both domains record and undo through the new timeline.
+        fresh.AddSpawn(new NpcSpawnRow(3, 20, 9, 10));
         session.SelectedTileLayer = new MapTileLayer(4, 5);
         session.BeginStroke(MapEditTool.Pencil, 1, 1);
         Assert.True(session.CompleteStroke());
-        Assert.True(_viewModel.Timeline.CanUndo);
         Assert.True(_viewModel.Timeline.Undo());
         Assert.Equal(new MapTileLayer(0, 0), session.Document[1, 1].GetLayer(0));
+        Assert.True(_viewModel.Timeline.Undo());
+        Assert.Empty(fresh.Spawns);
+        Assert.Equal(2, stale.Spawns.Count);
+    }
+
+    [Fact]
+    public void AttachSheetSession_MapHistorySurvivesPullAndInterleavesWithNewSheetEdits()
+    {
+        MapDocumentViewModel doc = Create4x4ViewModel();
+        MapEditSession session = doc.Session;
+        session.SelectedTileLayer = new MapTileLayer(1, 2);
+        session.BeginStroke(MapEditTool.Pencil, 0, 0);
+        Assert.True(session.CompleteStroke());
+
+        var pulled = new SheetEditSession(Array.Empty<NpcSpawnRow>(), Array.Empty<WarpRow>());
+        doc.AttachSheetSession(pulled);
+
+        Assert.True(doc.Undo());
+        Assert.Equal(new MapTileLayer(0, 0), session.Document[0, 0].GetLayer(0));
+
+        pulled.AddSpawn(new NpcSpawnRow(1, 10, 1, 1));
+        session.SelectedTileLayer = new MapTileLayer(3, 4);
+        session.BeginStroke(MapEditTool.Pencil, 2, 2);
+        Assert.True(session.CompleteStroke());
+
+        Assert.True(doc.Undo());
+        Assert.Equal(new MapTileLayer(0, 0), session.Document[2, 2].GetLayer(0));
+        Assert.Single(pulled.Spawns);
+        Assert.True(doc.Undo());
+        Assert.Empty(pulled.Spawns);
+        Assert.Equal(new MapTileLayer(0, 0), session.Document[0, 0].GetLayer(0));
+
+        Assert.True(doc.Redo());
+        Assert.Single(pulled.Spawns);
+        Assert.Equal(new MapTileLayer(0, 0), session.Document[2, 2].GetLayer(0));
+        Assert.True(doc.Redo());
+        Assert.Equal(new MapTileLayer(3, 4), session.Document[2, 2].GetLayer(0));
+    }
+
+    [Fact]
+    public void AttachSheetSession_DiscardsCompoundEntriesButKeepsEarlierMapEntries()
+    {
+        MapDocumentViewModel doc = Create4x4ViewModel();
+        var oldSheet = new SheetEditSession(Array.Empty<NpcSpawnRow>(), Array.Empty<WarpRow>());
+        doc.AttachSheetSession(oldSheet);
+        MapEditSession session = doc.Session;
+        session.SelectedTileLayer = new MapTileLayer(1, 2);
+        session.BeginStroke(MapEditTool.Pencil, 0, 0);
+        Assert.True(session.CompleteStroke());
+
+        var window = new MapTileRectangle(0, 0, 3, 3);
+        Assert.True(doc.Timeline.ApplyCompound(
+            map => map.ApplyResize(window),
+            sheet => sheet.ReplaceAll(Array.Empty<NpcSpawnRow>(), new[] { new WarpRow(10, 0, 0, 10, 1, 1) })));
+        Assert.Equal(3, session.Document.Width);
+        Assert.Single(oldSheet.Warps);
+
+        var fresh = new SheetEditSession(Array.Empty<NpcSpawnRow>(), Array.Empty<WarpRow>());
+        doc.AttachSheetSession(fresh);
+
+        // The compound entry is discarded with the old sheet session; only the earlier map edit remains.
+        Assert.Empty(fresh.Warps);
+        Assert.Single(oldSheet.Warps);
+        Assert.True(doc.Timeline.CanUndo);
+        Assert.False(doc.Timeline.CanRedo);
+
+        Assert.True(doc.Undo());
+        Assert.Equal(4, session.Document.Width);
+        Assert.Equal(4, session.Document.Height);
+        Assert.Equal(new MapTileLayer(1, 2), session.Document[0, 0].GetLayer(0));
+        Assert.Single(oldSheet.Warps);
+        Assert.False(doc.Timeline.CanUndo);
+
+        Assert.True(doc.Redo());
+        Assert.Equal(3, session.Document.Width);
+        Assert.Equal(3, session.Document.Height);
+        Assert.Equal(new MapTileLayer(1, 2), session.Document[0, 0].GetLayer(0));
     }
 }
