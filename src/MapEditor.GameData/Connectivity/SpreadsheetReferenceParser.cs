@@ -33,8 +33,15 @@ public static class SpreadsheetReferenceParser
             return false;
         }
 
-        // Structural validation must run on the escaped path; Uri.AbsolutePath decodes percent-encoding.
-        var parts = uri.GetComponents(UriComponents.Path, UriFormat.SafeUnescaped).Split('/');
+        // Structural validation must run on the raw path; Uri decodes unreserved percent-escapes
+        // (e.g. %41 -> A) in AbsolutePath and in both GetComponents formats.
+        var rawPath = RawPath(trimmed);
+        if (rawPath is null)
+        {
+            return false;
+        }
+
+        var parts = rawPath.Split('/');
         if (parts.Length is not (3 or 4 or 5))
         {
             return false;
@@ -76,6 +83,20 @@ public static class SpreadsheetReferenceParser
         }
 
         throw new FormatException($"'{value}' is not a valid Google spreadsheet URL.");
+    }
+
+    private static string? RawPath(string url)
+    {
+        var terminator = url.IndexOfAny(new[] { '?', '#' });
+        var rawUrl = terminator < 0 ? url : url[..terminator];
+        var schemeEnd = rawUrl.IndexOf("://", StringComparison.Ordinal);
+        if (schemeEnd < 0)
+        {
+            return null;
+        }
+
+        var pathStart = rawUrl.IndexOf('/', schemeEnd + 3);
+        return pathStart < 0 ? null : rawUrl[(pathStart + 1)..];
     }
 
     private static bool IsValidId(string id)

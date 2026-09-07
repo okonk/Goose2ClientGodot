@@ -73,6 +73,13 @@ public sealed class GameDataSyncCoordinator
             _delay,
             cancellationToken).ConfigureAwait(false);
 
+        if (!pulled.Maps.Any(map => map.MapId == mapId))
+        {
+            return new ValidationRejectedResult(SingleIssue(
+                MapNotFoundCode,
+                $"Map '{mapId}' was not found in spreadsheet '{spreadsheetId}'."));
+        }
+
         return new PullSucceededResult(new GameDataSyncSession(spreadsheetId, mapId, pulled));
     }
 
@@ -158,14 +165,15 @@ public sealed class GameDataSyncCoordinator
             };
         }
 
-        if (!session.Edits.IsDirty)
+        var spawnPlan = _planner.PlanSpawnReplacement(latest.Spawns, session.Edits.Spawns, session.MapId);
+        var warpPlan = _planner.PlanWarpReplacement(latest.Warps, session.Edits.Warps, session.MapId);
+
+        if (spawnPlan.Deletes.Count == 0 && spawnPlan.Inserts.Count == 0 &&
+            warpPlan.Deletes.Count == 0 && warpPlan.Inserts.Count == 0)
         {
             session.MarkPushed();
             return new PushedResult();
         }
-
-        var spawnPlan = _planner.PlanSpawnReplacement(latest.Spawns, session.Edits.Spawns, session.MapId);
-        var warpPlan = _planner.PlanWarpReplacement(latest.Warps, session.Edits.Warps, session.MapId);
 
         async Task<SyncResult> DispatchAsync()
         {
@@ -205,7 +213,14 @@ public sealed class GameDataSyncCoordinator
             }
             catch (GameDataGatewayException)
             {
-                await _delay(RetryPolicy.Delays[attempt - 1], cancellationToken).ConfigureAwait(false);
+                try
+                {
+                    await _delay(RetryPolicy.Delays[attempt - 1], cancellationToken).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    return new CancelledResult();
+                }
             }
         }
 

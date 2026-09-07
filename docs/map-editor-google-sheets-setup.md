@@ -26,8 +26,9 @@ scope).
     add as **test users** (*Audience → Test users*) can complete sign-in. Add every
     person who will sign in while you iterate.
   - **Production** — any Google account can sign in; the unverified-app warning
-    still shows until Google verifies the app (verification is only required for
-    sensitive scopes, which the Sheets scope is not, but the warning remains).
+    still shows until Google verifies the app. The Sheets read/write scope is a
+    sensitive scope under Google's OAuth classifications, so an External app in
+    Production using it must complete Google's verification process.
 
 ## 3. Desktop app OAuth client
 

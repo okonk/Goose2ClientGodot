@@ -60,6 +60,9 @@ public class SpreadsheetReferenceParserTests
     [InlineData("https://docs.google.com/spreadsheets/d/abc+123")]
     [InlineData("https://docs.google.com/spreadsheets/d/ab%2Fc")]
     [InlineData("https://docs.google.com/spreadsheets/d/ab c")]
+    [InlineData("https://docs.google.com/spreadsheets/d/%41")]
+    [InlineData("https://docs.google.com/spreadsheets/d/Ab%63123")]
+    [InlineData("https://docs.google.com/spreadsheets/d/abc123/ed%69t")]
     public void TryParse_InvalidValue_ReturnsFalse(string? value)
     {
         var parsed = SpreadsheetReferenceParser.TryParse(value, out var reference);

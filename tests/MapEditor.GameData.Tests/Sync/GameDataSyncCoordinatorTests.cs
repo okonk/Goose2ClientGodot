@@ -154,6 +154,27 @@ public class GameDataSyncCoordinatorTests
         Assert.Equal(new[] { "ReadMapsAsync" }, gateway.Calls.Select(call => call.Method).ToArray());
     }
 
+    [Fact]
+    public async Task Pull_MapDisappearsBetweenCatalogAndGameData_ReturnsValidationRejected_WithoutPublishingSession()
+    {
+        var (coordinator, gateway, _) = NewCoordinator();
+        gateway.EnqueueMaps(new[] { MapRef(Map), MapRef(10) });
+        gateway.EnqueueGameData(new RemoteGameData(
+            new[] { MapRef(10) },
+            new Dictionary<int, NpcAppearance> { [1] = Npc(1), [2] = Npc(2) },
+            Array.Empty<RemoteRow<NpcSpawnRow>>(),
+            Array.Empty<RemoteRow<WarpRow>>()));
+
+        var result = await coordinator.PullAsync(Sheet, Map, null, discardApproved: false, CancellationToken.None);
+
+        var rejected = Assert.IsType<ValidationRejectedResult>(result);
+        Assert.False(rejected.Validation.IsValid);
+        var issue = Assert.Single(rejected.Validation.Errors);
+        Assert.Equal("sync-map-not-found", issue.Code);
+        Assert.Equal(new[] { "ReadMapsAsync", "ReadGameDataAsync" },
+            gateway.Calls.Select(call => call.Method).ToArray());
+    }
+
     [Theory]
     [InlineData("maps")]
     [InlineData("npcs")]
@@ -503,6 +524,51 @@ public class GameDataSyncCoordinatorTests
     }
 
     [Fact]
+    public async Task Push_OverwriteWithCapturedRows_CleanLocalChangedRemote_WritesPlanRestoringLocalState()
+    {
+        var (coordinator, gateway, _) = NewCoordinator();
+        var session = NewSession();
+        var conflictRows = new RemoteOwnedRows(
+            new[] { Spawn(2, 1, Map, 1, 2), Spawn(3, 1, Map, 4, 4) },
+            new[] { Warp(2, Map, 3, 4, 10, 5, 6), Warp(3, Map, 7, 8, 10, 9, 10) });
+        gateway.EnqueueReplaceSuccess();
+
+        var result = await coordinator.PushAsync(session, Dimensions, NoOpenMaps,
+            PushConflictChoice.Overwrite, conflictRows, CancellationToken.None);
+
+        Assert.IsType<PushedResult>(result);
+        Assert.False(session.Edits.IsDirty);
+        var write = Assert.Single(gateway.Calls, call => call.Method == "ReplaceOwnedRowsAsync");
+        Assert.NotNull(write.SpawnPlan);
+        Assert.Equal(new[] { new RowDelete(3) }, write.SpawnPlan.Deletes);
+        var insert = Assert.Single(write.SpawnPlan.Inserts);
+        Assert.Equal(new[] { "2", "5", "5", "6" }, insert.CellValues);
+        Assert.NotNull(write.WarpPlan);
+        Assert.Empty(write.WarpPlan.Deletes);
+        Assert.Empty(write.WarpPlan.Inserts);
+    }
+
+    [Fact]
+    public async Task Push_OverwriteWithCapturedRows_EqualToLocalEdits_Dirty_MarksPushedWithoutWrite()
+    {
+        var (coordinator, gateway, _) = NewCoordinator();
+        var session = NewSession();
+        session.Edits.RemoveSpawnAt(1);
+        session.Edits.AddSpawn(new NpcSpawnRow(2, Map, 5, 6));
+        Assert.True(session.Edits.IsDirty);
+        var conflictRows = new RemoteOwnedRows(
+            new[] { Spawn(2, 1, Map, 1, 2), Spawn(3, 2, Map, 5, 6) },
+            new[] { Warp(2, Map, 3, 4, 10, 5, 6), Warp(3, Map, 7, 8, 10, 9, 10) });
+
+        var result = await coordinator.PushAsync(session, Dimensions, NoOpenMaps,
+            PushConflictChoice.Overwrite, conflictRows, CancellationToken.None);
+
+        Assert.IsType<PushedResult>(result);
+        Assert.Empty(gateway.Calls);
+        Assert.False(session.Edits.IsDirty);
+    }
+
+    [Fact]
     public async Task Push_Success_PromotesSnapshotsAndMarksPushed_SingleMutationCall()
     {
         var (coordinator, gateway, delays) = NewCoordinator();
@@ -712,6 +778,29 @@ public class GameDataSyncCoordinatorTests
 
         Assert.IsType<CancelledResult>(result);
         Assert.Empty(gateway.Calls);
+        Assert.True(session.Edits.IsDirty);
+        Assert.False(session.RequiresPull);
+    }
+
+    [Fact]
+    public async Task Write_CancellationDuringRetryDelay_AfterRejectedRateLimit_ReturnsCancelled_WithoutLatching()
+    {
+        var gateway = new ScriptedGameDataGateway();
+        var cts = new CancellationTokenSource();
+        var coordinator = new GameDataSyncCoordinator(gateway, (span, ct) =>
+        {
+            cts.Cancel();
+            return Task.FromCanceled(cts.Token);
+        });
+        var session = NewSession();
+        session.Edits.AddSpawn(new NpcSpawnRow(2, Map, 9, 9));
+        gateway.EnqueueOwnedRows(BaseOwnedRows());
+        gateway.EnqueueReplaceFailure(GatewayFailureKind.RateLimited, requestWasRejected: true);
+
+        var result = await coordinator.PushAsync(session, Dimensions, NoOpenMaps, null, null, cts.Token);
+
+        Assert.IsType<CancelledResult>(result);
+        Assert.Single(gateway.Calls, call => call.Method == "ReplaceOwnedRowsAsync");
         Assert.True(session.Edits.IsDirty);
         Assert.False(session.RequiresPull);
     }

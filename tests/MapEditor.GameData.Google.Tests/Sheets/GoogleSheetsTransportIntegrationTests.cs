@@ -118,7 +118,11 @@ public class GoogleSheetsTransportIntegrationTests
         var spawnPlan = new ReplacementPlan(
             "NPC Spawns",
             new[] { new RowDelete(3), new RowDelete(5) },
-            new[] { new RowInsert(new string?[] { "10", "1", "5", "6" }) });
+            new[]
+            {
+                new RowInsert(new string?[] { "10", "1", "5", "6" }),
+                new RowInsert(new string?[] { "12", null, "9", "9" })
+            });
         var warpPlan = new ReplacementPlan(
             "Warptiles",
             new[] { new RowDelete(4) },
@@ -150,9 +154,18 @@ public class GoogleSheetsTransportIntegrationTests
         var spawnAppend = requests[2].GetProperty("appendCells");
         Assert.Equal(103, spawnAppend.GetProperty("sheetId").GetInt32());
         Assert.Equal("userEnteredValue", spawnAppend.GetProperty("fields").GetString());
+        var spawnAppendRows = spawnAppend.GetProperty("rows");
+        Assert.Equal(2, spawnAppendRows.GetArrayLength());
         Assert.Equal(
             new[] { "10", "1", "5", "6" },
-            AppendCellValues(spawnAppend));
+            AppendCellValues(spawnAppendRows[0]));
+        var interiorBlankRow = spawnAppendRows[1].GetProperty("values");
+        Assert.Equal(4, interiorBlankRow.GetArrayLength());
+        Assert.Equal("12", interiorBlankRow[0].GetProperty("userEnteredValue").GetProperty("stringValue").GetString());
+        Assert.Equal(JsonValueKind.Object, interiorBlankRow[1].ValueKind);
+        Assert.False(interiorBlankRow[1].TryGetProperty("userEnteredValue", out _));
+        Assert.Equal("9", interiorBlankRow[2].GetProperty("userEnteredValue").GetProperty("stringValue").GetString());
+        Assert.Equal("9", interiorBlankRow[3].GetProperty("userEnteredValue").GetProperty("stringValue").GetString());
 
         var warpDelete = requests[3].GetProperty("deleteDimension").GetProperty("range");
         Assert.Equal(104, warpDelete.GetProperty("sheetId").GetInt32());
@@ -165,12 +178,11 @@ public class GoogleSheetsTransportIntegrationTests
         Assert.Equal("userEnteredValue", warpAppend.GetProperty("fields").GetString());
         Assert.Equal(
             new[] { "1", "2", "3", "9", "4", "5" },
-            AppendCellValues(warpAppend));
+            AppendCellValues(warpAppend.GetProperty("rows")[0]));
     }
 
-    private static List<string> AppendCellValues(JsonElement appendCells)
-        => appendCells.GetProperty("rows")[0]
-            .GetProperty("values")
+    private static List<string> AppendCellValues(JsonElement row)
+        => row.GetProperty("values")
             .EnumerateArray()
             .Select(cell => cell.GetProperty("userEnteredValue").GetProperty("stringValue").GetString()!)
             .ToList();
@@ -224,12 +236,25 @@ public class GoogleSheetsTransportIntegrationTests
 
         public static async Task<LoopbackSheetsServer> StartAsync()
         {
-            var port = GetFreePort();
-            var listener = new HttpListener();
-            listener.Prefixes.Add($"http://127.0.0.1:{port}/");
-            listener.Start();
-            var server = new LoopbackSheetsServer(listener, port);
-            return server;
+            HttpListenerException? last = null;
+            for (var attempt = 0; attempt < 5; attempt++)
+            {
+                var port = GetFreePort();
+                var listener = new HttpListener();
+                listener.Prefixes.Add($"http://127.0.0.1:{port}/");
+                try
+                {
+                    listener.Start();
+                    return new LoopbackSheetsServer(listener, port);
+                }
+                catch (HttpListenerException ex)
+                {
+                    last = ex;
+                    listener.Abort();
+                }
+            }
+
+            throw new InvalidOperationException("Could not bind a loopback HttpListener on a free port.", last);
         }
 
         private static int GetFreePort()

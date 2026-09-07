@@ -52,10 +52,15 @@ internal static class GoogleBatchBuilder
             foreach (var insert in plan.Inserts)
             {
                 var values = new List<CellData>();
-                foreach (var cell in insert.CellValues)
+                for (var i = 0; i < insert.CellValues.Count; i++)
                 {
+                    var cell = insert.CellValues[i];
                     if (string.IsNullOrEmpty(cell))
                     {
+                        if (insert.CellValues.Skip(i + 1).Any(remaining => !string.IsNullOrEmpty(remaining)))
+                        {
+                            values.Add(new CellData());
+                        }
                         continue;
                     }
                     values.Add(new CellData

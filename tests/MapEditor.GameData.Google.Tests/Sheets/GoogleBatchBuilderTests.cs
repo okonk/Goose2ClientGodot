@@ -76,7 +76,7 @@ public class GoogleBatchBuilderTests
     }
 
     [Fact]
-    public void Build_AppendRows_UseUserEnteredStringValue_AndOmitNullCells()
+    public void Build_AppendRows_KeepColumnPositionsForInteriorBlanks_AndOmitTrailingBlanks()
     {
         var plan = new ReplacementPlan(
             "NPC Spawns",
@@ -84,6 +84,8 @@ public class GoogleBatchBuilderTests
             new[]
             {
                 new RowInsert(new string?[] { "10", null, "5", "6" }),
+                new RowInsert(new string?[] { "10", null, null }),
+                new RowInsert(new string?[] { null, "7" }),
                 new RowInsert(new string?[] { "11", "1", null, null })
             });
 
@@ -92,12 +94,28 @@ public class GoogleBatchBuilderTests
         var append = request.Requests.Single().AppendCells;
         Assert.Equal(7, append.SheetId);
         Assert.Equal("userEnteredValue", append.Fields);
-        Assert.Equal(2, append.Rows.Count);
+        Assert.Equal(4, append.Rows.Count);
 
-        var firstCells = append.Rows[0].Values.Select(v => v.UserEnteredValue.StringValue).ToList();
-        Assert.Equal(new[] { "10", "5", "6" }, firstCells);
-        var secondCells = append.Rows[1].Values.Select(v => v.UserEnteredValue.StringValue).ToList();
-        Assert.Equal(new[] { "11", "1" }, secondCells);
+        var interior = append.Rows[0].Values;
+        Assert.Equal(4, interior.Count);
+        Assert.Equal("10", interior[0].UserEnteredValue.StringValue);
+        Assert.Null(interior[1].UserEnteredValue);
+        Assert.Equal("5", interior[2].UserEnteredValue.StringValue);
+        Assert.Equal("6", interior[3].UserEnteredValue.StringValue);
+
+        var trailing = append.Rows[1].Values;
+        Assert.Single(trailing);
+        Assert.Equal("10", trailing[0].UserEnteredValue.StringValue);
+
+        var leading = append.Rows[2].Values;
+        Assert.Equal(2, leading.Count);
+        Assert.Null(leading[0].UserEnteredValue);
+        Assert.Equal("7", leading[1].UserEnteredValue.StringValue);
+
+        var secondRow = append.Rows[3].Values;
+        Assert.Equal(2, secondRow.Count);
+        Assert.Equal("11", secondRow[0].UserEnteredValue.StringValue);
+        Assert.Equal("1", secondRow[1].UserEnteredValue.StringValue);
     }
 
     [Fact]
