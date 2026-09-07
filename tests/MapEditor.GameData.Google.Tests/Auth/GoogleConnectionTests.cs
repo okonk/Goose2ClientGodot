@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using Google.Apis.Auth.OAuth2;
@@ -49,6 +50,9 @@ public class GoogleConnectionTests
         Assert.Equal("test-client-id", captured.ClientSecrets.ClientId);
         Assert.IsType<LocalServerCodeReceiver>(captured.CodeReceiver);
         Assert.Equal("127.0.0.1", new Uri(captured.CodeReceiver.RedirectUri).Host);
+        var closePage = typeof(LocalServerCodeReceiver).GetField("_closePageResponse", BindingFlags.NonPublic | BindingFlags.Instance)!
+            .GetValue(captured.CodeReceiver);
+        Assert.IsType<string>(closePage);
     }
 
     [Fact]

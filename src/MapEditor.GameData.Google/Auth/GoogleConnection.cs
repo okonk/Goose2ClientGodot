@@ -14,6 +14,10 @@ public sealed class GoogleConnection
     // Stable across runs and machines so stored tokens survive app updates and reconnects.
     public const string UserKey = "map-editor-user";
 
+    // The 1.76.0 receiver's first constructor parameter is the close-page HTML, not an IP; null
+    // crashes after the consent redirect with a bare ArgumentNullException. ForceLoopbackIp binds 127.0.0.1.
+    private const string ClosePageResponse = "<html>\n  <head><title>OAuth 2.0 Authentication Token Received</title></head>\n  <body>\n    Received verification code. You may now close this window.\n  </body>\n</html>";
+
     internal delegate Task<UserCredential> AuthorizeAsyncDelegate(
         ClientSecrets clientSecrets,
         IEnumerable<string> scopes,
@@ -48,8 +52,7 @@ public sealed class GoogleConnection
         }
 
         var clientSecrets = _clientConfig.LoadClientSecrets();
-        // Loopback IP so the redirect binds to 127.0.0.1, where localhost may resolve to ::1 first.
-        var codeReceiver = new LocalServerCodeReceiver(null, LocalServerCodeReceiver.CallbackUriChooserStrategy.ForceLoopbackIp);
+        var codeReceiver = new LocalServerCodeReceiver(ClosePageResponse, LocalServerCodeReceiver.CallbackUriChooserStrategy.ForceLoopbackIp);
         var credential = await _authorizeAsync(
             clientSecrets,
             new[] { SheetsService.Scope.Spreadsheets },
