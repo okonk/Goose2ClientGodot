@@ -27,9 +27,9 @@ git diff --check
 git status --short
 ```
 
-Expected: Core 216 passed, Rendering 171 passed, App 382 passed, Godot 460 passed, and the
+Expected: Core 216 passed, Rendering 171 passed, App 395 passed, Godot 460 passed, and the
 same four suites green in the solution run; Release build 0 errors; `bash -n` clean;
-script tests 62/62; the publisher produces a new `build/map-editor/<BUILD_ID>` release
+script tests 92/92; the publisher produces a new `build/map-editor/<BUILD_ID>` release
 directory containing all four archives plus `BUILD-METADATA.txt`; both greps return empty
 (no Avalonia/App in Core/Rendering, no Godot in App); `git diff --check` clean;
 `git status --short` clean (`build/` is gitignored).

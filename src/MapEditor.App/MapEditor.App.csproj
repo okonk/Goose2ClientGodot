@@ -18,5 +18,7 @@
   <ItemGroup>
     <ProjectReference Include="../MapEditor.Core/MapEditor.Core.csproj" />
     <ProjectReference Include="../MapEditor.Rendering/MapEditor.Rendering.csproj" />
+    <ProjectReference Include="../MapEditor.GameData/MapEditor.GameData.csproj" />
+    <ProjectReference Include="../MapEditor.GameData.Google/MapEditor.GameData.Google.csproj" />
   </ItemGroup>
 </Project>
