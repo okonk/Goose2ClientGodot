@@ -353,37 +353,6 @@ public class EditorDocumentControllerTests : IDisposable
     }
 
     [Fact]
-    public void UndoRedo_ToggleAvailabilityAndNotifyOncePerEffectiveChange()
-    {
-        Paint(_controller.Document.Session, 0, 0, new MapTileLayer(2, 5));
-        int stateChanges = 0;
-        _controller.StateChanged += () => stateChanges++;
-
-        Assert.True(_controller.Undo());
-        Assert.False(_controller.Document.Session.CanUndo);
-        Assert.True(_controller.Document.Session.CanRedo);
-        Assert.Equal(1, stateChanges);
-
-        Assert.True(_controller.Redo());
-        Assert.True(_controller.Document.Session.CanUndo);
-        Assert.False(_controller.Document.Session.CanRedo);
-        Assert.Equal(2, stateChanges);
-
-        Assert.False(_controller.Redo());
-        Assert.Equal(2, stateChanges);
-    }
-
-    [Fact]
-    public void Undo_WithoutHistory_DoesNotNotify()
-    {
-        int stateChanges = 0;
-        _controller.StateChanged += () => stateChanges++;
-
-        Assert.False(_controller.Undo());
-        Assert.Equal(0, stateChanges);
-    }
-
-    [Fact]
     public async Task ConfirmClose_CleanDocument_ApprovesWithoutPrompt()
     {
         _dialogs.SavePickResult = MapPath("close-clean.bytes");

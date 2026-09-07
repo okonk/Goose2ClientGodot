@@ -8,6 +8,8 @@ using MapEditor.App.Documents;
 using MapEditor.App.Tests.Fakes;
 using MapEditor.App.ViewModels;
 using MapEditor.Core;
+using MapEditor.GameData.Editing;
+using MapEditor.GameData.Rows;
 using Xunit;
 
 namespace MapEditor.App.Tests;
@@ -803,5 +805,41 @@ public class MapDocumentViewModelTests : IDisposable
 
         Assert.Equal(2, _viewModel.LayerAnchor);
         Assert.Equal(0, other.LayerAnchor);
+    }
+
+    [Fact]
+    public void AttachSheetSession_ReplacesTimelineSubscriptionTargetAndDiscardsStaleEntries()
+    {
+        var stale = new SheetEditSession(Array.Empty<NpcSpawnRow>(), Array.Empty<WarpRow>());
+        _viewModel.AttachSheetSession(stale);
+        stale.AddSpawn(new NpcSpawnRow(1, 10, 5, 6));
+        MapEditSession session = _viewModel.Session;
+        session.SelectedTileLayer = new MapTileLayer(1, 2);
+        session.BeginStroke(MapEditTool.Pencil, 0, 0);
+        Assert.True(session.CompleteStroke());
+
+        var fresh = new SheetEditSession(Array.Empty<NpcSpawnRow>(), Array.Empty<WarpRow>());
+        _viewModel.AttachSheetSession(fresh);
+
+        Assert.Same(fresh, _viewModel.SheetSession);
+        Assert.False(_viewModel.Timeline.CanUndo);
+        Assert.False(_viewModel.Timeline.CanRedo);
+        Assert.Empty(fresh.Spawns);
+
+        stale.AddSpawn(new NpcSpawnRow(2, 10, 7, 8));
+        Assert.False(_viewModel.Timeline.CanUndo);
+
+        fresh.AddSpawn(new NpcSpawnRow(3, 20, 9, 10));
+        Assert.True(_viewModel.Timeline.CanUndo);
+        Assert.True(_viewModel.Timeline.Undo());
+        Assert.Empty(fresh.Spawns);
+        Assert.Equal(2, stale.Spawns.Count);
+
+        session.SelectedTileLayer = new MapTileLayer(4, 5);
+        session.BeginStroke(MapEditTool.Pencil, 1, 1);
+        Assert.True(session.CompleteStroke());
+        Assert.True(_viewModel.Timeline.CanUndo);
+        Assert.True(_viewModel.Timeline.Undo());
+        Assert.Equal(new MapTileLayer(0, 0), session.Document[1, 1].GetLayer(0));
     }
 }

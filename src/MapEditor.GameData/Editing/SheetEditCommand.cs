@@ -90,3 +90,50 @@ internal sealed class SheetMoveCommand<T> : SheetEditCommand
         _rows[_index] = reverse ? _beforeRow : _afterRow;
     }
 }
+
+internal sealed class SheetUpdateCommand<T> : SheetEditCommand
+{
+    private readonly IList<T> _rows;
+    private readonly int _index;
+    private readonly T _beforeRow;
+    private readonly T _afterRow;
+
+    internal SheetUpdateCommand(IList<T> rows, int index, T beforeRow, T afterRow, int beforeStateId, int afterStateId)
+        : base(beforeStateId, afterStateId)
+    {
+        _rows = rows;
+        _index = index;
+        _beforeRow = beforeRow;
+        _afterRow = afterRow;
+    }
+
+    internal override void Replay(bool reverse)
+    {
+        _rows[_index] = reverse ? _beforeRow : _afterRow;
+    }
+}
+
+internal sealed class SheetBulkCommand<T> : SheetEditCommand
+{
+    private readonly IList<T> _rows;
+    private readonly T[] _before;
+    private readonly T[] _after;
+
+    internal SheetBulkCommand(IList<T> rows, T[] before, T[] after, int beforeStateId, int afterStateId)
+        : base(beforeStateId, afterStateId)
+    {
+        _rows = rows;
+        _before = before;
+        _after = after;
+    }
+
+    internal override void Replay(bool reverse)
+    {
+        T[] target = reverse ? _before : _after;
+        _rows.Clear();
+        foreach (T row in target)
+        {
+            _rows.Add(row);
+        }
+    }
+}

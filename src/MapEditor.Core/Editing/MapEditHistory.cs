@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 
 namespace MapEditor.Core;
@@ -8,6 +9,7 @@ internal sealed class MapEditHistory
     private readonly LinkedList<MapEditCommand> _redo = new();
     private long _capBytes;
     private long _usedBytes;
+    private long _historyVersion;
 
     internal MapEditHistory(long capBytes)
     {
@@ -21,6 +23,10 @@ internal sealed class MapEditHistory
     internal long CapBytes => _capBytes;
 
     internal long UsedBytes => _usedBytes;
+
+    internal long HistoryVersion => _historyVersion;
+
+    internal event Action? HistoryChanged;
 
     internal MapEditCommand? PeekUndo() => _undo.Last?.Value;
 
@@ -37,18 +43,59 @@ internal sealed class MapEditHistory
         _undo.AddLast(command);
         _usedBytes += command.AccountedSizeBytes;
         EvictToCap();
+        Bump();
     }
 
     internal void MoveUndoToRedo(MapEditCommand command)
     {
         _undo.RemoveLast();
         _redo.AddFirst(command);
+        Bump();
     }
 
     internal void MoveRedoToUndo(MapEditCommand command)
     {
         _redo.RemoveFirst();
         _undo.AddLast(command);
+        Bump();
+    }
+
+    internal void DiscardRedo()
+    {
+        if (_redo.Count == 0)
+        {
+            return;
+        }
+
+        foreach (MapEditCommand discarded in _redo)
+        {
+            _usedBytes -= discarded.AccountedSizeBytes;
+        }
+
+        _redo.Clear();
+        Bump();
+    }
+
+    internal void Clear()
+    {
+        if (_undo.Count == 0 && _redo.Count == 0)
+        {
+            return;
+        }
+
+        foreach (MapEditCommand command in _undo)
+        {
+            _usedBytes -= command.AccountedSizeBytes;
+        }
+
+        foreach (MapEditCommand command in _redo)
+        {
+            _usedBytes -= command.AccountedSizeBytes;
+        }
+
+        _undo.Clear();
+        _redo.Clear();
+        Bump();
     }
 
     internal void SetCap(long capBytes)
@@ -75,5 +122,11 @@ internal sealed class MapEditHistory
 
             _usedBytes -= evicted!.AccountedSizeBytes;
         }
+    }
+
+    private void Bump()
+    {
+        _historyVersion++;
+        HistoryChanged?.Invoke();
     }
 }

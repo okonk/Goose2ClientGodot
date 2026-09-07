@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using MapEditor.GameData.Rows;
 
 namespace MapEditor.GameData.Editing;
@@ -16,6 +17,7 @@ public sealed class SheetEditSession
     private int _currentStateId;
     private int _pushedStateId;
     private int _nextStateId = 1;
+    private long _historyVersion;
 
     public SheetEditSession(IEnumerable<NpcSpawnRow> spawns, IEnumerable<WarpRow> warps)
     {
@@ -35,6 +37,10 @@ public sealed class SheetEditSession
     public bool CanUndo => _undo.Count > 0;
 
     public bool CanRedo => _redo.Count > 0;
+
+    public long HistoryVersion => _historyVersion;
+
+    public event Action? HistoryChanged;
 
     public void AddSpawn(NpcSpawnRow row)
     {
@@ -69,6 +75,72 @@ public sealed class SheetEditSession
         _spawns[index] = after;
         _currentStateId = afterStateId;
         Push(new SheetMoveCommand<NpcSpawnRow>(_spawns, index, before, after, beforeStateId, afterStateId));
+    }
+
+    public void UpdateSpawn(int index, NpcSpawnRow row)
+    {
+        NpcSpawnRow before = _spawns[index];
+        if (before == row)
+        {
+            return;
+        }
+
+        int beforeStateId = _currentStateId;
+        int afterStateId = _nextStateId++;
+        _spawns[index] = row;
+        _currentStateId = afterStateId;
+        Push(new SheetUpdateCommand<NpcSpawnRow>(_spawns, index, before, row, beforeStateId, afterStateId));
+    }
+
+    public void ReplaceSpawns(IReadOnlyList<NpcSpawnRow> rows)
+    {
+        if (rows is null)
+        {
+            throw new ArgumentNullException(nameof(rows));
+        }
+
+        NpcSpawnRow[] before = _spawns.ToArray();
+        NpcSpawnRow[] after = rows.ToArray();
+        if (RowsEqual(before, after))
+        {
+            return;
+        }
+
+        int beforeStateId = _currentStateId;
+        int afterStateId = _nextStateId++;
+        _spawns.Clear();
+        _spawns.AddRange(after);
+        _currentStateId = afterStateId;
+        Push(new SheetBulkCommand<NpcSpawnRow>(_spawns, before, after, beforeStateId, afterStateId));
+    }
+
+    public void TransformSpawns(Func<NpcSpawnRow, NpcSpawnRow> transform)
+    {
+        if (transform is null)
+        {
+            throw new ArgumentNullException(nameof(transform));
+        }
+
+        NpcSpawnRow[] before = _spawns.ToArray();
+        var after = new NpcSpawnRow[before.Length];
+        bool changed = false;
+        for (int i = 0; i < before.Length; i++)
+        {
+            after[i] = transform(before[i]);
+            changed |= after[i] != before[i];
+        }
+
+        if (!changed)
+        {
+            return;
+        }
+
+        int beforeStateId = _currentStateId;
+        int afterStateId = _nextStateId++;
+        _spawns.Clear();
+        _spawns.AddRange(after);
+        _currentStateId = afterStateId;
+        Push(new SheetBulkCommand<NpcSpawnRow>(_spawns, before, after, beforeStateId, afterStateId));
     }
 
     public void AddWarp(WarpRow row)
@@ -106,6 +178,72 @@ public sealed class SheetEditSession
         Push(new SheetMoveCommand<WarpRow>(_warps, index, before, after, beforeStateId, afterStateId));
     }
 
+    public void UpdateWarp(int index, WarpRow row)
+    {
+        WarpRow before = _warps[index];
+        if (before == row)
+        {
+            return;
+        }
+
+        int beforeStateId = _currentStateId;
+        int afterStateId = _nextStateId++;
+        _warps[index] = row;
+        _currentStateId = afterStateId;
+        Push(new SheetUpdateCommand<WarpRow>(_warps, index, before, row, beforeStateId, afterStateId));
+    }
+
+    public void ReplaceWarps(IReadOnlyList<WarpRow> rows)
+    {
+        if (rows is null)
+        {
+            throw new ArgumentNullException(nameof(rows));
+        }
+
+        WarpRow[] before = _warps.ToArray();
+        WarpRow[] after = rows.ToArray();
+        if (RowsEqual(before, after))
+        {
+            return;
+        }
+
+        int beforeStateId = _currentStateId;
+        int afterStateId = _nextStateId++;
+        _warps.Clear();
+        _warps.AddRange(after);
+        _currentStateId = afterStateId;
+        Push(new SheetBulkCommand<WarpRow>(_warps, before, after, beforeStateId, afterStateId));
+    }
+
+    public void TransformWarps(Func<WarpRow, WarpRow> transform)
+    {
+        if (transform is null)
+        {
+            throw new ArgumentNullException(nameof(transform));
+        }
+
+        WarpRow[] before = _warps.ToArray();
+        var after = new WarpRow[before.Length];
+        bool changed = false;
+        for (int i = 0; i < before.Length; i++)
+        {
+            after[i] = transform(before[i]);
+            changed |= after[i] != before[i];
+        }
+
+        if (!changed)
+        {
+            return;
+        }
+
+        int beforeStateId = _currentStateId;
+        int afterStateId = _nextStateId++;
+        _warps.Clear();
+        _warps.AddRange(after);
+        _currentStateId = afterStateId;
+        Push(new SheetBulkCommand<WarpRow>(_warps, before, after, beforeStateId, afterStateId));
+    }
+
     public bool Undo()
     {
         if (_undo.Count == 0)
@@ -118,6 +256,7 @@ public sealed class SheetEditSession
         command.Replay(reverse: true);
         _currentStateId = command.BeforeStateId;
         _redo.AddFirst(command);
+        Bump();
         return true;
     }
 
@@ -133,6 +272,7 @@ public sealed class SheetEditSession
         command.Replay(reverse: false);
         _currentStateId = command.AfterStateId;
         _undo.AddLast(command);
+        Bump();
         return true;
     }
 
@@ -141,10 +281,58 @@ public sealed class SheetEditSession
         _pushedStateId = _currentStateId;
     }
 
+    public void DiscardRedo()
+    {
+        if (_redo.Count == 0)
+        {
+            return;
+        }
+
+        _redo.Clear();
+        Bump();
+    }
+
+    public void ClearHistory()
+    {
+        if (_undo.Count == 0 && _redo.Count == 0)
+        {
+            return;
+        }
+
+        _undo.Clear();
+        _redo.Clear();
+        Bump();
+    }
+
     private void Push(SheetEditCommand command)
     {
         _redo.Clear();
         _undo.AddLast(command);
+        Bump();
+    }
+
+    private void Bump()
+    {
+        _historyVersion++;
+        HistoryChanged?.Invoke();
+    }
+
+    private static bool RowsEqual<T>(T[] before, T[] after) where T : struct
+    {
+        if (before.Length != after.Length)
+        {
+            return false;
+        }
+
+        for (int i = 0; i < before.Length; i++)
+        {
+            if (!before[i].Equals(after[i]))
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private sealed class LiveReadOnlyView<T> : IReadOnlyList<T>

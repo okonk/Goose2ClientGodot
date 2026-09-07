@@ -1030,5 +1030,66 @@ public class MapEditSessionTests
         Assert.Equal(0, raised);
     }
 
+    [Fact]
+    public void DiscardRedo_RemovesRedoEntriesWithoutMutatingTilesOrSaveBaseline()
+    {
+        var session = CreateSession();
+        int events = 0;
+        session.HistoryChanged += () => events++;
+
+        session.SelectedTileLayer = new MapTileLayer(1, 2);
+        session.BeginStroke(MapEditTool.Pencil, 0, 0);
+        Assert.True(session.CompleteStroke());
+        session.MarkSaved();
+        session.BeginStroke(MapEditTool.Pencil, 1, 1);
+        Assert.True(session.CompleteStroke());
+        Assert.True(session.Undo());
+        Assert.True(session.CanRedo);
+
+        byte[] tiles = MapCodec.Encode(session.Document);
+        long version = session.HistoryVersion;
+
+        session.DiscardRedo();
+
+        Assert.Equal(4, events);
+        Assert.Equal(version + 1, session.HistoryVersion);
+        Assert.False(session.CanRedo);
+        Assert.True(session.CanUndo);
+        Assert.Equal(tiles, MapCodec.Encode(session.Document));
+        Assert.False(session.IsDirty);
+        Assert.Equal(1, session.SavedStateId);
+
+        session.DiscardRedo();
+        Assert.Equal(version + 1, session.HistoryVersion);
+        Assert.Equal(4, events);
+        Assert.False(session.IsDirty);
+    }
+
+    [Fact]
+    public void ClearHistory_EmptiesBothStacksWithoutMutatingTilesOrDirty()
+    {
+        var session = CreateSession();
+        session.SelectedTileLayer = new MapTileLayer(1, 2);
+        session.BeginStroke(MapEditTool.Pencil, 0, 0);
+        Assert.True(session.CompleteStroke());
+        Assert.True(session.Undo());
+
+        byte[] tiles = MapCodec.Encode(session.Document);
+        bool dirty = session.IsDirty;
+        long version = session.HistoryVersion;
+
+        session.ClearHistory();
+
+        Assert.Equal(version + 1, session.HistoryVersion);
+        Assert.False(session.CanUndo);
+        Assert.False(session.CanRedo);
+        Assert.Equal(0, session.RetainedHistoryUsedBytes);
+        Assert.Equal(tiles, MapCodec.Encode(session.Document));
+        Assert.Equal(dirty, session.IsDirty);
+
+        session.ClearHistory();
+        Assert.Equal(version + 1, session.HistoryVersion);
+    }
+
     private static MapEditSession CreateSession(int width = 4, int height = 4) => new(MapDocument.Create(width, height));
 }

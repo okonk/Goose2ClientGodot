@@ -42,16 +42,15 @@ internal sealed class MapCanvas : Control, ICustomHitTest
 
     public void FinishInteraction(bool commit)
     {
-        MapEditSession session = _viewModel.Session;
-        if (session.HasActiveStroke)
+        if (_viewModel.Session.HasActiveStroke)
         {
             if (commit)
             {
-                session.CompleteStroke();
+                _viewModel.CompleteStroke();
             }
             else
             {
-                session.CancelStroke();
+                _viewModel.CancelStroke();
             }
         }
 
@@ -270,7 +269,7 @@ internal sealed class MapCanvas : Control, ICustomHitTest
 
         if (_stroking)
         {
-            _viewModel.Session.CompleteStroke();
+            _viewModel.CompleteStroke();
             _stroking = false;
         }
 
@@ -292,7 +291,7 @@ internal sealed class MapCanvas : Control, ICustomHitTest
 
         if (_stroking)
         {
-            _viewModel.Session.CompleteStroke();
+            _viewModel.CompleteStroke();
         }
 
         CancelRectDrag();

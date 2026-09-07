@@ -295,4 +295,265 @@ public class SheetEditSessionTests
         Assert.Equal(2, session.Spawns.Count);
         Assert.Equal(Spawn(2, 10, 7, 8), session.Spawns[1]);
     }
+
+    [Fact]
+    public void UpdateSpawn_ReplacesEveryFieldAsOneCommand()
+    {
+        var session = new SheetEditSession(new[] { Spawn(1, 10, 5, 6) }, Array.Empty<WarpRow>());
+        long version = session.HistoryVersion;
+
+        session.UpdateSpawn(0, Spawn(99, 20, 7, 8));
+
+        Assert.Equal(new[] { Spawn(99, 20, 7, 8) }, session.Spawns);
+        Assert.Equal(version + 1, session.HistoryVersion);
+        Assert.True(session.CanUndo);
+        Assert.False(session.CanRedo);
+
+        Assert.True(session.Undo());
+        Assert.Equal(new[] { Spawn(1, 10, 5, 6) }, session.Spawns);
+        Assert.True(session.CanRedo);
+
+        Assert.True(session.Redo());
+        Assert.Equal(new[] { Spawn(99, 20, 7, 8) }, session.Spawns);
+        Assert.False(session.CanRedo);
+    }
+
+    [Fact]
+    public void UpdateSpawn_ToIdenticalRow_IsNoOp()
+    {
+        var session = new SheetEditSession(new[] { Spawn(1, 10, 5, 6) }, Array.Empty<WarpRow>());
+        long version = session.HistoryVersion;
+
+        session.UpdateSpawn(0, Spawn(1, 10, 5, 6));
+
+        Assert.Equal(version, session.HistoryVersion);
+        Assert.Equal(new[] { Spawn(1, 10, 5, 6) }, session.Spawns);
+        Assert.False(session.CanUndo);
+        Assert.False(session.IsDirty);
+    }
+
+    [Fact]
+    public void UpdateSpawn_InvalidIndex_ThrowsWithoutMutation()
+    {
+        var session = new SheetEditSession(new[] { Spawn(1, 10, 5, 6) }, Array.Empty<WarpRow>());
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => session.UpdateSpawn(-1, Spawn(2, 10, 7, 8)));
+        Assert.Throws<ArgumentOutOfRangeException>(() => session.UpdateSpawn(1, Spawn(2, 10, 7, 8)));
+
+        Assert.Equal(new[] { Spawn(1, 10, 5, 6) }, session.Spawns);
+        Assert.False(session.CanUndo);
+        Assert.False(session.IsDirty);
+    }
+
+    [Fact]
+    public void UpdateWarp_ReplacesEveryFieldAsOneCommand()
+    {
+        var session = new SheetEditSession(Array.Empty<NpcSpawnRow>(), new[] { Warp(10, 1, 2, 55, 30, 40) });
+
+        session.UpdateWarp(0, Warp(11, 9, 9, 77, 31, 41));
+        Assert.Equal(new[] { Warp(11, 9, 9, 77, 31, 41) }, session.Warps);
+        Assert.True(session.CanUndo);
+
+        Assert.True(session.Undo());
+        Assert.Equal(new[] { Warp(10, 1, 2, 55, 30, 40) }, session.Warps);
+
+        Assert.True(session.Redo());
+        Assert.Equal(new[] { Warp(11, 9, 9, 77, 31, 41) }, session.Warps);
+    }
+
+    [Fact]
+    public void ReplaceSpawns_DuplicateAndCroppedRows_RoundTripExactly()
+    {
+        var first = Spawn(9, 1, 1, 1);
+        var second = Spawn(9, 1, 1, 1);
+        var third = Spawn(3, 2, 4, 5);
+        var session = new SheetEditSession(new[] { first, second, third }, Array.Empty<WarpRow>());
+
+        session.ReplaceSpawns(new[] { second, first });
+        Assert.Equal(new[] { second, first }, session.Spawns);
+        Assert.True(session.CanUndo);
+
+        Assert.True(session.Undo());
+        Assert.Equal(new[] { first, second, third }, session.Spawns);
+
+        Assert.True(session.Redo());
+        Assert.Equal(new[] { second, first }, session.Spawns);
+    }
+
+    [Fact]
+    public void ReplaceSpawns_ToIdenticalRows_IsNoOp()
+    {
+        var rows = new[] { Spawn(1, 10, 5, 6), Spawn(1, 10, 5, 6) };
+        var session = new SheetEditSession(rows, Array.Empty<WarpRow>());
+        long version = session.HistoryVersion;
+
+        session.ReplaceSpawns(new[] { Spawn(1, 10, 5, 6), Spawn(1, 10, 5, 6) });
+
+        Assert.Equal(version, session.HistoryVersion);
+        Assert.Equal(rows, session.Spawns);
+        Assert.False(session.CanUndo);
+        Assert.False(session.IsDirty);
+    }
+
+    [Fact]
+    public void ReplaceWarps_GrowAndShuffle_RoundTripExactly()
+    {
+        var session = new SheetEditSession(Array.Empty<NpcSpawnRow>(), new[] { Warp(10, 1, 2, 55, 30, 40) });
+
+        session.ReplaceWarps(new[] { Warp(11, 3, 4, 57, 32, 42), Warp(10, 1, 2, 55, 30, 40), Warp(11, 3, 4, 57, 32, 42) });
+        Assert.Equal(3, session.Warps.Count);
+        Assert.Equal(Warp(11, 3, 4, 57, 32, 42), session.Warps[0]);
+
+        Assert.True(session.Undo());
+        Assert.Equal(new[] { Warp(10, 1, 2, 55, 30, 40) }, session.Warps);
+
+        Assert.True(session.Redo());
+        Assert.Equal(new[] { Warp(11, 3, 4, 57, 32, 42), Warp(10, 1, 2, 55, 30, 40), Warp(11, 3, 4, 57, 32, 42) }, session.Warps);
+    }
+
+    [Fact]
+    public void TransformSpawns_ShiftsAllRowsAsOneCommand()
+    {
+        var session = new SheetEditSession(new[] { Spawn(1, 10, 5, 6), Spawn(2, 10, 7, 8) }, Array.Empty<WarpRow>());
+
+        session.TransformSpawns(row => row with { MapX = row.MapX + 1, MapY = row.MapY + 10 });
+        Assert.Equal(new[] { Spawn(1, 10, 6, 16), Spawn(2, 10, 8, 18) }, session.Spawns);
+        Assert.True(session.CanUndo);
+
+        Assert.True(session.Undo());
+        Assert.Equal(new[] { Spawn(1, 10, 5, 6), Spawn(2, 10, 7, 8) }, session.Spawns);
+
+        Assert.True(session.Redo());
+        Assert.Equal(new[] { Spawn(1, 10, 6, 16), Spawn(2, 10, 8, 18) }, session.Spawns);
+    }
+
+    [Fact]
+    public void TransformSpawns_NoOpTransform_CreatesNoHistory()
+    {
+        var session = new SheetEditSession(new[] { Spawn(1, 10, 5, 6) }, Array.Empty<WarpRow>());
+        long version = session.HistoryVersion;
+
+        session.TransformSpawns(row => row with { MapX = row.MapX });
+
+        Assert.Equal(version, session.HistoryVersion);
+        Assert.Equal(new[] { Spawn(1, 10, 5, 6) }, session.Spawns);
+        Assert.False(session.CanUndo);
+        Assert.False(session.IsDirty);
+    }
+
+    [Fact]
+    public void TransformSpawns_ThrowingTransform_IsAtomic()
+    {
+        var session = new SheetEditSession(new[] { Spawn(1, 10, 5, 6), Spawn(2, 10, 7, 8) }, Array.Empty<WarpRow>());
+        long version = session.HistoryVersion;
+
+        Assert.Throws<InvalidOperationException>(() =>
+            session.TransformSpawns(row => row.NpcId == 2
+                ? throw new InvalidOperationException("bad row")
+                : row with { MapX = row.MapX + 1 }));
+
+        Assert.Equal(new[] { Spawn(1, 10, 5, 6), Spawn(2, 10, 7, 8) }, session.Spawns);
+        Assert.Equal(version, session.HistoryVersion);
+        Assert.False(session.CanUndo);
+        Assert.False(session.IsDirty);
+    }
+
+    [Fact]
+    public void TransformWarps_ThrowingTransform_IsAtomic()
+    {
+        var session = new SheetEditSession(Array.Empty<NpcSpawnRow>(), new[] { Warp(10, 1, 2, 55, 30, 40), Warp(11, 3, 4, 57, 32, 42) });
+        long version = session.HistoryVersion;
+
+        Assert.Throws<InvalidOperationException>(() =>
+            session.TransformWarps(row => row.MapId == 11
+                ? throw new InvalidOperationException("bad row")
+                : row with { WarpX = row.WarpX + 1 }));
+
+        Assert.Equal(new[] { Warp(10, 1, 2, 55, 30, 40), Warp(11, 3, 4, 57, 32, 42) }, session.Warps);
+        Assert.Equal(version, session.HistoryVersion);
+        Assert.False(session.CanUndo);
+    }
+
+    [Fact]
+    public void HistoryVersionAndHistoryChanged_AdvanceExactlyOncePerEffectiveEditUndoRedoDiscardClear()
+    {
+        var session = new SheetEditSession(Array.Empty<NpcSpawnRow>(), Array.Empty<WarpRow>());
+        var events = new List<long>();
+        session.HistoryChanged += () => events.Add(session.HistoryVersion);
+
+        Assert.Equal(0, session.HistoryVersion);
+
+        session.AddSpawn(Spawn(1, 1, 1, 1));
+        Assert.Equal(1, session.HistoryVersion);
+
+        Assert.True(session.Undo());
+        Assert.Equal(2, session.HistoryVersion);
+
+        Assert.True(session.Redo());
+        Assert.Equal(3, session.HistoryVersion);
+
+        session.MoveSpawn(0, 1, 1);
+        Assert.Equal(3, session.HistoryVersion);
+
+        session.DiscardRedo();
+        Assert.Equal(3, session.HistoryVersion);
+
+        session.ClearHistory();
+        Assert.Equal(4, session.HistoryVersion);
+        Assert.False(session.CanUndo);
+        Assert.False(session.CanRedo);
+
+        session.ClearHistory();
+        Assert.Equal(4, session.HistoryVersion);
+
+        Assert.Equal(new long[] { 1, 2, 3, 4 }, events);
+    }
+
+    [Fact]
+    public void DiscardRedo_RemovesRedoWithoutChangingRowsOrPushedBaseline()
+    {
+        var session = new SheetEditSession(Array.Empty<NpcSpawnRow>(), Array.Empty<WarpRow>());
+        int events = 0;
+        session.HistoryChanged += () => events++;
+
+        session.AddSpawn(Spawn(1, 1, 1, 1));
+        session.MarkPushed();
+        session.AddSpawn(Spawn(2, 2, 2, 2));
+        Assert.True(session.Undo());
+        Assert.True(session.CanRedo);
+
+        session.DiscardRedo();
+
+        Assert.Equal(4, events);
+        Assert.False(session.CanRedo);
+        Assert.True(session.CanUndo);
+        Assert.Equal(new[] { Spawn(1, 1, 1, 1) }, session.Spawns);
+        Assert.False(session.IsDirty);
+
+        session.DiscardRedo();
+        Assert.Equal(4, session.HistoryVersion);
+        Assert.Equal(4, events);
+    }
+
+    [Fact]
+    public void MarkPushed_RemainsIndependentOfBulkEditsAndHistoryChanges()
+    {
+        var session = new SheetEditSession(new[] { Spawn(1, 10, 5, 6) }, Array.Empty<WarpRow>());
+
+        session.ReplaceSpawns(new[] { Spawn(1, 10, 5, 6), Spawn(2, 10, 7, 8) });
+        session.TransformSpawns(row => row with { MapX = row.MapX + 1 });
+        session.MarkPushed();
+        Assert.False(session.IsDirty);
+        Assert.True(session.CanUndo);
+
+        Assert.True(session.Undo());
+        Assert.True(session.IsDirty);
+
+        session.DiscardRedo();
+        Assert.True(session.IsDirty);
+        Assert.False(session.CanRedo);
+
+        session.MarkPushed();
+        Assert.False(session.IsDirty);
+    }
 }

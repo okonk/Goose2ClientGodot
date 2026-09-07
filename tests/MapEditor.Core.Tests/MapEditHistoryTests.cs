@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using MapEditor.Core;
 using Xunit;
 
@@ -410,5 +411,58 @@ public class MapEditHistoryTests
         Assert.Equal(224, session.RetainedHistoryCapBytes);
         Assert.Equal(224, session.RetainedHistoryUsedBytes);
         Assert.Equal(1, session.History.UndoCount);
+    }
+
+    [Fact]
+    public void HistoryVersionAndHistoryChanged_AdvanceExactlyOncePerEffectiveCommandUndoRedoClear()
+    {
+        var session = new MapEditSession(MapDocument.Create(4, 4));
+        var events = new List<long>();
+        session.HistoryChanged += () => events.Add(session.HistoryVersion);
+
+        Assert.Equal(0, session.HistoryVersion);
+        Assert.Empty(events);
+
+        PaintLayerCell(session, 0, 0);
+        Assert.Equal(1, session.HistoryVersion);
+
+        Assert.True(session.Undo());
+        Assert.Equal(2, session.HistoryVersion);
+
+        Assert.True(session.Redo());
+        Assert.Equal(3, session.HistoryVersion);
+
+        session.SelectedTileLayer = new MapTileLayer(1, 2);
+        session.BeginStroke(MapEditTool.Pencil, 0, 0);
+        Assert.False(session.CompleteStroke());
+        Assert.Equal(3, session.HistoryVersion);
+
+        session.DiscardRedo();
+        Assert.Equal(3, session.HistoryVersion);
+
+        session.ClearHistory();
+        Assert.Equal(4, session.HistoryVersion);
+        Assert.False(session.CanUndo);
+        Assert.False(session.CanRedo);
+
+        session.ClearHistory();
+        Assert.Equal(4, session.HistoryVersion);
+
+        Assert.Equal(new long[] { 1, 2, 3, 4 }, events);
+    }
+
+    [Fact]
+    public void HistoryVersion_KeepsAdvancingWhenCapEvictsThePushedCommand()
+    {
+        var session = new MapEditSession(MapDocument.Create(4, 4), retainedHistoryCapBytes: 223);
+        int events = 0;
+        session.HistoryChanged += () => events++;
+
+        PaintLayerCell(session, 0, 0);
+
+        Assert.Equal(1, session.HistoryVersion);
+        Assert.Equal(1, events);
+        Assert.False(session.CanUndo);
+        Assert.True(session.IsDirty);
     }
 }

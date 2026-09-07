@@ -4,6 +4,8 @@ using System.IO;
 using System.Threading.Tasks;
 using MapEditor.App.Documents;
 using MapEditor.Core;
+using MapEditor.GameData.Editing;
+using MapEditor.GameData.Rows;
 
 namespace MapEditor.App.ViewModels;
 
@@ -24,6 +26,8 @@ internal sealed class MapDocumentViewModel : ViewModelBase, IDisposable
     private readonly EditorDocumentController _controller;
     private readonly SharedTileClipboard _clipboard;
     private MapEditSession _session;
+    private SheetEditSession _sheetSession;
+    private DocumentEditTimeline _timeline;
 
     private MapEditTool _activeTool = MapEditTool.Pencil;
     private IReadOnlyList<int> _sheetIds = Array.Empty<int>();
@@ -53,6 +57,8 @@ internal sealed class MapDocumentViewModel : ViewModelBase, IDisposable
         _controller = controller ?? throw new ArgumentNullException(nameof(controller));
         _clipboard = clipboard ?? throw new ArgumentNullException(nameof(clipboard));
         _session = _controller.Document.Session;
+        _sheetSession = new SheetEditSession(Array.Empty<NpcSpawnRow>(), Array.Empty<WarpRow>());
+        _timeline = new DocumentEditTimeline(_session, _sheetSession);
         _mapWidth = _session.Document.Width;
         _mapHeight = _session.Document.Height;
         _title = BuildTitle();
@@ -71,6 +77,7 @@ internal sealed class MapDocumentViewModel : ViewModelBase, IDisposable
         _clipboard.Changed -= OnClipboardChanged;
         _controller.StateChanged -= OnControllerStateChanged;
         _session.Resized -= OnSessionResized;
+        _timeline.Detach();
     }
 
     public event Action? CanvasInvalidated;
@@ -78,6 +85,17 @@ internal sealed class MapDocumentViewModel : ViewModelBase, IDisposable
     public event Action? PaletteInvalidated;
 
     public MapEditSession Session => _controller.Document.Session;
+
+    internal SheetEditSession SheetSession => _sheetSession;
+
+    internal DocumentEditTimeline Timeline => _timeline;
+
+    internal void AttachSheetSession(SheetEditSession session)
+    {
+        _timeline.Detach();
+        _sheetSession = session ?? throw new ArgumentNullException(nameof(session));
+        _timeline = new DocumentEditTimeline(_session, _sheetSession);
+    }
 
     internal EditorDocument Document => _controller.Document;
 
@@ -404,24 +422,34 @@ internal sealed class MapDocumentViewModel : ViewModelBase, IDisposable
 
     public bool Undo()
     {
-        if (!_controller.Undo())
+        if (!_timeline.Undo())
         {
             return false;
         }
 
-        Refresh(EditorRefresh.Canvas);
+        Refresh(EditorRefresh.Canvas | EditorRefresh.Commands | EditorRefresh.Title);
         return true;
     }
 
     public bool Redo()
     {
-        if (!_controller.Redo())
+        if (!_timeline.Redo())
         {
             return false;
         }
 
-        Refresh(EditorRefresh.Canvas);
+        Refresh(EditorRefresh.Canvas | EditorRefresh.Commands | EditorRefresh.Title);
         return true;
+    }
+
+    internal void CompleteStroke()
+    {
+        _session.CompleteStroke();
+    }
+
+    internal void CancelStroke()
+    {
+        _session.CancelStroke();
     }
 
     public void ResizeMap(MapTileRectangle window)
@@ -446,8 +474,8 @@ internal sealed class MapDocumentViewModel : ViewModelBase, IDisposable
 
         if (flags.HasFlag(EditorRefresh.Commands))
         {
-            SetField(ref _canUndo, _session.CanUndo, nameof(CanUndo));
-            SetField(ref _canRedo, _session.CanRedo, nameof(CanRedo));
+            SetField(ref _canUndo, _timeline.CanUndo, nameof(CanUndo));
+            SetField(ref _canRedo, _timeline.CanRedo, nameof(CanRedo));
             SetField(ref _canSave, _session.IsDirty, nameof(CanSave));
             SetField(ref _lastNotifiedDirty, _session.IsDirty, nameof(IsDirty));
         }
