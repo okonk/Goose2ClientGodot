@@ -131,6 +131,9 @@ public class GameDataSyncSessionTests
 
         Assert.False(session.Edits.IsDirty);
         Assert.True(session.RequiresPull);
+        Assert.Equal(new SpawnSnapshot(new[] { new NpcSpawnRow(1, Map, 1, 2), new NpcSpawnRow(2, Map, 9, 9) }),
+            session.PulledSpawns);
+        Assert.Equal(new WarpSnapshot(Array.Empty<WarpRow>()), session.PulledWarps);
     }
 
     [Fact]

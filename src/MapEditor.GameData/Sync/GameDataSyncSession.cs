@@ -14,6 +14,8 @@ public sealed class GameDataSyncSession
     private SheetEditSession _edits = null!;
     private SpawnSnapshot _pulledSpawns = null!;
     private WarpSnapshot _pulledWarps = null!;
+    private IReadOnlyDictionary<int, NpcAppearance> _npcs = null!;
+    private IReadOnlyList<MapReference> _maps = null!;
     private bool _requiresPull;
 
     public GameDataSyncSession(string spreadsheetId, int mapId, RemoteGameData pulled)
@@ -38,6 +40,10 @@ public sealed class GameDataSyncSession
 
     public WarpSnapshot PulledWarps => _pulledWarps;
 
+    public IReadOnlyDictionary<int, NpcAppearance> Npcs => _npcs;
+
+    public IReadOnlyList<MapReference> Maps => _maps;
+
     public bool RequiresPull => _requiresPull;
 
     // Only the coordinator may publish remote state, mark pushed, or clear RequiresPull.
@@ -53,12 +59,16 @@ public sealed class GameDataSyncSession
         _pulledSpawns = new SpawnSnapshot(spawns);
         _pulledWarps = new WarpSnapshot(warps);
         _edits = new SheetEditSession(spawns, warps);
+        _npcs = pulled.Npcs;
+        _maps = pulled.Maps;
         _requiresPull = false;
     }
 
     internal void MarkPushed()
     {
         _edits.MarkPushed();
+        _pulledSpawns = new SpawnSnapshot(_edits.Spawns);
+        _pulledWarps = new WarpSnapshot(_edits.Warps);
     }
 
     internal void MarkAmbiguous()
