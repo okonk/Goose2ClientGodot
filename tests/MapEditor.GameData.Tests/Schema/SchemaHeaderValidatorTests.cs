@@ -74,16 +74,35 @@ public class SchemaHeaderValidatorTests
     }
 
     [Fact]
-    public void Validate_WithWhitespaceChangedHeader_ReturnsMismatch()
+    public void Validate_WithWhitespaceChangedHeader_ReturnsEmpty()
     {
         var schema = BuildSchema(("a", "A"), ("b", "B"));
 
         var mismatches = SchemaHeaderValidator.Validate(schema, new[] { " A ", "B" });
 
+        Assert.Empty(mismatches);
+    }
+
+    [Fact]
+    public void Validate_WithUnderscoreInsteadOfSpace_ReturnsEmpty()
+    {
+        var schema = BuildSchema(("a", "see invisible (0)"), ("b", "B"));
+
+        var mismatches = SchemaHeaderValidator.Validate(schema, new[] { "see_invisible (0)", "B" });
+
+        Assert.Empty(mismatches);
+    }
+
+    [Fact]
+    public void Validate_WithRewordedHeader_ReturnsMismatch()
+    {
+        var schema = BuildSchema(("a", "aggro range (0)"), ("b", "B"));
+
+        var mismatches = SchemaHeaderValidator.Validate(schema, new[] { "aggro radius (0)", "B" });
+
         var mismatch = Assert.Single(mismatches);
-        Assert.Equal(0, mismatch.ColumnIndex);
-        Assert.Equal("A", mismatch.Expected);
-        Assert.Equal(" A ", mismatch.Actual);
+        Assert.Equal("aggro range (0)", mismatch.Expected);
+        Assert.Equal("aggro radius (0)", mismatch.Actual);
     }
 
     private static SheetSchema BuildSchema(params (string Name, string Header)[] columns)
