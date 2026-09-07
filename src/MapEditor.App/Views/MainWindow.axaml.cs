@@ -870,10 +870,6 @@ internal partial class MainWindow : Window
     private bool InBounds(int x, int y)
         => x >= 0 && x < Document.MapWidth && y >= 0 && y < Document.MapHeight;
 
-    private void OnSpawnDelete(object? sender, RoutedEventArgs e) => Document.RemoveSelectedSpawn();
-
-    private void OnWarpDelete(object? sender, RoutedEventArgs e) => Document.RemoveSelectedWarp();
-
     private void OnWindowPointerPressed(object? sender, PointerPressedEventArgs e)
     {
         if (Document.PasteMode && e.Source is not MapCanvas)
@@ -1258,7 +1254,6 @@ internal partial class MainWindow : Window
 
     private void SyncSpawnProperties(DocumentGameDataState state)
     {
-        SpawnDeleteButton.IsEnabled = state.SelectedSpawn is not null;
         if (state.SelectedSpawn is { } index && state.Session is { } session && index < session.Edits.Spawns.Count)
         {
             NpcSpawnRow spawn = session.Edits.Spawns[index];
@@ -1271,7 +1266,6 @@ internal partial class MainWindow : Window
 
     private void SyncWarpProperties(DocumentGameDataState state, bool wasVisible)
     {
-        WarpDeleteButton.IsEnabled = state.SelectedWarp is not null;
         long version = state.Session?.Edits.HistoryVersion ?? -1;
         if (wasVisible && state.SelectedWarp == _warpPrefillSelection && version == _warpPrefillVersion)
         {

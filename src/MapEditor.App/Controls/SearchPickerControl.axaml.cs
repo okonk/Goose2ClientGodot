@@ -13,7 +13,6 @@ public class SearchPickerControl<T> : UserControl
 {
     private readonly TextBox _searchBox;
     private readonly ListBox _results;
-    private readonly TextBlock _selectionText;
 
     // AVP1002 suppressed: the value types are generic in T, so a non-generic owner type is
     // impossible; none of these properties are set from XAML.
@@ -37,7 +36,6 @@ public class SearchPickerControl<T> : UserControl
         Content = root;
         _searchBox = root.FindControl<TextBox>("SearchBox")!;
         _results = root.FindControl<ListBox>("Results")!;
-        _selectionText = root.FindControl<TextBlock>("SelectionText")!;
         _searchBox.TextChanged += (_, _) =>
         {
             if (_searchBox.Text != SearchText)
@@ -165,7 +163,6 @@ public class SearchPickerControl<T> : UserControl
         if (_results.Items.Count == 0)
         {
             _results.SelectedIndex = -1;
-            _selectionText.Text = "—";
             return;
         }
 
@@ -185,6 +182,5 @@ public class SearchPickerControl<T> : UserControl
         }
 
         _results.SelectedIndex = index < 0 ? 0 : index;
-        _selectionText.Text = hasSelection && ItemText is { } project ? project(SelectedItem) : "—";
     }
 }

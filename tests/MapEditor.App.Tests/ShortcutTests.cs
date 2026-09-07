@@ -466,14 +466,12 @@ public class ShortcutTests
         MenuItem undo = Control<MenuItem>(harness, "UndoCommand");
         MenuItem redo = Control<MenuItem>(harness, "RedoCommand");
         StackPanel spawnPanel = Control<StackPanel>(harness, "SpawnProperties");
-        Button spawnDelete = Control<Button>(harness, "SpawnDeleteButton");
 
         PaintCell(harness);
         Assert.Equal(new MapTileLayer(1, 1), vm.Session.Document[0, 0].GetLayer(0));
         Assert.Null(vm.FindSpawnAt(5, 6));
         Assert.True(vm.GameData.ShowSpawnOverlay);
         Assert.False(spawnPanel.IsVisible);
-        Assert.False(spawnDelete.IsEnabled);
         Assert.True(vm.IsDirty);
         Assert.Contains("*", window.Title);
         Assert.True(undo.IsEnabled);
@@ -493,7 +491,6 @@ public class ShortcutTests
         Assert.Equal(1, vm.FindSpawnAt(5, 6));
         Assert.True(vm.GameData.ShowSpawnOverlay);
         Assert.True(spawnPanel.IsVisible);
-        Assert.True(spawnDelete.IsEnabled);
         Assert.Equal(new MapTileLayer(1, 1), vm.Session.Document[0, 0].GetLayer(0));
         Assert.True(vm.IsDirty);
         Assert.Contains("*", window.Title);
@@ -508,7 +505,6 @@ public class ShortcutTests
         Assert.Null(vm.GameData.SelectedSpawn);
         Assert.Equal(new MapTileLayer(1, 1), vm.Session.Document[0, 0].GetLayer(0));
         Assert.True(spawnPanel.IsVisible);
-        Assert.False(spawnDelete.IsEnabled);
         Assert.True(vm.IsDirty);
         Assert.Contains("*", window.Title);
         Assert.True(undo.IsEnabled);
@@ -521,7 +517,6 @@ public class ShortcutTests
         Assert.Null(vm.FindSpawnAt(5, 6));
         Assert.True(vm.GameData.ShowSpawnOverlay);
         Assert.True(spawnPanel.IsVisible);
-        Assert.False(spawnDelete.IsEnabled);
         Assert.False(vm.IsDirty);
         Assert.DoesNotContain("*", window.Title);
         Assert.False(undo.IsEnabled);
@@ -534,7 +529,6 @@ public class ShortcutTests
         Assert.Null(vm.FindSpawnAt(5, 6));
         Assert.True(vm.GameData.ShowSpawnOverlay);
         Assert.True(spawnPanel.IsVisible);
-        Assert.False(spawnDelete.IsEnabled);
         Assert.True(vm.IsDirty);
         Assert.Contains("*", window.Title);
         Assert.True(undo.IsEnabled);
@@ -549,7 +543,6 @@ public class ShortcutTests
         Assert.Equal(1, vm.FindSpawnAt(5, 6));
         Assert.True(vm.GameData.ShowSpawnOverlay);
         Assert.True(spawnPanel.IsVisible);
-        Assert.False(spawnDelete.IsEnabled);
         Assert.True(vm.IsDirty);
         Assert.Contains("*", window.Title);
         Assert.True(undo.IsEnabled);

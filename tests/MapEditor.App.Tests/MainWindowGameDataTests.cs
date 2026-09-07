@@ -339,7 +339,6 @@ public class MainWindowGameDataTests
         Assert.False(mapPanel.IsVisible);
         Assert.False(warpPanel.IsVisible);
         Assert.IsType<SearchPickerControl<NpcAppearance>>(Control<Control>(harness, "SpawnNpcPicker"));
-        Assert.NotNull(Control<Button>(harness, "SpawnDeleteButton"));
         Assert.False(Control<ToggleButton>(harness, "PencilTool").IsChecked == true);
     }
 
@@ -360,7 +359,6 @@ public class MainWindowGameDataTests
         Assert.NotNull(Control<TextBox>(harness, "WarpDestinationX"));
         Assert.NotNull(Control<TextBox>(harness, "WarpDestinationY"));
         Assert.NotNull(Control<Button>(harness, "WarpUseSelectedTileButton"));
-        Assert.NotNull(Control<Button>(harness, "WarpDeleteButton"));
     }
 
     [AvaloniaFact]
@@ -467,7 +465,6 @@ public class MainWindowGameDataTests
 
         Assert.False(Control<StackPanel>(harness, "RightPanel").IsVisible);
         Assert.True(Control<StackPanel>(harness, "SpawnProperties").IsVisible);
-        Assert.True(Control<Button>(harness, "SpawnDeleteButton").IsEnabled);
     }
 
     [AvaloniaFact]
@@ -511,7 +508,7 @@ public class MainWindowGameDataTests
         harness.ViewModel.GameData.SelectedSpawn = 1;
         Dispatcher.UIThread.RunJobs();
 
-        Control<Button>(harness, "SpawnDeleteButton").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        harness.Window.KeyPressQwerty(PhysicalKey.Delete, RawInputModifiers.None);
         Dispatcher.UIThread.RunJobs();
 
         var spawns = harness.ViewModel.GameData.Session!.Edits.Spawns;

@@ -184,7 +184,6 @@
           <StackPanel Spacing="8">
             <TextBlock Text="NPC" Classes="muted" FontSize="11" />
             <controls:SearchPickerControl x:Name="SpawnNpcPicker" x:TypeArguments="rows:NpcAppearance" />
-            <Button x:Name="SpawnDeleteButton" Content="Delete" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" IsEnabled="False" Click="OnSpawnDelete" />
           </StackPanel>
         </Border>
       </StackPanel>
@@ -200,7 +199,6 @@
               <TextBox x:Name="WarpDestinationY" Width="58" />
             </StackPanel>
             <Button x:Name="WarpUseSelectedTileButton" Content="Use Selected Tile" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" IsEnabled="False" Click="OnUseSelectedTile" />
-            <Button x:Name="WarpDeleteButton" Content="Delete" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" IsEnabled="False" Click="OnWarpDelete" />
           </StackPanel>
         </Border>
       </StackPanel>

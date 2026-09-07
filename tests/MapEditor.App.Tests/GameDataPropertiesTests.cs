@@ -122,14 +122,14 @@ public class GameDataPropertiesTests
     }
 
     [AvaloniaFact]
-    public void WarpDeleteButton_RemovesTheSelectedOccurrence()
+    public void KeyboardDelete_RemovesTheSelectedWarpOccurrence()
     {
         using MainWindowHarness harness = MainWindowHarness.Create();
         harness.ViewModel.GameData!.AttachSession(Session());
         harness.ViewModel.GameData.SelectedWarp = 0;
         Dispatcher.UIThread.RunJobs();
 
-        Control<Button>(harness, "WarpDeleteButton").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        harness.Window.KeyPressQwerty(PhysicalKey.Delete, RawInputModifiers.None);
         Dispatcher.UIThread.RunJobs();
 
         Assert.Empty(harness.ViewModel.GameData.Session!.Edits.Warps);

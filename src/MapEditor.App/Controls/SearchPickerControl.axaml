@@ -4,5 +4,4 @@
   <TextBox x:Name="SearchBox" Watermark="Search" />
   <ListBox x:Name="Results" MinHeight="120" MaxHeight="200"
            ScrollViewer.HorizontalScrollBarVisibility="Disabled" />
-  <TextBlock x:Name="SelectionText" Classes="muted" FontSize="11" Text="—" TextTrimming="CharacterEllipsis" />
 </StackPanel>
