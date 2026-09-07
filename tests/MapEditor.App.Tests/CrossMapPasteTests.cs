@@ -157,6 +157,54 @@ public class CrossMapPasteTests : IDisposable
     }
 
     [Fact]
+    public void TilePayload_DoesNotCarryGameDataFields()
+    {
+        _a.SelectionRectangle = new MapTileRectangle(0, 0, 2, 2);
+        _a.CopySelection();
+
+        EditorClipboardPayload payload = _clipboard.Current!;
+        Assert.Equal(EditorClipboardKind.Tiles, payload.Kind);
+        Assert.Null(payload.SpawnNpcId);
+        Assert.Null(payload.WarpDestinationMapId);
+        Assert.Null(payload.SourceSpreadsheetId);
+    }
+
+    [Fact]
+    public void CopyTiles_ReplacesGameDataPayload()
+    {
+        _clipboard.Current = EditorClipboardPayload.FromSpawn(1, "sheet");
+        _a.SelectionRectangle = new MapTileRectangle(0, 0, 2, 2);
+        _a.CopySelection();
+
+        Assert.Equal(EditorClipboardKind.Tiles, _clipboard.Current!.Kind);
+        Assert.NotNull(_a.Clipboard);
+    }
+
+    [Fact]
+    public void BeginPasteMode_WithSpawnPayload_DoesNotEnterPasteMode()
+    {
+        _clipboard.Current = EditorClipboardPayload.FromSpawn(1, "sheet");
+
+        _b.BeginPasteMode();
+        _b.ApplyPasteAt(0, 0);
+
+        Assert.False(_b.PasteMode);
+        Assert.Null(_b.PasteGhost);
+        Assert.False(_b.Session.IsDirty);
+    }
+
+    [Fact]
+    public void ApplyPasteAt_WithWarpPayload_LeavesTilesUnchanged()
+    {
+        _clipboard.Current = EditorClipboardPayload.FromWarp(20, 7, 8, "sheet");
+
+        _b.ApplyPasteAt(0, 0);
+
+        Assert.False(_b.Session.IsDirty);
+        Assert.Equal(new MapTileLayer(0, 0), _b.Session.Document[0, 0].GetLayer(0));
+    }
+
+    [Fact]
     public void Dispose_StopsClipboardNotifications()
     {
         var raisedA = new List<string>();

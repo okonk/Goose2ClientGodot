@@ -293,7 +293,7 @@ internal sealed class MapDocumentViewModel : ViewModelBase, IDisposable
 
     public bool CanSave => _canSave;
 
-    public TileClipboard? Clipboard => _clipboard.Current;
+    public TileClipboard? Clipboard => _clipboard.Current?.Tiles;
 
     public bool PasteMode
     {
@@ -311,7 +311,7 @@ internal sealed class MapDocumentViewModel : ViewModelBase, IDisposable
     {
         get
         {
-            if (!_pasteMode || _clipboard.Current is not { } clip || HoverX is not { } x || HoverY is not { } y)
+            if (!_pasteMode || _clipboard.Current is not { Kind: EditorClipboardKind.Tiles, Tiles: { } clip } || HoverX is not { } x || HoverY is not { } y)
             {
                 return null;
             }
@@ -322,16 +322,60 @@ internal sealed class MapDocumentViewModel : ViewModelBase, IDisposable
 
     public void CopySelection()
     {
+        if (_gameData is { ActiveTool: GameDataTool.Spawn or GameDataTool.Warp } state && state.Session is { } session)
+        {
+            if (state.ActiveTool == GameDataTool.Spawn)
+            {
+                if (state.SelectedSpawn is { } spawnIndex && spawnIndex < session.Edits.Spawns.Count)
+                {
+                    NpcSpawnRow row = session.Edits.Spawns[spawnIndex];
+                    _clipboard.Current = EditorClipboardPayload.FromSpawn(row.NpcId, session.SpreadsheetId);
+                }
+                return;
+            }
+
+            if (state.SelectedWarp is { } warpIndex && warpIndex < session.Edits.Warps.Count)
+            {
+                WarpRow row = session.Edits.Warps[warpIndex];
+                _clipboard.Current = EditorClipboardPayload.FromWarp(row.WarpId, row.WarpX, row.WarpY, session.SpreadsheetId);
+            }
+            return;
+        }
+
         if (SelectionRectangle is not { } rect)
         {
             return;
         }
 
-        _clipboard.Current = TileClipboard.Capture(_session.Document, _session.SelectedLayers, rect);
+        _clipboard.Current = EditorClipboardPayload.FromTiles(TileClipboard.Capture(_session.Document, _session.SelectedLayers, rect));
     }
 
     public void CutSelection()
     {
+        if (_gameData is { ActiveTool: GameDataTool.Spawn or GameDataTool.Warp } state && state.Session is { } session)
+        {
+            if (state.ActiveTool == GameDataTool.Spawn)
+            {
+                if (state.SelectedSpawn is { } spawnIndex && spawnIndex < session.Edits.Spawns.Count)
+                {
+                    NpcSpawnRow row = session.Edits.Spawns[spawnIndex];
+                    _clipboard.Current = EditorClipboardPayload.FromSpawn(row.NpcId, session.SpreadsheetId);
+                    state.SelectedSpawn = null;
+                    session.Edits.RemoveSpawnAt(spawnIndex);
+                }
+                return;
+            }
+
+            if (state.SelectedWarp is { } warpIndex && warpIndex < session.Edits.Warps.Count)
+            {
+                WarpRow row = session.Edits.Warps[warpIndex];
+                _clipboard.Current = EditorClipboardPayload.FromWarp(row.WarpId, row.WarpX, row.WarpY, session.SpreadsheetId);
+                state.SelectedWarp = null;
+                session.Edits.RemoveWarpAt(warpIndex);
+            }
+            return;
+        }
+
         CopySelection();
         DeleteSelection();
     }
@@ -368,7 +412,7 @@ internal sealed class MapDocumentViewModel : ViewModelBase, IDisposable
 
     public void BeginPasteMode()
     {
-        if (_clipboard.Current is not null)
+        if (_clipboard.Current is { Kind: EditorClipboardKind.Tiles })
         {
             PasteMode = true;
             Refresh(EditorRefresh.Canvas);
@@ -384,10 +428,20 @@ internal sealed class MapDocumentViewModel : ViewModelBase, IDisposable
         }
     }
 
+    public void PasteSelection()
+    {
+        if (_clipboard.Current is { Kind: EditorClipboardKind.Spawn or EditorClipboardKind.Warp } payload)
+        {
+            PasteGameData(payload);
+            return;
+        }
+
+        BeginPasteMode();
+    }
+
     public void ApplyPasteAt(int x, int y)
     {
-        TileClipboard? clip = _clipboard.Current;
-        if (clip is null)
+        if (_clipboard.Current is not { Kind: EditorClipboardKind.Tiles, Tiles: { } clip })
         {
             return;
         }
@@ -757,6 +811,39 @@ internal sealed class MapDocumentViewModel : ViewModelBase, IDisposable
         return x >= 0 && x < document.Width && y >= 0 && y < document.Height;
     }
 
+    private void PasteGameData(EditorClipboardPayload payload)
+    {
+        if (_gameData is not { Session: { } session } state)
+        {
+            RaiseGameDataError(new ErrorPresentation("Paste game data", "Paste requires a pulled game data session."));
+            return;
+        }
+
+        if (SelectedX is not { } x || SelectedY is not { } y || !InBounds(x, y))
+        {
+            RaiseGameDataError(new ErrorPresentation("Paste game data", "Paste requires a selected map tile."));
+            return;
+        }
+
+        if (!string.Equals(payload.SourceSpreadsheetId, session.SpreadsheetId, StringComparison.Ordinal))
+        {
+            RaiseGameDataError(new ErrorPresentation("Paste game data", "Paste requires the same spreadsheet."));
+            return;
+        }
+
+        if (payload.Kind == EditorClipboardKind.Spawn)
+        {
+            int spawnIndex = session.Edits.Spawns.Count;
+            session.Edits.AddSpawn(new NpcSpawnRow(payload.SpawnNpcId!.Value, session.MapId, x, y));
+            state.SelectedSpawn = spawnIndex;
+            return;
+        }
+
+        int index = session.Edits.Warps.Count;
+        session.Edits.AddWarp(new WarpRow(session.MapId, x, y, payload.WarpDestinationMapId!.Value, payload.WarpDestinationX!.Value, payload.WarpDestinationY!.Value));
+        state.SelectedWarp = index;
+    }
+
     private void RaiseGameDataError(ErrorPresentation error) => GameDataError?.Invoke(error);
 
     public void Refresh(EditorRefresh flags)
@@ -801,6 +888,7 @@ internal sealed class MapDocumentViewModel : ViewModelBase, IDisposable
     private void OnClipboardChanged()
     {
         OnPropertyChanged(nameof(Clipboard));
+        Refresh(EditorRefresh.Commands);
     }
 
     private void OnSessionResized(MapResizeTransform transform)

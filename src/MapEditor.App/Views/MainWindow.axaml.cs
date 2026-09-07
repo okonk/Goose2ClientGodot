@@ -484,7 +484,7 @@ internal partial class MainWindow : Window
                     e.Handled = true;
                     break;
                 case Key.V when modifiers == PrimaryModifier && e.Source is not TextBox:
-                    Document.BeginPasteMode();
+                    Document.PasteSelection();
                     e.Handled = true;
                     break;
                 case Key.X when modifiers == PrimaryModifier && e.Source is not TextBox:

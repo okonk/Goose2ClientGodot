@@ -4,9 +4,9 @@ namespace MapEditor.App.ViewModels;
 
 internal sealed class SharedTileClipboard
 {
-    private TileClipboard? _current;
+    private EditorClipboardPayload? _current;
 
-    public TileClipboard? Current
+    public EditorClipboardPayload? Current
     {
         get => _current;
         set
