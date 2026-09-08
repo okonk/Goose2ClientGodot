@@ -225,6 +225,52 @@ public class GameDataCommandControllerTests
     }
 
     [Fact]
+    public async Task Pull_SuggestsMapWhenOnlyTheExtensionDiffers()
+    {
+        using var rig = new Rig();
+        string path = rig.WriteMap("Map10036.bytes");
+        var document = await rig.OpenDocumentAsync(path);
+        var maps = new[] { new MapReference(10001, "Minita", "Map10001.map"), new MapReference(10036, "Shops", "Map10036.map") };
+        rig.Gateway.EnqueueMaps(maps);
+        rig.Dialogs.SpreadsheetUrlResult = SheetUrl;
+
+        bool pulled = await rig.Controller.PullAsync(document);
+
+        Assert.False(pulled);
+        Assert.Equal(maps[1], rig.Dialogs.LastMapConfirmationSuggested);
+    }
+
+    [Fact]
+    public async Task Pull_SuggestsTheConfirmedMapOverTheFilenameMatch()
+    {
+        using var rig = new Rig();
+        string path = rig.WriteMap("dungeon.bytes");
+        var document = await rig.OpenDocumentAsync(path);
+        await rig.PullDocumentAsync(document, Map20);
+        rig.Gateway.EnqueueMaps(AllMaps);
+        rig.Dialogs.SpreadsheetUrlResult = SheetUrl;
+
+        await rig.Controller.PullAsync(document);
+
+        Assert.Equal(Map20, rig.Dialogs.LastMapConfirmationSuggested);
+    }
+
+    [Fact]
+    public async Task Pull_ConfirmedMapMissingFromFetchedList_FallsBackToFilenameSuggestion()
+    {
+        using var rig = new Rig();
+        string path = rig.WriteMap("dungeon.bytes");
+        var document = await rig.OpenDocumentAsync(path);
+        await rig.PullDocumentAsync(document, Map20);
+        rig.Gateway.EnqueueMaps(new[] { Map10, Map30 });
+        rig.Dialogs.SpreadsheetUrlResult = SheetUrl;
+
+        await rig.Controller.PullAsync(document);
+
+        Assert.Equal(Map10, rig.Dialogs.LastMapConfirmationSuggested);
+    }
+
+    [Fact]
     public async Task Pull_UntitledDocumentHasNoSuggestion()
     {
         using var rig = new Rig();

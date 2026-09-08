@@ -469,14 +469,25 @@ internal sealed class GameDataCommandController
 
     private static MapReference? SuggestMap(IReadOnlyList<MapReference> maps, MapDocumentViewModel document)
     {
+        if (document.GameData?.ConfirmedMapId is { } mapId)
+        {
+            foreach (MapReference map in maps)
+            {
+                if (map.MapId == mapId)
+                {
+                    return map;
+                }
+            }
+        }
+
         if (document.Document.Path is not { } path)
         {
             return null;
         }
 
-        string basename = Path.GetFileName(path);
+        string basename = Path.GetFileNameWithoutExtension(path);
         var matches = maps
-            .Where(map => string.Equals(map.MapFilename, basename, StringComparison.OrdinalIgnoreCase))
+            .Where(map => string.Equals(Path.GetFileNameWithoutExtension(map.MapFilename), basename, StringComparison.OrdinalIgnoreCase))
             .ToList();
         return matches.Count == 1 ? matches[0] : null;
     }
