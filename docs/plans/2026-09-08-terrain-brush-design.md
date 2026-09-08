@@ -116,7 +116,7 @@ An enabled terrain set is valid only when:
 
 The manager may retain incomplete, conflicting, or unresolved sets only as pending or disabled. Enabling one displays exact validation failures and is rejected until corrected.
 
-Missing or malformed terrain JSON does not block sprite assets or maps. The terrain palette and tool become unavailable with an actionable diagnostic while ordinary editing continues. A failed manager save preserves both the prior file and current published catalog. A successful save validates and atomically replaces the file, cancels active terrain gestures, publishes the new catalog, refreshes open documents, and does not alter map contents or history.
+Missing or malformed terrain JSON does not block sprite assets or maps. The terrain palette and tool become unavailable with an actionable diagnostic while ordinary editing continues. A manager save validates and builds the replacement, cancels active terrain gestures while failure is still reversible, atomically replaces the file, then publishes the new catalog through a nonthrowing path and refreshes open documents. A failed save preserves both the prior file and current published catalog; an I/O failure after preflight may leave a safely cancelled preview but does not alter map contents or history.
 
 Manager saves modify the generated file directly. A future converter run overwrites those reviews. The manager warns about this limitation; a generated-default plus override merge format is deferred.
 
@@ -162,7 +162,7 @@ Run conversion against the generated asset corpus, review candidate counts and h
 | Mutation | Source of truth | Required propagation | Failure atomicity |
 |---|---|---|---|
 | Generate terrain catalog | maps, manifest, sheet PNGs | features → candidates → topology/masks → diagnostics → JSON | Build and validate completely, then atomic replace; preserve prior file on failure |
-| Save manager changes | manager draft | validate references/completeness/conflicts → atomic file write → publish catalog → refresh documents | Invalid or failed save changes neither file nor published catalog |
+| Save manager changes | manager draft | validate/build → cancel active terrain previews → atomic file write → nonthrowing catalog publication → reconcile documents | Invalid or failed save changes neither file nor published catalog; an I/O failure may leave a preview cancelled with map/history restored |
 | Select terrain/mode | document view model | palette/tool checks → gesture configuration → canvas/status refresh | Presentation only; no map/history mutation |
 | Paint/erase stroke | intended membership set | affected-region masks → deterministic variants → one map command → canvas/title/commands | Any missing mask/reference or cancelled gesture restores exact prior state and adds no history |
 | Replace asset context | asset controller | sprite cache and optional terrain catalog → all palettes/canvases | Bad base manifest preserves old context; bad terrain file publishes usable sprite context with terrain unavailable |
@@ -180,7 +180,7 @@ Run conversion against the generated asset corpus, review candidate counts and h
 | Failed or cancelled resolution never partially edits a map | missing-mask, invalid-reference, Escape, and capture-loss tests |
 | Coordinate variants are independent of operation order and display names | resolver permutation tests |
 | Terrain failures never block ordinary sprite/map editing | asset-context and real window tests |
-| Manager save cannot publish data not durably written | injected write/replace failure tests |
+| Manager save cannot publish data not durably written or leave durable data unpublished | injected cancellation/write/replace/observer failure tests |
 
 ## Deferred gaps
 
