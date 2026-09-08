@@ -169,16 +169,19 @@ public class GameDataClipboardTests : IDisposable
     }
 
     [Fact]
-    public void PasteSpawn_SameTab_AppliesAtTheSelectedTileWithTheCurrentMapId()
+    public void PasteSpawn_SameTab_EntersPasteModeAndAppliesAtTheClickedTile()
     {
         SelectSpawn(_source, 0);
         _source.CopySelection();
-        _source.SelectedX = 9;
-        _source.SelectedY = 10;
 
         _source.PasteSelection();
 
-        var spawns = _source.GameData!.Session!.Edits.Spawns;
+        Assert.True(_source.PasteMode);
+        Assert.Equal(2, _source.GameData!.Session!.Edits.Spawns.Count);
+
+        _source.ApplyPasteAt(9, 10);
+
+        var spawns = _source.GameData.Session.Edits.Spawns;
         Assert.Equal(3, spawns.Count);
         Assert.Equal(new NpcSpawnRow(1, 10, 9, 10), spawns[2]);
         Assert.Equal(2, _source.GameData.SelectedSpawn);
@@ -191,10 +194,12 @@ public class GameDataClipboardTests : IDisposable
     {
         SelectSpawn(_source, 0);
         _source.CopySelection();
-        _sameSheet.SelectedX = 2;
-        _sameSheet.SelectedY = 3;
 
         _sameSheet.PasteSelection();
+
+        Assert.True(_sameSheet.PasteMode);
+
+        _sameSheet.ApplyPasteAt(2, 3);
 
         var spawns = _sameSheet.GameData!.Session!.Edits.Spawns;
         Assert.Equal(3, spawns.Count);
@@ -220,6 +225,7 @@ public class GameDataClipboardTests : IDisposable
         Assert.Equal(2, _otherSheet.GameData.Session.Edits.Spawns.Count);
         Assert.Equal(versionBefore, _otherSheet.GameData.Session.Edits.HistoryVersion);
         Assert.False(_otherSheet.CanUndo);
+        Assert.False(_otherSheet.PasteMode);
         Assert.NotNull(_workspace.Clipboard.Current);
     }
 
@@ -236,34 +242,40 @@ public class GameDataClipboardTests : IDisposable
         _unpulled.PasteSelection();
 
         Assert.Single(errors);
+        Assert.False(_unpulled.PasteMode);
         Assert.NotNull(_workspace.Clipboard.Current);
     }
 
     [Fact]
-    public void PasteSpawn_WithoutSelectedTile_IsRejectedWithoutMutation()
+    public void PasteSpawn_WithoutSelectedTile_EntersPasteModeAndAppliesAtTheClickedTile()
     {
         SelectSpawn(_source, 0);
         _source.CopySelection();
-        var errors = new List<ErrorPresentation>();
-        _source.GameDataError += error => errors.Add(error);
 
         _source.PasteSelection();
 
-        Assert.Single(errors);
+        Assert.True(_source.PasteMode);
         Assert.Equal(2, _source.GameData!.Session!.Edits.Spawns.Count);
-        Assert.False(_source.CanUndo);
-        Assert.NotNull(_workspace.Clipboard.Current);
+
+        _source.ApplyPasteAt(1, 1);
+
+        var spawns = _source.GameData.Session.Edits.Spawns;
+        Assert.Equal(3, spawns.Count);
+        Assert.Equal(new NpcSpawnRow(1, 10, 1, 1), spawns[2]);
+        Assert.False(_source.PasteMode);
     }
 
     [Fact]
-    public void PasteWarp_SameSpreadsheetOtherTab_SourcesAtTheSelectedTileKeepingTheDestination()
+    public void PasteWarp_SameSpreadsheetOtherTab_SourcesAtTheClickedTileKeepingTheDestination()
     {
         SelectWarp(_source, 0);
         _source.CopySelection();
-        _sameSheet.SelectedX = 4;
-        _sameSheet.SelectedY = 5;
 
         _sameSheet.PasteSelection();
+
+        Assert.True(_sameSheet.PasteMode);
+
+        _sameSheet.ApplyPasteAt(4, 5);
 
         var warps = _sameSheet.GameData!.Session!.Edits.Warps;
         Assert.Equal(2, warps.Count);
@@ -273,15 +285,17 @@ public class GameDataClipboardTests : IDisposable
     }
 
     [Fact]
-    public void PasteWarp_SameTab_AppliesAtTheSelectedTileKeepingTheDestination()
+    public void PasteWarp_SameTab_EntersPasteModeAndAppliesAtTheClickedTileKeepingTheDestination()
     {
         SelectWarp(_source, 0);
         _source.CopySelection();
-        _source.SelectedX = 8;
-        _source.SelectedY = 9;
         long versionBefore = _source.GameData!.Session!.Edits.HistoryVersion;
 
         _source.PasteSelection();
+
+        Assert.True(_source.PasteMode);
+
+        _source.ApplyPasteAt(8, 9);
 
         var warps = _source.GameData.Session.Edits.Warps;
         Assert.Equal(2, warps.Count);
@@ -305,26 +319,29 @@ public class GameDataClipboardTests : IDisposable
         _unpulled.PasteSelection();
 
         Assert.Single(errors);
+        Assert.False(_unpulled.PasteMode);
         Assert.Null(_unpulled.GameData.Session);
         Assert.NotNull(_workspace.Clipboard.Current);
     }
 
     [Fact]
-    public void PasteWarp_WithoutSelectedTile_IsRejectedWithoutMutation()
+    public void PasteWarp_WithoutSelectedTile_EntersPasteModeAndAppliesAtTheClickedTile()
     {
         SelectWarp(_source, 0);
         _source.CopySelection();
         long versionBefore = _source.GameData!.Session!.Edits.HistoryVersion;
-        var errors = new List<ErrorPresentation>();
-        _source.GameDataError += error => errors.Add(error);
 
         _source.PasteSelection();
 
-        Assert.Single(errors);
-        Assert.Single(_source.GameData.Session.Edits.Warps);
-        Assert.Equal(versionBefore, _source.GameData.Session.Edits.HistoryVersion);
-        Assert.False(_source.CanUndo);
-        Assert.NotNull(_workspace.Clipboard.Current);
+        Assert.True(_source.PasteMode);
+
+        _source.ApplyPasteAt(0, 0);
+
+        var warps = _source.GameData.Session.Edits.Warps;
+        Assert.Equal(2, warps.Count);
+        Assert.Equal(new WarpRow(10, 0, 0, 20, 7, 8), warps[1]);
+        Assert.Equal(1, _source.GameData.Session.Edits.HistoryVersion - versionBefore);
+        Assert.False(_source.PasteMode);
     }
 
     [Fact]
@@ -344,6 +361,7 @@ public class GameDataClipboardTests : IDisposable
         Assert.Equal(1, _otherSheet.GameData.Session.Edits.Warps.Count);
         Assert.Equal(versionBefore, _otherSheet.GameData.Session.Edits.HistoryVersion);
         Assert.False(_otherSheet.CanUndo);
+        Assert.False(_otherSheet.PasteMode);
         Assert.NotNull(_workspace.Clipboard.Current);
     }
 

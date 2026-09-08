@@ -316,12 +316,17 @@ internal sealed class MapDocumentViewModel : ViewModelBase, IDisposable
     {
         get
         {
-            if (!_pasteMode || _clipboard.Current is not { Kind: EditorClipboardKind.Tiles, Tiles: { } clip } || HoverX is not { } x || HoverY is not { } y)
+            if (!_pasteMode || HoverX is not { } x || HoverY is not { } y)
             {
                 return null;
             }
 
-            return new MapTileRectangle(x, y, clip.Width, clip.Height);
+            return _clipboard.Current switch
+            {
+                { Kind: EditorClipboardKind.Tiles, Tiles: { } clip } => new MapTileRectangle(x, y, clip.Width, clip.Height),
+                { Kind: EditorClipboardKind.Spawn or EditorClipboardKind.Warp } => new MapTileRectangle(x, y, 1, 1),
+                _ => null
+            };
         }
     }
 
@@ -437,7 +442,12 @@ internal sealed class MapDocumentViewModel : ViewModelBase, IDisposable
     {
         if (_clipboard.Current is { Kind: EditorClipboardKind.Spawn or EditorClipboardKind.Warp } payload)
         {
-            PasteGameData(payload);
+            if (TryValidateGameDataPaste(payload))
+            {
+                PasteMode = true;
+                Refresh(EditorRefresh.Canvas);
+            }
+
             return;
         }
 
@@ -446,11 +456,22 @@ internal sealed class MapDocumentViewModel : ViewModelBase, IDisposable
 
     public void ApplyPasteAt(int x, int y)
     {
-        if (_clipboard.Current is not { Kind: EditorClipboardKind.Tiles, Tiles: { } clip })
+        switch (_clipboard.Current)
         {
-            return;
+            case { Kind: EditorClipboardKind.Tiles, Tiles: { } clip }:
+                ApplyTilePaste(clip, x, y);
+                break;
+            case { Kind: EditorClipboardKind.Spawn or EditorClipboardKind.Warp } payload:
+                PasteGameData(payload, x, y);
+                break;
         }
 
+        CancelPasteMode();
+        Refresh(EditorRefresh.Canvas | EditorRefresh.Commands | EditorRefresh.Title);
+    }
+
+    private void ApplyTilePaste(TileClipboard clip, int x, int y)
+    {
         MapTileRectangle? dest = new MapTileRectangle(x, y, clip.Width, clip.Height)
             .ClipTo(_session.Document.Width, _session.Document.Height);
         if (dest is { } d)
@@ -492,9 +513,6 @@ internal sealed class MapDocumentViewModel : ViewModelBase, IDisposable
 
             _session.ApplyLayerPatch(d.X, d.Y, d.Width, d.Height, sub);
         }
-
-        CancelPasteMode();
-        Refresh(EditorRefresh.Canvas | EditorRefresh.Commands | EditorRefresh.Title);
     }
 
     public Task SaveAsync() => _controller.SaveAsync();
@@ -921,23 +939,27 @@ internal sealed class MapDocumentViewModel : ViewModelBase, IDisposable
         return x >= 0 && x < document.Width && y >= 0 && y < document.Height;
     }
 
-    private void PasteGameData(EditorClipboardPayload payload)
+    private bool TryValidateGameDataPaste(EditorClipboardPayload payload)
     {
-        if (_gameData is not { Session: { } session } state)
+        if (_gameData is not { Session: { } session })
         {
             RaiseGameDataError(new ErrorPresentation("Paste game data", "Paste requires a pulled game data session."));
-            return;
-        }
-
-        if (SelectedX is not { } x || SelectedY is not { } y || !InBounds(x, y))
-        {
-            RaiseGameDataError(new ErrorPresentation("Paste game data", "Paste requires a selected map tile."));
-            return;
+            return false;
         }
 
         if (!string.Equals(payload.SourceSpreadsheetId, session.SpreadsheetId, StringComparison.Ordinal))
         {
             RaiseGameDataError(new ErrorPresentation("Paste game data", "Paste requires the same spreadsheet."));
+            return false;
+        }
+
+        return true;
+    }
+
+    private void PasteGameData(EditorClipboardPayload payload, int x, int y)
+    {
+        if (!TryValidateGameDataPaste(payload) || _gameData is not { Session: { } session } state)
+        {
             return;
         }
 
