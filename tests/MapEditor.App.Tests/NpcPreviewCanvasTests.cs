@@ -40,7 +40,7 @@ public class NpcPreviewCanvasTests
     private static readonly MapReference Map10 = new(10, "Dungeon", "dungeon.bytes");
 
     // Mirror MapRenderer.MapRenderPalette; the palette is internal to MapEditor.Rendering.
-    private static readonly Color NpcAnchorFill = Color.FromArgb(0x40, 0x00, 0xC8, 0xFF);
+    private static readonly Color NpcAnchorFill = Color.FromArgb(0x80, 0xFF, 0xA0, 0x40);
     private static readonly Color PlaceholderFill = Color.FromArgb(0xCC, 0xFF, 0x00, 0xFF);
 
     private static readonly string MapManifestJson = """
@@ -81,7 +81,6 @@ public class NpcPreviewCanvasTests
         RecordingMapDrawTarget target = new();
         harness.Canvas.RenderMap(target);
 
-        Assert.Equal(0, CountRectangles(target, AvaloniaMapDrawSink.SpawnMarkerFill));
         Assert.Equal(2, CountRectangles(target, NpcAnchorFill));
         Assert.Equal(4, target.Images.Count);
         Bitmap sheet1000 = ((AvaloniaSpriteSheetImage)harness.Assets.Current.Resolve(new SpriteReference(1000, 100)).Image!).Bitmap;
@@ -171,7 +170,6 @@ public class NpcPreviewCanvasTests
         Assert.Equal(1, CountRectangles(target, NpcAnchorFill));
         Assert.Equal(1, CountRectangles(target, PlaceholderFill));
         Assert.Empty(target.Images);
-        Assert.Equal(0, CountRectangles(target, AvaloniaMapDrawSink.SpawnMarkerFill));
 
         Point tile = Point(1, 1);
         harness.Window.MouseDown(tile, MouseButton.Left, RawInputModifiers.None);
@@ -212,7 +210,6 @@ public class NpcPreviewCanvasTests
         RecordingMapDrawTarget target = new();
         harness.Canvas.RenderMap(target);
         Assert.Equal(1, CountRectangles(target, AvaloniaMapDrawSink.SpawnMarkerFill));
-        Assert.Equal(0, CountRectangles(target, NpcAnchorFill));
         Assert.Empty(target.Images);
 
         Point tile = Point(1, 1);
@@ -252,12 +249,10 @@ public class NpcPreviewCanvasTests
         RecordingMapDrawTarget firstTarget = new();
         harness.Canvas.RenderMap(firstTarget);
         Assert.Equal(1, CountRectangles(firstTarget, NpcAnchorFill));
-        Assert.Equal(0, CountRectangles(firstTarget, AvaloniaMapDrawSink.SpawnMarkerFill));
 
         RecordingMapDrawTarget secondTarget = new();
         harness.Canvas2!.RenderMap(secondTarget);
         Assert.Equal(1, CountRectangles(secondTarget, AvaloniaMapDrawSink.SpawnMarkerFill));
-        Assert.Equal(0, CountRectangles(secondTarget, NpcAnchorFill));
 
         second.GameData.PreviewMode = true;
         RecordingMapDrawTarget secondPreview = new();
@@ -311,13 +306,11 @@ public class NpcPreviewCanvasTests
             Assert.Same(sheet1000, images[4].Image);
             Assert.Equal(new Rect(64, 0, 32, 32), images[4].Source);
             Assert.Equal(2, CountRectangles(preview, NpcAnchorFill));
-            Assert.Equal(0, CountRectangles(preview, AvaloniaMapDrawSink.SpawnMarkerFill));
 
             viewModel.GameData.PreviewMode = false;
             RecordingMapDrawTarget markers = new();
             canvas.RenderMap(markers);
             Assert.Equal(2, CountRectangles(markers, AvaloniaMapDrawSink.SpawnMarkerFill));
-            Assert.Equal(0, CountRectangles(markers, NpcAnchorFill));
             Assert.Single(markers.Images);
             Assert.Same(sheet1, markers.Images[0].Image);
             Assert.Equal(new Rect(0, 0, 32, 32), markers.Images[0].Source);

@@ -78,6 +78,11 @@ public sealed class MapRenderer
             }
         }
 
+        if (npcGroups is not null)
+        {
+            DrawNpcSpawnAnchors(npcGroups, options.SpawnMarkers, document, viewport, sink);
+        }
+
         RenderEntityStage(document, ranges, visibility, npcGroups, viewport, sink);
 
         for (int layer = 3; layer < MapDocument.LayerCount; layer++)
@@ -124,11 +129,6 @@ public sealed class MapRenderer
             DrawMarkers(options.SpawnMarkers, GameDataMarkerKind.Spawn, document, viewport, sink);
         }
         DrawMarkers(options.WarpMarkers, GameDataMarkerKind.Warp, document, viewport, sink);
-
-        if (npcGroups is not null)
-        {
-            DrawNpcSpawnAnchors(npcGroups, options.SpawnMarkers, document, viewport, sink);
-        }
 
         if (options.SelectedTile is { } selected)
         {
@@ -704,8 +704,8 @@ public sealed class MapRenderer
         public static readonly RenderColor PasteGhostStroke = new(0xFF, 0xBF, 0xBF, 0xBF);
         public static readonly RenderColor BlockPreviewFill = new(0xFF, 0x00, 0x00, 0x60);
         public static readonly RenderColor UnblockPreviewFill = new(0x00, 0xFF, 0x00, 0x60);
-        public static readonly RenderColor NpcAnchorFill = new(0x00, 0xC8, 0xFF, 0x40);
-        public static readonly RenderColor NpcAnchorStroke = new(0x00, 0xC8, 0xFF, 0xFF);
-        public static readonly RenderColor NpcAnchorSelectedStroke = new(0xFF, 0xFF, 0x00, 0xFF);
+        public static readonly RenderColor NpcAnchorFill = new(0xFF, 0xA0, 0x40, 0x80);
+        public static readonly RenderColor NpcAnchorStroke = new(0xFF, 0xA0, 0x40, 0xFF);
+        public static readonly RenderColor NpcAnchorSelectedStroke = new(0xFF, 0xFF, 0xFF, 0xFF);
     }
 }

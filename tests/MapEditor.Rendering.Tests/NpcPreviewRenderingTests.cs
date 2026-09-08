@@ -82,26 +82,26 @@ public class NpcPreviewRenderingTests
         Assert.Equal(new SpriteReference(1, 1), ((SpriteDrawOperation)calls[0]).Reference);
         Assert.Equal(1, ((SpriteDrawOperation)calls[1]).Layer);
         Assert.Equal(new SpriteReference(1, 2), ((SpriteDrawOperation)calls[1]).Reference);
-        SpriteDrawOperation layer2 = (SpriteDrawOperation)calls[2];
+        SpriteDrawOperation layer2 = (SpriteDrawOperation)calls[3];
         Assert.Equal(2, layer2.Layer);
         Assert.Equal(new MapTileCoordinate(0, 0), layer2.Tile);
         Assert.Equal(new SpriteReference(1, 3), layer2.Reference);
-        NpcImageDrawOperation[] parts = calls.Skip(3).Take(4).Cast<NpcImageDrawOperation>().ToArray();
+        NpcSpawnAnchorDrawOperation anchor = (NpcSpawnAnchorDrawOperation)calls[2];
+        Assert.Equal(0, anchor.OccurrenceIndex);
+        Assert.Equal(new MapTileCoordinate(1, 0), anchor.Tile);
+        Assert.True(anchor.Selected);
+        NpcImageDrawOperation[] parts = calls.Skip(4).Take(4).Cast<NpcImageDrawOperation>().ToArray();
         Assert.Equal(
             new[] { NpcPartSlot.Body, NpcPartSlot.Eyes, NpcPartSlot.Legs, NpcPartSlot.Hair },
             parts.Select(part => part.Slot).ToArray());
         Assert.All(parts, part => Assert.Equal(0, part.OccurrenceIndex));
-        Assert.Equal(3, ((SpriteDrawOperation)calls[7]).Layer);
-        Assert.Equal(new SpriteReference(1, 4), ((SpriteDrawOperation)calls[7]).Reference);
-        Assert.Equal(4, ((SpriteDrawOperation)calls[8]).Layer);
-        Assert.Equal(new SpriteReference(1, 5), ((SpriteDrawOperation)calls[8]).Reference);
-        Assert.Equal(CellOverlayKind.Blocked, ((CellOverlayDrawOperation)calls[9]).Kind);
-        Assert.All(calls.Skip(10).Take(6), call => Assert.IsType<GridLineDrawOperation>(call));
-        Assert.Equal(GameDataMarkerKind.Warp, ((GameDataMarkerDrawOperation)calls[16]).Kind);
-        NpcSpawnAnchorDrawOperation anchor = (NpcSpawnAnchorDrawOperation)calls[17];
-        Assert.Equal(0, anchor.OccurrenceIndex);
-        Assert.Equal(new MapTileCoordinate(1, 0), anchor.Tile);
-        Assert.True(anchor.Selected);
+        Assert.Equal(3, ((SpriteDrawOperation)calls[8]).Layer);
+        Assert.Equal(new SpriteReference(1, 4), ((SpriteDrawOperation)calls[8]).Reference);
+        Assert.Equal(4, ((SpriteDrawOperation)calls[9]).Layer);
+        Assert.Equal(new SpriteReference(1, 5), ((SpriteDrawOperation)calls[9]).Reference);
+        Assert.Equal(CellOverlayKind.Blocked, ((CellOverlayDrawOperation)calls[10]).Kind);
+        Assert.All(calls.Skip(11).Take(6), call => Assert.IsType<GridLineDrawOperation>(call));
+        Assert.Equal(GameDataMarkerKind.Warp, ((GameDataMarkerDrawOperation)calls[17]).Kind);
         Assert.Equal(CellOverlayKind.Selected, ((CellOverlayDrawOperation)calls[18]).Kind);
         Assert.Equal(0, calls.Count(call => call is GameDataMarkerDrawOperation { Kind: GameDataMarkerKind.Spawn }));
     }
@@ -202,8 +202,10 @@ public class NpcPreviewRenderingTests
 
         object[] calls = sink.Calls.ToArray();
         Assert.Equal(15, calls.Length);
-        Assert.All(calls.Take(3), call => Assert.Equal(1, ((NpcImageDrawOperation)call).OccurrenceIndex));
-        NpcImageDrawOperation[] tallParts = calls.Skip(3).Take(9).Cast<NpcImageDrawOperation>().ToArray();
+        NpcSpawnAnchorDrawOperation[] anchors = calls.Take(2).Cast<NpcSpawnAnchorDrawOperation>().ToArray();
+        Assert.Equal(new[] { 0, 1 }, anchors.Select(anchor => anchor.OccurrenceIndex).ToArray());
+        Assert.All(calls.Skip(2).Take(3), call => Assert.Equal(1, ((NpcImageDrawOperation)call).OccurrenceIndex));
+        NpcImageDrawOperation[] tallParts = calls.Skip(5).Take(9).Cast<NpcImageDrawOperation>().ToArray();
         Assert.Equal(
             new[]
             {
@@ -212,11 +214,9 @@ public class NpcPreviewRenderingTests
             },
             tallParts.Select(part => part.Slot).ToArray());
         Assert.All(tallParts, part => Assert.Equal(0, part.OccurrenceIndex));
-        SpriteDrawOperation layer2 = (SpriteDrawOperation)calls[12];
+        SpriteDrawOperation layer2 = (SpriteDrawOperation)calls[14];
         Assert.Equal(2, layer2.Layer);
         Assert.Equal(new MapTileCoordinate(1, 1), layer2.Tile);
-        NpcSpawnAnchorDrawOperation[] anchors = calls.Skip(13).Cast<NpcSpawnAnchorDrawOperation>().ToArray();
-        Assert.Equal(new[] { 0, 1 }, anchors.Select(anchor => anchor.OccurrenceIndex).ToArray());
     }
 
     [Fact]
@@ -445,18 +445,18 @@ public class NpcPreviewRenderingTests
 
         object[] calls = sink.Calls.ToArray();
         Assert.Equal(5, calls.Length);
-        NpcImageDrawOperation[] parts = calls.Take(3).Cast<NpcImageDrawOperation>().ToArray();
+        NpcSpawnAnchorDrawOperation anchor = (NpcSpawnAnchorDrawOperation)calls[0];
+        Assert.Equal(1, anchor.OccurrenceIndex);
+        Assert.Equal(new MapTileCoordinate(1, 0), anchor.Tile);
+        Assert.True(anchor.Selected);
+        NpcImageDrawOperation[] parts = calls.Skip(1).Take(3).Cast<NpcImageDrawOperation>().ToArray();
         Assert.Equal(new[] { NpcPartSlot.Body, NpcPartSlot.Eyes, NpcPartSlot.Hair }, parts.Select(part => part.Slot).ToArray());
         Assert.All(parts, part => Assert.Equal(1, part.OccurrenceIndex));
-        GameDataMarkerDrawOperation marker = (GameDataMarkerDrawOperation)calls[3];
+        GameDataMarkerDrawOperation marker = (GameDataMarkerDrawOperation)calls[4];
         Assert.Equal(GameDataMarkerKind.Spawn, marker.Kind);
         Assert.Equal(0, marker.OccurrenceIndex);
         Assert.Equal(new MapTileCoordinate(0, 0), marker.Tile);
         Assert.False(marker.Selected);
-        NpcSpawnAnchorDrawOperation anchor = (NpcSpawnAnchorDrawOperation)calls[4];
-        Assert.Equal(1, anchor.OccurrenceIndex);
-        Assert.Equal(new MapTileCoordinate(1, 0), anchor.Tile);
-        Assert.True(anchor.Selected);
         Assert.Equal(1, calls.Count(call => call is GameDataMarkerDrawOperation));
         Assert.Equal(1, calls.Count(call => call is NpcSpawnAnchorDrawOperation));
     }
@@ -556,6 +556,10 @@ public class NpcPreviewRenderingTests
             else if (call is SpriteDrawOperation { Layer: 2 } sprite)
             {
                 sequence.Add(("map", -1, sprite.Tile));
+            }
+            else if (call is NpcSpawnAnchorDrawOperation)
+            {
+                continue;
             }
             else
             {
