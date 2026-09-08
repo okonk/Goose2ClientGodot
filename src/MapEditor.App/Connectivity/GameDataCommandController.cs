@@ -250,7 +250,8 @@ internal sealed class GameDataCommandController
         }
 
         var maps = mapsResult.Maps.OrderBy(map => map.MapId).ToList();
-        MapReference? confirmed = await _dialogs.ShowMapConfirmationAsync(maps, SuggestMap(maps, document), DocumentName(document));
+        MapReference? confirmed = ResolveAutoMap(maps, document)
+            ?? await _dialogs.ShowMapConfirmationAsync(maps, SuggestMap(maps, document), DocumentName(document));
         if (confirmed is not { } map)
         {
             return false;
@@ -481,6 +482,27 @@ internal sealed class GameDataCommandController
             }
         }
 
+        return UniqueFilenameMatch(maps, document);
+    }
+
+    private static MapReference? ResolveAutoMap(IReadOnlyList<MapReference> maps, MapDocumentViewModel document)
+    {
+        if (UniqueFilenameMatch(maps, document) is not { } match)
+        {
+            return null;
+        }
+
+        // A confirmed map that disagrees with the filename is an explicit prior choice; keep the dialog.
+        if (document.GameData?.ConfirmedMapId is { } mapId && mapId != match.MapId)
+        {
+            return null;
+        }
+
+        return match;
+    }
+
+    private static MapReference? UniqueFilenameMatch(IReadOnlyList<MapReference> maps, MapDocumentViewModel document)
+    {
         if (document.Document.Path is not { } path)
         {
             return null;

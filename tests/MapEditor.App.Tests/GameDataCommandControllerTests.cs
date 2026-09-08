@@ -210,49 +210,53 @@ public class GameDataCommandControllerTests
     }
 
     [Fact]
-    public async Task Pull_SuggestsMapByOrdinalBasename()
+    public async Task Pull_AutoSelectsTheUniqueFilenameMatchWithoutConfirming()
     {
         using var rig = new Rig();
         string path = rig.WriteMap("Dungeon.BYTES");
         var document = await rig.OpenDocumentAsync(path);
-        rig.Gateway.EnqueueMaps(AllMaps);
+        rig.Gateway.EnqueueMaps(AllMaps).EnqueueGameData(PullData(AllMaps));
         rig.Dialogs.SpreadsheetUrlResult = SheetUrl;
 
         bool pulled = await rig.Controller.PullAsync(document);
 
-        Assert.False(pulled);
-        Assert.Equal(Map10, rig.Dialogs.LastMapConfirmationSuggested);
+        Assert.True(pulled);
+        Assert.Equal(0, rig.Dialogs.MapConfirmationShown);
+        Assert.Equal(10, document.GameData.Session.MapId);
     }
 
     [Fact]
-    public async Task Pull_SuggestsMapWhenOnlyTheExtensionDiffers()
+    public async Task Pull_AutoSelectsWhenOnlyTheExtensionDiffers()
     {
         using var rig = new Rig();
         string path = rig.WriteMap("Map10036.bytes");
         var document = await rig.OpenDocumentAsync(path);
         var maps = new[] { new MapReference(10001, "Minita", "Map10001.map"), new MapReference(10036, "Shops", "Map10036.map") };
-        rig.Gateway.EnqueueMaps(maps);
+        rig.Gateway.EnqueueMaps(maps).EnqueueGameData(PullData(maps));
         rig.Dialogs.SpreadsheetUrlResult = SheetUrl;
 
         bool pulled = await rig.Controller.PullAsync(document);
 
-        Assert.False(pulled);
-        Assert.Equal(maps[1], rig.Dialogs.LastMapConfirmationSuggested);
+        Assert.True(pulled);
+        Assert.Equal(0, rig.Dialogs.MapConfirmationShown);
+        Assert.Equal(10036, document.GameData.Session.MapId);
     }
 
     [Fact]
-    public async Task Pull_SuggestsTheConfirmedMapOverTheFilenameMatch()
+    public async Task Pull_ConfirmedMapDisagreeingWithTheFilenameKeepsTheDialogAndSuggestsTheConfirmedMap()
     {
         using var rig = new Rig();
         string path = rig.WriteMap("dungeon.bytes");
         var document = await rig.OpenDocumentAsync(path);
-        await rig.PullDocumentAsync(document, Map20);
-        rig.Gateway.EnqueueMaps(AllMaps);
+        await rig.PullDocumentAsync(document, Map10);
+        var maps = new[] { Map10 with { MapFilename = "foo.bytes" }, Map20 with { MapFilename = "dungeon.bytes" }, Map30 };
+        rig.Gateway.EnqueueMaps(maps).EnqueueGameData(PullData(maps));
         rig.Dialogs.SpreadsheetUrlResult = SheetUrl;
 
         await rig.Controller.PullAsync(document);
 
-        Assert.Equal(Map20, rig.Dialogs.LastMapConfirmationSuggested);
+        Assert.Equal(1, rig.Dialogs.MapConfirmationShown);
+        Assert.Equal(maps[0], rig.Dialogs.LastMapConfirmationSuggested);
     }
 
     [Fact]
@@ -261,13 +265,15 @@ public class GameDataCommandControllerTests
         using var rig = new Rig();
         string path = rig.WriteMap("dungeon.bytes");
         var document = await rig.OpenDocumentAsync(path);
-        await rig.PullDocumentAsync(document, Map20);
-        rig.Gateway.EnqueueMaps(new[] { Map10, Map30 });
+        await rig.PullDocumentAsync(document, Map10);
+        var maps = new[] { new MapReference(11, "Dungeon Copy", "dungeon.bytes"), Map20, Map30 };
+        rig.Gateway.EnqueueMaps(maps).EnqueueGameData(PullData(maps));
         rig.Dialogs.SpreadsheetUrlResult = SheetUrl;
 
         await rig.Controller.PullAsync(document);
 
-        Assert.Equal(Map10, rig.Dialogs.LastMapConfirmationSuggested);
+        Assert.Equal(1, rig.Dialogs.MapConfirmationShown);
+        Assert.Equal(maps[0], rig.Dialogs.LastMapConfirmationSuggested);
     }
 
     [Fact]
