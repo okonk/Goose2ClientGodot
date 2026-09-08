@@ -48,6 +48,8 @@ internal interface IEditorDialogs
 
     Task ShowErrorAsync(ErrorPresentation error);
 
+    Task ShowInfoAsync(string title, string message);
+
     Task<string?> ShowSpreadsheetUrlAsync(string? prefill);
 
     Task<MapReference?> ShowMapConfirmationAsync(IReadOnlyList<MapReference> maps, MapReference? suggested, string documentName);

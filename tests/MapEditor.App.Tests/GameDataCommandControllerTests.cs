@@ -536,6 +536,25 @@ public class GameDataCommandControllerTests
         Assert.False(document.GameData.IsDirty);
         Assert.Equal(new[] { "ReadOwnedRowsAsync", "ReplaceOwnedRowsAsync" }, rig.Gateway.Calls.Skip(callsBefore).Select(call => call.Method));
         Assert.Empty(rig.Dialogs.Errors);
+        (string title, string message) info = Assert.Single(rig.Dialogs.Infos);
+        Assert.Equal("Push game data", info.title);
+        Assert.Equal("Successfully pushed 1 row to the sheet.", info.message);
+    }
+
+    [Fact]
+    public async Task Push_NoChanges_SucceedsWithANoOpNotice()
+    {
+        using var rig = new Rig();
+        var document = await rig.PullDocumentAsync(rig.Workspace.ActiveDocument, Map10);
+        rig.Gateway.EnqueueOwnedRows(OwnedRows(new[] { new NpcSpawnRow(1, 10, 3, 4) }));
+
+        bool pushed = await rig.Controller.PushAsync(document);
+
+        Assert.True(pushed);
+        Assert.Empty(rig.Dialogs.Errors);
+        (string title, string message) info = Assert.Single(rig.Dialogs.Infos);
+        Assert.Equal("Push game data", info.title);
+        Assert.Equal("Nothing to push — the sheet already matches this tab's game data.", info.message);
     }
 
     [Fact]

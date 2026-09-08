@@ -268,6 +268,23 @@ public class GameDataSyncCoordinatorTests
     }
 
     [Fact]
+    public async Task Push_Success_ReportsTheChangedRowCount()
+    {
+        var (coordinator, gateway, _) = NewCoordinator();
+        var session = NewSession();
+        session.Edits.AddSpawn(new NpcSpawnRow(1, Map, 9, 9));
+        session.Edits.RemoveSpawnAt(0);
+        gateway.EnqueueOwnedRows(BaseOwnedRows());
+        gateway.EnqueueReplaceSuccess();
+
+        var result = await coordinator.PushAsync(session, Dimensions, NoOpenMaps, null, null, CancellationToken.None);
+
+        var pushed = Assert.IsType<PushedResult>(result);
+        Assert.Equal(2, pushed.ChangedRows);
+        Assert.Equal(1, gateway.Calls.Count(c => c.Method == "ReplaceOwnedRowsAsync"));
+    }
+
+    [Fact]
     public async Task Read_RetriesExhausted_ThrowsLastException_AfterTwoDelays()
     {
         var (coordinator, gateway, delays) = NewCoordinator();

@@ -28,6 +28,6 @@ public sealed record CancelledResult() : SyncResult;
 
 public sealed record PullInsteadRequestedResult() : SyncResult;
 
-public sealed record PushedResult() : SyncResult;
+public sealed record PushedResult(int ChangedRows) : SyncResult;
 
 public sealed record AmbiguousResult() : SyncResult;

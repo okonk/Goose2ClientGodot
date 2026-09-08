@@ -172,8 +172,10 @@ public sealed class GameDataSyncCoordinator
             warpPlan.Deletes.Count == 0 && warpPlan.Inserts.Count == 0)
         {
             session.MarkPushed();
-            return new PushedResult();
+            return new PushedResult(0);
         }
+
+        int changedRows = spawnPlan.Inserts.Count + spawnPlan.Deletes.Count + warpPlan.Inserts.Count + warpPlan.Deletes.Count;
 
         async Task<SyncResult> DispatchAsync()
         {
@@ -182,7 +184,7 @@ public sealed class GameDataSyncCoordinator
                 await _gateway.ReplaceOwnedRowsAsync(session.SpreadsheetId, spawnPlan, warpPlan, cancellationToken)
                     .ConfigureAwait(false);
                 session.MarkPushed();
-                return new PushedResult();
+                return new PushedResult(changedRows);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {

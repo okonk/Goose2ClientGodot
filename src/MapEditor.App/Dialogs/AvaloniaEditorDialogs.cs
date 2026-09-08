@@ -111,6 +111,8 @@ internal sealed class AvaloniaEditorDialogs : IEditorDialogs
 
     public Task ShowErrorAsync(ErrorPresentation error) => new ErrorDialog(error.Title, error.Message).ShowDialog(_owner);
 
+    public Task ShowInfoAsync(string title, string message) => new ErrorDialog(title, message).ShowDialog(_owner);
+
     public Task<string?> ShowSpreadsheetUrlAsync(string? prefill)
         => new SpreadsheetDialog(prefill).ShowDialog<string?>(_owner);
 

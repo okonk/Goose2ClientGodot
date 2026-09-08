@@ -35,6 +35,8 @@ internal sealed class EditorDialogsProxy : IEditorDialogs
 
     public Task ShowErrorAsync(ErrorPresentation error) => Target.ShowErrorAsync(error);
 
+    public Task ShowInfoAsync(string title, string message) => Target.ShowInfoAsync(title, message);
+
     public Task<string?> ShowSpreadsheetUrlAsync(string? prefill) => Target.ShowSpreadsheetUrlAsync(prefill);
 
     public Task<MapReference?> ShowMapConfirmationAsync(IReadOnlyList<MapReference> maps, MapReference? suggested, string documentName)

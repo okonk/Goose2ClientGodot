@@ -360,7 +360,8 @@ internal sealed class GameDataCommandController
         {
             switch (result)
             {
-                case PushedResult:
+                case PushedResult { } pushed:
+                    await _dialogs.ShowInfoAsync(PushTitle, PushSuccessMessage(pushed.ChangedRows));
                     RaiseStateChanged();
                     return true;
                 case AmbiguousResult:
@@ -491,6 +492,11 @@ internal sealed class GameDataCommandController
             .ToList();
         return matches.Count == 1 ? matches[0] : null;
     }
+
+    private static string PushSuccessMessage(int changedRows)
+        => changedRows == 0
+            ? "Nothing to push — the sheet already matches this tab's game data."
+            : $"Successfully pushed {changedRows} {(changedRows == 1 ? "row" : "rows")} to the sheet.";
 
     private async Task<bool> PresentFailureAsync(SyncResult result, string title)
     {

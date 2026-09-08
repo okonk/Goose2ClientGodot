@@ -61,6 +61,7 @@ internal sealed class FakeEditorDialogs : IEditorDialogs
     public int OpenPickShown;
     public int SavePickShown;
     public List<ErrorPresentation> Errors = new();
+    public List<(string Title, string Message)> Infos = new();
 
     public Task<NewMapRequest?> ShowNewMapAsync()
     {
@@ -163,6 +164,12 @@ internal sealed class FakeEditorDialogs : IEditorDialogs
         }
 
         return ShowErrorGate ?? Task.CompletedTask;
+    }
+
+    public Task ShowInfoAsync(string title, string message)
+    {
+        Infos.Add((title, message));
+        return Task.CompletedTask;
     }
 
     public Task<string?> ShowSpreadsheetUrlAsync(string? prefill)
