@@ -154,6 +154,99 @@ public class GameDataPropertiesTests
     }
 
     [AvaloniaFact]
+    public void UseSelectedTile_EnabledForExactlyOneMatchingTabAndCopiesTheDestination()
+    {
+        using MainWindowHarness harness = MainWindowHarness.Create();
+        harness.ViewModel.GameData!.AttachSession(Session());
+        Dispatcher.UIThread.RunJobs();
+        SearchPickerControl<MapReference> picker = Control<SearchPickerControl<MapReference>>(harness, "WarpDestinationPicker");
+        Button useSelected = Control<Button>(harness, "WarpUseSelectedTileButton");
+
+        Assert.False(useSelected.IsEnabled);
+
+        picker.SelectedItem = Map10;
+        Dispatcher.UIThread.RunJobs();
+        Assert.False(useSelected.IsEnabled);
+
+        harness.ViewModel.SelectedX = 3;
+        harness.ViewModel.SelectedY = 4;
+        Dispatcher.UIThread.RunJobs();
+        Assert.True(useSelected.IsEnabled);
+
+        useSelected.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal("3", Control<TextBox>(harness, "WarpDestinationX").Text);
+        Assert.Equal("4", Control<TextBox>(harness, "WarpDestinationY").Text);
+    }
+
+    [AvaloniaFact]
+    public async Task UseSelectedTile_DisabledForAmbiguousMatch()
+    {
+        using MainWindowHarness harness = MainWindowHarness.Create();
+        MapDocumentViewModel first = harness.ViewModel;
+        first.GameData!.AttachSession(Session());
+
+        harness.Dialogs.NewMapResult = new NewMapRequest(100, 100);
+        await harness.Workspace.NewAsync();
+        MapDocumentViewModel second = harness.Workspace.ActiveDocument;
+        second.GameData!.AttachSession(Session());
+        Dispatcher.UIThread.RunJobs();
+
+        SearchPickerControl<MapReference> picker = Control<SearchPickerControl<MapReference>>(harness, "WarpDestinationPicker");
+        Button useSelected = Control<Button>(harness, "WarpUseSelectedTileButton");
+        picker.SelectedItem = Map10;
+        first.SelectedX = 1;
+        first.SelectedY = 1;
+        second.SelectedX = 2;
+        second.SelectedY = 2;
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.False(useSelected.IsEnabled);
+
+        second.SelectedX = null;
+        Dispatcher.UIThread.RunJobs();
+        Assert.True(useSelected.IsEnabled);
+
+        useSelected.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal("1", Control<TextBox>(harness, "WarpDestinationX").Text);
+        Assert.Equal("1", Control<TextBox>(harness, "WarpDestinationY").Text);
+    }
+
+    [AvaloniaFact]
+    public async Task UseSelectedTile_IgnoresDifferentSpreadsheetTabs()
+    {
+        using MainWindowHarness harness = MainWindowHarness.Create();
+        MapDocumentViewModel first = harness.ViewModel;
+        first.GameData!.AttachSession(Session());
+
+        harness.Dialogs.NewMapResult = new NewMapRequest(100, 100);
+        await harness.Workspace.NewAsync();
+        MapDocumentViewModel second = harness.Workspace.ActiveDocument;
+        second.GameData!.AttachSession(SessionWithSpreadsheet("other"));
+        Dispatcher.UIThread.RunJobs();
+
+        SearchPickerControl<MapReference> picker = Control<SearchPickerControl<MapReference>>(harness, "WarpDestinationPicker");
+        Button useSelected = Control<Button>(harness, "WarpUseSelectedTileButton");
+        picker.SelectedItem = Map10;
+        first.SelectedX = 1;
+        first.SelectedY = 1;
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.False(useSelected.IsEnabled);
+
+        second.SelectedX = 2;
+        second.SelectedY = 2;
+        Dispatcher.UIThread.RunJobs();
+        Assert.True(useSelected.IsEnabled);
+
+        useSelected.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal("2", Control<TextBox>(harness, "WarpDestinationX").Text);
+        Assert.Equal("2", Control<TextBox>(harness, "WarpDestinationY").Text);
+    }
+
+    [AvaloniaFact]
     public void SessionReplacement_ClearsThePickerWhileTheToolIsActive()
     {
         using MainWindowHarness harness = MainWindowHarness.Create();
@@ -195,5 +288,15 @@ public class GameDataPropertiesTests
             new List<RemoteRow<NpcSpawnRow>> { new(2, new NpcSpawnRow(1, 10, x, y)) },
             new List<RemoteRow<WarpRow>>());
         return new GameDataSyncSession("sheet", 10, data);
+    }
+
+    private static GameDataSyncSession SessionWithSpreadsheet(string spreadsheetId)
+    {
+        var data = new RemoteGameData(
+            new[] { Map10 },
+            new Dictionary<int, NpcAppearance> { [1] = Npc1 },
+            new List<RemoteRow<NpcSpawnRow>>(),
+            new List<RemoteRow<WarpRow>>());
+        return new GameDataSyncSession(spreadsheetId, 10, data);
     }
 }

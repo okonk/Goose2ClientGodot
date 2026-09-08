@@ -107,6 +107,7 @@ internal partial class MainWindow : Window
         foreach (MapDocumentViewModel document in _workspace.Documents)
         {
             _views[document] = CreateView(document);
+            document.PropertyChanged += OnAnyDocumentPropertyChanged;
             document.GameDataError += OnDocumentGameDataError;
         }
 
@@ -147,6 +148,7 @@ internal partial class MainWindow : Window
             foreach (MapDocumentViewModel document in e.NewItems)
             {
                 _views[document] = CreateView(document);
+                document.PropertyChanged += OnAnyDocumentPropertyChanged;
                 document.GameDataError += OnDocumentGameDataError;
             }
         }
@@ -172,6 +174,7 @@ internal partial class MainWindow : Window
                 }
 
                 view.Palette.UnbindScrollBar();
+                document.PropertyChanged -= OnAnyDocumentPropertyChanged;
                 document.GameDataError -= OnDocumentGameDataError;
                 _views.Remove(document);
             }
@@ -733,6 +736,64 @@ internal partial class MainWindow : Window
     private void OnPush(object? sender, RoutedEventArgs e)
         => _ = RunCommandAsync(() => _workspace.Commands.PushAsync(Document));
 
+    private void OnUseSelectedTile(object? sender, RoutedEventArgs e)
+    {
+        if (ResolveUseSelectedTileSource() is not { SelectedX: { } x, SelectedY: { } y })
+        {
+            return;
+        }
+
+        WarpDestinationX.Text = x.ToString();
+        WarpDestinationY.Text = y.ToString();
+        Document.CommitWarpDestinationCoordinates(x, y);
+    }
+
+    private MapDocumentViewModel? ResolveUseSelectedTileSource()
+    {
+        DocumentGameDataState state = Document.GameData!;
+        if (state.SelectedDestinationMapId is not { } mapId || state.Session is not { } session)
+        {
+            return null;
+        }
+
+        MapDocumentViewModel? match = null;
+        foreach (MapDocumentViewModel candidate in _workspace.Documents)
+        {
+            if (candidate.GameData?.Session is not { } candidateSession ||
+                !string.Equals(candidateSession.SpreadsheetId, session.SpreadsheetId, StringComparison.Ordinal) ||
+                candidateSession.MapId != mapId)
+            {
+                continue;
+            }
+
+            if (candidate.SelectedX is not { } x || candidate.SelectedY is not { } y ||
+                x < 0 || x >= candidate.MapWidth || y < 0 || y >= candidate.MapHeight)
+            {
+                continue;
+            }
+
+            if (match is not null)
+            {
+                return null;
+            }
+
+            match = candidate;
+        }
+
+        return match;
+    }
+
+    private void SyncUseSelectedTileButton()
+        => WarpUseSelectedTileButton.IsEnabled = ResolveUseSelectedTileSource() is not null;
+
+    private void OnAnyDocumentPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is nameof(MapDocumentViewModel.SelectedX) or nameof(MapDocumentViewModel.SelectedY))
+        {
+            SyncUseSelectedTileButton();
+        }
+    }
+
     private void OnDocumentGameDataError(ErrorPresentation error) => _ = _dialogs.ShowErrorAsync(error);
 
     private void OnSpawnNpcPickerChanged(object? sender, AvaloniaPropertyChangedEventArgs e)
@@ -765,6 +826,8 @@ internal partial class MainWindow : Window
         {
             Document.CommitWarpDestinationMap(id);
         }
+
+        SyncUseSelectedTileButton();
     }
 
     private void OnWarpDestinationFieldLostFocus(object? sender, RoutedEventArgs e) => CommitWarpDestinationFields();
@@ -1268,6 +1331,7 @@ internal partial class MainWindow : Window
             : "—";
         ZoomText.Text = $"{Document.ZoomPercent}%";
         SizeText.Text = $"{Document.MapWidth} × {Document.MapHeight}";
+        WarpUseSelectedTileButton.IsEnabled = ResolveUseSelectedTileSource() is not null;
         if (Document.SelectedX is { } selectedX && Document.SelectedY is { } selectedY &&
             selectedX >= 0 && selectedX < Document.MapWidth &&
             selectedY >= 0 && selectedY < Document.MapHeight)
