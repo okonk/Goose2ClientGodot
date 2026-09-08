@@ -935,6 +935,8 @@ public class MapCanvasTests
 
         public void DrawRectangle(Brush fill, Pen? stroke, Rect rect) => throw new InvalidOperationException("sink failure");
 
+        public void DrawText(string text, Point center, double fontSize, Brush fill, Brush? stroke) => throw new InvalidOperationException("sink failure");
+
         public IDisposable PushClip(Rect rect) => throw new InvalidOperationException("sink failure");
     }
 

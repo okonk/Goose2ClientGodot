@@ -186,7 +186,7 @@ public class MainWindowTests : IDisposable
         Assert.NotNull(Find<MenuItem>("GridMenuItem"));
         Assert.NotNull(Find<MenuItem>("BlockedMenuItem"));
 
-        foreach (string name in new[] { "GameDataMenu", "ConnectCommand", "PullCommand", "PushCommand", "SpawnOverlayMenuItem", "WarpOverlayMenuItem", "PreviewMenuItem" })
+        foreach (string name in new[] { "GameDataMenu", "ConnectCommand", "PullCommand", "PushCommand", "SpawnOverlayMenuItem", "WarpOverlayMenuItem", "PreviewMenuItem", "ShowNamesMenuItem" })
         {
             Assert.NotNull(Find<MenuItem>(name));
         }

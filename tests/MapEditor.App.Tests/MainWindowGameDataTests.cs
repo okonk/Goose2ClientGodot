@@ -125,6 +125,7 @@ public class MainWindowGameDataTests
         Assert.False(Item(harness, "PushCommand").IsEnabled);
         Assert.True(Item(harness, "SpawnOverlayMenuItem").IsChecked == true);
         Assert.True(Item(harness, "WarpOverlayMenuItem").IsChecked == true);
+        Assert.True(Item(harness, "ShowNamesMenuItem").IsChecked == true);
         Assert.False(Item(harness, "PreviewMenuItem").IsChecked == true);
         Assert.False(Control<TextBlock>(harness, "PreviewStatusText").IsVisible);
     }

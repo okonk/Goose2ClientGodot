@@ -151,6 +151,34 @@ public class GameDataMarkerRenderingTests
     }
 
     [Fact]
+    public void Render_MarkerNamesEmitOnlyWhenShowNamesIsEnabled()
+    {
+        MapRenderer renderer = new(CreateCache(new FakeSpriteSheetLoader(), ManifestJson((1, 1, 0, 0, 32, 32))));
+        MapDocument document = MapDocument.Create(2, 2);
+        MapRenderOptions options = new(
+            MapLayerVisibility.All,
+            false,
+            false,
+            null,
+            null,
+            SpawnMarkers: new[] { new GameDataMarkerInput(0, new MapTileCoordinate(0, 0), false, "npc 1", "Goose") },
+            WarpMarkers: new[] { new GameDataMarkerInput(0, new MapTileCoordinate(1, 0), false, "map 20 (5, 6)", "Dungeon") },
+            ShowNames: true);
+
+        RecordingMapDrawSink sink = new();
+        renderer.Render(new MapRenderRequest(document, Viewport(64, 64), options), sink);
+
+        GameDataMarkerDrawOperation[] markers = sink.Calls.OfType<GameDataMarkerDrawOperation>().ToArray();
+        Assert.Equal(2, markers.Length);
+        Assert.Equal("Goose", markers[0].Name);
+        Assert.Equal("Dungeon", markers[1].Name);
+
+        RecordingMapDrawSink hiddenSink = new();
+        renderer.Render(new MapRenderRequest(document, Viewport(64, 64), options with { ShowNames = false }), hiddenSink);
+        Assert.All(hiddenSink.Calls.OfType<GameDataMarkerDrawOperation>(), marker => Assert.Null(marker.Name));
+    }
+
+    [Fact]
     public void Render_EmitsNoMarkersWithoutInputs()
     {
         MapRenderer renderer = new(CreateCache(new FakeSpriteSheetLoader(), ManifestJson((1, 1, 0, 0, 32, 32))));

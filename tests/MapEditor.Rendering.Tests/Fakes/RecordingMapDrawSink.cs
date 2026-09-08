@@ -42,6 +42,8 @@ public sealed class RecordingMapDrawSink : IMapDrawSink
 
     public void DrawNpcSpawnAnchor(in NpcSpawnAnchorDrawOperation operation) => Record(operation);
 
+    public void DrawNpcName(in NpcNameDrawOperation operation) => Record(operation);
+
     private void Record(object operation)
     {
         if (_failure is not null)

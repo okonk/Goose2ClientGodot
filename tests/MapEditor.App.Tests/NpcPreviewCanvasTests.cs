@@ -199,6 +199,55 @@ public class NpcPreviewCanvasTests
     }
 
     [AvaloniaFact]
+    public void Names_RenderOnMarkerBoxesByDefault_AndHideWhenToggledOff()
+    {
+        Harness harness = CreateHarness();
+        MapDocumentViewModel viewModel = harness.ViewModel;
+        viewModel.GameData!.AttachSession(Session(
+            spawns: new[] { new NpcSpawnRow(1, 10, 1, 1), new NpcSpawnRow(999, 10, 3, 1) },
+            warps: new[] { new WarpRow(10, 2, 2, 10, 5, 6) }));
+
+        RecordingMapDrawTarget target = new();
+        harness.Canvas.RenderMap(target);
+
+        Assert.Equal(3, target.Texts.Count);
+        RecordingMapDrawTarget.TextDraw goose = target.Texts.Single(text => text.Text == "Goose");
+        Assert.Equal(new Point(48, 48), goose.Center);
+        Assert.Equal(11.2, goose.FontSize);
+        Assert.Equal("999", target.Texts.Single(text => text.Text != "Goose" && text.Text != "Dungeon").Text);
+        RecordingMapDrawTarget.TextDraw warp = target.Texts.Single(text => text.Text == "Dungeon");
+        Assert.Equal(new Point(80, 80), warp.Center);
+
+        viewModel.GameData.ShowNames = false;
+        RecordingMapDrawTarget hidden = new();
+        harness.Canvas.RenderMap(hidden);
+        Assert.Empty(hidden.Texts);
+    }
+
+    [AvaloniaFact]
+    public void Names_RenderAboveTheHeadInPreviewMode()
+    {
+        Harness harness = CreateHarness();
+        MapDocumentViewModel viewModel = harness.ViewModel;
+        viewModel.GameData!.AttachSession(Session(spawns: new[] { new NpcSpawnRow(1, 10, 1, 1) }));
+        viewModel.GameData.PreviewMode = true;
+
+        RecordingMapDrawTarget target = new();
+        harness.Canvas.RenderMap(target);
+
+        RecordingMapDrawTarget.TextDraw text = target.Texts.Single();
+        Assert.Equal("Goose", text.Text);
+        Assert.Equal(48, text.Center.X);
+        Assert.True(text.Center.Y < 32);
+        Assert.Equal(11.2, text.FontSize);
+
+        viewModel.GameData.ShowNames = false;
+        RecordingMapDrawTarget hidden = new();
+        harness.Canvas.RenderMap(hidden);
+        Assert.Empty(hidden.Texts);
+    }
+
+    [AvaloniaFact]
     public void AllAssetsMissing_FallsBackToNormalMarkersAndStaysClickable()
     {
         Harness harness = CreateHarness(withAppearanceSidecar: false);

@@ -56,7 +56,8 @@ public readonly record struct GameDataMarkerDrawOperation(
     MapTileCoordinate Tile,
     RenderRect DestinationRect,
     bool Selected,
-    string Diagnostic);
+    string Diagnostic,
+    string? Name = null);
 
 public readonly record struct GridLineDrawOperation(
     RenderPoint Start,
@@ -90,6 +91,12 @@ public readonly record struct NpcSpawnAnchorDrawOperation(
     RenderColor FillColor,
     RenderColor StrokeColor,
     string? Diagnostic);
+
+public readonly record struct NpcNameDrawOperation(
+    int OccurrenceIndex,
+    string Name,
+    RenderPoint Center,
+    double FontSize);
 
 public sealed class MapRenderWorkLimitException : Exception
 {

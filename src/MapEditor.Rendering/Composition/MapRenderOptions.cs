@@ -15,7 +15,8 @@ public sealed record MapRenderOptions(
     IReadOnlyList<GameDataMarkerInput>? SpawnMarkers = null,
     IReadOnlyList<GameDataMarkerInput>? WarpMarkers = null,
     bool PreviewMode = false,
-    IReadOnlyList<NpcAppearanceGroup>? NpcPreviews = null)
+    IReadOnlyList<NpcAppearanceGroup>? NpcPreviews = null,
+    bool ShowNames = false)
 {
     public static MapRenderOptions Default { get; } = new(MapLayerVisibility.All, false, false, null, null);
 }
@@ -24,7 +25,8 @@ public readonly record struct GameDataMarkerInput(
     int OccurrenceIndex,
     MapTileCoordinate Tile,
     bool Selected,
-    string Diagnostic);
+    string Diagnostic,
+    string? Name = null);
 
 public readonly record struct BlockPreview(MapTileRectangle Rectangle, bool Blocked);
 

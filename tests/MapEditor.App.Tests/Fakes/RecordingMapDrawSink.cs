@@ -34,4 +34,7 @@ public sealed class RecordingMapDrawSink : IMapDrawSink
 
     public void DrawNpcSpawnAnchor(in NpcSpawnAnchorDrawOperation operation)
         => _calls.Add(operation);
+
+    public void DrawNpcName(in NpcNameDrawOperation operation)
+        => _calls.Add(operation);
 }

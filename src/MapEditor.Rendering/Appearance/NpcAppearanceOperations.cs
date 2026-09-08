@@ -39,4 +39,5 @@ public sealed record NpcAppearanceGroup(
     int SortAnchorX,
     int SortAnchorY,
     IReadOnlyList<NpcPartDrawOperation> Parts,
-    string? EquipmentDiagnostic);
+    string? EquipmentDiagnostic,
+    string? Name = null);

@@ -41,6 +41,7 @@
         <MenuItem x:Name="SpawnOverlayMenuItem" Header="Spawn overlay" ToggleType="CheckBox" IsChecked="{Binding GameData.ShowSpawnOverlay, Mode=TwoWay}" />
         <MenuItem x:Name="WarpOverlayMenuItem" Header="Warp overlay" ToggleType="CheckBox" IsChecked="{Binding GameData.ShowWarpOverlay, Mode=TwoWay}" />
         <MenuItem x:Name="PreviewMenuItem" Header="Preview" ToggleType="CheckBox" IsChecked="{Binding GameData.PreviewMode, Mode=TwoWay}" />
+        <MenuItem x:Name="ShowNamesMenuItem" Header="Show names" ToggleType="CheckBox" IsChecked="{Binding GameData.ShowNames, Mode=TwoWay}" />
       </MenuItem>
     </Menu>
     <ListBox x:Name="TabStrip" DockPanel.Dock="Top"

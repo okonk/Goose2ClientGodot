@@ -24,6 +24,7 @@ internal sealed class DocumentGameDataState : IDisposable, INotifyPropertyChange
     private GameDataTool _activeTool;
     private bool _showSpawnOverlay = true;
     private bool _showWarpOverlay = true;
+    private bool _showNames = true;
     private bool _previewMode;
     private int? _selectedSpawn;
     private int? _selectedWarp;
@@ -71,6 +72,12 @@ internal sealed class DocumentGameDataState : IDisposable, INotifyPropertyChange
     {
         get => _showWarpOverlay;
         set => SetField(ref _showWarpOverlay, value);
+    }
+
+    public bool ShowNames
+    {
+        get => _showNames;
+        set => SetField(ref _showNames, value);
     }
 
     public bool PreviewMode

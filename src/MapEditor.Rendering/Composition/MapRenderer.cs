@@ -119,16 +119,21 @@ public sealed class MapRenderer
             DrawGrid(document, viewport, ranges, sink);
         }
 
+        if (npcGroups is not null && options.ShowNames)
+        {
+            DrawNpcNames(npcGroups, document, viewport, sink);
+        }
+
         if (options.PreviewMode && npcGroups is not null)
         {
             DrawMarkers(options.SpawnMarkers, GameDataMarkerKind.Spawn, document, viewport, sink,
-                new HashSet<int>(npcGroups.Select(group => group.OccurrenceIndex)));
+                new HashSet<int>(npcGroups.Select(group => group.OccurrenceIndex)), options.ShowNames);
         }
         else
         {
-            DrawMarkers(options.SpawnMarkers, GameDataMarkerKind.Spawn, document, viewport, sink);
+            DrawMarkers(options.SpawnMarkers, GameDataMarkerKind.Spawn, document, viewport, sink, null, options.ShowNames);
         }
-        DrawMarkers(options.WarpMarkers, GameDataMarkerKind.Warp, document, viewport, sink);
+        DrawMarkers(options.WarpMarkers, GameDataMarkerKind.Warp, document, viewport, sink, null, options.ShowNames);
 
         if (options.SelectedTile is { } selected)
         {
@@ -393,6 +398,47 @@ public sealed class MapRenderer
         }
     }
 
+    private static void DrawNpcNames(
+        IReadOnlyList<NpcAppearanceGroup> groups,
+        MapDocument document,
+        ViewportTransform viewport,
+        IMapDrawSink sink)
+    {
+        RenderRect visible = viewport.VisibleWorldRect;
+        foreach (NpcAppearanceGroup group in groups)
+        {
+            if (group.Name is not { } name)
+            {
+                continue;
+            }
+
+            if (!IsEntityCandidate(group, document, visible))
+            {
+                continue;
+            }
+
+            double headTop = double.MaxValue;
+            foreach (NpcPartDrawOperation part in group.Parts)
+            {
+                if (part.Destination.Height > 0 && part.Destination.Y < headTop)
+                {
+                    headTop = part.Destination.Y;
+                }
+            }
+
+            if (headTop == double.MaxValue)
+            {
+                headTop = group.TileY * ViewportCulling.TileSize;
+            }
+
+            double fontSize = ViewportCulling.TileSize * 0.35;
+            RenderPoint center = viewport.WorldToScreen(new RenderPoint(
+                group.SortAnchorX,
+                headTop - 2 - fontSize / 2));
+            sink.DrawNpcName(new NpcNameDrawOperation(group.OccurrenceIndex, name, center, fontSize * viewport.Scale));
+        }
+    }
+
     private static void DrawNpcSpawnAnchors(
         IReadOnlyList<NpcAppearanceGroup> groups,
         IReadOnlyList<GameDataMarkerInput>? spawnMarkers,
@@ -532,7 +578,8 @@ public sealed class MapRenderer
         MapDocument document,
         ViewportTransform viewport,
         IMapDrawSink sink,
-        HashSet<int>? suppressedSpawnOccurrences = null)
+        HashSet<int>? suppressedSpawnOccurrences = null,
+        bool showNames = false)
     {
         if (markers is null)
         {
@@ -565,7 +612,8 @@ public sealed class MapRenderer
                 tile,
                 viewport.WorldToScreen(cell),
                 marker.Selected,
-                marker.Diagnostic));
+                marker.Diagnostic,
+                showNames ? marker.Name : null));
         }
     }
 

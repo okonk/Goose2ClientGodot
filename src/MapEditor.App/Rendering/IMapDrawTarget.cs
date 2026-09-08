@@ -13,5 +13,7 @@ internal interface IMapDrawTarget
 
     void DrawRectangle(Brush fill, Pen? stroke, Rect rect);
 
+    void DrawText(string text, Point center, double fontSize, Brush fill, Brush? stroke);
+
     IDisposable PushClip(Rect rect);
 }

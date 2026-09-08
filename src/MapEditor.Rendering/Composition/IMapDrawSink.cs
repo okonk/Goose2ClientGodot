@@ -17,4 +17,6 @@ public interface IMapDrawSink
     void DrawNpcPartPlaceholder(in NpcPartPlaceholderDrawOperation operation);
 
     void DrawNpcSpawnAnchor(in NpcSpawnAnchorDrawOperation operation);
+
+    void DrawNpcName(in NpcNameDrawOperation operation);
 }

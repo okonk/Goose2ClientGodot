@@ -15,6 +15,8 @@ internal sealed class AvaloniaMapDrawSink : IMapDrawSink
     internal static readonly Color WarpMarkerFill = Color.FromArgb(0x80, 0x40, 0xC0, 0xFF);
     internal static readonly Color WarpMarkerStroke = Color.FromArgb(0xFF, 0x40, 0xC0, 0xFF);
     internal static readonly Color SelectedMarkerStroke = Colors.White;
+    internal static readonly Color NameFill = Colors.White;
+    internal static readonly Color NameStroke = Colors.Black;
 
     private readonly IMapDrawTarget _target;
     private readonly AvaloniaTintedSpriteCache _tintCache;
@@ -66,7 +68,12 @@ internal sealed class AvaloniaMapDrawSink : IMapDrawSink
         Color stroke = operation.Selected
             ? SelectedMarkerStroke
             : operation.Kind == GameDataMarkerKind.Spawn ? SpawnMarkerStroke : WarpMarkerStroke;
-        _target.DrawRectangle(new SolidColorBrush(fill), new Pen(new SolidColorBrush(stroke), StrokeWidth), ToRect(operation.DestinationRect));
+        Rect rect = ToRect(operation.DestinationRect);
+        _target.DrawRectangle(new SolidColorBrush(fill), new Pen(new SolidColorBrush(stroke), StrokeWidth), rect);
+        if (operation.Name is { } name)
+        {
+            _target.DrawText(name, rect.Center, rect.Height * 0.35, new SolidColorBrush(NameFill), new SolidColorBrush(NameStroke));
+        }
     }
 
     public void DrawNpcImage(in NpcImageDrawOperation operation)
@@ -104,6 +111,9 @@ internal sealed class AvaloniaMapDrawSink : IMapDrawSink
     {
         _target.DrawRectangle(ToBrush(operation.FillColor), ToPen(operation.StrokeColor), ToRect(operation.DestinationRect));
     }
+
+    public void DrawNpcName(in NpcNameDrawOperation operation)
+        => _target.DrawText(operation.Name, new Point(operation.Center.X, operation.Center.Y), operation.FontSize, new SolidColorBrush(NameFill), new SolidColorBrush(NameStroke));
 
     private static Rect ToRect(RenderRect rect)
         => new(rect.X, rect.Y, rect.Width, rect.Height);

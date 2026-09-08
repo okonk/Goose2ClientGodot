@@ -619,7 +619,8 @@ internal sealed class MapCanvas : Control, ICustomHitTest
             SpawnMarkers: BuildSpawnMarkers(),
             WarpMarkers: BuildWarpMarkers(),
             PreviewMode: _viewModel.GameData?.PreviewMode ?? false,
-            NpcPreviews: BuildNpcPreviews());
+            NpcPreviews: BuildNpcPreviews(),
+            ShowNames: _viewModel.GameData?.ShowNames ?? false);
         return new MapRenderRequest(session.Document, _viewport, options);
     }
 
@@ -632,6 +633,7 @@ internal sealed class MapCanvas : Control, ICustomHitTest
         }
 
         var spawns = edits.Spawns;
+        IReadOnlyDictionary<int, NpcAppearance> npcs = state.Session.Npcs;
         var markers = new GameDataMarkerInput[spawns.Count];
         for (int i = 0; i < spawns.Count; i++)
         {
@@ -642,7 +644,10 @@ internal sealed class MapCanvas : Control, ICustomHitTest
                 tile = drag.Current;
             }
 
-            markers[i] = new GameDataMarkerInput(i, tile, state.SelectedSpawn == i, $"npc {spawn.NpcId}");
+            string name = npcs.TryGetValue(spawn.NpcId, out NpcAppearance appearance) && !string.IsNullOrWhiteSpace(appearance.NpcName)
+                ? appearance.NpcName
+                : spawn.NpcId.ToString();
+            markers[i] = new GameDataMarkerInput(i, tile, state.SelectedSpawn == i, $"npc {spawn.NpcId}", name);
         }
 
         return markers;
@@ -657,6 +662,12 @@ internal sealed class MapCanvas : Control, ICustomHitTest
         }
 
         var warps = edits.Warps;
+        Dictionary<int, string> mapNames = new();
+        foreach (MapReference map in state.Session.Maps)
+        {
+            mapNames[map.MapId] = map.MapName;
+        }
+
         var markers = new GameDataMarkerInput[warps.Count];
         for (int i = 0; i < warps.Count; i++)
         {
@@ -667,7 +678,10 @@ internal sealed class MapCanvas : Control, ICustomHitTest
                 tile = drag.Current;
             }
 
-            markers[i] = new GameDataMarkerInput(i, tile, state.SelectedWarp == i, $"map {warp.WarpId} ({warp.WarpX}, {warp.WarpY})");
+            string name = mapNames.TryGetValue(warp.WarpId, out string? mapName) && !string.IsNullOrWhiteSpace(mapName)
+                ? mapName
+                : warp.WarpId.ToString();
+            markers[i] = new GameDataMarkerInput(i, tile, state.SelectedWarp == i, $"map {warp.WarpId} ({warp.WarpX}, {warp.WarpY})", name);
         }
 
         return markers;
@@ -700,7 +714,10 @@ internal sealed class MapCanvas : Control, ICustomHitTest
             }
 
             NpcAppearance? appearance = npcs.TryGetValue(spawn.NpcId, out NpcAppearance found) ? found : null;
-            groups[i] = composer.Compose(appearance ?? default, i, tile.X, tile.Y);
+            string name = appearance is { NpcName: { } npcName } && !string.IsNullOrWhiteSpace(npcName)
+                ? npcName
+                : spawn.NpcId.ToString();
+            groups[i] = composer.Compose(appearance ?? default, i, tile.X, tile.Y) with { Name = name };
         }
 
         return groups;

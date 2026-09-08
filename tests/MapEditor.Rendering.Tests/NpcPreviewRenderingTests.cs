@@ -537,6 +537,84 @@ public class NpcPreviewRenderingTests
         Assert.True(baseline.Calls.SequenceEqual(preview.Calls));
     }
 
+    [Fact]
+    public void Render_PreviewNamesRenderAboveTheHeadOnlyWhenShowNamesIsEnabled()
+    {
+        using Fixture fixture = new();
+        NpcAppearanceGroup group = fixture.Compose(Humanoid(1, NpcEquipmentParser.DefaultEquippedItems), 0, 1, 0) with { Name = "Goose" };
+        MapDocument document = MapDocument.Create(2, 2);
+        MapRenderOptions options = new(
+            MapLayerVisibility.All, false, false, null, null,
+            PreviewMode: true, NpcPreviews: new[] { group }, ShowNames: true);
+
+        RecordingMapDrawSink sink = new();
+        fixture.Renderer.Render(new MapRenderRequest(document, Viewport(64, 64), options), sink);
+
+        NpcNameDrawOperation name = sink.Calls.OfType<NpcNameDrawOperation>().Single();
+        Assert.Equal(0, name.OccurrenceIndex);
+        Assert.Equal("Goose", name.Name);
+        Assert.Equal(new RenderPoint(48, -31.6), name.Center);
+        Assert.Equal(11.2, name.FontSize);
+
+        object[] calls = sink.Calls.ToArray();
+        int nameIndex = Array.FindIndex(calls, op => op is NpcNameDrawOperation);
+        int lastPart = -1;
+        for (int i = 0; i < calls.Length; i++)
+        {
+            if (calls[i] is NpcImageDrawOperation)
+            {
+                lastPart = i;
+            }
+        }
+
+        Assert.True(lastPart >= 0 && nameIndex > lastPart);
+
+        RecordingMapDrawSink hiddenSink = new();
+        fixture.Renderer.Render(new MapRenderRequest(document, Viewport(64, 64), options with { ShowNames = false }), hiddenSink);
+        Assert.Equal(0, hiddenSink.Calls.Count(call => call is NpcNameDrawOperation));
+    }
+
+    [Fact]
+    public void Render_PreviewNameForAnUnknownNpcSitsAboveTheCell()
+    {
+        using Fixture fixture = new();
+        NpcAppearance unknown = new(999999, "Nobody", 3, 999999, default, 0, 0, default, NpcEquipmentParser.DefaultEquippedItems);
+        NpcAppearanceGroup group = fixture.Compose(unknown, 0, 0, 0) with { Name = "999999" };
+        MapDocument document = MapDocument.Create(2, 2);
+        MapRenderOptions options = new(
+            MapLayerVisibility.All, false, false, null, null,
+            PreviewMode: true, NpcPreviews: new[] { group }, ShowNames: true);
+
+        RecordingMapDrawSink sink = new();
+        fixture.Renderer.Render(new MapRenderRequest(document, Viewport(64, 64), options), sink);
+
+        NpcNameDrawOperation name = sink.Calls.OfType<NpcNameDrawOperation>().Single();
+        Assert.Equal(new RenderPoint(16, -7.6), name.Center);
+    }
+
+    [Fact]
+    public void Render_PreviewNamesRenderAboveTheUpperTileLayers()
+    {
+        using Fixture fixture = new();
+        NpcAppearanceGroup group = fixture.Compose(Humanoid(1, NpcEquipmentParser.DefaultEquippedItems), 0, 1, 0) with { Name = "Goose" };
+        MapDocument document = MapDocument.Create(2, 2);
+        for (int layer = 0; layer < MapDocument.LayerCount; layer++)
+        {
+            document.SetLayer(0, 0, layer, new MapTileLayer(1, layer + 1));
+        }
+        MapRenderOptions options = new(
+            MapLayerVisibility.All, false, false, null, null,
+            PreviewMode: true, NpcPreviews: new[] { group }, ShowNames: true);
+
+        RecordingMapDrawSink sink = new();
+        fixture.Renderer.Render(new MapRenderRequest(document, Viewport(64, 64), options), sink);
+
+        object[] calls = sink.Calls.ToArray();
+        int nameIndex = Array.FindIndex(calls, op => op is NpcNameDrawOperation);
+        int lastUpperLayer = Array.FindLastIndex(calls, op => op is SpriteDrawOperation { Layer: >= 3 });
+        Assert.True(nameIndex >= 0 && lastUpperLayer >= 0 && nameIndex > lastUpperLayer);
+    }
+
     private static NpcAppearance Humanoid(int bodyId, string equipped, int bodyState = 3)
         => new(1, "Goose", bodyState, bodyId, new RgbaValue(10, 20, 30, 40), 7, 2, new RgbaValue(50, 60, 70, 80), equipped);
 
