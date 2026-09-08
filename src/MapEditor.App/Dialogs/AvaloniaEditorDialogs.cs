@@ -15,7 +15,7 @@ internal sealed class AvaloniaEditorDialogs : IEditorDialogs
 {
     private static readonly FilePickerFileType[] MapFileTypes =
     {
-        new("Map files") { Patterns = new[] { "*.bytes" } },
+        new("Map files") { Patterns = new[] { "*.map" } },
         new("All files") { Patterns = new[] { "*" } }
     };
 
@@ -72,7 +72,7 @@ internal sealed class AvaloniaEditorDialogs : IEditorDialogs
 
     public async Task<string?> PickSaveMapAsync(string suggestedName)
     {
-        string suggested = Path.GetExtension(suggestedName).Length == 0 ? suggestedName + ".bytes" : suggestedName;
+        string suggested = Path.GetExtension(suggestedName).Length == 0 ? suggestedName + ".map" : suggestedName;
         IStorageFile? file = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
         {
             Title = "Save map",

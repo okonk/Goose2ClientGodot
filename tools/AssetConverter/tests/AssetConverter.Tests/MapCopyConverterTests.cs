@@ -18,7 +18,7 @@ public class MapCopyConverterTests
             var result = MapCopyConverter.Convert(source, output);
 
             Assert.Equal(1, result.Copied);
-            var outPath = Path.Combine(output, "Map100.bytes");
+            var outPath = Path.Combine(output, "Map100.map");
             Assert.True(File.Exists(outPath));
             Assert.Equal(new byte[] { 1, 2, 3 }, File.ReadAllBytes(outPath));
         }
@@ -45,9 +45,9 @@ public class MapCopyConverterTests
 
             Assert.Equal(3, result.Copied);
             Assert.Empty(result.Failures);
-            Assert.Equal(new byte[] { 1, 2, 3 }, File.ReadAllBytes(Path.Combine(output, "Map100.bytes")));
-            Assert.Equal(new byte[] { 4, 5, 6 }, File.ReadAllBytes(Path.Combine(output, "Map101.bytes")));
-            Assert.Equal(new byte[] { 7, 8, 9 }, File.ReadAllBytes(Path.Combine(output, "Map10.bytes")));
+            Assert.Equal(new byte[] { 1, 2, 3 }, File.ReadAllBytes(Path.Combine(output, "Map100.map")));
+            Assert.Equal(new byte[] { 4, 5, 6 }, File.ReadAllBytes(Path.Combine(output, "Map101.map")));
+            Assert.Equal(new byte[] { 7, 8, 9 }, File.ReadAllBytes(Path.Combine(output, "Map10.map")));
         }
         finally
         {
@@ -67,12 +67,12 @@ public class MapCopyConverterTests
             Directory.CreateDirectory(output);
             File.WriteAllBytes(Path.Combine(source, "Map100.map"), new byte[] { 1, 2, 3 });
             // Pre-existing output with different content
-            File.WriteAllBytes(Path.Combine(output, "Map100.bytes"), new byte[] { 9, 9, 9 });
+            File.WriteAllBytes(Path.Combine(output, "Map100.map"), new byte[] { 9, 9, 9 });
 
             var result = MapCopyConverter.Convert(source, output);
 
             Assert.Equal(1, result.Copied);
-            Assert.Equal(new byte[] { 1, 2, 3 }, File.ReadAllBytes(Path.Combine(output, "Map100.bytes")));
+            Assert.Equal(new byte[] { 1, 2, 3 }, File.ReadAllBytes(Path.Combine(output, "Map100.map")));
         }
         finally
         {
@@ -95,7 +95,7 @@ public class MapCopyConverterTests
 
             Assert.Equal(1, result.Copied);
             Assert.True(Directory.Exists(output));
-            Assert.True(File.Exists(Path.Combine(output, "Map100.bytes")));
+            Assert.True(File.Exists(Path.Combine(output, "Map100.map")));
         }
         finally
         {
@@ -145,8 +145,8 @@ public class MapCopyConverterTests
             Assert.Equal(1, result.Copied);
             Assert.Single(result.Failures);
             Assert.Contains("M.map", result.Failures[0]);
-            Assert.True(File.Exists(Path.Combine(output, "Map100.bytes")));
-            Assert.False(File.Exists(Path.Combine(output, "M.bytes")));
+            Assert.True(File.Exists(Path.Combine(output, "Map100.map")));
+            Assert.False(File.Exists(Path.Combine(output, "M.map")));
         }
         finally
         {

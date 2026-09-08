@@ -4,7 +4,7 @@ namespace Goose2.AssetConverter.Maps;
 public sealed record MapCopyResult(int Copied, IReadOnlyList<string> Failures);
 
 /// <summary>Copies *.map files from a source directory into a Godot-friendly layout.
-/// Unity naming rule: <c>Map100.map</c> → <c>Map100.bytes</c> (M + basename[1:] + .bytes).</summary>
+/// Unity naming rule: <c>Map100.map</c> → <c>Map100.map</c> (M + basename[1:] + .map).</summary>
 public static class MapCopyConverter
 {
     /// <summary>Copies all <c>*.map</c> files from <paramref name="sourceMapsDir"/> into
@@ -31,9 +31,9 @@ public static class MapCopyConverter
                     continue;
                 }
 
-                // Unity naming rule: M + rest_of_basename + .bytes
-                // e.g. Map100.map → M + ap100 + .bytes → Map100.bytes
-                var godotName = $"M{basename.Substring(1)}.bytes";
+                // Unity naming rule: M + rest_of_basename + .map
+                // e.g. Map100.map → M + ap100 + .map → Map100.map
+                var godotName = $"M{basename.Substring(1)}.map";
                 var outPath = Path.Combine(outMapsDir, godotName);
 
                 File.Copy(file, outPath, overwrite: true);

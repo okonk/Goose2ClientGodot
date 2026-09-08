@@ -26,7 +26,7 @@ public class AsperetaIntegrationTests
             var sheets = manifest.RootElement.GetProperty("sheets");
 
             var missing = new List<string>();
-            foreach (var mapFile in Directory.EnumerateFiles(tmp, "*.bytes"))
+            foreach (var mapFile in Directory.EnumerateFiles(tmp, "*.map"))
             {
                 using var r = new BinaryReader(File.OpenRead(mapFile));
                 r.ReadInt16(); r.ReadInt16(); int w = r.ReadInt32(); int h = r.ReadInt32();

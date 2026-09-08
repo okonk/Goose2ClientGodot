@@ -20,9 +20,9 @@ public class AsperetaMapConverterTests
 
             Assert.Equal(44, result.Converted);
             Assert.Empty(result.Failures);
-            Assert.True(File.Exists(Path.Combine(outDir, "Map10001.bytes")));
+            Assert.True(File.Exists(Path.Combine(outDir, "Map10001.map")));
 
-            var bytes = File.ReadAllBytes(Path.Combine(outDir, "Map10001.bytes"));
+            var bytes = File.ReadAllBytes(Path.Combine(outDir, "Map10001.map"));
             using var r = new BinaryReader(new MemoryStream(bytes));
             short version = r.ReadInt16(); short editorVersion = r.ReadInt16();
             int width = r.ReadInt32(); int height = r.ReadInt32();

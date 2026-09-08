@@ -55,10 +55,10 @@ public class SearchPickerControlTests
     {
         var items = new List<Item>
         {
-            Make(20, "Cave", "cave.bytes"),
-            Make(10, "Dungeon", "dungeon.bytes"),
-            Make(30, "Tower", "tower.bytes"),
-            Make(40, "Ruins", "cave_ruins.bytes")
+            Make(20, "Cave", "cave.map"),
+            Make(10, "Dungeon", "dungeon.map"),
+            Make(30, "Tower", "tower.map"),
+            Make(40, "Ruins", "cave_ruins.map")
         };
         return items.AsReadOnly();
     }
@@ -87,19 +87,19 @@ public class SearchPickerControlTests
         using Harness harness = Harness.Create(Catalog());
 
         Type(harness, "cave");
-        Assert.Equal(new[] { "20  Cave  cave.bytes", "40  Ruins  cave_ruins.bytes" }, VisibleTexts(harness));
+        Assert.Equal(new[] { "20  Cave  cave.map", "40  Ruins  cave_ruins.map" }, VisibleTexts(harness));
 
         harness.Picker.SearchText = string.Empty;
         Type(harness, "CAVE");
-        Assert.Equal(new[] { "20  Cave  cave.bytes", "40  Ruins  cave_ruins.bytes" }, VisibleTexts(harness));
+        Assert.Equal(new[] { "20  Cave  cave.map", "40  Ruins  cave_ruins.map" }, VisibleTexts(harness));
 
         harness.Picker.SearchText = string.Empty;
         Type(harness, "30");
-        Assert.Equal(new[] { "30  Tower  tower.bytes" }, VisibleTexts(harness));
+        Assert.Equal(new[] { "30  Tower  tower.map" }, VisibleTexts(harness));
 
         harness.Picker.SearchText = string.Empty;
-        Type(harness, "dungeon.bytes");
-        Assert.Equal(new[] { "10  Dungeon  dungeon.bytes" }, VisibleTexts(harness));
+        Type(harness, "dungeon.map");
+        Assert.Equal(new[] { "10  Dungeon  dungeon.map" }, VisibleTexts(harness));
     }
 
     [AvaloniaFact]
@@ -108,11 +108,11 @@ public class SearchPickerControlTests
         IReadOnlyList<Item> catalog = Catalog();
         using Harness harness = Harness.Create(catalog);
 
-        Assert.Equal(new[] { "20  Cave  cave.bytes", "10  Dungeon  dungeon.bytes", "30  Tower  tower.bytes", "40  Ruins  cave_ruins.bytes" },
+        Assert.Equal(new[] { "20  Cave  cave.map", "10  Dungeon  dungeon.map", "30  Tower  tower.map", "40  Ruins  cave_ruins.map" },
             VisibleTexts(harness));
 
-        Type(harness, "a");
-        Assert.Equal(new[] { "20  Cave  cave.bytes", "40  Ruins  cave_ruins.bytes" }, VisibleTexts(harness));
+        Type(harness, "v");
+        Assert.Equal(new[] { "20  Cave  cave.map", "40  Ruins  cave_ruins.map" }, VisibleTexts(harness));
 
         Assert.Equal(4, catalog.Count);
         Assert.Equal(20, catalog[0].Id);
@@ -241,7 +241,7 @@ public class SearchPickerControlTests
     [AvaloniaFact]
     public void ManyItems_PickerDesiredHeightStaysBounded()
     {
-        var items = Enumerable.Range(1, 50).Select(i => Make(i, $"Npc {i}", $"npc_{i}.bytes")).ToList();
+        var items = Enumerable.Range(1, 50).Select(i => Make(i, $"Npc {i}", $"npc_{i}.map")).ToList();
         var picker = new SearchPickerControl<Item>
         {
             Items = items,

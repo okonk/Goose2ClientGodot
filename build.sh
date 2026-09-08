@@ -67,7 +67,7 @@ done
 # Assets/ is generated, gitignored output. A non-empty Assets/ is not enough — the
 # tracked Assets/UI alone would satisfy that while the client is still unshippable.
 # Check one sentinel per generated subtree instead.
-for sentinel in Assets/Maps/Map1.bytes Assets/Sprites/manifest.json Assets/Resources/AnimationHeights.txt; do
+for sentinel in Assets/Maps/Map1.map Assets/Sprites/manifest.json Assets/Resources/AnimationHeights.txt; do
   [ -e "$sentinel" ] || die "missing generated asset '$sentinel' — regenerate with:
     ILLUTIA_DATA=... ILLUTIA_MAPS=... ASPERETA_DATA=... ASPERETA_MAPS=... \\
       dotnet run --project tools/AssetConverter/src/AssetConverter -- all \"\$PWD\"

@@ -65,7 +65,7 @@ public static class TileSheetGenerator
             return;
         }
 
-        foreach (string file in Directory.EnumerateFiles(mapsDir, "*.bytes"))
+        foreach (string file in Directory.EnumerateFiles(mapsDir, "*.map"))
         {
             byte[] bytes;
             try

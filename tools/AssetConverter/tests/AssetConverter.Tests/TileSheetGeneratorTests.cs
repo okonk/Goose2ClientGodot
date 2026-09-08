@@ -41,7 +41,7 @@ public class TileSheetGeneratorTests : IDisposable
 
         string mapsDir = Path.Combine(_dir, "maps");
         Directory.CreateDirectory(mapsDir);
-        WriteMap(mapsDir, "Map1.bytes", sheetsByLayer: new[] { 13, 0, 0, 0, 0 });
+        WriteMap(mapsDir, "Map1.map", sheetsByLayer: new[] { 13, 0, 0, 0, 0 });
 
         IReadOnlyList<int> tiles = TileSheetGenerator.Generate(_dir, icons, mapsDir);
 
@@ -59,7 +59,7 @@ public class TileSheetGeneratorTests : IDisposable
 
         string mapsDir = Path.Combine(_dir, "maps");
         Directory.CreateDirectory(mapsDir);
-        WriteMap(mapsDir, "Map1.bytes", sheetsByLayer: new[] { 11, 0, 0, 0, 0 });
+        WriteMap(mapsDir, "Map1.map", sheetsByLayer: new[] { 11, 0, 0, 0, 0 });
 
         IReadOnlyList<int> tiles = TileSheetGenerator.Generate(_dir, icons, mapsDir);
 

@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
-"""Regenerates tests/Goose2Client.Tests/Fixtures/Map10x10.bytes.
+"""Regenerates tests/MapEditor.Core.Tests/Fixtures/Map10x10.map.
 
-Carves the 10x10 tile region at (row 100, col 100) out of the real Assets/Maps/Map1.bytes
+Carves the 10x10 tile region at (row 100, col 100) out of the real Assets/Maps/Map1.map
 and rewrites the header dimensions. Real game data, small enough to commit. Run from the
 repo root with generated assets present; the output is deterministic.
 """
 import struct
 
-SRC = "Assets/Maps/Map1.bytes"
-DST = "tests/Goose2Client.Tests/Fixtures/Map10x10.bytes"
+SRC = "Assets/Maps/Map1.map"
+DST = "tests/MapEditor.Core.Tests/Fixtures/Map10x10.map"
 TILE, N, R0, C0 = 34, 10, 100, 100
 
 src = open(SRC, "rb").read()

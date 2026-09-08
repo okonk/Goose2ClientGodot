@@ -10,7 +10,7 @@ namespace MapEditor.Core.Tests;
 public class MapCodecTests
 {
     private static string FixturePath =>
-        Path.Combine(AppContext.BaseDirectory, "Fixtures", "Map10x10.bytes");
+        Path.Combine(AppContext.BaseDirectory, "Fixtures", "Map10x10.map");
 
     [Fact]
     public void Decode_ExistingFixturePreservesHeaderGridAndBlockedCount()

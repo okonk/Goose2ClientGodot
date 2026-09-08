@@ -259,23 +259,23 @@ public class MapDocumentViewModelTests : IDisposable
         _viewModel.Refresh(EditorRefresh.Title);
         Assert.EndsWith("*", _viewModel.Title);
 
-        _dialogs.SavePickResult = MapPath("titled.bytes");
+        _dialogs.SavePickResult = MapPath("titled.map");
 
         await _viewModel.SaveAsAsync();
-        Assert.Equal("Goose2 Map Editor — titled.bytes", _viewModel.Title);
+        Assert.Equal("Goose2 Map Editor — titled.map", _viewModel.Title);
 
         session = _viewModel.Session;
         session.SelectedTileLayer = new MapTileLayer(1, 1);
         session.BeginStroke(MapEditTool.Pencil, 1, 0);
         Assert.True(session.CompleteStroke());
         _viewModel.Refresh(EditorRefresh.Title);
-        Assert.Equal("Goose2 Map Editor — titled.bytes*", _viewModel.Title);
+        Assert.Equal("Goose2 Map Editor — titled.map*", _viewModel.Title);
     }
 
     [Fact]
     public async Task Commands_RefreshAfterSaveAndEdit()
     {
-        _dialogs.SavePickResult = MapPath("commands.bytes");
+        _dialogs.SavePickResult = MapPath("commands.map");
 
         await _viewModel.SaveAsAsync();
         Assert.False(_viewModel.CanSave);

@@ -105,13 +105,13 @@ public class TabStripTests : IDisposable
         Assert.Equal("Untitled", initial.TabToolTip);
         Assert.Equal("Untitled", TabTip(TabFor(initial)));
 
-        string path = WriteMap("open.bytes");
+        string path = WriteMap("open.map");
         _harness.Dialogs.OpenPickResult = path;
         await _harness.Workspace.OpenAsync();
         MapDocumentViewModel opened = _harness.Workspace.ActiveDocument;
         Dispatcher.UIThread.RunJobs();
 
-        Assert.Equal("open.bytes", TabLabel(TabFor(opened)));
+        Assert.Equal("open.map", TabLabel(TabFor(opened)));
         Assert.Equal(Path.GetFullPath(path), opened.TabToolTip);
         Assert.Equal(Path.GetFullPath(path), TabTip(TabFor(opened)));
         Assert.Null(Strip.ContainerFromItem(initial));
@@ -131,13 +131,13 @@ public class TabStripTests : IDisposable
         Assert.True(document.IsDirty);
         Assert.True(TabDirtyDot(tab).IsVisible);
 
-        string savedPath = Path.Combine(_harness.TempDirectory, "saved.bytes");
+        string savedPath = Path.Combine(_harness.TempDirectory, "saved.map");
         _harness.Dialogs.SavePickResult = savedPath;
         await document.SaveAsync();
 
         Assert.False(document.IsDirty);
         Assert.False(TabDirtyDot(tab).IsVisible);
-        Assert.Equal("saved.bytes", TabLabel(tab));
+        Assert.Equal("saved.map", TabLabel(tab));
         Assert.Equal(Path.GetFullPath(savedPath), TabTip(tab));
     }
 

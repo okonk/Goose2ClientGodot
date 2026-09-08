@@ -18,9 +18,9 @@ namespace MapEditor.App.Tests;
 
 public class GameDataDialogTests
 {
-    private static readonly MapReference Map10 = new(10, "Dungeon", "dungeon.bytes");
-    private static readonly MapReference Map20 = new(20, "Cave", "cave.bytes");
-    private static readonly MapReference Map30 = new(30, "Tower", "tower.bytes");
+    private static readonly MapReference Map10 = new(10, "Dungeon", "dungeon.map");
+    private static readonly MapReference Map20 = new(20, "Cave", "cave.map");
+    private static readonly MapReference Map30 = new(30, "Tower", "tower.map");
     private static readonly IReadOnlyList<MapReference> Maps = new[] { Map10, Map20, Map30 };
 
     // Rows carry an ellipsizing TextBlock rather than a bare string.
@@ -107,7 +107,7 @@ public class GameDataDialogTests
     public void Map_SuggestedRow_IsDistinguishedWithoutAutoConfirming()
     {
         using Owner owner = new();
-        var dialog = new MapReferenceDialog(Maps, Map20, "dungeon.bytes");
+        var dialog = new MapReferenceDialog(Maps, Map20, "dungeon.map");
         Task<MapReference?> result = dialog.ShowDialog<MapReference?>(owner.Window);
         Dispatcher.UIThread.RunJobs();
 
@@ -127,7 +127,7 @@ public class GameDataDialogTests
     public async Task Map_Confirm_ReturnsTheSelectedReference()
     {
         using Owner owner = new();
-        var dialog = new MapReferenceDialog(Maps, Map20, "dungeon.bytes");
+        var dialog = new MapReferenceDialog(Maps, Map20, "dungeon.map");
         Task<MapReference?> result = dialog.ShowDialog<MapReference?>(owner.Window);
         Dispatcher.UIThread.RunJobs();
 
@@ -160,9 +160,9 @@ public class GameDataDialogTests
     {
         using Owner owner = new();
         var manyMaps = Enumerable.Range(0, 200)
-            .Select(i => new MapReference(i, $"Map {i}", $"map{i}.bytes"))
+            .Select(i => new MapReference(i, $"Map {i}", $"map{i}.map"))
             .ToList();
-        var dialog = new MapReferenceDialog(manyMaps, null, "dungeon.bytes");
+        var dialog = new MapReferenceDialog(manyMaps, null, "dungeon.map");
         Task<MapReference?> result = dialog.ShowDialog<MapReference?>(owner.Window);
         Dispatcher.UIThread.RunJobs();
 
@@ -182,7 +182,7 @@ public class GameDataDialogTests
     public void Map_WithoutSuggestion_PreselectsTheFirstRow()
     {
         using Owner owner = new();
-        var dialog = new MapReferenceDialog(Maps, null, "dungeon.bytes");
+        var dialog = new MapReferenceDialog(Maps, null, "dungeon.map");
 
         Assert.Equal(0, dialog.FindControl<ListBox>("MapList")!.SelectedIndex);
     }
@@ -191,7 +191,7 @@ public class GameDataDialogTests
     public async Task Map_Cancel_ReturnsNull()
     {
         using Owner owner = new();
-        var dialog = new MapReferenceDialog(Maps, Map20, "dungeon.bytes");
+        var dialog = new MapReferenceDialog(Maps, Map20, "dungeon.map");
         Task<MapReference?> result = dialog.ShowDialog<MapReference?>(owner.Window);
         Dispatcher.UIThread.RunJobs();
 
@@ -206,7 +206,7 @@ public class GameDataDialogTests
     public async Task Map_WindowClose_ReturnsNull()
     {
         using Owner owner = new();
-        var dialog = new MapReferenceDialog(Maps, Map20, "dungeon.bytes");
+        var dialog = new MapReferenceDialog(Maps, Map20, "dungeon.map");
         Task<MapReference?> result = dialog.ShowDialog<MapReference?>(owner.Window);
         Dispatcher.UIThread.RunJobs();
 

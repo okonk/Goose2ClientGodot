@@ -42,7 +42,7 @@ Use `all` — it runs the full pipeline (sprite sheets, Aspereta monsters, maps)
 `batch` subcommand only produces sprite sheets and leaves the build unshippable.
 
 `build.sh` does not regenerate assets. It checks one sentinel per generated subtree
-(`Assets/Maps/Map1.bytes`, `Assets/Sprites/manifest.json`,
+(`Assets/Maps/Map1.map`, `Assets/Sprites/manifest.json`,
 `Assets/Resources/AnimationHeights.txt`) and aborts with the command above if any is
 missing. A merely non-empty `Assets/` is not enough: the tracked `Assets/UI` alone would
 satisfy that check while the client still has no sprites or maps.
@@ -83,13 +83,13 @@ and the export still reports success.
 That bites three generated file types, so every preset carries:
 
 ```ini
-include_filter="build_id.txt,Assets/Maps/*.bytes,Assets/Resources/*.txt"
+include_filter="build_id.txt,Assets/Maps/*.map,Assets/Resources/*.txt"
 ```
 
 - `build_id.txt` — a plain file; without this the client displays `dev`.
-- `Assets/Maps/*.bytes` — 160 map files with no importer and no `.import` sidecar.
+- `Assets/Maps/*.map` — 160 map files with no importer and no `.import` sidecar.
   Without this the client logs in fine and then fails with
-  `LoadMap: cannot open res://Assets/Maps/MapN.bytes (err FileNotFound)` followed by
+  `LoadMap: cannot open res://Assets/Maps/MapN.map (err FileNotFound)` followed by
   `MapManager: CurrentMap is null`, and the screen simply stays empty.
 - `Assets/Resources/*.txt` — `AnimationHeights.txt` / `AnimationToFirstFrame.txt`, read
   on every character spawn.

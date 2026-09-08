@@ -24,8 +24,8 @@ namespace MapEditor.App.Tests;
 
 public class GameDataPropertiesTests
 {
-    private static readonly MapReference Map10 = new(10, "Dungeon", "dungeon.bytes");
-    private static readonly MapReference Map20 = new(20, "Cave", "cave.bytes");
+    private static readonly MapReference Map10 = new(10, "Dungeon", "dungeon.map");
+    private static readonly MapReference Map20 = new(20, "Cave", "cave.map");
     private static readonly NpcAppearance Npc1 = new(1, "Goose", 0, 0, new RgbaValue(255, 255, 255, 255), 0, 0, new RgbaValue(255, 255, 255, 255), string.Empty);
     private static readonly NpcAppearance Npc2 = new(2, "Duck", 0, 0, new RgbaValue(255, 255, 255, 255), 0, 0, new RgbaValue(255, 255, 255, 255), string.Empty);
 
@@ -273,7 +273,7 @@ public class GameDataPropertiesTests
     private static GameDataSyncSession Session()
     {
         var data = new RemoteGameData(
-            new[] { Map10, new MapReference(20, "Cave", "cave.bytes"), new MapReference(30, "Tower", "tower.bytes") },
+            new[] { Map10, new MapReference(20, "Cave", "cave.map"), new MapReference(30, "Tower", "tower.map") },
             new Dictionary<int, NpcAppearance> { [1] = Npc1, [2] = Npc2 },
             new List<RemoteRow<NpcSpawnRow>> { new(2, new NpcSpawnRow(1, 10, 3, 4)), new(3, new NpcSpawnRow(2, 10, 7, 8)) },
             new List<RemoteRow<WarpRow>> { new(2, new WarpRow(10, 5, 6, 7, 8, 9)) });

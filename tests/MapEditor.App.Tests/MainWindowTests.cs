@@ -397,7 +397,7 @@ public class MainWindowTests : IDisposable
         Assert.False(undo.IsEnabled);
         Assert.True(redo.IsEnabled);
 
-        _harness.Dialogs.SavePickResult = Path.Combine(_harness.TempDirectory, "saved.bytes");
+        _harness.Dialogs.SavePickResult = Path.Combine(_harness.TempDirectory, "saved.map");
         await ViewModel.SaveAsync();
 
         Assert.False(save.IsEnabled);
@@ -644,10 +644,10 @@ public class MainWindowTests : IDisposable
         _harness.ViewModel.Refresh(EditorRefresh.Title);
         Assert.Equal("Goose2 Map Editor — Untitled*", Window.Title);
 
-        _harness.Dialogs.SavePickResult = Path.Combine(_harness.TempDirectory, "titled.bytes");
+        _harness.Dialogs.SavePickResult = Path.Combine(_harness.TempDirectory, "titled.map");
         await ViewModel.SaveAsync();
 
-        Assert.Equal("Goose2 Map Editor — titled.bytes", Window.Title);
+        Assert.Equal("Goose2 Map Editor — titled.map", Window.Title);
     }
 
     [AvaloniaFact]

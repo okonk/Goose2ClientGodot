@@ -19,9 +19,9 @@ namespace MapEditor.App.Tests;
 
 public class GameDataCommandControllerTests
 {
-    private static readonly MapReference Map10 = new(10, "Dungeon", "dungeon.bytes");
-    private static readonly MapReference Map20 = new(20, "Cave", "cave.bytes");
-    private static readonly MapReference Map30 = new(30, "Tower", "tower.bytes");
+    private static readonly MapReference Map10 = new(10, "Dungeon", "dungeon.map");
+    private static readonly MapReference Map20 = new(20, "Cave", "cave.map");
+    private static readonly MapReference Map30 = new(30, "Tower", "tower.map");
     private static readonly MapReference[] AllMaps = { Map10, Map20, Map30 };
     private static readonly string SheetUrl = "https://docs.google.com/spreadsheets/d/abc123";
     private static readonly NpcAppearance Npc1 = new(1, "Goose", 0, 0, new RgbaValue(255, 255, 255, 255), 0, 0, new RgbaValue(255, 255, 255, 255), string.Empty);
@@ -229,7 +229,7 @@ public class GameDataCommandControllerTests
     public async Task Pull_AutoSelectsWhenOnlyTheExtensionDiffers()
     {
         using var rig = new Rig();
-        string path = rig.WriteMap("Map10036.bytes");
+        string path = rig.WriteMap("Map10036.map");
         var document = await rig.OpenDocumentAsync(path);
         var maps = new[] { new MapReference(10001, "Minita", "Map10001.map"), new MapReference(10036, "Shops", "Map10036.map") };
         rig.Gateway.EnqueueMaps(maps).EnqueueGameData(PullData(maps));
@@ -246,10 +246,10 @@ public class GameDataCommandControllerTests
     public async Task Pull_ConfirmedMapDisagreeingWithTheFilenameKeepsTheDialogAndSuggestsTheConfirmedMap()
     {
         using var rig = new Rig();
-        string path = rig.WriteMap("dungeon.bytes");
+        string path = rig.WriteMap("dungeon.map");
         var document = await rig.OpenDocumentAsync(path);
         await rig.PullDocumentAsync(document, Map10);
-        var maps = new[] { Map10 with { MapFilename = "foo.bytes" }, Map20 with { MapFilename = "dungeon.bytes" }, Map30 };
+        var maps = new[] { Map10 with { MapFilename = "foo.map" }, Map20 with { MapFilename = "dungeon.map" }, Map30 };
         rig.Gateway.EnqueueMaps(maps).EnqueueGameData(PullData(maps));
         rig.Dialogs.SpreadsheetUrlResult = SheetUrl;
 
@@ -263,10 +263,10 @@ public class GameDataCommandControllerTests
     public async Task Pull_ConfirmedMapMissingFromFetchedList_FallsBackToFilenameSuggestion()
     {
         using var rig = new Rig();
-        string path = rig.WriteMap("dungeon.bytes");
+        string path = rig.WriteMap("dungeon.map");
         var document = await rig.OpenDocumentAsync(path);
         await rig.PullDocumentAsync(document, Map10);
-        var maps = new[] { new MapReference(11, "Dungeon Copy", "dungeon.bytes"), Map20, Map30 };
+        var maps = new[] { new MapReference(11, "Dungeon Copy", "dungeon.map"), Map20, Map30 };
         rig.Gateway.EnqueueMaps(maps).EnqueueGameData(PullData(maps));
         rig.Dialogs.SpreadsheetUrlResult = SheetUrl;
 
@@ -292,7 +292,7 @@ public class GameDataCommandControllerTests
     public async Task Pull_UnmatchedFilenameHasNoSuggestion()
     {
         using var rig = new Rig();
-        string path = rig.WriteMap("other.bytes");
+        string path = rig.WriteMap("other.map");
         var document = await rig.OpenDocumentAsync(path);
         rig.Gateway.EnqueueMaps(AllMaps);
         rig.Dialogs.SpreadsheetUrlResult = SheetUrl;
@@ -306,9 +306,9 @@ public class GameDataCommandControllerTests
     public async Task Pull_DuplicateFilenameHasNoSuggestion()
     {
         using var rig = new Rig();
-        string path = rig.WriteMap("dungeon.bytes");
+        string path = rig.WriteMap("dungeon.map");
         var document = await rig.OpenDocumentAsync(path);
-        var maps = new[] { Map10, new MapReference(11, "Dungeon Copy", "dungeon.bytes") };
+        var maps = new[] { Map10, new MapReference(11, "Dungeon Copy", "dungeon.map") };
         rig.Gateway.EnqueueMaps(maps);
         rig.Dialogs.SpreadsheetUrlResult = SheetUrl;
 
@@ -728,9 +728,9 @@ public class GameDataCommandControllerTests
     public async Task Push_OpenDimensions_IncludeSameSpreadsheetConfirmedTabs()
     {
         using var rig = new Rig();
-        string pathA = rig.WriteMap("dungeon.bytes", 20, 15);
+        string pathA = rig.WriteMap("dungeon.map", 20, 15);
         var a = await rig.OpenDocumentAsync(pathA);
-        string pathB = rig.WriteMap("cave.bytes", 30, 40);
+        string pathB = rig.WriteMap("cave.map", 30, 40);
         var b = await rig.OpenDocumentAsync(pathB);
 
         var maps = new[] { Map10, Map20 };
@@ -756,11 +756,11 @@ public class GameDataCommandControllerTests
     public async Task Push_OpenDimensions_ExcludeDifferentSpreadsheetAndUnconfirmedTabs()
     {
         using var rig = new Rig();
-        string pathA = rig.WriteMap("dungeon.bytes", 20, 15);
+        string pathA = rig.WriteMap("dungeon.map", 20, 15);
         var a = await rig.OpenDocumentAsync(pathA);
-        string pathB = rig.WriteMap("cave.bytes", 30, 40);
+        string pathB = rig.WriteMap("cave.map", 30, 40);
         var b = await rig.OpenDocumentAsync(pathB);
-        string pathC = rig.WriteMap("tower.bytes", 5, 5);
+        string pathC = rig.WriteMap("tower.map", 5, 5);
         var c = await rig.OpenDocumentAsync(pathC);
 
         var maps = new[] { Map10, Map20, Map30 };
@@ -792,9 +792,9 @@ public class GameDataCommandControllerTests
     public async Task TwoTabs_ShareConnectivity_WithDistinctSyncState()
     {
         using var rig = new Rig();
-        string pathA = rig.WriteMap("dungeon.bytes");
+        string pathA = rig.WriteMap("dungeon.map");
         var a = await rig.OpenDocumentAsync(pathA);
-        string pathB = rig.WriteMap("cave.bytes");
+        string pathB = rig.WriteMap("cave.map");
         var b = await rig.OpenDocumentAsync(pathB);
 
         rig.Gateway.EnqueueMaps(AllMaps).EnqueueGameData(PullData(AllMaps));
@@ -933,11 +933,11 @@ public class GameDataCommandControllerTests
     public async Task Disconnect_MultipleDirtyTabs_ActivatesEachInWorkspaceOrder()
     {
         using var rig = new Rig();
-        string pathA = rig.WriteMap("alpha.bytes");
+        string pathA = rig.WriteMap("alpha.map");
         var first = await rig.OpenDocumentAsync(pathA);
-        string pathB = rig.WriteMap("beta.bytes");
+        string pathB = rig.WriteMap("beta.map");
         var second = await rig.OpenDocumentAsync(pathB);
-        string pathC = rig.WriteMap("gamma.bytes");
+        string pathC = rig.WriteMap("gamma.map");
         var third = await rig.OpenDocumentAsync(pathC);
 
         rig.Gateway.EnqueueMaps(AllMaps).EnqueueGameData(PullData(AllMaps));

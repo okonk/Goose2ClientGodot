@@ -15,8 +15,8 @@ namespace MapEditor.App.Tests;
 
 public class GameDataClipboardTests : IDisposable
 {
-    private static readonly MapReference Map10 = new(10, "Dungeon", "dungeon.bytes");
-    private static readonly MapReference Map20 = new(20, "Cave", "cave.bytes");
+    private static readonly MapReference Map10 = new(10, "Dungeon", "dungeon.map");
+    private static readonly MapReference Map20 = new(20, "Cave", "cave.map");
     private static readonly IReadOnlyList<MapReference> Maps = new[] { Map10, Map20 };
     private static readonly NpcAppearance Npc1 = new(1, "Goose", 0, 0, new RgbaValue(255, 255, 255, 255), 0, 0, new RgbaValue(255, 255, 255, 255), string.Empty);
 

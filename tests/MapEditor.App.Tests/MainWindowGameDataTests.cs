@@ -26,9 +26,9 @@ namespace MapEditor.App.Tests;
 
 public class MainWindowGameDataTests
 {
-    private static readonly MapReference Map10 = new(10, "Dungeon", "dungeon.bytes");
-    private static readonly MapReference Map20 = new(20, "Cave", "cave.bytes");
-    private static readonly MapReference Map30 = new(30, "Tower", "tower.bytes");
+    private static readonly MapReference Map10 = new(10, "Dungeon", "dungeon.map");
+    private static readonly MapReference Map20 = new(20, "Cave", "cave.map");
+    private static readonly MapReference Map30 = new(30, "Tower", "tower.map");
     private static readonly IReadOnlyList<MapReference> Maps = new[] { Map10, Map20, Map30 };
     private static readonly string SheetUrl = "https://docs.google.com/spreadsheets/d/abc123";
     private static readonly NpcAppearance Npc1 = new(1, "Goose", 0, 0, new RgbaValue(255, 255, 255, 255), 0, 0, new RgbaValue(255, 255, 255, 255), string.Empty);

@@ -26,8 +26,8 @@ namespace MapEditor.App.Tests;
 
 public class ShortcutTests
 {
-    private static readonly MapReference Map10 = new(10, "Dungeon", "dungeon.bytes");
-    private static readonly MapReference Map20 = new(20, "Cave", "cave.bytes");
+    private static readonly MapReference Map10 = new(10, "Dungeon", "dungeon.map");
+    private static readonly MapReference Map20 = new(20, "Cave", "cave.map");
     private static readonly NpcAppearance Npc1 = new(1, "Goose", 0, 0, new RgbaValue(255, 255, 255, 255), 0, 0, new RgbaValue(255, 255, 255, 255), string.Empty);
 
     private static void PaintCell(MainWindowHarness harness)
@@ -280,7 +280,7 @@ public class ShortcutTests
     public void ControlS_InvokesSave()
     {
         using MainWindowHarness harness = MainWindowHarness.Create();
-        string mapPath = Path.Combine(harness.TempDirectory, "shortcut.bytes");
+        string mapPath = Path.Combine(harness.TempDirectory, "shortcut.map");
         harness.Dialogs.SavePickResult = mapPath;
         harness.Window.Canvas.Focus();
 
@@ -295,7 +295,7 @@ public class ShortcutTests
     public void ControlShiftS_InvokesSaveAs()
     {
         using MainWindowHarness harness = MainWindowHarness.Create();
-        harness.Dialogs.SavePickResult = Path.Combine(harness.TempDirectory, "saveas.bytes");
+        harness.Dialogs.SavePickResult = Path.Combine(harness.TempDirectory, "saveas.map");
         harness.Window.Canvas.Focus();
 
         harness.Window.KeyPressQwerty(PhysicalKey.S, RawInputModifiers.Control | RawInputModifiers.Shift);
@@ -409,7 +409,7 @@ public class ShortcutTests
     public void SaveDuringDrag_CompletesStrokeOnceBeforeStorage()
     {
         using MainWindowHarness harness = MainWindowHarness.Create();
-        string mapPath = Path.Combine(harness.TempDirectory, "drag-save.bytes");
+        string mapPath = Path.Combine(harness.TempDirectory, "drag-save.map");
         harness.Dialogs.SavePickResult = mapPath;
         harness.ViewModel.Brush = new MapTileLayer(3, 9);
         MainWindow window = harness.Window;

@@ -62,7 +62,7 @@ public class EditorDocumentControllerTests : IDisposable
     [Fact]
     public async Task SaveAs_ThenSave_UpdatesFileWithoutPicker()
     {
-        string path = MapPath("save.bytes");
+        string path = MapPath("save.map");
         _dialogs.SavePickResult = path;
 
         await _controller.SaveAsAsync();
@@ -89,7 +89,7 @@ public class EditorDocumentControllerTests : IDisposable
     [Fact]
     public async Task Save_WithoutPath_DelegatesToSaveAs()
     {
-        string path = MapPath("delegate.bytes");
+        string path = MapPath("delegate.map");
         _dialogs.SavePickResult = path;
 
         await _controller.SaveAsync();
@@ -121,7 +121,7 @@ public class EditorDocumentControllerTests : IDisposable
     [Fact]
     public async Task SaveAs_PathOwnedByAnotherDocument_ReportsErrorAndKeepsDirtyState()
     {
-        string ownedPath = MapPath("owned.bytes");
+        string ownedPath = MapPath("owned.map");
         EditorDocument initial = InitialDocument();
         var controller = new EditorDocumentController(_dialogs, _store, initial, (_, path) => path == ownedPath);
         Paint(initial.Session, 0, 0, new MapTileLayer(1, 1));
@@ -142,9 +142,9 @@ public class EditorDocumentControllerTests : IDisposable
     [Fact]
     public async Task SaveAs_UnownedPath_Writes()
     {
-        string path = MapPath("unowned.bytes");
+        string path = MapPath("unowned.map");
         EditorDocument initial = InitialDocument();
-        var controller = new EditorDocumentController(_dialogs, _store, initial, (_, candidate) => candidate == MapPath("other.bytes"));
+        var controller = new EditorDocumentController(_dialogs, _store, initial, (_, candidate) => candidate == MapPath("other.map"));
         Paint(initial.Session, 0, 0, new MapTileLayer(1, 1));
         _dialogs.SavePickResult = path;
 
@@ -162,7 +162,7 @@ public class EditorDocumentControllerTests : IDisposable
     [Fact]
     public async Task SaveAs_ValidationFailure_KeepsDirtyStatePathAndRevision()
     {
-        string path = MapPath("invalid.bytes");
+        string path = MapPath("invalid.map");
         _dialogs.SavePickResult = path;
         Paint(_controller.Document.Session, 0, 0, new MapTileLayer(short.MinValue - 1, 0));
 
@@ -184,7 +184,7 @@ public class EditorDocumentControllerTests : IDisposable
     {
         string blocker = MapPath("blocker");
         File.WriteAllText(blocker, "x");
-        string path = Path.Combine(blocker, "nested.bytes");
+        string path = Path.Combine(blocker, "nested.map");
         _dialogs.SavePickResult = path;
         Paint(_controller.Document.Session, 0, 0, new MapTileLayer(1, 1));
 
@@ -202,7 +202,7 @@ public class EditorDocumentControllerTests : IDisposable
     [Fact]
     public async Task Save_ExternalConflictCanceled_KeepsDirtyStateRevisionAndFile()
     {
-        string path = MapPath("conflict.bytes");
+        string path = MapPath("conflict.map");
         _dialogs.SavePickResult = path;
         await _controller.SaveAsAsync();
         MapFileRevision expected = _controller.Document.Revision!.Value;
@@ -228,7 +228,7 @@ public class EditorDocumentControllerTests : IDisposable
     [Fact]
     public async Task Save_ExternalConflictOverwrite_ReplacesFileAndMarksSaved()
     {
-        string path = MapPath("overwrite.bytes");
+        string path = MapPath("overwrite.map");
         _dialogs.SavePickResult = path;
         await _controller.SaveAsAsync();
 
@@ -252,8 +252,8 @@ public class EditorDocumentControllerTests : IDisposable
     [Fact]
     public async Task Save_ExternalConflictSaveAs_SavesToNewDestinationLeavingOriginal()
     {
-        string path = MapPath("conflict-as.bytes");
-        string secondPath = MapPath("conflict-as-copy.bytes");
+        string path = MapPath("conflict-as.map");
+        string secondPath = MapPath("conflict-as-copy.map");
         _dialogs.SavePickResult = path;
         await _controller.SaveAsAsync();
 
@@ -267,7 +267,7 @@ public class EditorDocumentControllerTests : IDisposable
 
         await _controller.SaveAsync();
 
-        Assert.Equal("conflict-as.bytes", _dialogs.LastSaveSuggestedName);
+        Assert.Equal("conflict-as.map", _dialogs.LastSaveSuggestedName);
         EditorDocument document = _controller.Document;
         Assert.Equal(Path.GetFullPath(secondPath), document.Path);
         Assert.False(document.Session.IsDirty);
@@ -280,8 +280,8 @@ public class EditorDocumentControllerTests : IDisposable
     [Fact]
     public async Task Save_ExternalConflictSaveAs_PathOwnedByAnotherDocument_ReportsErrorAndKeepsOriginal()
     {
-        string path = MapPath("conflict-owned.bytes");
-        string ownedPath = MapPath("owned-by-other.bytes");
+        string path = MapPath("conflict-owned.map");
+        string ownedPath = MapPath("owned-by-other.map");
         EditorDocument initial = InitialDocument();
         var controller = new EditorDocumentController(_dialogs, _store, initial, (_, candidate) => candidate == ownedPath);
         _dialogs.SavePickResult = path;
@@ -314,7 +314,7 @@ public class EditorDocumentControllerTests : IDisposable
     [Fact]
     public async Task SaveAs_SamePathAfterExternalRewrite_StillGuardsExpectedRevision()
     {
-        string path = MapPath("guard.bytes");
+        string path = MapPath("guard.map");
         _dialogs.SavePickResult = path;
         await _controller.SaveAsAsync();
         MapFileRevision expected = _controller.Document.Revision!.Value;
@@ -348,7 +348,7 @@ public class EditorDocumentControllerTests : IDisposable
         session.ContinueStroke(1, 1);
         Assert.True(session.CompleteStroke());
 
-        string path = MapPath("stroke.bytes");
+        string path = MapPath("stroke.map");
         _dialogs.SavePickResult = path;
 
         await _controller.SaveAsync();
@@ -363,7 +363,7 @@ public class EditorDocumentControllerTests : IDisposable
     [Fact]
     public async Task ConfirmClose_CleanDocument_ApprovesWithoutPrompt()
     {
-        _dialogs.SavePickResult = MapPath("close-clean.bytes");
+        _dialogs.SavePickResult = MapPath("close-clean.map");
         await _controller.SaveAsAsync();
 
         Assert.True(await _controller.ConfirmCloseAsync());
@@ -395,7 +395,7 @@ public class EditorDocumentControllerTests : IDisposable
     {
         Paint(_controller.Document.Session, 0, 0, new MapTileLayer(1, 1));
         _dialogs.DirtyResult = DirtyChoice.Save;
-        _dialogs.SavePickResult = MapPath("close-save.bytes");
+        _dialogs.SavePickResult = MapPath("close-save.map");
 
         Assert.True(await _controller.ConfirmCloseAsync());
         Assert.False(_controller.Document.Session.IsDirty);
@@ -444,8 +444,8 @@ public class EditorDocumentControllerTests : IDisposable
         Assert.Contains("dialog failed", error.Message);
     }
 
-    private static readonly MapReference CloseMap10 = new(10, "Dungeon", "dungeon.bytes");
-    private static readonly MapReference CloseMap20 = new(20, "Cave", "cave.bytes");
+    private static readonly MapReference CloseMap10 = new(10, "Dungeon", "dungeon.map");
+    private static readonly MapReference CloseMap20 = new(20, "Cave", "cave.map");
     private static readonly IReadOnlyList<MapReference> CloseMaps = new[] { CloseMap10, CloseMap20 };
     private static readonly string CloseSheetUrl = "https://docs.google.com/spreadsheets/d/abc123";
     private static readonly NpcAppearance CloseNpc1 = new(1, "Goose", 0, 0, new RgbaValue(255, 255, 255, 255), 0, 0, new RgbaValue(255, 255, 255, 255), string.Empty);
@@ -556,7 +556,7 @@ public class EditorDocumentControllerTests : IDisposable
     {
         using var rig = new SheetCloseRig();
         MapDocumentViewModel document = await rig.PullAsync(rig.Workspace.ActiveDocument);
-        rig.Dialogs.SavePickResult = rig.MapPath("baseline.bytes");
+        rig.Dialogs.SavePickResult = rig.MapPath("baseline.map");
         await document.SaveAsAsync();
         document.GameData!.Session.Edits.AddSpawn(new NpcSpawnRow(1, 10, 5, 5));
         MakeMapDirty(document);
@@ -640,7 +640,7 @@ public class EditorDocumentControllerTests : IDisposable
     {
         using var rig = new SheetCloseRig();
         MapDocumentViewModel document = await rig.PullAsync(rig.Workspace.ActiveDocument);
-        rig.Dialogs.SavePickResult = rig.MapPath("saved.bytes");
+        rig.Dialogs.SavePickResult = rig.MapPath("saved.map");
         await document.SaveAsAsync();
         document.GameData!.Session.Edits.AddSpawn(new NpcSpawnRow(1, 10, 5, 5));
         MakeMapDirty(document);
@@ -708,7 +708,7 @@ public class EditorDocumentControllerTests : IDisposable
     {
         using var rig = new SheetCloseRig();
         MapDocumentViewModel document = await rig.PullAsync(rig.Workspace.ActiveDocument);
-        rig.Dialogs.SavePickResult = rig.MapPath("save1.bytes");
+        rig.Dialogs.SavePickResult = rig.MapPath("save1.map");
         await document.SaveAsAsync();
         document.GameData!.Session.Edits.AddSpawn(new NpcSpawnRow(1, 10, 5, 5));
         int callsBefore = rig.Gateway.Calls.Count;
@@ -726,7 +726,7 @@ public class EditorDocumentControllerTests : IDisposable
         using var rig = new SheetCloseRig();
         MapDocumentViewModel document = await rig.PullAsync(rig.Workspace.ActiveDocument);
         document.GameData!.Session.Edits.AddSpawn(new NpcSpawnRow(1, 10, 5, 5));
-        rig.Dialogs.SavePickResult = rig.MapPath("save2.bytes");
+        rig.Dialogs.SavePickResult = rig.MapPath("save2.map");
 
         await document.SaveAsAsync();
 
@@ -740,7 +740,7 @@ public class EditorDocumentControllerTests : IDisposable
     {
         using var rig = new SheetCloseRig();
         MapDocumentViewModel document = await rig.PullAsync(rig.Workspace.ActiveDocument);
-        rig.Dialogs.SavePickResult = rig.MapPath("pushed.bytes");
+        rig.Dialogs.SavePickResult = rig.MapPath("pushed.map");
         await document.SaveAsAsync();
         string path = document.Document.Path!;
         MapFileRevision revision = document.Document.Revision!.Value;

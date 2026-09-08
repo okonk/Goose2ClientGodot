@@ -96,7 +96,7 @@ public class WorkspaceViewModelTests : IDisposable
     [Fact]
     public async Task Open_EveryTabGetsItsOwnGameDataState()
     {
-        string path = WriteMap("game-state.bytes");
+        string path = WriteMap("game-state.map");
         MapDocumentViewModel opened = await OpenDocumentAsync(path);
         MapDocumentViewModel fresh = await NewDocumentAsync();
 
@@ -184,7 +184,7 @@ public class WorkspaceViewModelTests : IDisposable
     [Fact]
     public async Task Open_AddsTabAndActivatesIt()
     {
-        string path = WriteMap("open.bytes", 25, 18);
+        string path = WriteMap("open.map", 25, 18);
         MapFileRevision revision = _store.Open(path).Revision;
 
         await OpenDocumentAsync(path);
@@ -202,7 +202,7 @@ public class WorkspaceViewModelTests : IDisposable
     [Fact]
     public async Task Open_AlreadyOpenPath_ActivatesExistingTabWithoutDuplicating()
     {
-        string path = WriteMap("same.bytes");
+        string path = WriteMap("same.map");
         MapDocumentViewModel first = await OpenDocumentAsync(path);
         _workspace.Activate(_workspace.Documents[0]);
 
@@ -220,7 +220,7 @@ public class WorkspaceViewModelTests : IDisposable
         Paint(blank.Session, 0, 0, new MapTileLayer(1, 1));
         Assert.True(blank.Session.IsDirty);
 
-        string path = WriteMap("dirty-blank.bytes");
+        string path = WriteMap("dirty-blank.map");
         await OpenDocumentAsync(path);
 
         Assert.Equal(2, _workspace.Documents.Count);
@@ -234,7 +234,7 @@ public class WorkspaceViewModelTests : IDisposable
         MapDocumentViewModel blank = _workspace.ActiveDocument;
         await NewDocumentAsync();
 
-        string path = WriteMap("multi-tab.bytes");
+        string path = WriteMap("multi-tab.map");
         await OpenDocumentAsync(path);
 
         Assert.Equal(3, _workspace.Documents.Count);
@@ -244,11 +244,11 @@ public class WorkspaceViewModelTests : IDisposable
     [Fact]
     public async Task Open_SingleSavedTab_KeepsIt()
     {
-        string pathA = WriteMap("a.bytes");
+        string pathA = WriteMap("a.map");
         await OpenDocumentAsync(pathA);
         Assert.Equal(1, _workspace.Documents.Count);
 
-        string pathB = WriteMap("b.bytes");
+        string pathB = WriteMap("b.map");
         await OpenDocumentAsync(pathB);
 
         Assert.Equal(2, _workspace.Documents.Count);
@@ -259,7 +259,7 @@ public class WorkspaceViewModelTests : IDisposable
     [Fact]
     public async Task Open_InvalidFile_AddsNoTabAndReportsError()
     {
-        string path = MapPath("bad-version.bytes");
+        string path = MapPath("bad-version.map");
         File.WriteAllBytes(path, Header(1, 99, 1, 1));
         int countBefore = _workspace.Documents.Count;
 
@@ -274,7 +274,7 @@ public class WorkspaceViewModelTests : IDisposable
     [Fact]
     public async Task Open_MissingFile_ReportsErrorAndAddsNothing()
     {
-        string path = MapPath("missing.bytes");
+        string path = MapPath("missing.map");
 
         await OpenDocumentAsync(path);
 
@@ -287,7 +287,7 @@ public class WorkspaceViewModelTests : IDisposable
     [Fact]
     public async Task Open_MalformedFile_ReportsTypedFormatReason()
     {
-        string path = MapPath("truncated.bytes");
+        string path = MapPath("truncated.map");
         File.WriteAllBytes(path, new byte[] { 1, 2, 3 });
 
         await OpenDocumentAsync(path);
@@ -328,7 +328,7 @@ public class WorkspaceViewModelTests : IDisposable
     [Fact]
     public async Task Open_InvalidDimensionsFile_ReportsValidationMessage()
     {
-        string path = MapPath("zero-width.bytes");
+        string path = MapPath("zero-width.map");
         File.WriteAllBytes(path, Header(1, MapDocument.SupportedEditorVersion, 0, 10));
 
         await OpenDocumentAsync(path);
@@ -631,7 +631,7 @@ public class WorkspaceViewModelTests : IDisposable
     [Fact]
     public async Task SaveAs_ToAnotherDocumentsPath_LeavesBothDocumentsIntact()
     {
-        string path = WriteMap("owned.bytes");
+        string path = WriteMap("owned.map");
         MapDocumentViewModel opened = await OpenDocumentAsync(path);
         MapFileRevision revision = opened.Document.Revision!.Value;
         MapDocumentViewModel untitled = await NewDocumentAsync();
@@ -652,7 +652,7 @@ public class WorkspaceViewModelTests : IDisposable
     [Fact]
     public async Task SaveAs_AfterOwnerClosed_SucceedsAndWritesFile()
     {
-        string path = WriteMap("released.bytes");
+        string path = WriteMap("released.map");
         MapDocumentViewModel owner = await OpenDocumentAsync(path);
         MapDocumentViewModel remaining = await NewDocumentAsync();
 

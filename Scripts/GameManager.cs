@@ -352,10 +352,10 @@ namespace Goose2Client
 
         private MapDocument LoadMap(string mapFile)
         {
-            // The server's MapFileName carries the original ".map" extension (e.g. "Map2.map");
-            // the converter emits "{basename}.bytes" (e.g. "Map2.bytes"). Normalize to the basename.
+            // The server's MapFileName carries the ".map" extension (e.g. "Map2.map");
+            // normalize to the basename in case the wire name ever differs in extension.
             var name = System.IO.Path.GetFileNameWithoutExtension(mapFile);
-            var path = $"res://Assets/Maps/{name}.bytes";
+            var path = $"res://Assets/Maps/{name}.map";
             using var f = Godot.FileAccess.Open(path, Godot.FileAccess.ModeFlags.Read);
             if (f == null)
             {

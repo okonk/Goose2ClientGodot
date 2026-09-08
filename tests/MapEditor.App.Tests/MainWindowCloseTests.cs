@@ -77,7 +77,7 @@ public class MainWindowCloseTests
         harness.ViewModel.Brush = new MapTileLayer(1, 2);
         harness.ViewModel.Session.BeginStroke(MapEditTool.Pencil, 0, 0);
         Assert.True(harness.ViewModel.Session.CompleteStroke());
-        string mapPath = Path.Combine(harness.TempDirectory, "closed-saved.bytes");
+        string mapPath = Path.Combine(harness.TempDirectory, "closed-saved.map");
         harness.Dialogs.DirtyResult = DirtyChoice.Save;
         harness.Dialogs.SavePickResult = mapPath;
 
@@ -205,7 +205,7 @@ public class MainWindowCloseTests
     public void Close_DragInProgress_Save_CommitsStrokeOnceAndSavesCompletedStroke()
     {
         using MainWindowHarness harness = MainWindowHarness.Create();
-        string mapPath = Path.Combine(harness.TempDirectory, "drag-close.bytes");
+        string mapPath = Path.Combine(harness.TempDirectory, "drag-close.map");
         harness.Dialogs.DirtyResult = DirtyChoice.Save;
         harness.Dialogs.SavePickResult = mapPath;
         harness.ViewModel.Brush = new MapTileLayer(4, 6);
@@ -422,8 +422,8 @@ public class MainWindowCloseTests
         Assert.Equal(2, counter.Count);
     }
 
-    private static readonly MapReference SheetMap10 = new(10, "Dungeon", "dungeon.bytes");
-    private static readonly MapReference SheetMap20 = new(20, "Cave", "cave.bytes");
+    private static readonly MapReference SheetMap10 = new(10, "Dungeon", "dungeon.map");
+    private static readonly MapReference SheetMap20 = new(20, "Cave", "cave.map");
     private static readonly IReadOnlyList<MapReference> SheetMaps = new[] { SheetMap10, SheetMap20 };
     private static readonly string SheetUrl = "https://docs.google.com/spreadsheets/d/abc123";
     private static readonly NpcAppearance SheetNpc1 = new(1, "Goose", 0, 0, new RgbaValue(255, 255, 255, 255), 0, 0, new RgbaValue(255, 255, 255, 255), string.Empty);
@@ -531,7 +531,7 @@ public class MainWindowCloseTests
         rig.Dialogs = harness.Dialogs;
         MapDocumentViewModel doc = harness.ViewModel;
         await rig.PullAsync(harness.Workspace, doc);
-        harness.Dialogs.SavePickResult = Path.Combine(harness.TempDirectory, "sheet-close-saved.bytes");
+        harness.Dialogs.SavePickResult = Path.Combine(harness.TempDirectory, "sheet-close-saved.map");
         await doc.SaveAsAsync();
         doc.GameData!.Session.Edits.AddSpawn(new NpcSpawnRow(1, 10, 5, 5));
         MakeDirty(doc);

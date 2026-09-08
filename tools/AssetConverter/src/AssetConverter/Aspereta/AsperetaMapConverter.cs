@@ -22,7 +22,7 @@ public static class AsperetaMapConverter
                 string basename = Path.GetFileNameWithoutExtension(file);
                 int number = int.Parse(basename["Map".Length..]);
                 string outPath = Path.Combine(outDir,
-                    $"Map{AsperetaSheets.MapNumberBase + number}.bytes");
+                    $"Map{AsperetaSheets.MapNumberBase + number}.map");
 
                 using var reader = new BinaryReader(File.OpenRead(file));
                 using var writer = new BinaryWriter(File.Create(outPath));

@@ -37,7 +37,7 @@ public class NpcPreviewCanvasTests
     private const int MapSize = 8;
     private const int Cell = 32;
 
-    private static readonly MapReference Map10 = new(10, "Dungeon", "dungeon.bytes");
+    private static readonly MapReference Map10 = new(10, "Dungeon", "dungeon.map");
 
     // Mirror MapRenderer.MapRenderPalette; the palette is internal to MapEditor.Rendering.
     private static readonly Color NpcAnchorFill = Color.FromArgb(0x80, 0xFF, 0xA0, 0x40);
