@@ -1,6 +1,7 @@
 using System.Text;
 using System.Text.Json;
 using Goose2.AssetConverter.Adf;
+using Goose2.AssetConverter.Aspereta;
 using Goose2.AssetConverter.SpriteFrames;
 
 namespace Goose2.AssetConverter.Manifest;
@@ -88,7 +89,12 @@ public static class AppearanceManifestBuilder
             if (spec.Name != clipName || spec.Frames.Count == 0)
                 continue;
             var frame = spec.Frames[0];
-            return new[] { frame.SheetNumber, frame.Frame.Index };
+            // The sprite manifest keys Aspereta graphics as GraphicBase + frame index,
+            // not the raw ADF index, so the reference must match that space.
+            int graphic = frame.SheetNumber >= AsperetaSheets.SheetBase
+                ? AsperetaSheets.GraphicBase + frame.Frame.Index
+                : frame.Frame.Index;
+            return new[] { frame.SheetNumber, graphic };
         }
         return null;
     }

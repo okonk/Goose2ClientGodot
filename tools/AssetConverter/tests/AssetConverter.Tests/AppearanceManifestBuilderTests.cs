@@ -120,6 +120,22 @@ public class AppearanceManifestBuilderTests
     }
 
     [Fact]
+    public void Build_AsperetaSheet_OffsetsGraphicByManifestBase()
+    {
+        var body = Resource(AnimationType.Body, 10113, Spec("idle-no-equip-down", 20337, 20342));
+        string json = AppearanceManifestBuilder.Build(new[] { body });
+        Assert.Contains("\"Body\":{\"10113\":{\"noEquip\":[20337,720342]}}", json);
+    }
+
+    [Fact]
+    public void Build_IllutiaSheet_KeepsRawFrameIndex()
+    {
+        var body = Resource(AnimationType.Body, 1, Spec("idle-no-equip-down", 116, 3229));
+        string json = AppearanceManifestBuilder.Build(new[] { body });
+        Assert.Contains("\"Body\":{\"1\":{\"noEquip\":[116,3229]}}", json);
+    }
+
+    [Fact]
     public void Build_AllEightKinds_MapExactlyWithShieldAndWeaponUnderHand()
     {
         var resources = new[]
