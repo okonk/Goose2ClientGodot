@@ -30,6 +30,7 @@ public sealed class TerrainCandidateFamily
     public int RegionSupport { get; internal set; }
     public int ObservationSupport { get; internal set; }
     public int DiagonalSupport { get; internal set; }
+    public int DiagonalMapSupport { get; internal set; }
     public Dictionary<TerrainGraphicReference, double> ReferenceWeights { get; internal set; }
     public Dictionary<TerrainGraphicReference, Dictionary<int, double>> WeightedMasks { get; internal set; }
     public TerrainGraphicReference Medoid { get; internal set; }

@@ -263,6 +263,10 @@ public static class TerrainCandidateMiner
                     family.RegionSupport += mining.Regions.Count;
                     family.ObservationSupport += mining.Regions.Sum(region => region.Placements.Count);
                     family.DiagonalSupport += mining.DiagonalTrials;
+                    if (mining.DiagonalTrials > 0)
+                    {
+                        family.DiagonalMapSupport++;
+                    }
 
                     foreach (var region in mining.Regions)
                     {
