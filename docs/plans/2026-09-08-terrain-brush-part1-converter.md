@@ -2,7 +2,7 @@
 
 **Goal:** Add the shared terrain-catalog contract and a deterministic converter pipeline that mines generated maps and 32×32 sprite frames, infers conservative four-way/eight-way terrain candidates, and atomically emits `Assets/Sprites/terrain-brushes.json` from both `terrain` and `all`.
 
-**Architecture:** `MapEditor.Core` owns the provider-neutral schema, mask semantics, stable-ID derivation, structural parsing, canonical serialization, and catalog-level validation. `AssetConverter` references that .NET 8 library, strictly loads the generated map/manifest/PNG corpus, extracts each frame once, builds bucketed hybrid candidates, scores both topologies on deterministic held-out maps, then validates and atomically publishes a complete in-memory catalog. The converter remains synchronous and CLI-owned; no editor asset loading, rendering, painting, manager UI, or map-format change is included.
+**Architecture:** `MapEditor.Core` owns the provider-neutral schema, mask semantics, stable-ID derivation, structural parsing, canonical serialization, and catalog validation. `AssetConverter` references Core, reads a declared generated-map inventory plus the manifest and relevant sheets in bounded batches, computes exact image/evidence descriptors, trains independently from deterministic holdouts, and separates top-1 evaluation predictions from emitted variant lists. The synchronous generator builds and validates the complete catalog before a durable sibling-temp write and same-directory replacement.
 
 **Tech Stack:** C#; .NET 8 `MapEditor.Core`; .NET 10 `AssetConverter`; `System.Text.Json`; `System.Security.Cryptography`; SixLabors.ImageSharp 3.1.12; xUnit 2.9.x.
 
@@ -10,62 +10,54 @@
 
 > Implement with @executing-plans, one task and commit at a time. Follow `AGENTS.md`: add no comments/doc strings unless a non-obvious invariant genuinely requires one.
 
-## Scope and sequencing
+## Scope, sequencing, and cross-part ownership
 
 This is Part 1 of 3. It includes only:
 
-- provider-neutral terrain definitions, mask rules, stable IDs, JSON parsing/serialization, and validation needed by conversion and later editor parts;
-- strict generated-corpus discovery and layer-0 map mining;
-- deterministic 32×32 RGBA feature extraction and caching;
-- bucketed map/image candidate inference, weighting, holdout evaluation, topology selection, diagnostics, and conservative review status;
-- complete in-memory generation followed by same-directory atomic replacement;
-- the focused `terrain [repoRoot]` command and invocation from `all` after the combined manifest is written;
-- synthetic tests and an optional local real-corpus smoke that never becomes a proprietary-data test dependency.
+- provider-neutral terrain definitions, mask rules, stable IDs, typed JSON parsing, canonical serialization, and catalog validation used by all parts;
+- a generated-map inventory so stale files in `Assets/Maps` cannot silently enter the corpus;
+- strict layer-0 map/manifest/PNG discovery and exact corpus/holdout hashing;
+- deterministic 32×32 RGBA feature extraction, same-sheet buckets, weighted candidate inference, image-only expansion, topology evaluation, scoring, diagnostics, and review status;
+- complete in-memory generation followed by durable same-directory atomic replacement;
+- the focused `terrain [repoRoot]` command and production `all` finalization after map inventory and combined manifest publication;
+- synthetic tests and an optional local real-corpus calibration smoke that never becomes a proprietary-data dependency.
 
-It excludes rendering asset-context loading, editor-side frame validation/degradation, terrain resolution and map edits, palette/tool state, gestures, undo/redo, and the Terrain Sets manager. Parts 2 and 3 will consume the exact contract introduced here.
+It excludes runtime resolution and map edits (Part 2), and Rendering asset validation/degradation, palettes, gestures, and the Terrain Sets manager (Part 3). Manifest frame existence and 32×32 checks at editor load time belong to Part 3; the converter independently guarantees its own generated members here. `MapEditTool.Terrain` and all Core editing changes belong to Part 2.
 
-No map schema or database changes are involved. `terrain-brushes.json` is a new, generated, gitignored schema-v1 file; no migration is needed. Regeneration intentionally replaces manager reviews, as approved. Do not commit generated `Assets/` output.
+No map schema or database changes are involved. `terrain-map-inputs-v1.txt` is one converter-owned generated corpus inventory, not map metadata or a per-map sidecar. `terrain-brushes.json` is a new generated schema-v1 file. Both live under ignored `Assets/`; no migration is needed, and regeneration intentionally replaces manager reviews.
 
-## APIs and facts verified before planning
+Tasks remain independently executable in dependency order: Task 0 establishes the shared contract; Tasks 1–4 add read-only inference stages; Task 5 composes and publishes them; Task 6 alone changes command routing and existing map-converter result reporting.
+
+## APIs and repository facts verified before planning
 
 | API / fact | Citation and consequence |
 |---|---|
-| Core owns provider-neutral definitions and topology behavior; converter analysis is layer 0 and rendering/editor concerns remain elsewhere | `docs/plans/2026-09-08-terrain-brush-design.md:38-46`. Put the contract in `MapEditor.Core`, not in converter DTOs or Rendering. |
-| The generated contract requires versions, fingerprint, settings, IDs/names/status, metrics, masks, provenance, and diagnostics | `docs/plans/2026-09-08-terrain-brush-design.md:48-66`. Lock every field below; do not emit anonymous converter-only JSON. |
-| Four-way has 16 masks; canonical eight-way has 47, with diagonals retained only when both adjacent cardinals exist | `docs/plans/2026-09-08-terrain-brush-design.md:64-66`. The shared mask helper and exhaustive tests are prerequisites for inference. |
-| Required inference stages and deterministic/atomic publication are explicit | `docs/plans/2026-09-08-terrain-brush-design.md:68-82`. Input ordering, feature cache, buckets, holdout assignment, tie breaks, JSON ordering, and replace behavior must all be pinned. |
-| Converter tests must use synthetic maps/images and cover topology, noise, lookalikes, sparse corners, image-only members, weighting, thresholds, IDs, determinism, and atomic failure | `docs/plans/2026-09-08-terrain-brush-design.md:138-143`. Proprietary paths are smoke-only. |
-| `MapCodec.Decode(ReadOnlySpan<byte>)` accepts the normal and legacy editor versions, validates dimensions/length, ignores trailers, and returns `MapDocument` | `src/MapEditor.Core/MapCodec.cs:15-69`; supported versions are at `src/MapEditor.Core/MapDocument.cs:72-81`. Use it instead of duplicating the wire parser currently in `TileSheetGenerator`. |
-| `MapDocument` exposes row-major and coordinate reads, and each `MapTile` exposes `GetLayer(int)` | `src/MapEditor.Core/MapDocument.cs:169-184` and `src/MapEditor.Core/MapDocument.cs:36-47`. Mining reads only `GetLayer(0)` and never mutates decoded documents. |
-| Tests can build valid synthetic map bytes with `MapDocument.Create`, `SetLayer`, and `MapCodec.Encode` | `src/MapEditor.Core/MapDocument.cs:107-120,193-202`; `src/MapEditor.Core/MapCodec.cs:80-120`. Do not hand-write an incompatible editor-version-1 map like the older tile-sheet fixture does at `tools/AssetConverter/tests/AssetConverter.Tests/TileSheetGeneratorTests.cs:110-125`. |
-| The frame manifest shape is `{tileSize:32,sheets:{sheet:{graphic:[x,y,w,h]}}}` | `tools/AssetConverter/src/AssetConverter/Manifest/FrameManifestBuilder.cs:7-16,23-37`. The converter input parser must preserve numeric reference/rect semantics and reject duplicate aliases rather than deserialize into lossy dictionaries. |
-| Generated PNGs are `<sheet>.png` under the sheets output directory | `tools/AssetConverter/src/AssetConverter/BatchConverter.cs:17-18,40-42`; CLI paths place them at `Assets/Sprites/sheets` in `tools/AssetConverter/src/AssetConverter/Program.cs:92-99,146-151`. |
-| Rendering's existing strict manifest parser already proves duplicate-aware object traversal, rectangle checks, sorted frame publication, and `<assetDirectory>/manifest.json` loading | `src/MapEditor.Rendering/Assets/SpriteManifest.cs:64-127,129-223,225-259`. Do not reference Rendering from the converter; mirror this wire contract in an internal converter input index so dependency direction remains Core ← Rendering and Core ← Converter. |
-| A graphic with `Graphic == 0` is the existing empty sentinel regardless of sheet | `src/MapEditor.Rendering/Assets/SpriteReference.cs:3-6`; converted Aspereta maps also write `(0,0)` for empty cells at `tools/AssetConverter/src/AssetConverter/Aspereta/AsperetaMapConverter.cs:41-57`. Ignore such layer-0 placements. |
-| Existing `all` writes maps before the combined manifest and currently ends conversion after writing that manifest | `tools/AssetConverter/src/AssetConverter/Program.cs:173-189`. Invoke terrain generation immediately after line 189 so every required generated input exists. |
-| Focused commands use an optional repo root and `all` defaults it to `../..` | `tools/AssetConverter/src/AssetConverter/Program.cs:140-148,207-216`. `terrain` must follow the same root convention. |
-| The converter targets `net10.0` while Core targets `net8.0` | `tools/AssetConverter/src/AssetConverter/AssetConverter.csproj:3-7`; `src/MapEditor.Core/MapEditor.Core.csproj:1-5`. A net10 executable can reference the net8 library; add the project reference rather than copying Core types. |
-| Rendering already references Core, preserving the desired future consumption direction | `src/MapEditor.Rendering/MapEditor.Rendering.csproj:1-9`. Core must gain no ImageSharp, file-system asset-root, Rendering, Avalonia, or Godot dependency. |
-| Existing converter atomic output uses create/write/flush followed by same-directory move-with-overwrite and cleanup on failure | `tools/AssetConverter/src/AssetConverter/Manifest/AppearanceManifestFileStore.cs:5-12,18-51,54-64`. Keep the terrain writer independent but follow and strengthen this tested seam. |
-| Existing injected atomic-write tests prove prior-byte preservation and no leaked temp file on write/replace/move failure | `tools/AssetConverter/tests/AssetConverter.Tests/AppearanceManifestBuilderTests.cs:197-285,287-350`. The terrain fake must mirror the new terrain file-operations interface exactly. |
-| Generated assets, including the new catalog, are ignored and are recreated through `all` | `.gitignore:21-30`. Commit code/tests only. |
+| Core owns definitions/topology/editing; converter analyzes layer 0; Rendering/App own asset loading and UI | `docs/plans/2026-09-08-terrain-brush-design.md:38-46`. Keep JSON types in Core, ImageSharp in Converter, runtime editing in Part 2, and asset/UI work in Part 3. |
+| Generated data requires versions, fingerprint, settings, IDs/names/status, metrics, mappings, provenance, and diagnostics | `docs/plans/2026-09-08-terrain-brush-design.md:48-66`. Every field and wire spelling is locked below. |
+| The design requires weighted hybrid inference, held-out 4/8 selection, conservative status, deterministic focused/`all` output, and atomic replacement | `docs/plans/2026-09-08-terrain-brush-design.md:68-82`. Training isolation, evaluation prediction, sorting, and publication need explicit tests. |
+| Converter tests must be synthetic and cover topology, variants/lookalikes, sparse corners, image-only inference, weighting, thresholds, IDs, determinism, and failure preservation | `docs/plans/2026-09-08-terrain-brush-design.md:138-142`. Proprietary data is smoke/calibration only. |
+| `MapCodec.Decode(ReadOnlySpan<byte>)` validates supported editor versions/dimensions/minimum length, ignores trailers, and returns `MapDocument` | `src/MapEditor.Core/MapCodec.cs:15-69`; versions/dimension limits are `src/MapEditor.Core/MapDocument.cs:72-81`. Use it; wrap its typed format failures rather than duplicating the wire parser. |
+| `MapDocument` exposes coordinate and row-major reads; each `MapTile` exposes `GetLayer(int)` | `src/MapEditor.Core/MapDocument.cs:169-184` and `src/MapEditor.Core/MapDocument.cs:36-47`. Mining reads only layer 0 and never mutates decoded documents. |
+| Synthetic maps can use `MapDocument.Create`, `SetLayer`, and `MapCodec.Encode` | `src/MapEditor.Core/MapDocument.cs:107-120,193-202`; `src/MapEditor.Core/MapCodec.cs:80-120`. Do not copy the unsupported editor-version-1 fixture in `tools/AssetConverter/tests/AssetConverter.Tests/TileSheetGeneratorTests.cs:110-125`. |
+| The converter manifest wire shape is `{tileSize:32,sheets:{sheet:{graphic:[x,y,w,h]}}}` | `tools/AssetConverter/src/AssetConverter/Manifest/FrameManifestBuilder.cs:10-16,23-37`. Parse with duplicate/alias detection rather than lossy dictionary deserialization. |
+| Existing Rendering parsing demonstrates duplicate-aware traversal, exact 32 tile size, checked rectangles, sorted frames, and signed canonical integer handling | `src/MapEditor.Rendering/Assets/SpriteManifest.cs:64-127,129-259,262-327`. Do not reference Rendering from Converter; mirror the wire rules in a converter-internal index. |
+| Generated sheet files are `<sheet>.png` | `tools/AssetConverter/src/AssetConverter/BatchConverter.cs:14-17,40-42`; current CLI output paths are `tools/AssetConverter/src/AssetConverter/Program.cs:146-147`. |
+| `Graphic == 0` is the empty sentinel regardless of sheet | `src/MapEditor.Rendering/Assets/SpriteReference.cs:3-6`; converted Aspereta maps write `(0,0)` for empty at `tools/AssetConverter/src/AssetConverter/Aspereta/AsperetaMapConverter.cs:41-57`. Exclude graphic zero from observations and image-only search even if manifest graphic 0 exists. |
+| Current `all` writes Illutia maps, then Aspereta maps, then the combined manifest, and returns after summaries | `tools/AssetConverter/src/AssetConverter/Program.cs:140-204`. Production finalization must write the successful-map inventory and manifest before terrain generation. |
+| Existing map converter results report counts/failures but not successful output names | `tools/AssetConverter/src/AssetConverter/Maps/MapCopyConverter.cs:3-4,12-49`; `tools/AssetConverter/src/AssetConverter/Aspereta/AsperetaMapConverter.cs:3-9,18-67`. Task 6 extends these results so `all` can declare exact map inputs without globbing stale output. |
+| Existing focused commands and `all` use optional output/root arguments | `tools/AssetConverter/src/AssetConverter/Program.cs:119-148,207-220`. Preserve existing argument meanings and add `terrain [repoRoot]`. |
+| Converter is net10 while Core is net8 | `tools/AssetConverter/src/AssetConverter/AssetConverter.csproj:3-12`; `src/MapEditor.Core/MapEditor.Core.csproj:1-5`. Add a normal project reference; do not copy Core types. |
+| Rendering already references Core | `src/MapEditor.Rendering/MapEditor.Rendering.csproj:1-9`. Core gains no ImageSharp, file-system root, Rendering, Avalonia, or Godot dependency. |
+| Existing atomic output has `Exists/CreateFile/Replace/Move/Delete`, but calls only `Stream.Flush()` and cleanup can mask a primary exception | `tools/AssetConverter/src/AssetConverter/Manifest/AppearanceManifestFileStore.cs:5-12,18-51`. The new independent terrain seam adds explicit durable flush and primary-exception preservation rather than copying those gaps. |
+| Existing failure tests cover write/flush/replace/move and temp cleanup using exact file-operation fakes | `tools/AssetConverter/tests/AssetConverter.Tests/AppearanceManifestBuilderTests.cs:197-350`. Terrain tests mirror only the new interface declared below. |
+| Generated assets are ignored and regenerated by `all` | `.gitignore:21-30`. Do not commit map inventory, sheets, maps, or terrain JSON. |
+| AssetConverter tests target net10 and already reference the converter executable | `tools/AssetConverter/tests/AssetConverter.Tests/AssetConverter.Tests.csproj:3-24`. Internals can be exposed to this existing test project without a new project. |
 
-Planning baseline, verified in this worktree with .NET SDK `10.0.400`:
+Planning baseline in this worktree is .NET SDK `10.0.400`. New automated tests and every mandatory commit gate must be synthetic and independent of the configured Illutia/Aspereta paths. Illutia-only and combined proprietary-corpus runs are explicitly optional manual calibration smokes and are skipped when their inputs are unavailable.
 
-```bash
-dotnet test tests/MapEditor.Core.Tests/MapEditor.Core.Tests.csproj -v minimal
-# PASS: 220 tests
+## Locked Part 1 → Parts 2/3 catalog contract
 
-dotnet test tools/AssetConverter/tests/AssetConverter.Tests/AssetConverter.Tests.csproj \
-  --filter 'FullyQualifiedName~TileSheetGeneratorTests|FullyQualifiedName~AppearanceManifestBuilderTests' -v minimal
-# PASS: 22 tests; existing GifLoader nullable warnings remain
-```
-
-The Illutia data/maps and Unity comparison PNGs exist locally, but the configured Aspereta data/maps under `/home/hayden/...` do not. Therefore neither full existing converter tests that require Aspereta nor `all` are a planning/CI gate on this machine. All new automated tests must remain synthetic.
-
-## Locked schema-v1 contract
-
-Use namespace `MapEditor.Core.Terrain`. The small public surface is:
+Use namespace `MapEditor.Core.Terrain`. The public shape is:
 
 ```csharp
 public enum TerrainTopology { FourWay, EightWay }
@@ -101,37 +93,75 @@ public sealed record TerrainSetMetrics(
     double EightWayAccuracyGain,
     double Confidence);
 
-public sealed record TerrainMaskDefinition(
-    int Mask,
-    IReadOnlyList<TerrainGraphicReference> Variants);
+public sealed record TerrainMaskDefinition
+{
+    public int Mask { get; }
+    public IReadOnlyList<TerrainGraphicReference> Variants { get; }
+    public TerrainMaskDefinition(int mask, IEnumerable<TerrainGraphicReference> variants);
+}
 
-public sealed record TerrainMemberDefinition(
-    TerrainGraphicReference Reference,
-    TerrainMemberProvenance Provenance);
+public sealed record TerrainMemberDefinition
+{
+    public TerrainGraphicReference Reference { get; }
+    public TerrainMemberProvenance Provenance { get; }
+    public TerrainMemberDefinition(
+        TerrainGraphicReference reference,
+        TerrainMemberProvenance provenance);
+}
 
-public sealed record TerrainDiagnostic(
-    string Code,
-    string Message,
-    int? Mask = null,
-    TerrainGraphicReference? Reference = null);
+public sealed record TerrainSetDefinition
+{
+    public string Id { get; }
+    public string DisplayName { get; }
+    public TerrainReviewStatus Status { get; }
+    public TerrainTopology Topology { get; }
+    public TerrainSetMetrics Metrics { get; }
+    public IReadOnlyList<TerrainMaskDefinition> Masks { get; }
+    public IReadOnlyList<TerrainMemberDefinition> Members { get; }
+    public IReadOnlyList<TerrainDiagnostic> Diagnostics { get; }
 
-public sealed record TerrainSetDefinition(
-    string Id,
-    string DisplayName,
-    TerrainReviewStatus Status,
-    TerrainTopology Topology,
-    TerrainSetMetrics Metrics,
-    IReadOnlyList<TerrainMaskDefinition> Masks,
-    IReadOnlyList<TerrainMemberDefinition> Members,
-    IReadOnlyList<TerrainDiagnostic> Diagnostics);
+    public TerrainSetDefinition(
+        string id,
+        string displayName,
+        TerrainReviewStatus status,
+        TerrainTopology topology,
+        TerrainSetMetrics metrics,
+        IEnumerable<TerrainMaskDefinition> masks,
+        IEnumerable<TerrainMemberDefinition> members,
+        IEnumerable<TerrainDiagnostic> diagnostics);
+}
 
-public sealed record TerrainCatalog(
-    int SchemaVersion,
-    string GeneratorVersion,
-    string CorpusFingerprint,
-    TerrainGenerationSettings Settings,
-    IReadOnlyList<TerrainSetDefinition> Sets,
-    IReadOnlyList<TerrainDiagnostic> Diagnostics);
+public sealed record TerrainCatalog
+{
+    public int SchemaVersion { get; }
+    public string GeneratorVersion { get; }
+    public string CorpusFingerprint { get; }
+    public TerrainGenerationSettings Settings { get; }
+    public IReadOnlyList<TerrainSetDefinition> Sets { get; }
+    public IReadOnlyList<TerrainDiagnostic> Diagnostics { get; }
+
+    public TerrainCatalog(
+        int schemaVersion,
+        string generatorVersion,
+        string corpusFingerprint,
+        TerrainGenerationSettings settings,
+        IEnumerable<TerrainSetDefinition> sets,
+        IEnumerable<TerrainDiagnostic> diagnostics);
+}
+
+public sealed record TerrainDiagnostic
+{
+    public string Code { get; }
+    public string Message { get; }
+    public int? Mask { get; }
+    public TerrainGraphicReference? Reference { get; }
+
+    public TerrainDiagnostic(
+        string code,
+        string message,
+        int? mask = null,
+        TerrainGraphicReference? reference = null);
+}
 
 public static class TerrainMasks
 {
@@ -156,6 +186,33 @@ public static class TerrainGeneratedId
         IEnumerable<TerrainGraphicReference> members);
 }
 
+public enum TerrainCatalogError
+{
+    MalformedJson,
+    InvalidRoot,
+    UnsupportedSchemaVersion,
+    MissingProperty,
+    DuplicateProperty,
+    UnknownProperty,
+    InvalidPropertyType,
+    NullNotAllowed,
+    InvalidEnum,
+    NumberOutOfRange,
+    InvalidRelationship
+}
+
+public sealed class TerrainCatalogException : FormatException
+{
+    public TerrainCatalogError Error { get; }
+    public string SourcePath { get; }
+
+    public TerrainCatalogException(
+        TerrainCatalogError error,
+        string sourcePath,
+        string message,
+        Exception? inner = null);
+}
+
 public static class TerrainCatalogJson
 {
     public const int CurrentSchemaVersion = 1;
@@ -176,9 +233,281 @@ public readonly record struct TerrainValidationIssue(
     TerrainGraphicReference? Reference = null);
 ```
 
-JSON uses the exact camel-case field names represented above. Enum wire values are `four-way`/`eight-way`, `enabled`/`pending`/`disabled`, and `map-observed`/`image-only`. The root property order is `schemaVersion`, `generatorVersion`, `corpusFingerprint`, `settings`, `diagnostics`, `sets`; set property order follows the constructor above. Serialization is compact UTF-8 JSON represented as a .NET string, ends with exactly one LF, writes invariant-culture JSON numbers, and never emits a timestamp or absolute path.
+The collection-bearing records have explicit constructors and get-only properties:
 
-Defaults emitted by generator version `terrain-v1` are:
+```text
+TerrainMaskDefinition(mask, variants)
+TerrainMemberDefinition(reference, provenance)
+TerrainSetDefinition(id, displayName, status, topology, metrics, masks, members, diagnostics)
+TerrainCatalog(schemaVersion, generatorVersion, corpusFingerprint, settings, sets, diagnostics)
+```
+
+The declarations above are the exact signatures; constructor bodies perform the copies rather than using positional collection properties.
+
+Every constructor rejects null required arguments/elements and copies each incoming collection into a private array exposed through a read-only wrapper. Copy at every nested boundary, not only in `Parse`; mutating a caller list after construction must not alter any catalog value. Scalar records are immutable values. This is the immutability contract consumed by Part 2’s reusable resolver and Part 3’s asset catalog; `IReadOnlyList<T>` alone is not treated as proof of immutability.
+
+### Stable IDs and masks
+
+`TerrainGeneratedId.Create` materializes input once, rejects empty input and any duplicate, sorts numeric `(Sheet, Graphic)`, encodes exactly `four-way|sheet:graphic,...` or `eight-way|sheet:graphic,...` as UTF-8 without BOM/LF, hashes with SHA-256, and returns `terrain-4-<64 lowercase hex>` or `terrain-8-<64 lowercase hex>`. Name, review status, metrics, mask/variant order, and diagnostics do not affect the ID; topology or the effective member set does. Part 3 must immediately recompute the authored/generated ID when topology or effective membership changes while retaining a separate immutable draft key for manager identity and selection.
+
+Four-way normalization first masks to `0x0F`. Eight-way normalization first masks to `0xFF`, then removes NE unless N and E are both set, SE unless S and E are set, SW unless S and W are set, and NW unless N and W are set. Unknown `TerrainTopology` values throw `ArgumentOutOfRangeException`. `Required` returns a non-mutable numeric-ascending list containing exactly 16 or 47 values.
+
+Coordinate convention is fixed across converter and later resolver work: `(0,0)` is top-left; `x` increases east/right; `y` increases south/down. Neighbor offsets are N `(0,-1)`, E `(+1,0)`, S `(0,+1)`, W `(-1,0)`, NE `(+1,-1)`, SE `(+1,+1)`, SW `(-1,+1)`, NW `(-1,-1)`. Outside-map coordinates and nonfamily references are absent bits.
+
+### JSON syntax, nulls, ranges, and canonical order
+
+All JSON property names are exact camel case. Enum strings are exactly `four-way`/`eight-way`, `enabled`/`pending`/`disabled`, and `map-observed`/`image-only`, case-sensitive. Every listed property is required at every object level. Unknown and duplicate properties are rejected at every fixed-shape object. Manifest-style dynamic IDs are not part of this catalog schema.
+
+Only `diagnostic.mask` and `diagnostic.reference` may be JSON `null`; both properties are still emitted. No string, object, array, array element, metric, setting, member reference, or variant reference may be null. Empty `sets` and diagnostic arrays parse; empty member/mask/variant arrays are left to status-aware validation. JSON numbers must be JSON numbers of the required integer/double kind; numeric strings and non-finite values are rejected.
+
+Parser failures always throw `TerrainCatalogException`, preserve `SourcePath`, and use these categories. At each object, enumerate wire properties once: the first unknown property or second occurrence throws immediately; after enumeration, report the first missing property in the canonical property order; then validate values in canonical property order, depth-first and array order. A forbidden null is reported before wrong-kind validation. At the root, validate `schemaVersion` before other property values so a complete unsupported document reports `UnsupportedSchemaVersion`.
+
+- invalid JSON syntax → `MalformedJson`;
+- nonobject root → `InvalidRoot`;
+- missing/duplicate/unknown property → the corresponding category;
+- wrong JSON kind or noninteger integer field → `InvalidPropertyType`;
+- forbidden null → `NullNotAllowed`;
+- unknown enum spelling → `InvalidEnum`;
+- schema other than 1 → `UnsupportedSchemaVersion`;
+- scalar outside the ranges below → `NumberOutOfRange`;
+- a cross-setting relationship failure → `InvalidRelationship`.
+
+`TerrainGenerationSettings` requires `HoldoutModulo >= 2`; all four support minima are `>= 1`; `MinimumEightWayAccuracyGain` and `MinimumClassificationMargin` are finite in `(0,1]`; all other double settings are finite in `[0,1]`; `ImageOnlyCompatibility >= MapMemberCompatibility`; and `PendingConfidence <= EnabledConfidence`. Metrics require nonnegative integer supports, all normalized values in `[0,1]`, and `EightWayAccuracyGain` in `[-1,1]`. This corrects the tempting but invalid blanket `[0,1]` rule for a signed accuracy difference. `Serialize(null)` throws `ArgumentNullException`; otherwise serialization applies the same enum/scalar/relationship checks as parsing and throws `TerrainCatalogException` with `SourcePath == "<object>"` before writing invalid structural values. Semantic catalog issues remain the validator/caller's responsibility.
+
+Canonical serialization is compact UTF-8 JSON represented by a .NET string, with exactly one trailing LF and no BOM, timestamp, or absolute path. Numbers use invariant JSON formatting; generator metrics are rounded to six decimal places, midpoint-to-even, before object construction. Property order is exact:
+
+```text
+root:       schemaVersion, generatorVersion, corpusFingerprint, settings, diagnostics, sets
+settings:   holdoutModulo, minimumMapSupport, minimumRegionSupport,
+            minimumObservationSupport, minimumDiagonalSupport,
+            minimumEightWayAccuracyGain, mapMemberCompatibility,
+            imageOnlyCompatibility, minimumClassificationMargin,
+            maximumAmbiguity, enabledConfidence, pendingConfidence
+set:        id, displayName, status, topology, metrics, masks, members, diagnostics
+metrics:    mapSupport, regionSupport, observationSupport, diagonalSupport,
+            maskEntropy, completeness, ambiguity, visualCompatibility,
+            holdoutAccuracy, eightWayAccuracyGain, confidence
+mask:       mask, variants
+member:     reference, provenance
+diagnostic: code, message, mask, reference
+reference:  sheet, graphic
+```
+
+The serializer canonicalizes root/set diagnostics by the ordering below, sets by ID ordinal, masks numeric ascending, and members by numeric reference. It preserves variant order because Part 2 selection and Part 3 manager reordering make that order semantically significant. Parse preserves variant order and defensively copies everything; parse→serialize canonicalizes only nonsemantic ordering.
+
+### Catalog validation issue contract
+
+Parsing is structural and range-aware; status-aware/catalog-wide validation is separate. `TerrainCatalogValidator.Validate` never throws for semantic invalidity and returns fresh read-only issues in this order: `(TerrainId null first ordinal, Mask null first numeric, Reference null first then Sheet then Graphic, Code ordinal, Message ordinal)`. Exact duplicate issues are removed by all five fields.
+
+Machine codes and emission are:
+
+| Code | Emission |
+|---|---|
+| `catalog-schema-version-invalid` | programmatically built schema version is not current version 1 |
+| `catalog-generator-version-required` | generator version is blank |
+| `catalog-fingerprint-invalid` | fingerprint is not `sha256:` plus 64 lowercase hex digits |
+| `setting-out-of-range` | a programmatically built setting violates the scalar ranges above |
+| `setting-relationship-invalid` | either locked setting relationship fails |
+| `terrain-id-required` | set ID is blank |
+| `terrain-id-duplicate` | the same nonblank ID occurs more than once; emit for each occurrence |
+| `terrain-id-mismatch` | ID differs from `TerrainGeneratedId.Create(topology, distinct members)`; suppress when member input is empty/duplicate so the primary member issue is sufficient |
+| `terrain-display-name-required` | display name is blank |
+| `terrain-topology-invalid` | programmatically built topology enum is unknown |
+| `terrain-status-invalid` | programmatically built review-status enum is unknown |
+| `metric-out-of-range` | a programmatically built metric violates its range |
+| `member-required` | set has no members |
+| `member-provenance-invalid` | programmatically built provenance enum is unknown |
+| `member-graphic-zero` | any member has `Graphic == 0` |
+| `member-sheet-out-of-range` | member sheet is outside signed Int16 range used by `MapCodec.Encode` |
+| `member-duplicate` | duplicate member in one set |
+| `mask-duplicate` | duplicate mask in one set |
+| `mask-unreachable` | mask is not normalized/reachable for the set topology |
+| `variant-duplicate` | duplicate reference within one mask list |
+| `variant-not-member` | variant is absent from the member list |
+| `enabled-member-unused` | enabled member appears in no variant list |
+| `enabled-mask-missing` | enabled set omits a required mask |
+| `enabled-mask-empty` | enabled required mask has no variant |
+| `enabled-member-conflict` | a reference belongs to two or more enabled sets; emit one issue per owner with all sorted owner IDs in the message |
+| `diagnostic-code-required` | root or set diagnostic code is blank |
+| `diagnostic-message-required` | root or set diagnostic message is blank |
+
+Issue messages are exact:
+
+```text
+catalog-schema-version-invalid: Catalog schema version <n> is not supported; expected 1.
+catalog-generator-version-required: Catalog generator version is required.
+catalog-fingerprint-invalid: Catalog corpus fingerprint must be 'sha256:' plus 64 lowercase hex digits.
+setting-out-of-range: Setting '<camelName>' value <v> is outside <range>.
+setting-relationship-invalid: Setting '<left>' must be <relation> setting '<right>'.
+terrain-id-required: Terrain ID is required.
+terrain-id-duplicate: Terrain ID '<id>' occurs more than once.
+terrain-id-mismatch: Terrain '<id>' does not match generated ID '<expected>'.
+terrain-display-name-required: Terrain '<id>' display name is required.
+terrain-topology-invalid: Terrain '<id>' topology value <n> is invalid.
+terrain-status-invalid: Terrain '<id>' review status value <n> is invalid.
+metric-out-of-range: Terrain '<id>' metric '<camelName>' value <v> is outside <range>.
+member-required: Terrain '<id>' must contain at least one member.
+member-provenance-invalid: Terrain '<id>' member (s,g) provenance value <n> is invalid.
+member-graphic-zero: Terrain '<id>' member (s,g) uses reserved graphic 0.
+member-sheet-out-of-range: Terrain '<id>' member (s,g) sheet is outside Int16 range.
+member-duplicate: Terrain '<id>' contains duplicate member (s,g).
+mask-duplicate: Terrain '<id>' contains duplicate mask 0xNN.
+mask-unreachable: Terrain '<id>' mask 0xNN is not reachable for <topology>.
+variant-duplicate: Terrain '<id>' mask 0xNN contains duplicate variant (s,g).
+variant-not-member: Terrain '<id>' mask 0xNN variant (s,g) is not a member.
+enabled-member-unused: Enabled terrain '<id>' member (s,g) is unused.
+enabled-mask-missing: Enabled terrain '<id>' is missing mask 0xNN.
+enabled-mask-empty: Enabled terrain '<id>' mask 0xNN has no variants.
+enabled-member-conflict: Enabled terrain '<id>' member (s,g) is shared by [<quoted sorted IDs>].
+diagnostic-code-required: Diagnostic code is required.
+diagnostic-message-required: Diagnostic message is required.
+```
+
+`<v>` uses invariant `G17` (`NaN`, `Infinity`, and `-Infinity` literally when validating a programmatic value), `<n>` is invariant decimal, `<range>` is the mathematical range written in the JSON section, `<topology>` is the wire spelling when valid, and `(s,g)`/`0xNN` use actual invariant integers/uppercase hex. The relationship text is `be greater than or equal to` for image/map compatibility and `be less than or equal to` for pending/enabled confidence. Conflict IDs render as comma-separated individually quoted IDs. Blank IDs use `'<blank>'` when needed by another issue. Pending/disabled sets may be incomplete, have empty required masks, overlap each other, and retain unused members without issues; duplicate/unreachable/zero/wiring errors remain invalid regardless of status. Manifest resolution is not a Core concern. Part 3 adds enabled-only manifest/exact-32 checks while retaining parsed pending/disabled review data.
+
+### Persisted generator diagnostics contract
+
+Scope is represented by containment: root diagnostics describe excluded corpus/family input; `set.diagnostics` describe one emitted candidate. `mask` and `reference` are explicitly null when not applicable. Generator messages never contain absolute paths. Map identity is the quoted normalized repository-relative identity. Generated numbers are invariant fixed six decimals; references and masks use the issue formatting above.
+
+Diagnostics are exact-deduplicated by `(code, message, mask, reference)` within their scope, then ordered by `(code ordinal, mask null first/numeric, reference null first/sheet/graphic, message ordinal)`. A diagnostic is emitted once per condition at the scope/key described below:
+
+| Scope/code | Emission and exact message template |
+|---|---|
+| root `missing-manifest-reference` | once per map/reference excluded: `Map '<map>' references (s,g), which is absent from manifest; placements were excluded.` |
+| root `unsupported-frame-size` | once per map-used reference excluded: `Frame (s,g) is <w>x<h>; expected 32x32; placements were excluded.` |
+| root `insufficient-family-members` | once per training reference left in a singleton component: `Map-observed reference (s,g) did not join a family with at least two members.` |
+| root `heldout-only-member-excluded` | once per eligible reference observed only in held-out maps: `Map-observed reference (s,g) has no training-family owner and was not considered image-only.` |
+| set `image-only-member-admitted` | once per admitted member/reference/mask: `Admitted image-only (s,g) at mask 0xNN: compatibility <v>, owner margin <v>.` |
+| set `image-only-ambiguous` | once per near-threshold rejected frame on its unique best candidate, or on every exactly tied best candidate: `Rejected image-only (s,g): compatibility <v>, owner margin <v>.` |
+| set `image-only-centroids-missing` | once when a family cannot classify any expansion because a required connected/disconnected side centroid is absent: `Image-only expansion skipped because connected/disconnected edge centroids are incomplete.` |
+| set `no-training-observations` | model has no training observations: `No training observations were available.` |
+| set `no-holdout-observations` | model has no eligible held-out observations: `No held-out observations were available; holdout accuracy is 0.000000.` |
+| set `eight-way-evidence-insufficient` | eight-way is not selected despite at least one diagonal trial: `Eight-way not selected: diagonal support <n>, diagonal maps <n>, four-way accuracy <v>, eight-way accuracy <v>, required gain <v>.` |
+| set `support-below-minimum` | any support gate fails: `Support <maps>/<regions>/<observations> is below required <maps>/<regions>/<observations>.` |
+| set `incomplete-required-masks` | selected model is incomplete: `Completeness <v> leaves <n> required masks without variants.` |
+| set `ambiguity-above-maximum` | ambiguity gate fails: `Ambiguity <v> exceeds maximum <v>.` |
+| set `holdout-accuracy-below-enabled` | holdout enable gate fails: `Holdout accuracy <v> is below enabled threshold <v>.` |
+| set `confidence-below-enabled` | pending candidate is below enabled confidence: `Confidence <v> is below enabled threshold <v>.` |
+| set `confidence-below-pending` | disabled candidate is below pending confidence: `Confidence <v> is below pending threshold <v>.` |
+| set `enabled-member-conflict` | overlap loser is demoted: `Demoted from enabled because (s,g) is owned by higher-ranked terrain '<id>'.` |
+
+In these templates `(s,g)` is replaced by the actual invariant sheet/graphic integers, `<v>` is `value.ToString("F6", InvariantCulture)`, and `<n>` is invariant decimal. Root aborts (missing inventory, malformed map/manifest, unsupported tile size, missing/corrupt relevant PNG, out-of-bounds rect, no maps, no eligible placements) are typed exceptions, not persisted diagnostics. Every admitted image-only member has `image-only-member-admitted` review evidence. The builder asserts every pending/disabled set has at least one of the status-explanation codes `no-training-observations`, `no-holdout-observations`, `eight-way-evidence-insufficient`, `support-below-minimum`, `incomplete-required-masks`, `ambiguity-above-maximum`, `holdout-accuracy-below-enabled`, `confidence-below-enabled`, `confidence-below-pending`, or `enabled-member-conflict`.
+
+## Locked generated-map, fingerprint, and holdout inputs
+
+### Generated map inventory and map identity
+
+The converter-owned file is `<repoRoot>/Assets/Maps/terrain-map-inputs-v1.txt`. Its internal API is `TerrainMapInventory.Read(string repoRoot)` and `TerrainMapInventory.Write(string mapsDirectory, IEnumerable<string> outputFileNames)`; `TerrainCorpusLoader.Load(string repoRoot)` consumes `Read`. Its exact UTF-8/no-BOM/LF format is:
+
+```text
+terrain-map-inputs-v1
+Map1.map
+Map2.map
+```
+
+The header and at least one file line are required. File names are ordinal-sorted, unique, bare names ending in `.map`, and may not be rooted, contain `/` or `\`, equal `.`/`..`, or escape `Assets/Maps`. Each listed file must exist as a regular file. The map identity used for diagnostics and holdout is exactly `Assets/Maps/<fileName>` with `/`, regardless of host separator/root. Unlisted `.map` files are stale/irrelevant and must not be read, diagnosed, or fingerprinted.
+
+Task 6 extends successful map conversion results with sorted output file names. `maps` writes an Illutia-only inventory for its output directory; `aspereta` writes an Aspereta-only inventory for its output; `all` writes the sorted distinct union of both successful result lists. The inventory is sibling-temp/replace written before terrain runs. A conversion failure is absent from the inventory and remains in existing CLI failures. This avoids destructive directory cleanup and makes stale generated maps explicit.
+
+### Corpus fingerprint byte layout
+
+The fingerprint is `sha256:<64 lowercase hex>` over this exact byte stream:
+
+```text
+ASCII "terrain-corpus-v1\0"
+record inventory
+records maps in map-identity ordinal order
+record manifest
+records relevant sheets in numeric sheet order
+```
+
+Each record is:
+
+```text
+1 byte kind: 0x01 inventory, 0x02 map, 0x03 manifest, 0x04 sheet
+UInt32 big-endian UTF-8 path-byte count
+path UTF-8 bytes, no terminator
+UInt64 big-endian content-byte count
+exact file bytes
+```
+
+Record paths are respectively `Assets/Maps/terrain-map-inputs-v1.txt`, the map identity, `Assets/Sprites/manifest.json`, and `Assets/Sprites/sheets/<canonical-sheet>.png`. A relevant sheet is one containing at least one manifest-resolved exact-32 frame used by an eligible layer-0 placement. Each relevant sheet is recorded once. Absolute roots, timestamps, enumeration order, diagnostics, and settings are excluded. Therefore an unlisted stale map, an unreferenced sheet PNG, root relocation, timestamp change, or settings-only change does not change the corpus fingerprint; any inventory byte, listed map byte, manifest byte, or relevant PNG byte change does. A manifest change is relevant as a whole even if the changed property names an otherwise unused frame.
+
+Use streaming/incremental SHA-256 for inventory/manifest/PNGs and at most one listed map byte array at a time for `MapCodec.Decode`; never concatenate or retain all file bytes.
+
+### Holdout byte layout
+
+For map identity UTF-8 bytes `p`, hash exactly:
+
+```text
+ASCII "terrain-holdout-v1\0"
+UInt32 big-endian p.Length
+p
+```
+
+Read digest bytes 0–7 as unsigned UInt64 big-endian. The map is held out iff that value modulo `HoldoutModulo` is zero. The fixture builder must find deterministic training/holdout names by this public rule rather than hard-code machine-dependent names.
+
+## Locked image descriptor, distances, and buckets
+
+Only manifest frames with `Graphic != 0` and rectangle exactly 32×32 are feature candidates. For source pixel bytes `(R,G,B,A)`, all sums use integer arithmetic in row-major order and convert to `double` only at the final denominator. Transparent RGB never contributes because color terms are multiplied by alpha.
+
+Define per-pixel normalized channels:
+
+```text
+pr = R*A / 65025
+pg = G*A / 65025
+pb = B*A / 65025
+pa = A / 255
+l  = (54*R + 183*G + 19*B)*A / (256*65025)
+```
+
+The five descriptor groups are:
+
+1. **Alpha occupancy:** 64 row-major 4×4 cells. Each is `sum(A)/(16*255)`.
+2. **Palette:** 65 bins. For each pixel, add `A` to opaque-color bin `(R >> 6)*16 + (G >> 6)*4 + (B >> 6)` and add `255-A` to bin 64. Divide every bin by `32*32*255`; the vector sums to 1.
+3. **Perceptual cells:** for the same 64 row-major 4×4 cells, store mean `(pr,pg,pb,pa,l)` in that order, producing 320 values.
+4. **Corners:** NW `[0,8)×[0,8)`, NE `[24,32)×[0,8)`, SE `[24,32)×[24,32)`, SW `[0,8)×[24,32)`, in that order. Store each region’s mean `(pr,pg,pb,pa,l)`, producing 20 values.
+5. **Directional edges:** N, E, S, W in that order. Each side has depth `d=0..3`, then edge segment `s=0..7`, then `(pr,pg,pb,pa,l)`. A segment averages four pixels: N uses `y=d,x=4s..4s+3`; E uses `x=31-d,y=4s..4s+3`; S uses `y=31-d,x=4s..4s+3`; W uses `x=d,y=4s..4s+3`. This produces 160 values/side and 640 total.
+
+No gamma transform, color-space conversion, resizing, DCT, SIMD reduction, or platform image transform is allowed. This exact simple descriptor satisfies the design’s alpha/palette/perceptual/corner/edge needs without adding an uncalibrated perceptual pipeline.
+
+The 64-bit perceptual hash uses the 64 luminance cells. Keep each cell's pre-division Int64 luminance numerator; bit `i = 8*y+x` is 1 iff `cellNumerator*64 > sum(allCellNumerators)`, with bit 0 the least-significant bit. Equality is 0. Hash bands are numeric bits 0–15, 16–31, 32–47, 48–63 in that order. All descriptor accumulators are checked Int64 values.
+
+Component distances are:
+
+```text
+alpha      = sum(abs(a-b)) / 64
+palette    = sum(abs(a-b)) / 2
+perceptual = sum(abs(a-b)) / 320
+corner     = sum(abs(a-b)) / 20
+edge       = sum(abs(a-b)) / 640
+```
+
+Each is clamped to `[0,1]` only after division. Component similarity is `1-distance`. Overall similarity is exactly `0.15*alpha + 0.20*palette + 0.25*perceptual + 0.15*corner + 0.25*edge`, with one final `[0,1]` clamp. No L2 normalization is applied because every coordinate and each distance denominator is already range-normalized.
+
+Bucket metadata is exact:
+
+- sheet ID;
+- alpha decile `min(9, floor(meanAlpha*10))`, where `meanAlpha=sum(A)/(1024*255)`;
+- two palette bin IDs with greatest normalized mass across all 65 bins, tie by lower bin ID;
+- four hash bands above.
+
+A query may compare only entries on the same sheet, with alpha decile difference `<=1`, at least one common dominant palette ID, and at least three equal corresponding hash bands. Results are distinct and numeric `(Sheet,Graphic)` sorted. Bucket filtering is only a recall/performance gate; compatibility thresholds still decide edges/admissions.
+
+Hand-checkable fixtures lock the implementation:
+
+| 32×32 fixture | Expected values |
+|---|---|
+| fully transparent with arbitrary RGB | all alpha/perceptual/corner/edge values 0; palette[64]=1 and all others 0; hash `0x0000000000000000`; decile 0; dominant bins 64 then 0 |
+| opaque black | alpha cells 1; palette[0]=1; every five-channel cell/region/profile is `(0,0,0,1,0)`; hash 0; decile 9; dominant bins 0 then 1 |
+| opaque white | alpha cells 1; palette[63]=1; every five-channel cell/region/profile is `(1,1,1,1,1)`; strict-mean hash 0; decile 9; dominant bins 63 then 0 |
+| opaque vertical split, black columns 0–15/white 16–31 | palette[0]=palette[63]=0.5; perceptual columns 0–3 are black and 4–7 white; hash `0xF0F0F0F0F0F0F0F0`; all bands `0xF0F0`; corners NW/SW black and NE/SE white; N/S edge segments 0–3 black and 4–7 white; E all white; W all black |
+
+Tests compare complete arrays for the first three fixtures, the stated selected indices for the split fixture, and prove transparent RGB noise is byte-for-byte feature-equal.
+
+## Locked evidence, image-only, model, and scoring formulas
+
+Generator version `terrain-v1` emits these deterministic initial defaults:
 
 ```text
 holdoutModulo=5
@@ -195,99 +524,232 @@ enabledConfidence=0.90
 pendingConfidence=0.45
 ```
 
-`TerrainGeneratedId.Create` sorts distinct members by numeric `(Sheet, Graphic)`, encodes `four-way|sheet:graphic,...` or `eight-way|...` as UTF-8, hashes it with SHA-256, and returns `terrain-4-<64 lowercase hex>` or `terrain-8-<64 lowercase hex>`. Empty input and duplicate input are invalid. Name/status/metrics/mask ordering/diagnostics do not affect the ID; topology or membership does.
+These are initial deterministic defaults, not claims of corpus calibration. Do not alter formulas or thresholds ad hoc while implementing a fixture.
 
-Four-way normalization removes all diagonal bits. Eight-way normalization first masks to the eight declared bits, then removes NE unless N+E are set, SE unless S+E are set, SW unless S+W are set, and NW unless N+W are set. `Required` is numeric ascending and therefore contains exactly 16 or 47 values.
+### Candidate graph and populations
 
-Parsing and validation are separate. Parsing rejects malformed JSON, wrong schema version, missing/duplicate/wrong-kind required properties, unknown enum strings, non-finite/out-of-range `[0,1]` settings or metrics, and mutable/null collection members. It permits incomplete/overlapping pending and disabled sets. Catalog validation then reports stable machine-readable issues for blank/duplicate/mismatched IDs, `Graphic == 0`, a sheet outside the map format’s signed Int16 range, duplicate members/masks/variants, unreachable masks, variants absent from members, members absent from all variant lists, enabled missing masks/empty variants, and membership shared by enabled sets. Sheet zero and negative sheet/graphic IDs remain structurally valid when `Graphic != 0`; the future asset validator decides whether the manifest resolves them, matching current map/sprite semantics. Manifest existence and exact 32×32 frame checks remain a Part 2 asset-context responsibility; the converter independently guarantees them from its source index.
+Partition maps before any graph, mask, centroid, or image admission work. The global set of references observed anywhere is used only to prevent a map-observed frame from being mislabeled `ImageOnly`; holdout adjacency, masks, region sizes, and labels never train a family.
 
-## Locked inference rules
+Graph vertices are eligible map-observed references in training maps. Evaluate only distinct unordered pairs produced by the union of each vertex's locked bucket query. For a same-sheet pair A/B, an undirected edge exists when feature similarity is at least `MapMemberCompatibility` and either (a) at least one cardinal A/B adjacency occurs in each of two distinct training maps, or (b) one training map contains two cardinal A/B adjacency occurrences whose endpoint coordinate sets are disjoint. Occurrences are unordered cell pairs; repeated direction scans do not double count. Deterministic connected components, including transitive A–B–C bridges, with at least two vertices are provisional families. Singleton references receive root diagnostics.
 
-These rules make the approved “hybrid” and “deterministic conservative” requirements implementable rather than leaving tuning decisions hidden in code:
+For family F in training map m, flood-fill cardinally connected cells whose references are in F. Let `R_m` be region count and `n_r` placements in region r. Each placement in r has training weight:
 
-1. Sort map files, manifest IDs, sheet IDs, frame IDs, references, candidates, diagnostics, and ties with ordinal strings then numeric IDs as applicable. Never depend on `Directory.EnumerateFiles`, `Dictionary`, or `HashSet` iteration order.
-2. Hash only normalized relative names and exact bytes, never full paths. The corpus fingerprint is `sha256:<lowercase hex>` over length-prefixed records for sorted `Assets/Maps/*.map`, exact `Assets/Sprites/manifest.json`, and each map-referenced eligible `Assets/Sprites/sheets/<sheet>.png`. Include record kind, `/`-normalized relative path, byte length, and bytes. Settings are recorded separately and are not part of this corpus fingerprint.
-3. A placement is eligible only when layer-0 `Graphic != 0`, its manifest reference exists, and its rect is exactly 32×32. Missing references and oversized frames become sorted root diagnostics and are excluded. A malformed/unreadable map, malformed manifest, missing/decode-failed required PNG, out-of-bounds source rect, no maps, or no eligible placements aborts generation before publication.
-4. Premultiply RGB by alpha before feature work. Extract once per reference: 8×8 alpha occupancy, a 65-bin quantized RGB histogram (4 bins/channel plus transparent), 8×8 premultiplied RGBA/luminance perceptual cells, four 8×8 corner descriptors, and N/E/S/W four-pixel-deep directional edge profiles. All values are normalized to `[0,1]` using integer accumulation before division.
-5. Similarity is `0.15 alpha + 0.20 palette + 0.25 perceptual + 0.15 corner + 0.25 edge-style`, where each component is `1 - normalized mean absolute distance`, clamped to `[0,1]`. Bucket by sheet, alpha-coverage decile, the two strongest palette bins, and four 16-bit perceptual-hash bands. Compare only same-sheet entries with adjacent alpha deciles, at least one matching dominant palette bin, and at least three matching hash bands; this bounds comparisons instead of global all-pairs work.
-6. Seed a graph from map-observed references. Add a same-sheet edge only when references occur cardinally adjacent in at least two distinct maps, or in at least two disjoint adjacency occurrences that share no cell, and similarity is at least `MapMemberCompatibility`. Deterministic connected components with at least two members become provisional families. Omit singletons with a sorted root `insufficient-family-members` diagnostic; Task 4 assigns review states only to materialized families.
-7. For each family/map, cardinal flood-fill family cells into regions. Give each map total weight 1, each family region in that map equal share, and each placement within its region equal share. The weighted modal neighbor mask for a reference is the greatest weight, with a tie marked ambiguous and broken by smaller normalized mask only for deterministic output. This prevents a giant floor/map from dominating many small maps.
-8. Hold out maps for which the first 64 bits of SHA-256 of the ordinal map identity are divisible by `HoldoutModulo`. Fit modal members/masks on remaining maps and reconstruct held-out placements. A candidate with no training or no held-out observations receives holdout accuracy 0 and cannot auto-enable.
-9. Train connected/disconnected N/E/S/W edge centroids and present/absent corner centroids from map-observed members. Search only other 32×32 frames on the family’s sheet through the same buckets. Admit an image-only frame only when overall similarity is at least `ImageOnlyCompatibility`, its best family beats the next family by `MinimumClassificationMargin`, and every classified side/corner beats its opposite centroid by that margin. Normalize the inferred mask; otherwise emit `image-only-ambiguous` on the owning candidate and do not admit it.
-10. Fit four-way and eight-way models independently. Choose eight-way only when diagonal support reaches `MinimumDiagonalSupport` and held-out accuracy exceeds four-way by at least `MinimumEightWayAccuracyGain`; otherwise choose four-way and emit `eight-way-evidence-insufficient` when diagonal observations existed.
-11. Compute normalized entropy over required masks and completeness as covered-required/required. Ambiguity is nonmodal weighted observation mass/total mass. Visual compatibility is the mean member-to-family-medoid similarity. Support score is the minimum of map/minimum-map, region/minimum-region, and observations/minimum-observations, each capped at 1. Confidence is `0.20 support + 0.15 entropy + 0.25 completeness + 0.15 (1-ambiguity) + 0.10 visualCompatibility + 0.15 holdoutAccuracy`.
-12. A candidate is initially enabled only if all support minima pass, completeness is 1, ambiguity is at most the maximum, holdout accuracy and confidence are each at least `EnabledConfidence`, every source frame is valid, and catalog validation has no set-local issue. Otherwise it is pending at confidence ≥ `PendingConfidence` or when incomplete despite passing support; lower-confidence candidates are disabled. Resolve enabled overlaps by descending confidence, then descending map/region/observation support, then ID ordinal; keep the winner enabled and demote losers to pending with `enabled-member-conflict` diagnostics. Pending/disabled overlaps remain.
-13. Within each mask, list map-observed variants before image-only variants, then numeric `(Sheet, Graphic)`. Sort members numerically, diagnostics by `(code, mask, sheet, graphic, message)`, sets by ID, and root diagnostics by the same key. Generated display name is `Generated <lowest-sheet>-<first 8 ID hash chars>`.
+```text
+w(m,r,placement) = 1 / (R_m * n_r)
+```
+
+Thus each region has mass `1/R_m` and each map containing F has total mass 1. Holdout evaluation independently uses the same formula over trained-family references in each held-out map. All sums iterate map identity, region minimum row-major coordinate, then placement row-major coordinate and use `double`; nonfinite results throw before publication.
+
+Persisted/raw supports use training data only:
+
+- `MapSupport`: distinct training maps containing at least one family placement;
+- `RegionSupport`: total cardinal family regions across those maps;
+- `ObservationSupport`: total family placements across those maps;
+- `DiagonalSupport`: total corner trials across training placements where both cardinal prerequisites for that corner are present; present and absent diagonal outcomes both count one trial.
+
+Raw counts are diversity gates, not statistical weights. A giant map can increase observation/diagonal counts but has only weight 1, has one map support, and commonly one region support. It therefore cannot satisfy all enable gates by itself. Eight-way additionally requires diagonal trials in at least `MinimumMapSupport` distinct training maps, preventing one giant map from supplying its evidence gate.
+
+For a topology t, observation mask is family membership at the eight fixed offsets followed by `TerrainMasks.Normalize(raw,t)`. Define weighted mass `W_t(reference,mask)` as the sum of training placement weights for that reference/mask.
+
+### Emitted variants versus evaluation predictions
+
+These are deliberately separate:
+
+- **Emitted mapping:** each map-observed member is assigned to the mask with maximum `W_t(reference,mask)`; a tie is ambiguity evidence and is broken by smaller mask. Each admitted image-only member is assigned to its classified mask. A mask’s variant list contains all assigned members, map-observed first then image-only, each numeric-reference sorted.
+- **Evaluation predictor:** for each mask, predict exactly one map-observed reference with maximum `W_t(reference,mask)`; tie by smaller numeric reference. A mask with no training mass predicts no reference.
+
+For each held-out placement whose reference belongs to the trained map-observed family, prediction is correct only when it equals that single predicted reference for the held-out normalized mask. Membership in the emitted multi-variant list is not an accuracy hit. `HoldoutAccuracy_t` is `sum(holdout weights of correct placements) / sum(all eligible holdout weights)`; no denominator or no prediction yields 0 for those cases. Because each held-out map has total mass 1, a giant map cannot dominate accuracy.
+
+This top-1 rule is required for topology selection: four-way cardinal merging can emit a superset of eight-way variants, but cannot claim every superset member as a correct prediction. A diagonal-distinct fixture must make four-way choose one tied/majority member while eight-way predicts the correct member per canonical mask and gains at least 0.05.
+
+`EightWayAccuracyGain = HoldoutAccuracy_eight - HoldoutAccuracy_four`. Select eight-way iff all are true: `DiagonalSupport >= MinimumDiagonalSupport`, informative corner trials occur in at least `MinimumMapSupport` training maps, and gain `>= MinimumEightWayAccuracyGain`. Otherwise select four-way. If any diagonal trial existed, emit `eight-way-evidence-insufficient` with both accuracies/supports.
+
+### Image-only expansion
+
+Build family medoids/centroids from training map-observed members only. The map-observed universe across training and holdout is excluded from image-only search; a holdout-only reference gets `heldout-only-member-excluded` and is neither admitted nor used to train/evaluate another family. This provenance-only exclusion is the sole allowed holdout inventory use. Tests that alter held-out masks/adjacency while preserving its reference set must leave membership/centroids/admissions unchanged.
+
+For each family, the visual medoid is the map-observed reference minimizing the weighted sum of `(1-overallSimilarity)` to other map-observed references, where each reference weight is its total training placement weight; tie by numeric reference. No map-observed members means no candidate.
+
+For each N/E/S/W side, compute connected and disconnected arithmetic-mean centroids of that side’s 160-value descriptor, weighted by training placement weight and grouped by observed family cardinal bit. For each corner, compute present/absent centroids of its 5-value corner descriptor only from trials where both adjacent cardinal bits are present. A centroid with zero group weight is missing.
+
+Consider the numeric-sorted union of bucket-query results obtained by querying from every map-observed family member, then keep only other exact-32, nonzero frames on that family’s sheet. Classification uses a snapshot of all provisional families before any admission. Side/corner centroid similarity is `1 - mean absolute distance` over the side's 160 or corner's 5 normalized values:
+
+1. Overall owner score is similarity to each same-sheet family medoid. Families missing any connected/disconnected side centroid are ineligible owners.
+2. Choose greatest score, tie by no owner (do not break by ID). Require score `>= ImageOnlyCompatibility`. A threshold-passing exact tie emits `image-only-ambiguous` on every tied family with owner margin 0 and admits nowhere.
+3. If at least two eligible families exist and the best is unique, require best minus second-best `>= MinimumClassificationMargin`; a near tie emits only on that unique best family. If exactly one eligible family exists, runner-up score is defined as 0, so the strict absolute compatibility threshold remains the conservative gate.
+4. For each side, compare candidate side descriptor similarity to connected versus disconnected centroid. Require absolute difference `>= MinimumClassificationMargin`; set the side bit from the closer centroid. Exact ties fail.
+5. For a corner whose two predicted cardinal bits are present, require both present/absent corner centroids, require their similarity difference `>= MinimumClassificationMargin`, and set the diagonal from the closer centroid. Otherwise clear that diagonal without consulting corner centroids.
+6. Normalize the raw prediction with eight-way rules and retain that canonical mask as classification evidence. Each fitted topology normalizes it again for its emitted mapping. Admit once to the unique owner; after topology selection, emit `image-only-member-admitted` with the selected emitted mask. A near-threshold (`score >= ImageOnlyCompatibility`) ownership/side/corner failure emits `image-only-ambiguous` on the best family; incomplete side centroid coverage emits one `image-only-centroids-missing` on that family. Frames with no owner below threshold produce no catalog noise.
+
+A frame already map-observed anywhere, a manifest graphic 0, a non-32 frame, or a frame on another sheet is never admitted. Simultaneous snapshot ownership means a frame cannot be admitted by two families and one family’s additions cannot change another’s score.
+
+Image-only members contribute to emitted completeness, visual compatibility, members, ID, and diagnostics. They contribute zero map/region/observation/diagonal support, zero training/holdout mass, zero entropy/ambiguity evidence, and no centroids/medoid selection.
+
+### Metrics, status, conflict resolution, and ties
+
+For selected topology with `K=16` or `47` and weighted training mask totals `q(mask)`:
+
+- `MaskEntropy = 0` when total mass is 0; otherwise `-sum(p*ln(p))/ln(K)`, `p=q/total`, with zero terms omitted.
+- `Completeness = nonempty required emitted masks / K`.
+- For each map-observed reference, modal mass is `max_mask W(reference,mask)`. `Ambiguity = sum(total-reference-mass - modal-mass) / sum(total-reference-mass)`; no mass yields 1. Tied modal masks use the same maximum and smaller-mask output tie break.
+- `VisualCompatibility = arithmetic mean similarity from every final member to the training medoid`; no members yields 0. Every member has equal visual weight so a giant map cannot dominate it.
+- `HoldoutAccuracy` is the selected topology’s exact top-1 weighted accuracy above; no eligible holdout is 0.
+- `EightWayAccuracyGain` is signed and retained even when four-way is selected.
+- `SupportScore = min(min(1,MapSupport/MinimumMapSupport), min(1,RegionSupport/MinimumRegionSupport), min(1,ObservationSupport/MinimumObservationSupport))`, with floating-point division.
+- `Confidence = 0.20*SupportScore + 0.15*MaskEntropy + 0.25*Completeness + 0.15*(1-Ambiguity) + 0.10*VisualCompatibility + 0.15*HoldoutAccuracy`.
+
+Model comparisons/status use unrounded finite values. Persisted doubles are rounded six places midpoint-to-even. Numeric/reference/ID ties always use the lower numeric reference, smaller mask, or ordinal ID as specified; do not use collection iteration order.
+
+Initial `Enabled` requires all three support minima, completeness exactly 1, ambiguity `<= MaximumAmbiguity`, holdout accuracy `>= EnabledConfidence`, confidence `>= EnabledConfidence`, all member frames source-valid, and no set-local Core validation issue. Otherwise status is `Pending` when confidence `>= PendingConfidence` or when incomplete while all three support minima pass; all other candidates are `Disabled`. Emit every failed status gate, not only the first, and assert the explanation invariant above.
+
+Resolve enabled overlap once after all definitions exist: rank by descending unrounded confidence, then descending MapSupport, RegionSupport, ObservationSupport, then ID ordinal. Keep already claimed references with the higher-ranked set; demote every overlapping lower-ranked set to Pending and emit one `enabled-member-conflict` per conflicting reference/winner. Pending/disabled overlap is retained. Recompute no ID because status is not identity.
+
+Generated display name is `Generated <lowest-sheet>-<first 8 hash hex chars after the ID prefix>`. Sets sort by ID. The shared validator must return no issue for the final generated catalog; any remaining issue is `TerrainGenerationError.InvalidGeneratedCatalog` and prevents publication.
+
+## Deterministic default calibration workflow
+
+The defaults above remain fixed for initial implementation and synthetic byte snapshots. Real-corpus calibration may change a threshold or bucket condition in either direction only through an explicit measured change:
+
+1. Run identical corpus bytes/settings before and after and export candidate ID, status, topology, both holdout accuracies, gain, all metrics, failed gates, and image-only admission score/margin.
+2. Manually label representative candidate families and image-only admissions as accept/reject/uncertain, emphasizing deceptive lookalikes, shorelines, paths, and sparse corners. Record corpus fingerprint and reviewer labels outside generated JSON in PR evidence.
+3. Report before/after true enables, false enables, false disables, pending shifts, and comparison counts. A less conservative numeric threshold is allowed only when it improves labeled recall without enabling any known negative/adversarial fixture; a more conservative change is allowed to remove false enables.
+4. Preserve hard conservative gates: training/holdout isolation, same-sheet and bucket boundedness, unique image owner/margins, three support minima, multi-map diagonal evidence, completeness, ambiguity, top-1 accuracy, enabled overlap resolution, and shared validation. Calibration may adjust their configured values/bucket constants, not silently delete a gate.
+5. Update generator version if interpretation changes, settings defaults, locked JSON bytes, deterministic synthetic fixtures, false-enable regression fixtures, and smoke assertions in one reviewed change. Rerun separate-process byte identity.
+
+No implementation task may tune just to force a real enabled candidate. Zero real enabled sets is acceptable; a known false enable is not.
+
+## Converter failure type and bounded ownership
+
+Add:
+
+```csharp
+public enum TerrainGenerationError
+{
+    MapInventoryNotFound,
+    InvalidMapInventory,
+    MapNotFound,
+    MapReadFailed,
+    MapDecodeFailed,
+    ManifestNotFound,
+    ManifestReadFailed,
+    ManifestMalformed,
+    UnsupportedTileSize,
+    SheetNotFound,
+    SheetReadFailed,
+    SheetDecodeFailed,
+    FrameOutOfBounds,
+    NoMaps,
+    NoEligiblePlacements,
+    NumericOverflow,
+    InvalidGeneratedCatalog
+}
+
+public sealed class TerrainGenerationException : InvalidOperationException
+{
+    public TerrainGenerationError Error { get; }
+    public string? InputPath { get; }
+    public TerrainGraphicReference? Reference { get; }
+}
+```
+
+Input path is absolute for actionable CLI exceptions but is never persisted. Wrap expected I/O/`MapFormatException`/ImageSharp decode failures with the exact category and inner exception. Do not convert publication `IOException` into success or an inference diagnostic.
+
+`TerrainCorpus` is a read-only index of sorted map descriptors/identities, strict frame metadata, globally observed references, relevant sheets, root diagnostics, and fingerprint; it retains no map bytes, `MapDocument`, pixel buffers, or `Image`. Corpus loading reads/decode-validates one listed map at a time and releases its bytes/document before the next. Later graph/region/evaluation passes deliberately reread one map at a time rather than retaining all map grids. Region/placement objects are map-local; candidates retain only aggregate counts, weighted reference/mask totals, medoid/centroid vectors, and diagnostics after each visitor returns.
+
+`TerrainFeatureCache.Build(TerrainCorpus corpus, ITerrainSheetImageLoader? loader = null)` processes relevant sheets in numeric order. `ITerrainSheetImageLoader.Load(string path)` returns an `Image<Rgba32>` owned by `Build`; `Build` disposes that image in the same sheet iteration on success and every extraction failure after extracting every eligible exact-32 frame on it once. The returned cache owns only immutable descriptor arrays and bucket indexes and needs no disposal. One image/sheet and one feature/reference are asserted.
+
+The builder/generator seams are exact and invocation-local:
+
+```csharp
+internal interface ITerrainCatalogBuilder
+{
+    TerrainCatalog Build(TerrainCorpus corpus, TerrainGenerationSettings settings);
+}
+
+internal interface ITerrainCatalogStore
+{
+    void Write(string repoRoot, string serializedCatalog);
+}
+
+internal static TerrainGenerationResult Generate(
+    string repoRoot,
+    TerrainGenerationSettings settings,
+    Func<string, TerrainCorpus> loadCorpus,
+    ITerrainCatalogBuilder builder,
+    ITerrainCatalogStore store);
+```
+
+The public overload supplies `TerrainCorpusLoader.Load`, a production `TerrainCatalogBuilder`, and `TerrainCatalogFileStore`. Generator owns orchestration only: load → build → shared validate → serialize → store → result. Builder owns feature-cache construction and all map rereads but no persisted file. Store owns temp stream/path only, receives an already serialized string, and never validates/builds. Test fakes implement these exact surfaces; no async/open/save aliases.
 
 ## Overall mutation propagation
 
-| Mutation | Source of truth | Readers/dependencies | Required propagation and atomicity |
-|---|---|---|---|
-| Add catalog contract | New `MapEditor.Core.Terrain` values | Converter now; Rendering/App in Parts 2–3 | Core compile → canonical parser/writer/validator tests → converter project reference. No runtime registry or persisted migration. |
-| Build feature cache/candidates | Manifest/map/PNG bytes | Scoring and output diagnostics only | Load strict corpus → cache one feature/reference and one decoded image/sheet → dispose after candidate materialization. No shared/background publication. |
-| Generate catalog file | Fully built validated `TerrainCatalog` | Future asset loader and manager; current CLI output | Serialize in memory → write and durable-flush unique same-directory temp → atomic move/replace → report success. Any earlier or I/O failure leaves prior destination bytes and no temp. |
-| Integrate `all` | Existing conversion workflow | Generated `Assets/Sprites/terrain-brushes.json` | Sheets/maps/combined manifest → invoke the exact focused terrain implementation → only then print terrain success. A terrain failure does not roll back other generated assets but must preserve the previous terrain catalog and make `all` fail. |
+| Mutation | Source/readers | Required propagation and atomicity |
+|---|---|---|
+| Add catalog contract | New get-only Core values → converter now, Parts 2/3 later | Define/copy → parse/serialize/validate tests → converter project reference. No runtime registry or migration. |
+| Publish map inventory | Successful map-converter output names → terrain loader | Collect successful names → canonicalize/validate → durable sibling-temp replace. Stale unlisted maps remain ignored. |
+| Build features/candidates | Listed map, manifest, relevant PNG bytes → scorer/diagnostics | Decode one map/sheet batch → retain compact evidence/features only → dispose/release → immutable candidate values. No global publication. |
+| Generate catalog | Complete validated catalog → CLI/Part 3 loader | Serialize entirely → durable sibling-temp write → replace → only then success result. Any prior/I/O failure preserves destination. |
+| Integrate `all` | Existing production all tail → generated inventory/manifest/catalog | Existing sheets/maps → successful-name inventory → combined manifest → exact `TerrainCommand.Execute` → summaries. Terrain failure leaves previous terrain catalog and causes nonzero process exit. |
 
-## Task 0: Add the shared schema, masks, stable IDs, and validation
+## Task 0: Add the shared schema, typed parser, masks, IDs, and validation
 
 **Files:**
 - Create: `src/MapEditor.Core/Terrain/TerrainCatalog.cs`
 - Create: `src/MapEditor.Core/Terrain/TerrainMasks.cs`
 - Create: `src/MapEditor.Core/Terrain/TerrainGeneratedId.cs`
+- Create: `src/MapEditor.Core/Terrain/TerrainCatalogException.cs`
 - Create: `src/MapEditor.Core/Terrain/TerrainCatalogJson.cs`
 - Create: `src/MapEditor.Core/Terrain/TerrainCatalogValidator.cs`
 - Create: `tests/MapEditor.Core.Tests/Terrain/TerrainMasksTests.cs`
 - Create: `tests/MapEditor.Core.Tests/Terrain/TerrainCatalogJsonTests.cs`
 - Create: `tests/MapEditor.Core.Tests/Terrain/TerrainCatalogValidatorTests.cs`
 - Modify: `tools/AssetConverter/src/AssetConverter/AssetConverter.csproj:10-12`
-- Modify: `tools/AssetConverter/AssetConverter.sln:6-13,23-54`
+- Modify: `tools/AssetConverter/AssetConverter.sln:6-13,23-55`
 
 **Mutation impact:**
-- Source of truth changed: the new immutable schema-v1 types in `src/MapEditor.Core/Terrain/TerrainCatalog.cs`; `MapEditor.Core` remains the sole terrain-contract owner.
-- Important readers: `TerrainCatalogJson`, `TerrainCatalogValidator`, the new converter project reference, and future Rendering/App parts. Existing map codec/editing readers are unchanged.
-- Derived/cached state affected: no runtime cache. Converter build dependency gains Core; root editor dependency direction is unchanged because Rendering already references Core (`src/MapEditor.Rendering/MapEditor.Rendering.csproj:6-9`).
-- Required propagation: define values → prove normalization/round-trip/validation → add Core reference to converter csproj and converter solution → build both solutions.
-- Invariants: no provider/file-system/UI type in Core; 16/47 masks exactly; IDs depend only on topology+distinct sorted membership; pending/disabled incompleteness and overlap parse; enabled incompleteness/overlap validate as errors; serializer output is canonical.
-- Observable proof required: compare exact serialized bytes and validation issue values, not merely method calls.
+- Source of truth: new Core schema-v1 values and helpers.
+- Readers: parser/writer/validator, converter, Part 2 resolver, Part 3 loader/manager.
+- Derived state: no runtime cache; converter solution gains Core.
+- Propagation: define values → prove deep copying/masks/IDs/parser bytes/issues → add project/solution reference → build both dependency directions.
+- Invariants: provider-neutral Core; exact 16/47 masks; identity depends only on topology/distinct members; strict typed parsing; review candidates remain representable; canonical bytes.
+- Observable proof: exact bytes, exception category/path, copied-list behavior, and complete issue values.
 
-**Step 1: Write failing Core tests**
+**Step 1: Write failing tests**
 
-Add exhaustive tests named:
+Add:
 
 - `Required_FourWay_ReturnsAll16CardinalMasksInOrder`
 - `Required_EightWay_ReturnsExactly47NormalizedMasksInOrder`
-- `Normalize_EightWay_RemovesUnsupportedDiagonalBits` (iterate all 256 masks)
-- `Create_ReorderedMembersAndChangedEditableFields_KeepGeneratedId`
-- `Create_ChangedTopologyOrMember_ChangesGeneratedId`
-- `Serialize_RepresentativeCatalog_MatchesLockedSchemaV1Bytes`
-- `Parse_Serialize_RoundTripsWithoutMutableCollectionLeaks`
-- `Parse_DuplicateRequiredPropertyOrUnknownEnum_ThrowsWithSourcePath`
-- `Validate_IncompletePendingAndOverlappingDisabledSets_AllowsReviewData`
-- `Validate_IncompleteOrOverlappingEnabledSets_ReturnsExactIssues`
-- adversarial `Validate_VariantNotInMembersAndUnreachableDiagonal_AreNotSilentlyAccepted`.
+- `Normalize_EightWay_RemovesUnsupportedDiagonalBits` over all 256 masks
+- `Create_ReorderedMembersProducesSameId`
+- `Create_EmptyOrDuplicateMembersThrows`
+- `Create_ChangedTopologyOrMemberChangesId`
+- `Constructors_CopyEveryNestedInputCollection`
+- `Serialize_RepresentativeCatalogMatchesLockedSchemaV1Bytes`
+- `Parse_SerializeCanonicalizesNonSemanticOrderButPreservesVariantOrder`
+- `Parse_MalformedDuplicateUnknownMissingNullWrongKindAndInvalidEnumReturnExactTerrainCatalogError`
+- `Parse_InvalidSettingsRelationshipsOrMetricRangesReturnExactTerrainCatalogError`
+- `Validate_ProgrammaticSchemaEnumAndEmptyMemberErrorsReturnExactIssuesWithoutThrowing`
+- `Validate_IncompleteOverlappingPendingAndDisabledAllowsReviewData`
+- `Validate_IncompleteOrOverlappingEnabledReturnsExactOrderedIssues`
+- adversarial `Validate_VariantNotInMembersAndUnreachableDiagonalAreNotSilentlyAccepted`.
 
-The locked-byte fixture must include one enabled complete four-way set and one incomplete pending eight-way set with an image-only member and diagnostic, so every wire field and enum spelling is pinned.
+The locked-byte fixture includes one complete enabled four-way set and one incomplete pending eight-way set with image-only provenance and a diagnostic, exercising all fields, enum spellings, explicit diagnostic nulls, nested property order, sorting, and trailing LF.
 
-**Step 2: Run tests to verify red**
-
-Run:
+**Step 2: Run red**
 
 ```bash
 dotnet test tests/MapEditor.Core.Tests/MapEditor.Core.Tests.csproj \
   --filter 'FullyQualifiedName~Terrain' -v minimal
 ```
 
-Expected: FAIL to compile because `MapEditor.Core.Terrain` does not exist.
+Expected: compile failure because `MapEditor.Core.Terrain` does not exist.
 
-**Step 3: Implement the minimal shared contract**
+**Step 3: Implement the minimal contract**
 
-Implement the locked APIs and JSON rules above. Construct defensive `Array.AsReadOnly`/read-only copies during parse; never expose parser DTO collections. Use `Utf8JsonWriter` for canonical property/order control and `JsonDocument.EnumerateObject()` with explicit seen-property sets so duplicate JSON properties cannot collapse. Keep semantic review-state validation out of parse.
+Use explicit get-only constructors for collection-bearing records. Use `Utf8JsonWriter` for exact output and `JsonDocument.EnumerateObject()` plus seen-name sets for strict parsing. Parsing wraps every structural/range failure in the exact typed exception; semantic validation returns issues. Add Core to `AssetConverter.csproj` and to the converter solution under `src` using path `..\..\src\MapEditor.Core\MapEditor.Core.csproj`.
 
-Add the Core project reference to `AssetConverter.csproj`, and add Core under the converter solution’s `src` folder with normal configuration/nesting entries. Do not add ImageSharp or converter references to Core.
-
-**Step 4: Run green and dependency checks**
-
-Run:
+**Step 4: Run green**
 
 ```bash
 dotnet test tests/MapEditor.Core.Tests/MapEditor.Core.Tests.csproj \
@@ -296,18 +758,16 @@ dotnet build tools/AssetConverter/AssetConverter.sln -v minimal
 dotnet test tests/MapEditor.Core.Tests/MapEditor.Core.Tests.csproj -v minimal
 ```
 
-Expected: all terrain tests pass, converter solution builds with only pre-existing GifLoader nullable warnings, and all Core tests pass.
-
-**Invariant-to-test matrix:**
+Expected: all pass; only pre-existing converter warnings are acceptable.
 
 | Invariant | Proved by |
 |---|---|
-| Cardinal/blob spaces are exactly 16/47 and diagonals normalize canonically | `Required_*`, `Normalize_EightWay_*` |
-| Editable metadata cannot perturb generated identity | `Create_ReorderedMembersAndChangedEditableFields_KeepGeneratedId` |
-| Schema bytes and enum spellings are stable | `Serialize_RepresentativeCatalog_MatchesLockedSchemaV1Bytes` |
-| Review candidates can remain incomplete/overlapping, enabled sets cannot | `Validate_IncompletePending*`, `Validate_IncompleteOrOverlappingEnabledSets*` |
-| Invalid mask/member wiring is rejected adversarially | `Validate_VariantNotInMembersAndUnreachableDiagonal_AreNotSilentlyAccepted` |
-| Core remains provider-neutral | `dotnet build tools/AssetConverter/AssetConverter.sln` plus project-reference inspection; compile-time dependency structure is the proof |
+| Exact mask spaces and normalization | `Required_*`, exhaustive `Normalize_*` |
+| Stable identity and invalid input rejection | three `Create_*` tests |
+| Values do not retain mutable caller collections | `Constructors_CopyEveryNestedInputCollection` |
+| Wire bytes/types/nulls/order are exact | serializer/parser tests |
+| Review data is retained while enabled invalidity is rejected | validator status tests |
+| Adversarial wiring cannot pass | `Validate_VariantNotInMembers*` |
 
 **Step 5: Commit**
 
@@ -318,88 +778,90 @@ git add src/MapEditor.Core/Terrain tests/MapEditor.Core.Tests/Terrain \
 git commit -m "feat: add terrain catalog contract"
 ```
 
-## Task 1: Load and fingerprint the generated map/frame corpus
+## Task 1: Declare, load, stream, and fingerprint the generated corpus
 
 **Files:**
+- Create: `tools/AssetConverter/src/AssetConverter/Terrain/TerrainGenerationException.cs`
+- Create: `tools/AssetConverter/src/AssetConverter/Terrain/TerrainMapInventory.cs`
 - Create: `tools/AssetConverter/src/AssetConverter/Terrain/TerrainCorpus.cs`
 - Create: `tools/AssetConverter/src/AssetConverter/Terrain/TerrainCorpusLoader.cs`
 - Create: `tools/AssetConverter/src/AssetConverter/Terrain/TerrainFrameIndex.cs`
 - Create: `tools/AssetConverter/src/AssetConverter/Terrain/TerrainCorpusFingerprint.cs`
+- Create: `tools/AssetConverter/src/AssetConverter/Terrain/TerrainHoldout.cs`
 - Create: `tools/AssetConverter/src/AssetConverter/Properties/AssemblyInfo.cs`
 - Create: `tools/AssetConverter/tests/AssetConverter.Tests/Terrain/TerrainFixtureBuilder.cs`
+- Create: `tools/AssetConverter/tests/AssetConverter.Tests/Terrain/TerrainMapInventoryTests.cs`
 - Create: `tools/AssetConverter/tests/AssetConverter.Tests/Terrain/TerrainCorpusLoaderTests.cs`
 - Create: `tools/AssetConverter/tests/AssetConverter.Tests/Terrain/TerrainCorpusFingerprintTests.cs`
+- Create: `tools/AssetConverter/tests/AssetConverter.Tests/Terrain/TerrainHoldoutTests.cs`
 
 **Mutation impact:**
-- Source of truth changed: none; generated map, manifest, and PNG bytes remain read-only. `TerrainCorpus` is an immutable snapshot built from those files.
-- Important readers: Tasks 2–5 consume eligible placements, frame rectangles, diagnostics, and fingerprint. `MapCodec` remains the map-format authority (`src/MapEditor.Core/MapCodec.cs:15-69`).
-- Derived/cached state affected: frame lookup, map grid, observed directed adjacency counts, and fingerprint are derived per invocation and are not published globally.
-- Required propagation: normalize root → read exact manifest bytes → parse duplicate-aware index → read/decode every sorted map → retain layer-0 grids/boundaries/raw adjacency → identify referenced sheets/PNGs → hash all sorted records → return one immutable corpus.
-- Failure behavior: any required malformed/unreadable input throws a path-bearing `TerrainGenerationException`; excluded non-32/missing references produce diagnostics. No output file exists in this task.
-- Invariants: only layer 0 seeds; map trailers work through `MapCodec`; empty graphic is ignored; paths do not affect fingerprint; file creation/enumeration order does not affect observations or fingerprint; no eligible corpus cannot overwrite an existing catalog later.
-- Observable proof required: inspect final placement grids/diagnostics/fingerprint from real encoded `MapDocument` objects.
+- Source of truth: generated input files remain read-only; new inventory declares the map subset.
+- Readers: Tasks 2–5 consume the read-only corpus index and reread descriptors.
+- Derived state: strict frame index, globally observed reference set, relevant sheets, diagnostics, and fingerprint; no retained maps/images/file bytes.
+- Propagation: parse inventory/manifest → stream/decode listed maps one at a time → identify eligible refs/sheets → stream fingerprint records → return complete index.
+- Failure: expected inputs throw exact `TerrainGenerationException`; missing manifest references/non-32 map-used frames are excluded diagnostics; no output mutation exists.
+- Invariants: only listed maps/layer 0/nonzero graphics; stale maps irrelevant; exact map/hash identity; bounded lifetime; no eligible corpus aborts.
+- Observable proof: inspect final identities/references/diagnostics/hash and recording lifetime counters.
 
-**Step 1: Write failing loader/fingerprint tests**
+**Step 1: Write failing tests**
 
-`TerrainFixtureBuilder` must create a temporary repository layout, use `MapDocument.Create`/`SetLayer`/`MapCodec.Encode`, write a minimal manifest, and generate real ImageSharp PNG sheets. It must not read `Paths.Illutia*`.
+`TerrainFixtureBuilder` creates a temp repo layout, canonical inventory, `MapDocument.Create`/`SetLayer`/`MapCodec.Encode` maps, strict manifest, and real ImageSharp PNG sheets. Add:
 
-Add tests:
+- `Inventory_WriteProducesCanonicalSiblingReplacementWithoutStaleEntries`
+- `Inventory_MalformedDuplicateUnsortedTraversalOrMissingEntryThrowsExactCategory`
+- `Load_ReadsOnlyInventoryListedMapsAndIgnoresStaleMap`
+- `Load_ReadsOnlyLayer0AndUsesLockedMapIdentity`
+- `Load_GraphicZeroWithNonzeroSheetIsIgnored`
+- `Load_MapTrailerIsAcceptedByMapCodec`
+- `Load_MissingManifestReferenceAndUndersizedOrOversizedFrameAreDiagnosedAndExcluded`
+- `Load_MalformedOrDuplicateAliasManifestThrowsManifestMalformed`
+- `Load_UnsupportedTileSizeThrowsUnsupportedTileSize`
+- `Load_MalformedMissingOrUnreadableMapThrowsExactCategory`
+- `Load_MissingRelevantPngThrowsSheetNotFound`
+- `Load_NoMapsOrNoEligiblePlacementsThrows`
+- `Load_ProcessesAtMostOneMapByteArrayAndDocumentAtATime`
+- `Compute_EquivalentRootsCreationOrderAndTimestampsHaveSameFingerprint`
+- `Compute_UnlistedMapAndUnreferencedPngDoNotChangeFingerprint`
+- adversarial `Compute_InventoryListedMapManifestOrRelevantPngByteChangeChangesFingerprint`
+- `Compute_SettingsChangeDoesNotChangeCorpusFingerprint`
+- `Holdout_KnownIdentityBytesProduceLockedDigestPrefixAndAssignment`.
 
-- `Load_ReadsOnlyLayer0AndCollectsBoundariesCardinalAndDiagonalAdjacency`
-- `Load_GraphicZeroWithNonzeroSheet_IsIgnored`
-- `Load_MapTrailer_IsAcceptedByMapCodec`
-- `Load_MissingManifestReferenceAndOversizedFrame_AreDiagnosedAndExcluded`
-- `Load_MalformedMap_ThrowsBeforeCatalogMutation`
-- `Load_NoMapsOrNoEligiblePlacements_Throws`
-- `Compute_EquivalentRootsAndDifferentCreationOrder_HaveSameFingerprint`
-- adversarial `Compute_OneMapOrRelevantPngByteChanged_ChangesFingerprint`.
-
-The test fixture should place a valid tile only on layer 1 in one cell and assert it never enters observations, catching accidental all-layer mining.
+The layer test puts a valid frame only on layer 1 at one cell. The manifest test includes exact duplicate property names and numeric aliases (`"1"`/`"01"`) for sheets and graphics. The size test covers 16×32 and 64×32.
 
 **Step 2: Run red**
 
 ```bash
 dotnet test tools/AssetConverter/tests/AssetConverter.Tests/AssetConverter.Tests.csproj \
-  --filter 'FullyQualifiedName~TerrainCorpus' -v minimal
+  --filter 'FullyQualifiedName~TerrainMapInventory|FullyQualifiedName~TerrainCorpus|FullyQualifiedName~TerrainHoldout' -v minimal
 ```
 
-Expected: FAIL to compile because terrain corpus types do not exist.
+Expected: compile failure because corpus types do not exist.
 
-**Step 3: Implement strict immutable corpus loading**
+**Step 3: Implement strict bounded loading**
 
-Use exact paths:
+Use exact generated paths from the locked section. Parse IDs only when `int.TryParse(..., NumberStyles.AllowLeadingSign, InvariantCulture)` succeeds and `value.ToString(InvariantCulture) == propertyName`; this rejects `01`, `+1`, and `-0`. Detect aliases before insertion. Require manifest root to contain only `tileSize` and `sheets` exactly once, with tile size 32. Rects require four Int32 values, nonnegative x/y, positive width/height, and checked `x+width`/`y+height`.
 
-```text
-<repoRoot>/Assets/Maps/*.map
-<repoRoot>/Assets/Sprites/manifest.json
-<repoRoot>/Assets/Sprites/sheets/<sheet>.png
-```
+Read a listed map byte array, hash/decode/scan it, then release it before the next. Keep sorted descriptors, not grids. Wrap map codec errors with map identity/path. Stream inventory, manifest, and PNG hash content. Implement inventory `Write` now as create-new sibling temp → UTF-8/no-BOM write → `FileStream.Flush(true)` → close → same-directory move/overwrite, with primary-exception-preserving best-effort cleanup; Task 6 only supplies successful names. Grant internals only to `AssetConverter.Tests`.
 
-The loader contract is `internal static TerrainCorpus Load(string repoRoot)`. `TerrainCorpus` owns sorted immutable map samples, eligible frame metadata grouped by sheet, root diagnostics, and the fingerprint. Grant internals only to `AssetConverter.Tests` through the new assembly attribute.
-
-Parse manifest IDs as invariant canonical integers; reject duplicate textual properties and numeric aliases (`"1"`/`"01"`). Validate rect arithmetic with checked bounds. Do not use `MapEditor.Rendering.SpriteManifest`, because that would invert converter/editor ownership. Read each map exactly once, retain its bytes for fingerprinting, call `MapCodec.Decode`, and materialize only layer 0 references plus coordinates and outside-map boundary facts.
-
-Do not decode PNG pixels yet, but require each relevant sheet file to exist and include its exact bytes in the fingerprint. Pixel dimensions/source bounds are validated by `Get_OutOfBoundsManifestRect_ThrowsReferenceDiagnostic` in Task 2; `Load_MalformedMap_ThrowsBeforeCatalogMutation` covers only malformed map bytes here.
-
-**Step 4: Run green and regressions**
+**Step 4: Run green**
 
 ```bash
 dotnet test tools/AssetConverter/tests/AssetConverter.Tests/AssetConverter.Tests.csproj \
-  --filter 'FullyQualifiedName~TerrainCorpus' -v minimal
+  --filter 'FullyQualifiedName~TerrainMapInventory|FullyQualifiedName~TerrainCorpus|FullyQualifiedName~TerrainHoldout' -v minimal
 dotnet test tests/MapEditor.Core.Tests/MapEditor.Core.Tests.csproj -v minimal
 ```
 
-Expected: focused and Core tests pass; no test accesses proprietary paths.
-
-**Invariant-to-test matrix:**
+Expected: the exact synthetic inventory/corpus/holdout filter and the full hermetic Core suite pass; no configured corpus path is accessed.
 
 | Invariant | Proved by |
 |---|---|
-| Inference seeds only layer 0 and ignores empty graphic values | `Load_ReadsOnlyLayer0*`, `Load_GraphicZeroWithNonzeroSheet_IsIgnored` |
-| Existing trailer-bearing maps decode through the authoritative codec | `Load_MapTrailer_IsAcceptedByMapCodec` |
-| Unsupported/missing frames never masquerade as candidate members | `Load_MissingManifestReferenceAndOversizedFrame_AreDiagnosedAndExcluded` |
-| Invalid/empty input aborts rather than publishing an empty replacement | `Load_MalformedMap_ThrowsBeforeCatalogMutation`, `Load_NoMapsOrNoEligiblePlacements_Throws` |
-| Fingerprint is root/order independent and content sensitive | both `Compute_*` tests, including the adversarial byte-change case |
+| Inventory publication is canonical and stale/unlisted maps cannot affect inference | inventory write, stale-map, and irrelevant fingerprint tests |
+| Layer 0 and graphic-zero semantics are exact | layer/graphic tests |
+| Parser/input failures are typed and actionable | manifest/map/tile-size/PNG tests |
+| Unsupported frames are review diagnostics, not members | size/reference test |
+| Memory does not scale with simultaneous decoded maps | lifetime recording test |
+| Fingerprint/holdout byte contracts are stable | all hash tests |
 
 **Step 5: Commit**
 
@@ -410,7 +872,7 @@ git add tools/AssetConverter/src/AssetConverter/Terrain \
 git commit -m "feat: load terrain inference corpus"
 ```
 
-## Task 2: Extract and cache deterministic image features
+## Task 2: Extract exact image features by sheet batch
 
 **Files:**
 - Create: `tools/AssetConverter/src/AssetConverter/Terrain/TerrainImageFeatures.cs`
@@ -422,29 +884,32 @@ git commit -m "feat: load terrain inference corpus"
 - Create: `tools/AssetConverter/tests/AssetConverter.Tests/Terrain/TerrainFeatureCacheTests.cs`
 
 **Mutation impact:**
-- Source of truth changed: none; RGBA pixels from the indexed PNG/rect are canonical inputs.
-- Important readers: family seeding, directional mask classification, image-only admission, visual score, and diagnostics.
-- Derived/cached state affected: `TerrainFeatureCache` mutates private dictionaries for decoded sheets and extracted reference features.
-- Required propagation: first reference request → decode sheet once with `Image.Load<Rgba32>` → validate image bounds → copy/process exact rect → cache immutable feature; later requests return the same feature → generator disposal disposes every decoded sheet once.
-- Publication/lifecycle boundary: the cache is invocation-local, synchronous, and never globally registered. Construct → use while building candidates → materialize candidate values → dispose before file publication. Readers cannot observe partially extracted features.
-- Failure behavior: decode/bounds failures throw path/reference-bearing `TerrainGenerationException`; cache disposal occurs through `using` even when extraction/inference fails.
-- Invariants: transparent RGB cannot affect distance; one extraction/reference and one decode/sheet; bucket queries are deterministic and cannot degrade into global cross-sheet comparisons; input-order permutations preserve similarity/buckets.
-- Observable proof required: compare concrete vectors/similarities/candidate reference lists and loader/disposal counts.
+- Source of truth: indexed RGBA pixels remain read-only.
+- Readers: graph similarity, medoids/centroids, image-only ownership, visual score.
+- Derived state: descriptor arrays and bucket indexes only.
+- Propagation: relevant sheet numeric order → load one image → validate every eligible rect → extract every feature once → dispose image → publish complete cache after all sheets.
+- Lifecycle: loader returns an owned image; cache builder disposes it on success/failure before moving to next sheet; no `Image` escapes or survives publication.
+- Failure: decode/bounds failures throw `SheetDecodeFailed`/`FrameOutOfBounds` with path/reference; partial cache is not returned.
+- Invariants: exact hand fixtures, transparent noise independence, bounded same-sheet queries, one decode/sheet/extraction/reference.
+- Observable proof: full arrays, hashes/buckets, similarities, comparison counts, and disposal counters.
 
-**Step 1: Write failing feature tests**
+**Step 1: Write failing tests**
 
-Use generated solid, checker, transparent-noise, directional-edge, and deceptive-lookalike 32×32 frames. Add:
+Add:
 
-- `Extract_TransparentRgbNoise_ProducesIdenticalFeatures`
-- `Extract_DirectionalBordersAndCorners_ProduceExpectedNormalizedComponents`
-- `Similarity_IsSymmetricBoundedAndRanksStyledVariantAboveLookalike`
-- `QueryCandidates_UsesSameSheetAndLockedBucketNeighborhoodInNumericOrder`
-- adversarial `QueryCandidates_DifferentSheetOrNoSharedHashBand_IsNeverCompared`
-- `Get_RepeatedReferences_DecodesSheetOnceAndExtractsFrameOnce`
-- `Dispose_AfterExtractionOrFailure_DisposesEveryDecodedSheetOnce`
-- `Get_OutOfBoundsManifestRect_ThrowsReferenceDiagnostic`.
+- `Extract_TransparentNoiseBlackWhiteAndSplitMatchLockedVectorsAndHashes`
+- `Extract_TransparentRgbNoiseProducesIdenticalFeatures`
+- `Extract_DirectionalBordersAndCornersUseLockedOrientation`
+- `Similarity_UsesLockedComponentDistancesAndIsSymmetricBounded`
+- `QueryCandidates_UsesExactSameSheetDecilePaletteAndThreeBandRulesInNumericOrder`
+- adversarial `QueryCandidates_DifferentSheetOrTwoMatchingBandsIsNeverCompared`
+- `Build_DecodesEachRelevantSheetOnceExtractsEachEligibleFrameOnceAndRetainsNoImages`
+- `Build_SuccessOrExtractionFailureDisposesEachLoadedImageOnce`
+- `Build_MissingOrCorruptPngThrowsExactCategory`
+- `Build_OutOfBoundsOrOverflowingManifestRectThrowsReferenceCategory`
+- one real-PNG `Build_ImageSharpLoaderMatchesDirectExtractor` integration test.
 
-Use a recording fake image loader implementing the exact new internal production interface `ITerrainSheetImageLoader.Load(string path)` and return type; do not invent `Open`, `Read`, or async methods. Also include one real ImageSharp PNG integration test so the fake cannot validate a phantom loading path.
+The recording fake implements exactly `ITerrainSheetImageLoader.Load(string)` and returns real `Image<Rgba32>` instances; it has no `Open`, `Read`, async, or caller-dispose method.
 
 **Step 2: Run red**
 
@@ -453,41 +918,24 @@ dotnet test tools/AssetConverter/tests/AssetConverter.Tests/AssetConverter.Tests
   --filter 'FullyQualifiedName~TerrainFeature' -v minimal
 ```
 
-Expected: FAIL to compile because feature types do not exist.
+Expected: compile failure because feature/cache/bucket types do not exist; test discovery is limited to synthetic `TerrainFeature*` fixtures.
 
-**Step 3: Implement the locked descriptors, distance, buckets, and cache**
+**Step 3: Implement only the locked descriptor/distance/buckets**
 
-Keep pixel/image types internal to converter. Use integer channel sums and fixed loop order; convert to doubles only after each bin/cell sum is complete. Use no SIMD- or platform-dependent image transforms. Feature buckets must materialize `SortedSet<TerrainGraphicReference>` results and expose comparison-count data internally for the adversarial bounded-comparison test, not as public catalog data.
-
-The real loader surface is:
-
-```csharp
-internal interface ITerrainSheetImageLoader
-{
-    Image<Rgba32> Load(string path);
-}
-```
-
-`TerrainFeatureCache` owns returned images and is `IDisposable`; callers do not dispose an individual image. It intentionally performs no parallel work, cancellation, global caching, or cross-run reuse.
+Use fixed scalar loops and checked integer accumulation where required. Materialize descriptor arrays/read-only bucket results. `TerrainFeatureCache.Build` uses a per-sheet `using`; the returned cache is read-only and not `IDisposable`. Expose internal comparison counts only for bounded-work tests.
 
 **Step 4: Run green**
 
-```bash
-dotnet test tools/AssetConverter/tests/AssetConverter.Tests/AssetConverter.Tests.csproj \
-  --filter 'FullyQualifiedName~TerrainFeature' -v minimal
-```
-
-Expected: all focused tests pass, including real PNG loading and disposal.
-
-**Invariant-to-test matrix:**
+Run the focused command above. Expected: all feature tests pass.
 
 | Invariant | Proved by |
 |---|---|
-| Transparent storage artifacts do not alter inference | `Extract_TransparentRgbNoise_ProducesIdenticalFeatures` |
-| Feature/distance math is deterministic and bounded | `Extract_Directional*`, `Similarity_*` |
-| Candidate work remains same-sheet and bucketed | `QueryCandidates_*`, especially the adversarial no-shared-band case |
-| Expensive state is cached exactly once and always released | `Get_RepeatedReferences_*`, `Dispose_AfterExtractionOrFailure_*` |
-| Bad atlas metadata fails with actionable identity | `Get_OutOfBoundsManifestRect_ThrowsReferenceDiagnostic` |
+| Exact descriptor and bit/band order | locked hand fixtures |
+| Transparent storage artifacts do not alter inference | transparent-noise test |
+| Distances/weights are exact and bounded | similarity test |
+| Work is same-sheet and bucket bounded | query tests |
+| Images are batch-owned and always disposed | build lifetime tests |
+| Real ImageSharp loading follows the fake surface | real PNG integration |
 
 **Step 5: Commit**
 
@@ -497,10 +945,11 @@ git add tools/AssetConverter/src/AssetConverter/Terrain \
 git commit -m "feat: extract terrain image features"
 ```
 
-## Task 3: Mine weighted hybrid candidate families
+## Task 3: Mine weighted families and classify image-only members
 
 **Files:**
 - Create: `tools/AssetConverter/src/AssetConverter/Terrain/TerrainCandidate.cs`
+- Create: `tools/AssetConverter/src/AssetConverter/Terrain/TerrainMapBatchReader.cs`
 - Create: `tools/AssetConverter/src/AssetConverter/Terrain/TerrainRegionMiner.cs`
 - Create: `tools/AssetConverter/src/AssetConverter/Terrain/TerrainCandidateMiner.cs`
 - Create: `tools/AssetConverter/src/AssetConverter/Terrain/TerrainImageMemberClassifier.cs`
@@ -509,30 +958,38 @@ git commit -m "feat: extract terrain image features"
 - Create: `tools/AssetConverter/tests/AssetConverter.Tests/Terrain/TerrainImageMemberClassifierTests.cs`
 
 **Mutation impact:**
-- Source of truth changed: none; candidates are deterministic projections of immutable corpus observations/features/settings.
-- Important readers: Task 5 model fitting and diagnostics. No catalog file or editor state reads provisional candidates.
-- Derived/cached state affected: adjacency graph components, family-region IDs, weighted mask histograms, centroids, image-only assignments, and rejection diagnostics.
-- Required propagation: deterministically partition maps by identity → use training-map references/features only for the bounded same-sheet adjacency graph → sorted components → training-map cardinal regions → weighted placement/mask evidence → directional centroids → uniquely classified same-sheet image-only members → immutable candidates. Holdout maps remain unread by mining after corpus loading and are passed only to Task 4 evaluation.
-- Failure behavior: an unclassifiable image remains absent and adds a diagnostic; it does not abort other candidates. Numeric overflow/non-finite weight is an implementation error and aborts generation before publication.
-- Invariants: held-out maps cannot influence graph membership, masks, centroids, image-only admission, or topology; dominant map/region size cannot dominate total map weight; disconnected but visually identical lookalikes do not seed a family; image-only admission uses stricter threshold and unique margin; all admitted image-only members carry provenance and a normalized predicted mask.
-- Observable proof required: assert final candidate membership, weighted histograms, provenance, inferred masks, and diagnostics—not just graph helper calls.
+- Source of truth: none; candidates project corpus/features/settings.
+- Readers: Task 4 fitter/scorer.
+- Derived state: graph components, per-map regions/weights, map-observed masks/supports, medoids/centroids, admissions/rejections.
+- Propagation: fixed partition → training graph → sorted components → one-map-at-a-time weighted evidence → training visual models → simultaneous image ownership → read-only candidates.
+- Failure: unclassified frames remain absent with bounded diagnostics; nonfinite/overflow throws before any output.
+- Invariants: holdout labels do not train; map/region weighting; transitive same-sheet graph; strict unique image owner; provenance/graphic zero; no image support inflation.
+- Observable proof: candidate members, exact weights/supports/centroids/masks/provenance/diagnostics.
 
-**Step 1: Write failing mining tests**
+**Step 1: Write failing tests**
 
-Construct maps and PNGs through `TerrainFixtureBuilder` to add:
+Add:
 
-- `Mine_CardinallyAdjacentCompatibleVariants_FormDeterministicFamily`
-- `Mine_DeceptiveLookalikeWithoutAdjacency_DoesNotJoinFamily`
-- `Mine_DifferentSheetsNeverJoinEvenWhenPixelsMatch`
-- `Weighting_HugeRegionAndTinyMap_EachContributeOneMapWeight`
-- `Weighting_DisconnectedRegionsSplitTheirMapWeightEqually`
-- `Classify_MissingVariantOnSameSheet_IsAdmittedAsImageOnlyWithNormalizedMask`
-- `Classify_MapObservedReference_RemainsMapObservedWhenAlsoFoundByImageSearch`
-- adversarial `Classify_NearTieOrBelowStrictThreshold_IsRejectedWithImageOnlyAmbiguousDiagnostic`
-- `Mine_InputAndMapOrderPermutation_ProducesEquivalentCandidates`;
-- adversarial `Mine_ChangingOnlyHeldOutMaps_DoesNotChangeCandidatesCentroidsOrAdmissions`.
+- `Mine_CardinallyAdjacentCompatibleVariantsFormFamily`
+- `Mine_TransitiveBridgeProducesOneDeterministicComponent`
+- `Mine_DeceptiveLookalikeWithoutAdjacencyDoesNotJoin`
+- `Mine_DifferentSheetsNeverJoin`
+- `Weighting_HugeRegionAndTinyMapEachContributeOneMapMass`
+- `Weighting_DisconnectedRegionsSplitMapMassEqually`
+- `Masks_UseLockedCoordinateDirectionsAndTreatOutsideAsAbsent`
+- `Supports_UseTrainingRawMapsRegionsPlacementsAndCornerTrialsOnly`
+- `Classify_MissingVariantIsAdmittedWithNormalizedMaskAndReviewEvidence`
+- `Classify_GraphicZeroAndEveryMapObservedReferenceAreNeverImageOnly`
+- `Classify_HoldoutObservedReferenceWithoutTrainingOwnerIsExcludedNotRelabeled`
+- `Classify_OnlyOneFamilyUsesZeroRunnerUpAndStillRequiresStrictThreshold`
+- `Classify_MissingCentroidCannotOwnAndEmitsExactDiagnostic`
+- `Classify_NoOwnerExactTieNearTieOrSideCornerTieIsRejectedDeterministically`
+- `Classify_AdmissionsUseSnapshotSoFamilyIterationCannotChangeOwner`
+- `Mine_InputAndMapOrderPermutationProducesEquivalentCandidates`
+- adversarial `Mine_ChangingOnlyHeldoutMasksAndAdjacencyDoesNotChangeTrainingOrAdmissions`
+- `Mine_ReleasesEachDecodedMapBeforeReadingNextAcrossEveryPass`.
 
-Assign train/holdout identity before constructing any adjacency graph or centroid. The weighting regression fixture must create one very large repeated floor and several small training maps whose modal mask differs; assert the small-map evidence is not overwhelmed by raw tile count.
+Use deterministic identity helpers to force train/holdout. The giant fixture has one huge region and several tiny maps with conflicting masks; assert weighted modes are controlled by map mass, while raw support values remain the locked populations.
 
 **Step 2: Run red**
 
@@ -541,37 +998,26 @@ dotnet test tools/AssetConverter/tests/AssetConverter.Tests/AssetConverter.Tests
   --filter 'FullyQualifiedName~TerrainCandidate|FullyQualifiedName~TerrainRegion|FullyQualifiedName~TerrainImageMember' -v minimal
 ```
 
-Expected: FAIL to compile because candidate-mining types do not exist.
+Expected: compile failure because candidate/region/classifier types do not exist; only temporary synthetic fixtures are discovered.
 
-**Step 3: Implement graph, regions, weights, and image-only classification**
+**Step 3: Implement graph, evidence, centroids, and simultaneous expansion**
 
-Use the locked inference rules exactly. Region identity is `(map identity, candidate component, row-major minimum coordinate)` and flood fill uses cardinal neighbors only. Compute raw support counts separately from normalized weights so diagnostics can explain both. A reference observed in maps always wins provenance over later image search.
+`TerrainMapBatchReader` decodes one descriptor and invokes a synchronous visitor; it retains nothing after return. `TerrainRegionMiner` returns map-local values only and mutates no candidate/map/cache. The candidate miner folds those values into aggregate support/mask/centroid accumulators before the next map and never appends placement samples to a cross-map collection. `TerrainCandidateMiner` owns components and evidence but not topology/status/serialization. `TerrainImageMemberClassifier` receives a complete family snapshot and returns admissions/diagnostics; the caller materializes all expanded candidates only after classification ends.
 
-Helper contracts:
-
-- `TerrainRegionMiner` reads a candidate membership set and a map; it returns regions/weighted placement observations only. It does not alter the map, feature cache, candidate membership, or diagnostics.
-- `TerrainCandidateMiner` owns graph/component construction and returns immutable candidates; it does not select topology/status or serialize.
-- `TerrainImageMemberClassifier` reads trained centroids and eligible same-sheet features; it returns admissions and diagnostics, but does not mutate another candidate. The caller creates the expanded candidate after all classifications are known, preventing iteration-order effects.
+Region identity is `(map identity, row-major minimum coordinate)` within a family; flood fill visits N/E/S/W in that order but output sorts by minimum coordinate. Preserve raw support separately from weights.
 
 **Step 4: Run green**
 
-```bash
-dotnet test tools/AssetConverter/tests/AssetConverter.Tests/AssetConverter.Tests.csproj \
-  --filter 'FullyQualifiedName~TerrainCandidate|FullyQualifiedName~TerrainRegion|FullyQualifiedName~TerrainImageMember' -v minimal
-```
-
-Expected: focused tests pass and candidate snapshots are order independent.
-
-**Invariant-to-test matrix:**
+Run the focused command above. Expected: candidate snapshots and all exact diagnostics pass.
 
 | Invariant | Proved by |
 |---|---|
-| Adjacency plus similarity, not appearance alone, seeds map families | `Mine_CardinallyAdjacent*`, adversarial `Mine_DeceptiveLookalike*` |
-| Family membership never crosses sheets | `Mine_DifferentSheetsNeverJoinEvenWhenPixelsMatch` |
-| Every map has equal total influence and each region shares it | both `Weighting_*` tests |
-| Image-only additions are strict, uniquely classified, normalized, and marked | `Classify_MissingVariant*`, `Classify_MapObserved*`, adversarial `Classify_NearTie*` |
-| Input order cannot change candidates | `Mine_InputAndMapOrderPermutation_ProducesEquivalentCandidates` |
-| Held-out evidence cannot leak into training | adversarial `Mine_ChangingOnlyHeldOutMaps_DoesNotChangeCandidatesCentroidsOrAdmissions` |
+| Adjacency+visual graph and transitive closure are exact | graph/bridge/lookalike tests |
+| Giant maps/regions do not dominate fitted evidence | weighting tests |
+| Support populations stay map-observed/training-only | support test |
+| Image-only edge cases are explicit and conservative | classifier zero/owner/tie/centroid tests |
+| Provenance-only holdout exclusion does not train labels | heldout tests |
+| Processing is bounded per map | lifetime test |
 
 **Step 5: Commit**
 
@@ -581,7 +1027,7 @@ git add tools/AssetConverter/src/AssetConverter/Terrain \
 git commit -m "feat: mine hybrid terrain candidates"
 ```
 
-## Task 4: Fit topologies, score candidates, and resolve enabled conflicts
+## Task 4: Fit top-1 topology models, score, diagnose, and resolve conflicts
 
 **Files:**
 - Create: `tools/AssetConverter/src/AssetConverter/Terrain/TerrainModelFitter.cs`
@@ -592,32 +1038,38 @@ git commit -m "feat: mine hybrid terrain candidates"
 - Create: `tools/AssetConverter/tests/AssetConverter.Tests/Terrain/TerrainCatalogBuilderTests.cs`
 
 **Mutation impact:**
-- Source of truth changed: none; final definitions/statuses are derived from candidates and locked settings.
-- Important readers: canonical JSON output, future manager diagnostics, and later enabled-set resolution.
-- Derived/cached state affected: train/holdout partitions, modal mask mappings, 4/8 model metrics, selected topology, stable IDs, initial statuses, and conflict-demoted statuses.
-- Required propagation: receive the partition fixed by Task 3 → fit both models from training observations only → reconstruct holdout without updating any model value → select topology → compute exact metrics/confidence → construct masks/members/diagnostics/ID → rank initial enabled sets globally → demote overlaps → run shared catalog validation.
-- Failure behavior: no-holdout/no-training/insufficient support yields diagnostics and cannot enable; one bad candidate does not erase reviewable alternatives. Any enabled validation issue is an internal generation failure, not silently emitted invalid JSON.
-- Invariants: 8-way requires support and material improvement; only complete high-confidence candidates enable; enabled membership is unique; pending/disabled alternatives may overlap; stable ID ignores names/status/metrics; all tie breaks are deterministic.
-- Observable proof required: assert final topology, status, mappings, metrics, IDs, and conflict diagnostics from synthetic evidence.
+- Source of truth: none; definitions derive from read-only candidates/settings.
+- Readers: Task 5 serialization/publication and Part 3 diagnostics.
+- Derived state: topology-specific `W`, emitted mappings, top-1 predictors/accuracies, selected metrics/status/ID, overlap demotions.
+- Propagation: fit both from training → evaluate top-1 on holdout only → select → formulas/status diagnostics → construct copied values → globally resolve overlap → shared validate.
+- Failure: no train/holdout/support yields review status/diagnostics; remaining generated validation issue throws typed failure.
+- Invariants: eight-way can prove material gain; emitted variants never define accuracy; exact empty/tie/formula behavior; every nonenabled set explained; enabled unique/complete.
+- Observable proof: final mappings/predictions/metrics/status/diagnostics/IDs from synthetic evidence.
 
-**Step 1: Write failing model/scoring tests**
+**Step 1: Write failing tests**
 
-Add the design-required scenarios:
+Add:
 
-- `Fit_FourWayCorpus_ReconstructsAll16MasksAndSelectsFourWay`
-- `Fit_CanonicalBlobCorpus_WithSupportedAccuracyGain_SelectsEightWayAndAll47Masks`
-- `Fit_SparseCorners_StayFourWayAndReportInsufficientDiagonalEvidence`
-- `Fit_NoisyVisualVariants_ShareMaskInDeterministicVariantOrder`
-- `Fit_HoldoutAssignment_IsStableAcrossInputOrder`
-- adversarial `Fit_ChangingHoldoutLabelsChangesAccuracyButNotFittedMasksCentroidsOrMembership`
-- `Score_CompleteHighConfidenceCandidate_IsEnabled`
-- `Score_IncompleteCandidate_IsPendingEvenWhenOtherMetricsAreHigh`
-- `Score_BelowPendingThreshold_IsDisabled`
-- `Build_StableIdIgnoresDisplayNameStatusAndObservationOrder`
-- adversarial `Build_OverlappingEnabledCandidates_DeterministicallyDemotesLoserAndValidates`
-- `Build_PendingAlternativesMayOverlapWithoutDemotion`.
+- `Fit_FourWayCorpusReconstructsAll16AndSelectsFourWay`
+- blocker regression `Fit_DiagonalDistinctCorpus_Top1EightWayBeatsFourWayAlthoughFourWayEmittedListsAreSupersets`
+- `Fit_CanonicalBlobCorpusWithMultiMapDiagonalSupportSelectsEightWayAndAll47`
+- `Fit_SparseOrSingleMapCornersStayFourWayWithExactEvidenceDiagnostic`
+- `Fit_NoisyVariantsShareEmittedMaskButTop1TieUsesLowerReference`
+- `Fit_NoTrainingOrNoHoldoutUsesZeroAccuracyAndExactDiagnostic`
+- `Fit_HoldoutAssignmentAndWeightedAccuracyAreStableAcrossOrderAndHugeMaps`
+- adversarial `Fit_ChangingHeldoutLabelsChangesAccuracyButNotFittedPredictorsMappingsCentroidsOrMembers`
+- `Metrics_HandCalculatedEntropyAmbiguityMedoidVisualSupportConfidenceMatch`
+- `Metrics_EmptyPopulationsUseLockedZeroOrOneValuesWithoutNaN`
+- `Score_CompleteHighConfidenceCandidateIsEnabled`
+- `Score_IncompleteCandidateIsPendingEvenWhenOtherMetricsAreHigh`
+- `Score_BelowPendingThresholdIsDisabled`
+- `Score_EveryPendingAndDisabledSetHasStatusExplanation`
+- `Build_StableIdIgnoresEditableAndObservationOrder`
+- adversarial `Build_OverlappingEnabledCandidatesDeterministicallyDemotesLoserAndValidates`
+- `Build_PendingAlternativesMayOverlap`
+- `Build_DiagnosticsAreDeduplicatedOrderedAndUseInvariantFixedValues`.
 
-Generate the complete mask corpora algorithmically from `TerrainMasks.Required`; do not check in 63 hand-authored image/map files. Ensure the 8-way fixture makes four-way collapse diagonal-distinct references so held-out reconstruction has a measured gain ≥ 0.05.
+Generate 16/47 evidence algorithmically from `TerrainMasks.Required`. The blocker fixture must explicitly compute the old membership-list hit rate and show it cannot favor eight-way, then assert the locked top-1 four/eight accuracies and selected eight-way result.
 
 **Step 2: Run red**
 
@@ -626,15 +1078,13 @@ dotnet test tools/AssetConverter/tests/AssetConverter.Tests/AssetConverter.Tests
   --filter 'FullyQualifiedName~TerrainModel|FullyQualifiedName~TerrainCandidateScorer|FullyQualifiedName~TerrainCatalogBuilder' -v minimal
 ```
 
-Expected: FAIL to compile because fitter/scorer/builder types do not exist.
+Expected: compile failure because fitter/scorer/builder types do not exist; only synthetic terrain model tests are discovered.
 
-**Step 3: Implement deterministic fitting and scoring**
+**Step 3: Implement exact fitting/scoring**
 
-Keep train and holdout evidence separate. Variants are learned from training data; held-out references only count correct when the trained mapping for the held-out normalized mask contains that observed member. Do not leak held-out modal masks into the model before measuring accuracy.
+Keep emitted map and evaluation predictor as different fields/types so code cannot accidentally use a membership list for accuracy. Reread held-out maps one at a time only after fitting is complete. Use locked formulas, unrounded comparisons, six-place persisted values, and all tie rules. Validate explanation codes before catalog construction, resolve overlap once, and throw `InvalidGeneratedCatalog` with all ordered issue messages if shared validation is nonempty.
 
-Emit exact diagnostic codes from the locked rules. Metrics are serialized rounded to six decimal places using midpoint-to-even rounding so equivalent arithmetic paths do not change bytes; comparisons use unrounded values. Build all definitions first, resolve global overlap once, then invoke `TerrainCatalogValidator.Validate`. The builder must throw with all enabled validation issues if any remain.
-
-**Step 4: Run green and all terrain tests**
+**Step 4: Run green**
 
 ```bash
 dotnet test tools/AssetConverter/tests/AssetConverter.Tests/AssetConverter.Tests.csproj \
@@ -643,18 +1093,16 @@ dotnet test tests/MapEditor.Core.Tests/MapEditor.Core.Tests.csproj \
   --filter 'FullyQualifiedName~Terrain' -v minimal
 ```
 
-Expected: all converter/Core terrain tests pass.
-
-**Invariant-to-test matrix:**
+Expected: all synthetic converter/Core terrain tests pass; no legacy converter corpus class matches either exact positive filter.
 
 | Invariant | Proved by |
 |---|---|
-| Four-way and canonical blob models cover their exact reachable masks | both `Fit_*Corpus*` tests |
-| 8-way is selected only for supported material held-out gain | `Fit_CanonicalBlobCorpus*`, `Fit_SparseCorners*` |
-| Holdout evidence is deterministic and not leaked into training | `Fit_HoldoutAssignment_IsStableAcrossInputOrder` plus expected held-out accuracy assertions in both corpus tests |
-| Completeness/support/confidence govern enabled/pending/disabled exactly | three `Score_*` tests |
-| Enabled references are globally unique under adversarial overlap | `Build_OverlappingEnabledCandidates_DeterministicallyDemotesLoserAndValidates` |
-| Review alternatives remain available | `Build_PendingAlternativesMayOverlapWithoutDemotion` |
+| Eight-way can materially outperform cardinal supersets | blocker regression and full blob test |
+| Holdout is deterministic, top-1, weighted, and isolated | holdout/label/huge-map tests |
+| Every formula/population/empty/tie is exact | hand metric and empty tests |
+| Status diagnostics explain all review states | scoring explanation tests |
+| Enabled overlap is deterministic and pending overlap retained | both build overlap tests |
+| Diagnostic persistence is canonical | diagnostic ordering/value test |
 
 **Step 5: Commit**
 
@@ -664,7 +1112,7 @@ git add tools/AssetConverter/src/AssetConverter/Terrain \
 git commit -m "feat: score terrain topology candidates"
 ```
 
-## Task 5: Orchestrate deterministic generation and atomic catalog publication
+## Task 5: Compose generation and durable atomic catalog publication
 
 **Files:**
 - Create: `tools/AssetConverter/src/AssetConverter/Terrain/TerrainCatalogGenerator.cs`
@@ -673,23 +1121,15 @@ git commit -m "feat: score terrain topology candidates"
 - Create: `tools/AssetConverter/tests/AssetConverter.Tests/Terrain/TerrainCatalogFileStoreTests.cs`
 
 **Mutation impact:**
-- Source of truth changed: persisted `<repoRoot>/Assets/Sprites/terrain-brushes.json`; its canonical value is the serialized, validated `TerrainCatalog` built from current corpus bytes.
-- Important readers: focused/all CLI output now, and future Rendering/App asset loading. Existing maps, manifest, PNGs, and map codec are read-only.
-- Derived/cached state affected: no cross-run cache. Features/candidates are invocation-local and disposed/materialized before write.
-- Required propagation sequence:
-  1. Load and fingerprint all source inputs.
-  2. Build/cache features under `using`.
-  3. Mine candidates and materialize definitions/diagnostics.
-  4. Build and shared-validate the complete catalog.
-  5. Canonically serialize all bytes in memory.
-  6. Create a unique temp in the destination directory, write all bytes, and flush file contents.
-  7. Move temp over destination (or move into an absent destination).
-  8. Only after replacement succeeds, return counts/path/fingerprint to the caller.
-- Failure behavior: steps 1–5 touch no destination; write/flush/move failures delete temp and preserve prior bytes. With no prior file, failure leaves no destination. Never delete destination first.
-- Invariants: repeat generation from equivalent input is byte-identical; publication is all-or-nothing; no absolute paths/timestamps leak; generated enabled sets pass shared validation and all source refs resolve to exact 32×32 frames.
-- Observable proof required: compare destination bytes before/after injected failures and compare complete bytes from independent equivalent roots.
+- Source of truth: persisted `<repoRoot>/Assets/Sprites/terrain-brushes.json` after successful replacement.
+- Readers: CLI now; Part 3 later.
+- Derived state: invocation-local corpus/features/candidates only; all disposed/released before store return.
+- Propagation: load → build → shared validate → serialize memory → temp create/write/durable flush/close → same-directory move/replace → return counts.
+- Publication boundary: no destination access before complete bytes; destination never deleted first; no success result until replace.
+- Failure: input/builder/validation/serialize touches no destination; write/flush/dispose/replace/move preserves prior destination. Cleanup is best effort and cannot replace the primary exception.
+- Observable proof: exact destination/temp bytes, exception identity/data, production durable-flush call, and full parsed output.
 
-The public converter entry point is intentionally small:
+Public entry point:
 
 ```csharp
 public sealed record TerrainGenerationResult(
@@ -707,21 +1147,49 @@ public static class TerrainCatalogGenerator
 }
 ```
 
-`TerrainCatalogFileStore` has an internal overload accepting `ITerrainCatalogFileOperations`. The fake implements exactly the production interface methods `Exists`, `CreateFile`, `Replace`, `Move`, and `Delete`, matching the established repository seam at `tools/AssetConverter/src/AssetConverter/Manifest/AppearanceManifestFileStore.cs:5-12`. Production `CreateFile` returns a `FileStream`; after writing, call its durable flush before close. Tests may return a failing `Stream`, and the store must still clean up.
+Exact store seams:
 
-**Step 1: Write failing orchestration/atomicity tests**
+```csharp
+internal interface ITerrainCatalogFileOperations
+{
+    bool Exists(string path);
+    Stream CreateFile(string path);
+    void FlushToDisk(Stream stream);
+    void Replace(string sourcePath, string destinationPath);
+    void Move(string sourcePath, string destinationPath);
+    void Delete(string path);
+}
+
+internal sealed class TerrainCatalogFileStore : ITerrainCatalogStore
+{
+    public TerrainCatalogFileStore();
+    internal TerrainCatalogFileStore(ITerrainCatalogFileOperations operations);
+    public void Write(string repoRoot, string serializedCatalog);
+}
+```
+
+Production `CreateFile` uses `new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None)`; `FlushToDisk` requires that `FileStream` and calls `Flush(flushToDisk:true)`. Store writes UTF-8 without BOM, invokes `FlushToDisk` before disposing, and only then replaces. Temp is `terrain-brushes.json.tmp-<guid N>` in the destination directory.
+
+On a primary failure, attempt `Delete(temp)`. If cleanup fails, rethrow the original exception instance with original stack via `ExceptionDispatchInfo`; attach the cleanup exception at `primary.Data["TerrainCatalogFileStore.CleanupException"]`. Never throw the cleanup exception or an aggregate instead. A cleanup failure may leave only the unique temp, never a partial/replaced destination.
+
+**Step 1: Write failing tests**
 
 Add:
 
-- `Generate_SyntheticFourWayCorpus_WritesParseableValidatedCatalog`
-- `Generate_EquivalentRootsAndRepeatedRuns_AreByteIdentical`
-- `Generate_MapOrPngChange_ChangesFingerprintAndOutput`
-- `Generate_InputFailure_PreservesPriorCatalogWithoutCreatingTemp`
-- `Write_FlushOrReplaceFailure_PreservesPriorBytesAndDeletesTemp`
-- `Write_MoveFailureWithoutPriorCatalog_LeavesNoDestinationOrTemp`
-- adversarial `Generate_InvalidEnabledBuilderOutput_IsNeverPublished` using an internal `ITerrainCatalogBuilder.Build(TerrainCorpus, TerrainGenerationSettings)` seam whose production adapter delegates to `TerrainCatalogBuilder`.
+- `Generate_SyntheticFourWayPipelineWritesParseableValidatedCatalog`
+- `Generate_IntegratedEightWayPipelineSelectsEightWayByTop1Gain`
+- `Generate_IntegratedImageOnlyPipelinePersistsProvenanceMaskAndAdmissionEvidence`
+- `Generate_EquivalentRootsAndRepeatedRunsAreByteIdentical`
+- `Generate_RelevantMutationChangesFingerprintAndOutputWhileIrrelevantMutationDoesNot`
+- `Generate_InputFailurePreservesPriorCatalogWithoutCreatingTemp`
+- adversarial `Generate_InvalidInjectedBuilderOutputIsNeverPublished`
+- `Generate_InjectedBuilderAndStoreAreCalledOnceAndGeneratorOwnsOnlyOrchestration`
+- `Write_UsesSiblingCreateNewAndDurableFlushBeforeReplace`
+- `Write_WriteFlushDisposeOrReplaceFailurePreservesPriorBytesAndDeletesTemp`
+- `Write_MoveFailureWithoutPriorCatalogLeavesNoDestinationOrTemp`
+- adversarial `Write_DeleteFailureRethrowsPrimaryExceptionAndRecordsCleanupFailure`.
 
-The first test must parse the actual destination through `TerrainCatalogJson.Parse`, run `TerrainCatalogValidator.Validate`, and assert the final enabled set/masks/provenance—not only `TerrainGenerationResult` counts.
+The three pipeline tests use real corpus loader, feature builder, miner, fitter, shared serializer/validator, and real files; do not mock an inference stage. The invalid-builder test uses the exact internal overload and store fake.
 
 **Step 2: Run red**
 
@@ -730,40 +1198,29 @@ dotnet test tools/AssetConverter/tests/AssetConverter.Tests/AssetConverter.Tests
   --filter 'FullyQualifiedName~TerrainCatalogGenerator|FullyQualifiedName~TerrainCatalogFileStore' -v minimal
 ```
 
-Expected: FAIL to compile because orchestrator/store types do not exist.
+Expected: compile failure because generator/store types do not exist; only synthetic terrain publication tests are discovered.
 
-**Step 3: Implement one synchronous build-and-publish path**
+**Step 3: Implement one synchronous path**
 
-`Generate` normalizes but never serializes the absolute repo root. It owns all temporary/cache lifetimes. Do not catch generation exceptions merely to return a success-shaped result; let the CLI fail nonzero after the store has preserved prior state.
+Normalize repo root for access only. Builder owns all bounded processing. Generator validates even injected output and creates a defensively copied result diagnostic list. Store performs no validation. Let typed generation and I/O failures propagate so CLI exits nonzero.
 
-The file store must generate a sibling name such as `terrain-brushes.json.tmp-<guid>`, never a system-temp path. Follow construct/build/validate → write temp → publish; there is no shared registry and no reader can observe the temp as the catalog path.
-
-**Step 4: Run green and full converter suite**
+**Step 4: Run green and repository-isolated converter gate**
 
 ```bash
 dotnet test tools/AssetConverter/tests/AssetConverter.Tests/AssetConverter.Tests.csproj \
-  --filter 'FullyQualifiedName~TerrainCatalogGenerator|FullyQualifiedName~TerrainCatalogFileStore' -v minimal
-dotnet test tools/AssetConverter/tests/AssetConverter.Tests/AssetConverter.Tests.csproj -v minimal
+  --filter 'FullyQualifiedName~Terrain|FullyQualifiedName~MapConversionResultTests' -v minimal
 ```
 
-Expected: focused tests pass. Full suite passes where configured external datasets exist; on this machine, run the non-Aspereta gate below because the known hard-coded Aspereta paths are absent:
-
-```bash
-dotnet test tools/AssetConverter/tests/AssetConverter.Tests/AssetConverter.Tests.csproj \
-  --filter 'FullyQualifiedName!~Aspereta&FullyQualifiedName!~CombinedManifest_ContainsIllutiaAndRenumberedAsperetaSheets' -v minimal
-```
-
-Expected locally: all selected tests pass; only pre-existing nullable warnings are acceptable.
-
-**Invariant-to-test matrix:**
+Expected: every selected synthetic terrain test passes; the `MapConversionResultTests` branch is intentionally empty until Task 6 introduces that dedicated class. This exact positive filter excludes all legacy Illutia/Aspereta corpus snapshots; do not substitute a broad negative filter or run an unconditional external-data suite and call its failure acceptable.
 
 | Invariant | Proved by |
 |---|---|
-| End-to-end output is consumable, valid, and source-resolved | `Generate_SyntheticFourWayCorpus_WritesParseableValidatedCatalog` |
-| Equivalent corpus always emits identical bytes | `Generate_EquivalentRootsAndRepeatedRuns_AreByteIdentical` |
-| Fingerprint/output reflects relevant source mutations | `Generate_MapOrPngChange_ChangesFingerprintAndOutput` |
-| Build/input failure never reaches persisted state | `Generate_InputFailure_*`, adversarial invalid-builder test |
-| Write/flush/replace/move failure preserves the prior publication boundary | both `Write_*Failure*` tests |
+| Full four/eight/image-only pipelines honor contracts | three integrated tests |
+| Equivalent inputs emit exact bytes | determinism test |
+| Only relevant inputs alter fingerprint/output | mutation test |
+| Builder invalidity cannot cross publication boundary | injected-builder test |
+| File bytes are durably flushed before replace | ordered operations test |
+| Primary failure and old destination survive every I/O/cleanup edge | failure tests |
 
 **Step 5: Commit**
 
@@ -773,23 +1230,31 @@ git add tools/AssetConverter/src/AssetConverter/Terrain \
 git commit -m "feat: atomically generate terrain catalog"
 ```
 
-## Task 6: Add `terrain`, integrate `all`, and run final/red-team gates
+## Task 6: Publish map inventory, add `terrain`, and integrate production `all`
 
 **Files:**
 - Create: `tools/AssetConverter/src/AssetConverter/Terrain/TerrainCommand.cs`
-- Modify: `tools/AssetConverter/src/AssetConverter/Program.cs:1-6,140-220`
+- Create: `tools/AssetConverter/src/AssetConverter/Terrain/TerrainAllFinalizer.cs`
+- Modify: `tools/AssetConverter/src/AssetConverter/Maps/MapCopyConverter.cs:3-4,12-49`
+- Modify: `tools/AssetConverter/src/AssetConverter/Aspereta/AsperetaMapConverter.cs:3-9,18-67`
+- Modify: `tools/AssetConverter/src/AssetConverter/Program.cs:119-220`
+- Create: `tools/AssetConverter/tests/AssetConverter.Tests/MapConversionResultTests.cs`
 - Create: `tools/AssetConverter/tests/AssetConverter.Tests/Terrain/TerrainCommandTests.cs`
+- Create: `tools/AssetConverter/tests/AssetConverter.Tests/Terrain/TerrainAllFinalizerTests.cs`
 
 **Mutation impact:**
-- Source of truth changed: converter command routing and `all` workflow; both publish the same generated catalog path.
-- Important readers: shell users, `.gitignore` regeneration guidance (`.gitignore:26-29`), release asset generation, and the future editor.
-- Derived/cached state affected: none across commands. Both routes instantiate the same generator defaults per invocation.
-- Required propagation sequence: for focused command, resolve repo root → `TerrainCommand.Execute` → `TerrainCatalogGenerator.Generate` → print one success summary plus sorted warnings. For `all`, complete sheets/maps/combined manifest (`Program.cs:146-189`) → call that exact same `TerrainCommand.Execute` method → continue existing summaries and include terrain summary.
-- Failure behavior: missing/invalid inputs or publication failure propagate out of top-level Main for nonzero exit. `all` may already have generated other asset classes, but the previous terrain file remains unchanged and no false terrain success line prints.
-- Invariants: `terrain` and `all` share no duplicated inference/settings/writer code; same generated inputs produce byte-identical catalog bytes; terrain executes only after the combined manifest in `all`; usage includes `terrain [repoRoot]`.
-- Observable proof required: invoke the built CLI process against a synthetic root and inspect exit code/stdout/file bytes, then compare with direct shared-command regeneration.
+- Source of truth: command routing plus generated map inventory/manifest/catalog.
+- Readers: terrain loader, shell users, `all`, future editor.
+- Derived state: successful output-name lists only.
+- Propagation: map converters collect successful basenames → focused map command or all writes canonical inventory → `all` finalizer writes combined manifest → exact terrain command → summaries. Focused terrain loads existing inventory.
+- Production publication boundary: `TerrainAllFinalizer` is the actual helper called by top-level `all`; its test observes the same manifest/inventory/terrain order production uses, not a parallel test-only ordering helper.
+- Failure: inventory/manifest/terrain exception makes process nonzero; no terrain success line; prior terrain remains. Existing other generated classes are not rolled back.
+- Invariants: no stale map glob; focused/`all` share exact generator/settings/writer; terrain after complete manifest; usage accurate; output byte-identical across processes.
+- Observable proof: built CLI processes, exact stdout/exit/file bytes, and production finalizer callback observations.
 
-`TerrainCommand` surface:
+`MapCopyResult` gains `IReadOnlyList<string> OutputFileNames`; `MapConvertResult` gains the same final property. Each converter appends only after its output stream/copy closes successfully and returns distinct ordinal-sorted bare names. Existing count/failure semantics remain.
+
+`TerrainCommand` is:
 
 ```csharp
 public static class TerrainCommand
@@ -798,58 +1263,81 @@ public static class TerrainCommand
 }
 ```
 
-Success output is exactly:
+Success output after publication is exactly:
 
 ```text
 Terrain: <enabled> enabled, <pending> pending, <disabled> disabled -> <absolute output path>
 Terrain fingerprint: <sha256 fingerprint>
 ```
 
-Each root diagnostic follows as `  WARN <code>: <message>`, already sorted by generation. It writes no success line before atomic publication.
+Then each sorted root diagnostic is `  WARN <code>: <message>`. No success text precedes generation.
 
-**Step 1: Write failing CLI tests**
+`TerrainAllFinalizer` has this exact internal surface:
 
-Add:
+```csharp
+internal static TerrainGenerationResult Execute(
+    string repoRoot,
+    IEnumerable<string> successfulMapFileNames,
+    Func<string> buildCombinedManifest,
+    TextWriter output,
+    Func<string, TextWriter, TerrainGenerationResult> runTerrain);
+```
 
-- `Execute_SyntheticRoot_PrintsLockedSummaryAfterWritingCatalog`
-- `TerrainProcess_SyntheticRoot_ExitsZeroAndWritesExpectedPath`
-- `TerrainProcess_InvalidRoot_ExitsNonzeroAndPreservesPriorCatalog`
-- `Execute_RepeatedAfterSameGeneratedInputs_IsByteIdentical`
-- adversarial `AllRouting_CallsTerrainOnlyAfterManifestAndUsesSameCommand`.
+It canonical-writes map inventory, fully writes/closes manifest, then calls the runner. Production `Program` passes `FrameManifestBuilder.BuildCombined(...)` and `TerrainCommand.Execute`; tests inject only the runner/builder while invoking this production finalizer. Top-level `all` calls this helper after both map conversions at current `tools/AssetConverter/src/AssetConverter/Program.cs:173-183` and does not separately write the manifest.
 
-For the process test, run `dotnet` with `typeof(TerrainCommand).Assembly.Location`, `terrain`, and the fixture root; capture stdout/stderr/exit code. The `all` ordering test should exercise an extracted internal ordering helper or command delegate seam, not launch proprietary conversion. Its fake must mirror `TerrainCommand.Execute(string, TextWriter)` semantics and assert the manifest exists before invocation. Keep actual `all` production code as one call to the real method.
+**Step 1: Write failing result/inventory/CLI tests**
+
+Add to the dedicated `MapConversionResultTests` class, using only temporary synthetic map inputs:
+
+- `MapCopyConvert_ReturnsOnlySuccessfulSortedOutputFileNames`
+- `AsperetaConvert_ReturnsOnlySuccessfulSortedOutputFileNames`
+
+The Aspereta case creates one valid minimal 100×100 source map, one malformed source map, and an invocation-local mapping (empty tile graphics are sufficient); it must not read `Paths.AsperetaMaps`, `Paths.AsperetaData`, `data/aspereta-mapping.tsv`, or any repository corpus. Both tests assert ordinal output-name order, absence of failed names, unchanged count/failure behavior, and that a name is added only after its output stream/copy completed successfully.
+
+Add the remaining synthetic command/finalizer tests:
+
+- `Execute_SyntheticRootPrintsLockedSummaryAfterWritingCatalog`
+- `TerrainProcess_SyntheticRootExitsZeroAndWritesExpectedPath`
+- `TerrainProcess_InvalidRootExitsNonzeroAndPreservesPriorCatalog`
+- `TerrainProcess_EquivalentRootsProduceByteIdenticalCatalogs`
+- `Execute_RepeatedSameInputsIsByteIdentical`
+- `AllFinalizer_ProductionPathWritesSuccessfulInventoryThenManifestThenCallsExactTerrainRunner`
+- adversarial `AllFinalizer_PreseededStaleMapIsAbsentFromInventoryAndCannotAffectTerrainBytes`
+- `AllFinalizer_TerrainFailurePrintsNoSuccessAndPreservesPriorCatalog`.
+
+Process tests run `dotnet` with `typeof(TerrainCommand).Assembly.Location`, command, and fixture root, capturing stdout/stderr/exit. The ordering runner asserts inventory and manifest streams are closed/readable and exact before returning. Also assert `Program.cs` delegates manifest+terrain finalization only to `TerrainAllFinalizer` by exercising the built `terrain` process and the production finalizer; do not create an unrelated ordering helper.
 
 **Step 2: Run red**
 
 ```bash
 dotnet test tools/AssetConverter/tests/AssetConverter.Tests/AssetConverter.Tests.csproj \
-  --filter 'FullyQualifiedName~TerrainCommand' -v minimal
+  --filter 'FullyQualifiedName~Terrain|FullyQualifiedName~MapConversionResultTests' -v minimal
 ```
 
-Expected: FAIL because command routing/output does not exist.
+Expected: compile failure because the result properties and terrain command/finalizer types do not exist. The exact positive filter discovers only new hermetic synthetic tests and excludes every legacy Illutia/Aspereta corpus test.
 
-**Step 3: Implement focused and `all` routing**
+**Step 3: Implement map reporting and routing**
 
-Add `using Goose2.AssetConverter.Terrain;`. Place the focused branch before `all`, with the same optional root resolution as `all`. In `all`, invoke terrain immediately after `FrameManifestBuilder.BuildCombined` has been completely written at current `Program.cs:185-189`; do not call it before maps or manifest and do not reimplement settings. Update the final usage string at current line 220.
+Collect names without changing existing naming/conversion behavior. Call the already tested Task 1 `TerrainMapInventory.Write`; do not add a second inventory format or direct `File.WriteAllText` path.
 
-Do not change unrelated converter command behavior or rewrite the whole top-level program.
+Add focused `terrain` before `all`, with `all`’s optional repo-root default. Replace current direct combined-manifest write at `tools/AssetConverter/src/AssetConverter/Program.cs:185-189` with `TerrainAllFinalizer.Execute` after maps/sheets/effects are complete. Print existing summaries plus terrain’s own two-line summary once. Update usage to include `terrain [repoRoot]`. Do not weaken missing Aspereta behavior.
 
 **Step 4: Run automated final gates**
 
 ```bash
 dotnet test tests/MapEditor.Core.Tests/MapEditor.Core.Tests.csproj -v minimal
 dotnet test tools/AssetConverter/tests/AssetConverter.Tests/AssetConverter.Tests.csproj \
-  --filter 'FullyQualifiedName!~Aspereta&FullyQualifiedName!~CombinedManifest_ContainsIllutiaAndRenumberedAsperetaSheets' -v minimal
+  --filter 'FullyQualifiedName~Terrain|FullyQualifiedName~MapConversionResultTests' -v minimal
 dotnet build tools/AssetConverter/AssetConverter.sln -v minimal
 dotnet build Goose2ClientGodot.sln -v minimal
 git status --short
 ```
 
-Expected: tests/builds pass, with only existing GifLoader nullable warnings; status lists source/test/plan changes and no generated `Assets/` files.
+Expected: the full hermetic Core suite, exactly the new synthetic converter tests, and both builds pass; only intended source/tests/plans are changed and no generated `Assets/` file is staged. The positive converter filter must list `Terrain*` and `MapConversionResultTests` only.
 
-**Step 5: Run the local real-Illutia smoke outside the repository output**
+**Step 5: Optionally run an asserted real-Illutia smoke outside the repository**
 
-This is manual evidence, not an automated test or committed artifact:
+This is conditional manual calibration evidence, never an automated or pre-commit gate. Run it only when the configured Illutia source data/maps exist; otherwise skip it and still proceed to Step 6:
 
 ```bash
 SMOKE_ROOT="$(mktemp -d)"
@@ -859,24 +1347,50 @@ dotnet run --project tools/AssetConverter/src/AssetConverter -- maps "$SMOKE_ROO
 dotnet run --project tools/AssetConverter/src/AssetConverter -- manifest "$SMOKE_ROOT/Assets/Sprites/manifest.json"
 dotnet run --project tools/AssetConverter/src/AssetConverter -- terrain "$SMOKE_ROOT"
 python3 - "$SMOKE_ROOT/Assets/Sprites/terrain-brushes.json" <<'PY'
-import json, sys
+import json, re, sys
 with open(sys.argv[1], encoding="utf-8") as f:
     c = json.load(f)
+assert c["schemaVersion"] == 1
+assert re.fullmatch(r"sha256:[0-9a-f]{64}", c["corpusFingerprint"])
 sets = c["sets"]
-print("fingerprint", c["corpusFingerprint"])
+status_reasons = {
+    "no-training-observations", "no-holdout-observations",
+    "eight-way-evidence-insufficient", "support-below-minimum",
+    "incomplete-required-masks", "ambiguity-above-maximum",
+    "holdout-accuracy-below-enabled", "confidence-below-enabled",
+    "confidence-below-pending", "enabled-member-conflict",
+}
+owners = {}
+for s in sets:
+    required = 16 if s["topology"] == "four-way" else 47
+    if s["status"] == "enabled":
+        assert len(s["masks"]) == required
+        assert all(m["variants"] for m in s["masks"])
+        for member in s["members"]:
+            ref = (member["reference"]["sheet"], member["reference"]["graphic"])
+            assert ref not in owners, (ref, owners.get(ref), s["id"])
+            owners[ref] = s["id"]
+    else:
+        assert status_reasons.intersection(d["code"] for d in s["diagnostics"]), s["id"]
+    admitted = {d["reference"]["sheet"] << 32 | (d["reference"]["graphic"] & 0xffffffff)
+                for d in s["diagnostics"] if d["code"] == "image-only-member-admitted"}
+    for member in s["members"]:
+        if member["provenance"] == "image-only":
+            key = member["reference"]["sheet"] << 32 | (member["reference"]["graphic"] & 0xffffffff)
+            assert key in admitted, (s["id"], member)
 for status in ("enabled", "pending", "disabled"):
     selected = [s for s in sets if s["status"] == status]
     print(status, len(selected))
     for s in selected[:10]:
-        m = s["metrics"]
-        print(" ", s["id"], s["topology"], m["confidence"], m["holdoutAccuracy"], len(s["masks"]), [d["code"] for d in s["diagnostics"]])
+        print(s["id"], s["topology"], s["metrics"]["confidence"],
+              s["metrics"]["holdoutAccuracy"], [d["code"] for d in s["diagnostics"]])
 PY
 rm -rf "$SMOKE_ROOT"
 ```
 
-Expected: the terrain command succeeds, parsing succeeds, at least one review candidate is reported, every enabled four-way/eight-way set has 16/47 nonempty masks respectively, and no enabled references overlap. Record candidate counts and representative diagnostic codes in the PR/commit notes. Threshold changes are allowed only in this task if the smoke reveals false auto-enables; keep them more conservative, update the locked defaults/snapshots/tests together, and rerun byte-determinism and synthetic topology gates. Absence of an auto-enabled real set is acceptable; a false enabled set is not.
+The assertions do not require any real candidate to be enabled. If candidates exist, all nonenabled sets are explained and image-only members have evidence. Record counts/fingerprint and manually label representative results for the calibration workflow. Do not alter thresholds merely to make this smoke produce enabled sets.
 
-The full `all` smoke is deferred on this workstation because its configured Aspereta paths do not exist. On a machine with both source corpora, run:
+On a machine with both configured corpora:
 
 ```bash
 dotnet run --project tools/AssetConverter/src/AssetConverter -- all "$PWD"
@@ -885,52 +1399,56 @@ dotnet run --project tools/AssetConverter/src/AssetConverter -- terrain "$PWD"
 cmp -s /tmp/terrain-from-all.json Assets/Sprites/terrain-brushes.json
 ```
 
-Expected: `cmp` exits 0. Remove generated assets if they were created only for verification; they remain gitignored and must not be committed.
-
-**Invariant-to-test matrix:**
+Expected: `cmp` exits 0. Remove verification assets if created solely for testing; never commit them.
 
 | Invariant | Proved by |
 |---|---|
-| Focused command writes only after successful generation and reports exact result | `Execute_SyntheticRoot_*`, `TerrainProcess_SyntheticRoot_*` |
-| CLI failure is nonzero and preserves the old file | `TerrainProcess_InvalidRoot_ExitsNonzeroAndPreservesPriorCatalog` |
-| Focused and `all` share one implementation after manifest publication | adversarial `AllRouting_CallsTerrainOnlyAfterManifestAndUsesSameCommand` plus full-corpus `cmp` where data exists |
-| Repeated command bytes are stable | `Execute_RepeatedAfterSameGeneratedInputs_IsByteIdentical` |
-| Real corpus produces conservative, inspectable candidates | manual smoke counts/diagnostics and enabled completeness/overlap checks |
+| Successful map inventory excludes stale/failed files | converter result and finalizer stale tests |
+| Focused CLI has exact success/failure behavior | command/process tests |
+| Separate processes emit identical bytes | equivalent-root process test |
+| Production all finalization observes inventory → manifest → terrain | production finalizer test |
+| Real data satisfies structural/conservative review invariants without forced enables | asserted smoke |
 
 **Step 6: Commit**
 
 ```bash
-git add tools/AssetConverter/src/AssetConverter/Program.cs \
+git add tools/AssetConverter/src/AssetConverter/Maps/MapCopyConverter.cs \
+  tools/AssetConverter/src/AssetConverter/Aspereta/AsperetaMapConverter.cs \
+  tools/AssetConverter/src/AssetConverter/Program.cs \
   tools/AssetConverter/src/AssetConverter/Terrain/TerrainCommand.cs \
-  tools/AssetConverter/tests/AssetConverter.Tests/Terrain/TerrainCommandTests.cs \
+  tools/AssetConverter/src/AssetConverter/Terrain/TerrainAllFinalizer.cs \
+  tools/AssetConverter/tests/AssetConverter.Tests/MapConversionResultTests.cs \
+  tools/AssetConverter/tests/AssetConverter.Tests/Terrain \
   docs/plans/2026-09-08-terrain-brush-part1-converter.md
 git commit -m "feat: integrate terrain converter command"
 ```
 
-## Red-team review before declaring Part 1 complete
+## Final red-team review before declaring Part 1 complete
 
-Run this review after implementation and before the final commit:
+- **Evaluation:** inspect types/call sites to prove held-out accuracy consumes only one top-1 prediction/mask, never emitted variants. Re-run the cardinal-superset blocker fixture.
+- **Coordinates/formulas:** compare direction offsets, corner order, support populations, map/region weights, entropy/ambiguity/medoid/visual/confidence equations, all empty behavior, and every tie against this plan.
+- **Parsing/schema:** reject duplicate/unknown/null/wrong-kind/invalid enum/range/relationship input with exact `TerrainCatalogException.Error`; verify all nested output order and defensive copies. Part 3 catches this exact type.
+- **Diagnostics:** every image-only member has evidence; every pending/disabled set has a status reason; all codes/messages/nulls/value formatting/order/dedup match the contract.
+- **Memory/lifecycle:** no collection retains map bytes/documents or sheet images. At most one decoded map and one sheet image is live in its respective pass; every exception disposes/releases before publication.
+- **Publication:** validate/serialize before temp creation; call `FileStream.Flush(true)` before close/replace; never delete destination first; preserve the primary exception if cleanup fails.
+- **Fingerprint/stale input:** inventory is canonical; unlisted maps and unreferenced PNGs are never read; exact relevant records and holdout bytes match tests.
+- **Inference isolation:** holdout masks/adjacency/labels never train graph, mappings, medoids, centroids, or admissions. Global holdout reference awareness only prevents false `ImageOnly` provenance and contributes no support/evaluation label.
+- **Conservatism:** deceptive lookalikes, missing centroids, one-family classification, no owner/ties, sparse/single-map diagonals, incomplete masks, graphic zero, and overlaps never false-enable.
+- **Orchestration:** `Program` uses the tested production finalizer after successful map names and combined manifest; focused/`all` both call exact `TerrainCommand.Execute` and default settings.
+- **Ownership:** Core remains provider-neutral; Part 2 owns Core editing/tool work; Part 3 owns Rendering validation and manager ID recomputation/publication. `TerrainGraphicReference` adapts to Rendering’s `SpriteReference` only in Part 3.
+- **Environment:** every mandatory converter gate uses the exact positive `Terrain|MapConversionResultTests` filter and no proprietary paths. Illutia-only and full `all` comparisons are optional manual calibration where the required corpora exist.
+- **Scope:** no editor loader, runtime resolver, map edits, UI, manager, map format change, nearest-mask fallback, transition terrain, or generated asset enters Part 1.
 
-- **Threading/lifecycle:** all work is synchronous on the converter process thread. Confirm no `Task.Run`, parallel LINQ, static mutable feature cache, or background publication was introduced. `TerrainFeatureCache` must dispose images on success and every exception path before atomic write.
-- **Persistence/schema:** schema v1 is new generated JSON, not a database/map migration. Confirm `MapCodec.Encode` and map files are never called for mutation by production terrain code. Generated output remains ignored and uncommitted.
-- **Publication boundary:** confirm source loading, feature extraction, inference, validation, and serialization complete before temp creation. Confirm destination is never deleted first and success output occurs only after move/replace.
-- **Failure paths:** corrupt map/manifest/PNG, missing sheet, source-rect overflow/out-of-bounds, no eligible corpus, invalid enabled set, failed write/flush/replace/move, and failed cleanup all need deterministic behavior. Cleanup failure must not mask the original exception; best-effort cleanup may leave only a uniquely named temp, never a replaced/partially written destination.
-- **Input completeness:** confirm fingerprint includes all maps, manifest bytes, and every relevant PNG exactly once, and excludes absolute root and file timestamps. Confirm a newly added relevant frame/sheet changes manifest/PNG records and therefore the fingerprint.
-- **Determinism:** search for unsorted enumeration before every graph component, tie, hash, diagnostic list, variants list, set list, and JSON list. Repeat synthetic generation in separate roots/processes and compare bytes.
-- **Inference leakage:** confirm held-out maps do not train masks/centroids, and image-only references do not count as map/region/observation support. Confirm giant maps/regions receive no extra total weight.
-- **Conservatism:** adversarial deceptive lookalikes, near-tie image-only frames, sparse diagonal evidence, incomplete masks, and overlaps must never remain enabled.
-- **Contract alignment:** compare every schema field and enum spelling against the locked representative JSON. Verify IDs change only for topology/member changes and every enabled set has all 16/47 masks with nonempty variants.
-- **Dependency direction:** inspect project references: Core has no provider/ImageSharp/Rendering reference; converter references Core; Rendering continues to reference Core. No converter type leaks into the shared contract.
-- **Test-helper reality:** fixture maps must be encoded with supported editor version 10 via `MapDocument.Create`, sheet PNGs must be real files at the generated path, and process tests must invoke the actual built converter DLL. Fakes implement only declared interfaces.
-- **Environment isolation:** run new tests with proprietary directories temporarily unavailable or environment variables unset. No new automated test may depend on `/home/agent/workspace/Illutia` or `/home/hayden/...`.
-- **Scope:** reject editor asset loading, runtime terrain resolution, painting, manager save, UI, or generated default data in this part. Those belong to Parts 2–3.
+## Design alignment and explicit clarifications
 
-## Design alignment and known conflict
+This plan preserves every approved design decision: hybrid map/image inference, layer-0 seeding, exact 32×32 frames, map/region weighting, stricter image-only admission with diagnostics, automatic conservative 4/8 selection, complete nonoverlapping enabled sets, stable topology+membership IDs, focused/`all` identity, and atomic failure preservation.
 
-The plan covers every converter/catalog promise in the approved design: all schema fields, stable IDs, review states, provenance/diagnostics, 16/47 topology semantics, layer-0-only mining, same-sheet image-only search, weighted map/region evidence, deterministic holdout, conservative enablement, non-overlapping enabled sets, focused/`all` byte identity, and atomic failure preservation.
+Three implementation clarifications resolve real ambiguities without changing product behavior:
 
-One repository/design integration conflict is explicit: `all` is the only approved combined-corpus producer, but this worktree cannot run it because `Paths.AsperetaData`/`Paths.AsperetaMaps` default to absent `/home/hayden/...` locations while `Program.cs:153-189` unconditionally loads that corpus. The implementation must not weaken `all` or silently fall back to Illutia-only data. Synthetic tests prove routing and determinism; the Illutia-only focused smoke tunes conservatism locally; the final `all`/`terrain` byte comparison must be run where both configured corpora exist.
+1. Held-out reconstruction uses a deterministic weighted top-1 member prediction per mask, while emitted masks retain all visual variants. Using emitted membership as correctness would make four-way supersets unable to lose and contradict the approved requirement that measured diagonal gain can select eight-way.
+2. A generated map inventory declares successful map outputs, so stale ignored files cannot enter the corpus. It is converter metadata, not map-format terrain metadata or a per-map sidecar.
+3. Manager topology/member edits immediately recompute the design-defined authored ID; Part 3 keeps immutable draft keys separate from authored IDs and atomically updates the authored ID plus any published-ID reconciliation map. Rename/status/variant reorder remain ID-stable.
 
-A second contract tension is resolved deliberately: `MapEditor.Rendering` already owns `SpriteReference` and strict manifest loading, but the design assigns terrain definitions to Core. Core therefore introduces `TerrainGraphicReference` instead of referencing or moving Rendering’s type. Part 2 will adapt the two same-shaped values at the asset boundary without reversing project dependencies.
+Do not weaken combined behavior or silently fall back when either proprietary corpus is absent. The hermetic synthetic integration/process tests are the mandatory implementation gates. Illutia-only smoke and combined `all`/`terrain` `cmp` are optional manual calibration/acceptance evidence on an environment where the corresponding corpora exist.
 
 Plan complete and saved to `docs/plans/2026-09-08-terrain-brush-part1-converter.md`. Ready to implement.
