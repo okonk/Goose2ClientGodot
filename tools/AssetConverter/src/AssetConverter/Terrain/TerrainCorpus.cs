@@ -6,6 +6,7 @@ public sealed record TerrainMapDescriptor(string Identity, int Width, int Height
 
 public sealed class TerrainCorpus
 {
+    public string Root { get; }
     public string Fingerprint { get; }
     public IReadOnlyList<TerrainMapDescriptor> Maps { get; }
     public TerrainFrameIndex FrameIndex { get; }
@@ -14,6 +15,7 @@ public sealed class TerrainCorpus
     public IReadOnlyList<TerrainDiagnostic> Diagnostics { get; }
 
     internal TerrainCorpus(
+        string root,
         string fingerprint,
         IReadOnlyList<TerrainMapDescriptor> maps,
         TerrainFrameIndex frameIndex,
@@ -21,6 +23,7 @@ public sealed class TerrainCorpus
         IReadOnlyList<int> relevantSheets,
         IReadOnlyList<TerrainDiagnostic> diagnostics)
     {
+        Root = root;
         Fingerprint = fingerprint;
         Maps = maps;
         FrameIndex = frameIndex;

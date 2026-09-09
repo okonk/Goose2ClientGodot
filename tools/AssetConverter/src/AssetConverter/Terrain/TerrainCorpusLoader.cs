@@ -134,7 +134,7 @@ public static class TerrainCorpusLoader
         using var hash = SHA256.Create();
         var digest = hash.ComputeHash(source);
         var fingerprint = "sha256:" + Convert.ToHexString(digest).ToLowerInvariant();
-        return new TerrainCorpus(fingerprint, maps, frameIndex, observed, relevant, diagnostics);
+        return new TerrainCorpus(fullRoot, fingerprint, maps, frameIndex, observed, relevant, diagnostics);
     }
 
     private static int ScanMap(
