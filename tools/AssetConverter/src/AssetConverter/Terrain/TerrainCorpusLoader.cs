@@ -10,13 +10,13 @@ using SixLabors.ImageSharp.PixelFormats;
 
 namespace Goose2.AssetConverter.Terrain;
 
-internal interface ITerrainMapData
+public interface ITerrainMapData
 {
     byte[] Bytes { get; }
     void Release();
 }
 
-internal interface ITerrainMapDataReader
+public interface ITerrainMapDataReader
 {
     ITerrainMapData Open(string mapIdentity);
 }

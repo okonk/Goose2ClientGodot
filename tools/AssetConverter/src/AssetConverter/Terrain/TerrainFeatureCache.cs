@@ -9,7 +9,7 @@ public interface ITerrainSheetImageLoader
     Image<Rgba32> Load(string path);
 }
 
-public sealed class TerrainFeatureCache
+public sealed class TerrainFeatureCache : ITerrainFeatureSource
 {
     private readonly Dictionary<TerrainGraphicReference, TerrainImageFeatures> _features;
 
@@ -54,7 +54,7 @@ public sealed class TerrainFeatureCache
         return new TerrainFeatureCache(features);
     }
 
-    public bool TryGetFeatures(TerrainGraphicReference reference, out TerrainImageFeatures features)
+    public bool TryGetFeatures(TerrainGraphicReference reference, out TerrainImageFeatures? features)
         => _features.TryGetValue(reference, out features);
 
     public double Similarity(TerrainGraphicReference a, TerrainGraphicReference b)
