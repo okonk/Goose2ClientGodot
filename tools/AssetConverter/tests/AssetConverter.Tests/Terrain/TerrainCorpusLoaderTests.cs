@@ -119,16 +119,16 @@ public class TerrainCorpusLoaderTests
 
         var missing = Assert.Single(
             corpus.Diagnostics,
-            d => d.Code == TerrainCorpusLoader.DiagnosticCodeManifestReferenceMissing);
+            d => d.Code == TerrainCorpusLoader.DiagnosticCodeMissingManifestReference);
         Assert.Equal(new TerrainGraphicReference(1, 200), missing.Reference);
 
         Assert.Single(
             corpus.Diagnostics,
-            d => d.Code == TerrainCorpusLoader.DiagnosticCodeFrameSizeMismatch
+            d => d.Code == TerrainCorpusLoader.DiagnosticCodeUnsupportedFrameSize
                  && d.Reference == new TerrainGraphicReference(2, 300));
         Assert.Single(
             corpus.Diagnostics,
-            d => d.Code == TerrainCorpusLoader.DiagnosticCodeFrameSizeMismatch
+            d => d.Code == TerrainCorpusLoader.DiagnosticCodeUnsupportedFrameSize
                  && d.Reference == new TerrainGraphicReference(2, 400));
 
         Assert.Contains(new TerrainGraphicReference(1, 200), corpus.ObservedReferences);

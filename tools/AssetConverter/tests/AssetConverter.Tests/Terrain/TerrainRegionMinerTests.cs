@@ -25,7 +25,7 @@ public class TerrainRegionMinerTests
             });
 
         var region = Assert.Single(result.Regions);
-        Assert.Equal((0, 1), (region.MinimumX, region.MinimumY));
+        Assert.Equal((1, 0), (region.MinimumX, region.MinimumY));
         Assert.Equal(4, region.Placements.Count);
         var placement = region.Placements.Single(p => p.X == 1 && p.Y == 1);
         Assert.Equal(new TerrainGraphicReference(1, 100), placement.Reference);

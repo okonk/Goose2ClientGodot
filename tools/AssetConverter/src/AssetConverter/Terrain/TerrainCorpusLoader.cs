@@ -26,8 +26,8 @@ public static class TerrainCorpusLoader
     public const int RequiredTileSize = 32;
     public const string ManifestRelativePath = "Assets/Sprites/manifest.json";
     public const string SheetsRelativeDirectory = "Assets/Sprites/sheets";
-    public const string DiagnosticCodeManifestReferenceMissing = "manifest-reference-missing";
-    public const string DiagnosticCodeFrameSizeMismatch = "frame-size-mismatch";
+    public const string DiagnosticCodeMissingManifestReference = "missing-manifest-reference";
+    public const string DiagnosticCodeUnsupportedFrameSize = "unsupported-frame-size";
 
     private static readonly byte[] FingerprintHeader = Encoding.ASCII.GetBytes("terrain-corpus-v1\0");
 
@@ -170,16 +170,16 @@ public static class TerrainCorpusLoader
                     else if (seen.Add(reference))
                     {
                         diagnostics.Add(new TerrainDiagnostic(
-                            DiagnosticCodeFrameSizeMismatch,
-                            $"Map {identity} uses frame {reference.Sheet}:{reference.Graphic} sized {rect.Width}x{rect.Height}; expected {RequiredTileSize}x{RequiredTileSize}.",
+                            DiagnosticCodeUnsupportedFrameSize,
+                            $"Frame ({reference.Sheet},{reference.Graphic}) is {rect.Width}x{rect.Height}; expected {RequiredTileSize}x{RequiredTileSize}; placements were excluded.",
                             reference: reference));
                     }
                 }
                 else if (seen.Add(reference))
                 {
                     diagnostics.Add(new TerrainDiagnostic(
-                        DiagnosticCodeManifestReferenceMissing,
-                        $"Map {identity} uses frame {reference.Sheet}:{reference.Graphic} that is missing from the manifest.",
+                        DiagnosticCodeMissingManifestReference,
+                        $"Map '{identity}' references ({reference.Sheet},{reference.Graphic}), which is absent from manifest; placements were excluded.",
                         reference: reference));
                 }
             }

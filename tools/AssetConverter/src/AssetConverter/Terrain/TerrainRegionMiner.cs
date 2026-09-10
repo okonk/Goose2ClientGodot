@@ -54,10 +54,10 @@ public static class TerrainRegionMiner
                 while (stack.Count > 0)
                 {
                     var (cx, cy) = stack.Pop();
-                    if (cx < minimumX || (cx == minimumX && cy < minimumY))
+                    if (cy < minimumY || (cy == minimumY && cx < minimumX))
                     {
-                        minimumX = cx;
                         minimumY = cy;
+                        minimumX = cx;
                     }
 
                     var (reference, mask) = Placement(map, cx, cy, isFamily);

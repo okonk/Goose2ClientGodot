@@ -122,10 +122,12 @@ if (args.Length >= 1 && args[0] == "maps")
         : Path.GetFullPath(Path.Combine("..", "..", "Assets", "Maps"));
 
     var result = MapCopyConverter.Convert(Paths.IllutiaMaps, outDir);
-    if (result.OutputFileNames.Count > 0)
+    if (result.OutputFileNames.Count == 0)
     {
-        TerrainMapInventory.Write(outDir, result.OutputFileNames);
+        throw new InvalidOperationException(
+            $"No maps were converted ({result.Failures.Count} failed); the terrain map inventory requires at least one successful map.");
     }
+    TerrainMapInventory.Write(outDir, result.OutputFileNames);
     Console.WriteLine($"Copied {result.Copied} maps -> {outDir}");
     foreach (var f in result.Failures) Console.WriteLine($"  FAIL {f}");
     return;
