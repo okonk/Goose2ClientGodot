@@ -22,6 +22,7 @@
         <MenuItem x:Name="RedoCommand" Header="_Redo" IsEnabled="{Binding CanRedo}" Click="OnRedo" />
         <Separator />
         <MenuItem x:Name="ResizeCommand" Header="Resize _Map" Click="OnResize" />
+        <MenuItem x:Name="TerrainSetsCommand" Header="Terrain Sets…" IsEnabled="False" Click="OnTerrainSets" />
       </MenuItem>
       <MenuItem x:Name="ViewMenu" Header="_View">
         <MenuItem x:Name="GridMenuItem" Header="Grid" ToggleType="CheckBox" IsChecked="{Binding ShowGrid, Mode=TwoWay}" />

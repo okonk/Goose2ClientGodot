@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using MapEditor.App.Terrain;
 using MapEditor.Core;
 using MapEditor.GameData.Rows;
 using MapEditor.GameData.Sync;
@@ -20,6 +21,9 @@ internal sealed class EditorDialogsProxy : IEditorDialogs
     }
 
     public Task<NewMapRequest?> ShowNewMapAsync() => Target.ShowNewMapAsync();
+
+    public Task<TerrainCatalogSaveResult?> ShowTerrainSetsAsync(TerrainCatalogManager manager)
+        => Target.ShowTerrainSetsAsync(manager);
 
     public Task<MapTileRectangle?> ShowResizeMapAsync(MapDocument document, Func<MapTileRectangle, MapResizePlan> plan) => Target.ShowResizeMapAsync(document, plan);
 

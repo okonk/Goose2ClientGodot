@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Platform.Storage;
+using MapEditor.App.Terrain;
 using MapEditor.Core;
 using MapEditor.GameData.Rows;
 using MapEditor.GameData.Sync;
@@ -27,6 +28,9 @@ internal sealed class AvaloniaEditorDialogs : IEditorDialogs
     }
 
     public Task<NewMapRequest?> ShowNewMapAsync() => new NewMapDialog().ShowDialog<NewMapRequest?>(_owner);
+
+    public Task<TerrainCatalogSaveResult?> ShowTerrainSetsAsync(TerrainCatalogManager manager)
+        => new TerrainSetsDialog(manager, ConfirmTerrainDirtyAsync).ShowDialog<TerrainCatalogSaveResult?>(_owner);
 
     public Task<MapTileRectangle?> ShowResizeMapAsync(MapDocument document, Func<MapTileRectangle, MapResizePlan> plan) => new ResizeMapDialog(document, plan).ShowDialog<MapTileRectangle?>(_owner);
 
@@ -140,6 +144,17 @@ internal sealed class AvaloniaEditorDialogs : IEditorDialogs
             "Cancel",
             PushConflictChoice.Cancel)
         .ShowDialog<PushConflictChoice>(_owner);
+
+    private Task<DirtyChoice> ConfirmTerrainDirtyAsync() => new ChoiceDialog(
+            "Unsaved Terrain Sets changes",
+            "Save Terrain Sets changes before closing?",
+            "Save",
+            DirtyChoice.Save,
+            "Discard",
+            DirtyChoice.Discard,
+            "Cancel",
+            DirtyChoice.Cancel)
+        .ShowDialog<DirtyChoice>(_owner);
 
     private IStorageProvider StorageProvider => TopLevel.GetTopLevel(_owner)!.StorageProvider;
 

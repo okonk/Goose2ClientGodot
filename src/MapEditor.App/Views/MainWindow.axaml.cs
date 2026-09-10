@@ -17,6 +17,7 @@ using MapEditor.App.Controls;
 using MapEditor.App.Dialogs;
 using MapEditor.App.Rendering;
 using MapEditor.App.Settings;
+using MapEditor.App.Terrain;
 using MapEditor.App.ViewModels;
 using MapEditor.Core;
 using MapEditor.GameData.Rows;
@@ -721,6 +722,21 @@ internal partial class MainWindow : Window
             }
         });
 
+    private void OnTerrainSets(object? sender, RoutedEventArgs e)
+    {
+        if (!CanManageTerrainSets())
+            return;
+        AssetContext source = _assets.Current;
+        var manager = new TerrainCatalogManager(_assets, source, new TerrainCatalogFileStore());
+        _ = RunCommandAsync(async () =>
+        {
+            TerrainCatalogSaveResult? result = await _dialogs.ShowTerrainSetsAsync(manager);
+            SyncAssetDirectory();
+            if (result?.Status == TerrainCatalogSaveStatus.Succeeded)
+                await PresentTerrainManagerWarningsAsync(result.Warnings);
+        });
+    }
+
     private void OnNew(object? sender, RoutedEventArgs e) => _ = RunCommandAsync(() => _workspace.NewAsync());
 
     private void OnOpen(object? sender, RoutedEventArgs e) => _ = RunCommandAsync(() => _workspace.OpenAsync());
@@ -1137,6 +1153,24 @@ internal partial class MainWindow : Window
         }
     }
 
+    private async Task PresentTerrainManagerWarningsAsync(IReadOnlyList<TerrainOperationWarning> warnings)
+    {
+        foreach (TerrainOperationWarning warning in warnings)
+        {
+            try
+            {
+                await _dialogs.ShowInfoAsync("Terrain Sets warning", $"{warning.Scope}: {warning.Message}");
+            }
+            catch (OutOfMemoryException)
+            {
+                throw;
+            }
+            catch (Exception)
+            {
+            }
+        }
+    }
+
     private async void OnClosing(object? sender, WindowClosingEventArgs e)
     {
         // A modal command is on screen; its continuation would resume after Closed, so the close must wait.
@@ -1193,6 +1227,7 @@ internal partial class MainWindow : Window
         }
 
         _commandRunning = true;
+        SyncTerrainSetsCommand();
         try
         {
             Canvas.FinishInteraction(commit: true);
@@ -1209,6 +1244,7 @@ internal partial class MainWindow : Window
         finally
         {
             _commandRunning = false;
+            SyncTerrainSetsCommand();
         }
     }
 
@@ -1479,9 +1515,15 @@ internal partial class MainWindow : Window
         }
     }
 
+    private bool CanManageTerrainSets()
+        => !_commandRunning && _assets.Current.IsAvailable && _assets.Current.Terrain.Source is not null;
+
+    private void SyncTerrainSetsCommand() => TerrainSetsCommand.IsEnabled = CanManageTerrainSets();
+
     private void SyncAssetDirectory()
     {
         AssetDirectoryText.Text = _assets.Current.IsAvailable ? _assets.Current.Cache.AssetDirectory : "—";
         SyncPreviewStatus();
+        SyncTerrainSetsCommand();
     }
 }

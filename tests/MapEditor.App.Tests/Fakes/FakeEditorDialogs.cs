@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using MapEditor.App.Dialogs;
+using MapEditor.App.Terrain;
 using MapEditor.Core;
 using MapEditor.GameData.Rows;
 using MapEditor.GameData.Sync;
@@ -54,6 +55,11 @@ internal sealed class FakeEditorDialogs : IEditorDialogs
     public TaskCompletionSource<SheetDirtyChoice>? SheetDirtyGate;
     public TaskCompletionSource<string?>? AssetDirectoryPickGate;
     public TaskCompletionSource<string?>? SavePickGate;
+    public TerrainCatalogSaveResult? TerrainSetsResult;
+    public TerrainCatalogManager? LastTerrainCatalogManager;
+    public TerrainCatalogManager? LastTerrainSetsManager;
+    public int TerrainSetsShown;
+    public TaskCompletionSource<TerrainCatalogSaveResult?>? TerrainSetsGate;
 
     public int NewMapShown;
     public int ResizeMapShown;
@@ -73,6 +79,14 @@ internal sealed class FakeEditorDialogs : IEditorDialogs
         }
 
         return Task.FromResult(NewMapResult);
+    }
+
+    public Task<TerrainCatalogSaveResult?> ShowTerrainSetsAsync(TerrainCatalogManager manager)
+    {
+        TerrainSetsShown++;
+        LastTerrainCatalogManager = manager;
+        LastTerrainSetsManager = manager;
+        return TerrainSetsGate?.Task ?? Task.FromResult(TerrainSetsResult);
     }
 
     public Task<MapTileRectangle?> ShowResizeMapAsync(MapDocument document, Func<MapTileRectangle, MapResizePlan> plan)

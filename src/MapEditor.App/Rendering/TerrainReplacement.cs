@@ -1,12 +1,31 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using MapEditor.App.Terrain;
 using MapEditor.App.ViewModels;
 using MapEditor.Rendering.Terrain;
 
 namespace MapEditor.App.Rendering;
 
 internal sealed record TerrainOperationWarning(string Scope, string Message, Exception Exception);
+
+internal sealed class TerrainManagerPublicationPlan
+{
+    internal TerrainManagerPublicationPlan(
+        TerrainSetsManagerViewModel manager,
+        TerrainDraftAcceptance acceptance,
+        IEnumerable<string> properties)
+    {
+        Manager = manager;
+        Acceptance = acceptance;
+        Properties = Array.AsReadOnly(properties.ToArray());
+    }
+
+    internal TerrainSetsManagerViewModel Manager { get; }
+    internal TerrainDraftAcceptance Acceptance { get; }
+    internal IReadOnlyList<string> Properties { get; }
+    internal bool IsConsumed { get; set; }
+}
 
 internal sealed record TerrainReplacementPreparation
 {
@@ -45,6 +64,7 @@ internal sealed class TerrainReplacementPlan
     internal AssetContext? Candidate { get; set; }
     internal AssetContext? Replaced { get; set; }
     internal IReadOnlyList<PlannedDocumentAssetState> Documents { get; set; } = Array.Empty<PlannedDocumentAssetState>();
+    internal TerrainManagerPublicationPlan? ManagerPublication { get; set; }
 }
 
 internal sealed record TerrainPublicationResult

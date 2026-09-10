@@ -263,16 +263,27 @@ internal sealed class TerrainCatalogDraft
         return new System.Collections.ObjectModel.ReadOnlyDictionary<string, string>(result);
     }
 
-    internal void AcceptChanges()
+    internal TerrainDraftAcceptance PlanAcceptChanges()
     {
         var counts = _states
             .Where(state => state.Definition.Status == TerrainReviewStatus.Enabled && !string.IsNullOrWhiteSpace(state.Definition.Id))
             .GroupBy(state => state.Definition.Id, StringComparer.Ordinal)
             .ToDictionary(group => group.Key, group => group.Count(), StringComparer.Ordinal);
-        foreach (SetState state in _states)
-            state.OriginalPublishedId = state.Definition.Status == TerrainReviewStatus.Enabled &&
-                counts.TryGetValue(state.Definition.Id, out int count) && count == 1 ? state.Definition.Id : null;
-        _baseline = Snapshot();
+        string?[] publishedIds = _states.Select(state => state.Definition.Status == TerrainReviewStatus.Enabled &&
+            counts.TryGetValue(state.Definition.Id, out int count) && count == 1 ? state.Definition.Id : null).ToArray();
+        return new TerrainDraftAcceptance(Snapshot(), publishedIds);
+    }
+
+    internal void CommitAcceptChanges(TerrainDraftAcceptance acceptance)
+    {
+        for (var i = 0; i < _states.Count; i++)
+            _states[i].OriginalPublishedId = acceptance.PublishedIds[i];
+        _baseline = acceptance.Baseline;
+    }
+
+    internal void AcceptChanges()
+    {
+        CommitAcceptChanges(PlanAcceptChanges());
         Recompute();
         Changed?.Invoke(this, EventArgs.Empty);
     }
@@ -430,3 +441,5 @@ internal sealed class TerrainCatalogDraft
         }
     }
 }
+
+internal sealed record TerrainDraftAcceptance(string Baseline, string?[] PublishedIds);

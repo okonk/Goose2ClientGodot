@@ -1,0 +1,100 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:controls="using:MapEditor.App.Controls"
+        x:Class="MapEditor.App.Dialogs.TerrainSetsDialog"
+        Title="Terrain Sets"
+        Width="980" Height="700" MinWidth="760" MinHeight="520"
+        CanResize="True" WindowStartupLocation="CenterOwner">
+  <Grid Margin="16" RowDefinitions="*,Auto,Auto" ColumnDefinitions="250,*">
+    <ListBox x:Name="TerrainSetList" Grid.Row="0" Grid.Column="0" Margin="0,0,12,0"
+             ScrollViewer.VerticalScrollBarVisibility="Auto">
+      <ListBox.ItemTemplate>
+        <DataTemplate>
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <TextBlock Text="{Binding DisplayName}" />
+            <TextBlock Text="{Binding Status, StringFormat='({0})'}" />
+          </StackPanel>
+        </DataTemplate>
+      </ListBox.ItemTemplate>
+    </ListBox>
+    <ScrollViewer Grid.Row="0" Grid.Column="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+      <StackPanel Spacing="10">
+        <Grid ColumnDefinitions="*,160,160" ColumnSpacing="8">
+          <TextBox x:Name="TerrainNameBox" Watermark="Terrain name" />
+          <ComboBox x:Name="TerrainStatusCombo" Grid.Column="1" />
+          <ComboBox x:Name="TerrainTopologyCombo" Grid.Column="2" />
+        </Grid>
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <Button x:Name="RegenerateIdButton" Content="Regenerate ID" />
+          <TextBlock x:Name="RegenerationWarningText" Text="Converter regeneration overwrites edits made in Terrain Sets." TextWrapping="Wrap" VerticalAlignment="Center" />
+        </StackPanel>
+        <TextBlock Text="Members and provenance" FontWeight="SemiBold" />
+        <ListBox x:Name="TerrainMemberList" MaxHeight="120" ScrollViewer.VerticalScrollBarVisibility="Auto">
+          <ListBox.ItemTemplate>
+            <DataTemplate>
+              <StackPanel Orientation="Horizontal">
+                <TextBlock Text="{Binding Reference.Sheet}" />
+                <TextBlock Text="/" />
+                <TextBlock Text="{Binding Reference.Graphic}" />
+              </StackPanel>
+            </DataTemplate>
+          </ListBox.ItemTemplate>
+        </ListBox>
+        <TextBlock Text="Diagnostics" FontWeight="SemiBold" />
+        <ListBox x:Name="TerrainDiagnosticList" MaxHeight="120" ScrollViewer.VerticalScrollBarVisibility="Auto">
+          <ListBox.ItemTemplate>
+            <DataTemplate>
+              <TextBlock Text="{Binding Message}" TextWrapping="Wrap" />
+            </DataTemplate>
+          </ListBox.ItemTemplate>
+        </ListBox>
+        <TextBlock Text="Required visual masks" FontWeight="SemiBold" />
+        <ListBox x:Name="TerrainMaskList" MaxHeight="180" ScrollViewer.VerticalScrollBarVisibility="Auto">
+          <ListBox.ItemTemplate>
+            <DataTemplate>
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <TextBlock Text="{Binding Mask, StringFormat='0x{0:X2}'}" />
+                <TextBlock Text="{Binding Variants.Count, StringFormat='({0} variants)'}" />
+              </StackPanel>
+            </DataTemplate>
+          </ListBox.ItemTemplate>
+        </ListBox>
+        <TextBlock Text="Variants" FontWeight="SemiBold" />
+        <ListBox x:Name="TerrainVariantList" MaxHeight="120" ScrollViewer.VerticalScrollBarVisibility="Auto">
+          <ListBox.ItemTemplate>
+            <DataTemplate>
+              <StackPanel Orientation="Horizontal">
+                <TextBlock Text="{Binding Reference.Sheet}" />
+                <TextBlock Text="/" />
+                <TextBlock Text="{Binding Reference.Graphic}" />
+              </StackPanel>
+            </DataTemplate>
+          </ListBox.ItemTemplate>
+        </ListBox>
+        <Grid ColumnDefinitions="100,100,Auto,Auto,Auto" ColumnSpacing="8">
+          <TextBox x:Name="AddVariantSheetBox" Watermark="Sheet" />
+          <TextBox x:Name="AddVariantGraphicBox" Grid.Column="1" Watermark="Graphic" />
+          <Button x:Name="AddVariantButton" Grid.Column="2" Content="Add" />
+          <Button x:Name="RemoveVariantButton" Grid.Column="3" Content="Remove" />
+          <StackPanel Grid.Column="4" Orientation="Horizontal" Spacing="4">
+            <Button x:Name="MoveVariantUpButton" Content="Up" />
+            <Button x:Name="MoveVariantDownButton" Content="Down" />
+          </StackPanel>
+        </Grid>
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <Button x:Name="RemoveOrphanMaskButton" Content="Remove orphan mask" />
+          <Button x:Name="RemoveAllOrphansButton" Content="Remove all orphans" />
+        </StackPanel>
+        <Border Classes="sunken" Height="52" ClipToBounds="True">
+          <controls:TerrainDraftPreviewControl x:Name="TerrainMaskPreview" />
+        </Border>
+        <TextBlock x:Name="PreviewDiagnosticText" TextWrapping="Wrap" />
+      </StackPanel>
+    </ScrollViewer>
+    <TextBlock x:Name="ValidationSummary" Grid.Row="1" Grid.ColumnSpan="2" Margin="0,12,0,8" TextWrapping="Wrap" Focusable="True" />
+    <StackPanel Grid.Row="2" Grid.ColumnSpan="2" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+      <Button x:Name="SaveButton" Classes="accent" Content="Save" MinWidth="84" IsDefault="True" />
+      <Button x:Name="CancelButton" Content="Cancel" MinWidth="84" IsCancel="True" />
+    </StackPanel>
+  </Grid>
+</Window>

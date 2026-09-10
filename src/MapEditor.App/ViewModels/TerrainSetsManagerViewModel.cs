@@ -1,3 +1,4 @@
+using MapEditor.App.Rendering;
 using MapEditor.App.Terrain;
 using MapEditor.Core.Terrain;
 
@@ -44,6 +45,25 @@ internal sealed class TerrainSetsManagerViewModel : ViewModelBase
     internal TerrainCatalog Build() => _draft.Build();
     internal IReadOnlyDictionary<string, string> BuildPublishedIdRekeys() => _draft.BuildPublishedIdRekeys();
     internal void AcceptChanges() => _draft.AcceptChanges();
+
+    internal TerrainManagerPublicationPlan PlanAcceptSavedCatalog()
+        => new(this, _draft.PlanAcceptChanges(), new[]
+        {
+            nameof(Sets),
+            nameof(SelectedSet),
+            nameof(Issues),
+            nameof(IsDirty),
+            nameof(CanSave)
+        });
+
+    internal void CommitSavedCatalog(TerrainManagerPublicationPlan plan)
+        => _draft.CommitAcceptChanges(plan.Acceptance);
+
+    internal void NotifySavedCatalog(TerrainManagerPublicationPlan plan, Action<string, Exception> failure)
+    {
+        foreach (string property in plan.Properties)
+            OnPropertyChangedSafely(property, failure);
+    }
 
     private void OnDraftChanged(object? sender, EventArgs e)
     {

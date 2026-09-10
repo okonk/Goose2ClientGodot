@@ -20,10 +20,12 @@ using MapEditor.App.Dialogs;
 using MapEditor.App.Documents;
 using MapEditor.App.Rendering;
 using MapEditor.App.Settings;
+using MapEditor.App.Terrain;
 using MapEditor.App.Tests.Fakes;
 using MapEditor.App.Tests.Fixtures;
 using MapEditor.App.ViewModels;
 using MapEditor.Core;
+using MapEditor.Core.Terrain;
 using MapEditor.Rendering;
 using MapEditor.Rendering.Terrain;
 using Xunit;
@@ -1442,5 +1444,156 @@ public class MainWindowTests : IDisposable
         document.Brush = new MapTileLayer(1, 2);
         document.Session.BeginStroke(MapEditTool.Pencil, 0, 0);
         Assert.True(document.Session.CompleteStroke());
+    }
+}
+
+public sealed class TerrainSetsMainWindowTests
+{
+    [AvaloniaFact]
+    public void MainWindow_TerrainSetsCommandUsesExactCapturedManagerSource()
+    {
+        using MainWindowHarness harness = MainWindowHarness.Create();
+        OpenTerrain(harness);
+        MenuItem command = harness.Window.FindControl<MenuItem>("TerrainSetsCommand")!;
+        command.RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+        Dispatcher.UIThread.RunJobs();
+        Assert.Same(harness.Assets.Current, harness.Dialogs.LastTerrainCatalogManager!.SourceContext);
+    }
+
+    [AvaloniaFact]
+    public void MainWindow_TerrainSetsCommandEnablementCoversInitialMissingMalformedParsedInvalidAndZeroEnabled()
+    {
+        using (MainWindowHarness harness = MainWindowHarness.Create())
+        {
+            MenuItem command = harness.Window.FindControl<MenuItem>("TerrainSetsCommand")!;
+            Assert.False(command.IsEnabled);
+            OpenTerrain(harness, null);
+            Assert.False(command.IsEnabled);
+        }
+        using (MainWindowHarness harness = MainWindowHarness.Create())
+        {
+            OpenTerrain(harness, "{");
+            Assert.False(harness.Window.FindControl<MenuItem>("TerrainSetsCommand")!.IsEnabled);
+        }
+        using (MainWindowHarness harness = MainWindowHarness.Create())
+        {
+            OpenTerrain(harness, TerrainCatalogJson.Serialize(TerrainTestData.Catalog(("Invalid", 999))));
+            Assert.True(harness.Window.FindControl<MenuItem>("TerrainSetsCommand")!.IsEnabled);
+            Assert.False(harness.Assets.Current.Terrain.Availability.IsToolAvailable);
+        }
+        using (MainWindowHarness harness = MainWindowHarness.Create())
+        {
+            OpenTerrain(harness, TerrainCatalogJson.Serialize(TerrainTestData.Catalog()));
+            Assert.True(harness.Window.FindControl<MenuItem>("TerrainSetsCommand")!.IsEnabled);
+            Assert.Empty(harness.Assets.Current.Terrain.Runtime!.EnabledSets);
+        }
+        using (MainWindowHarness harness = MainWindowHarness.Create())
+        {
+            OpenTerrain(harness);
+            Assert.True(harness.Window.FindControl<MenuItem>("TerrainSetsCommand")!.IsEnabled);
+        }
+    }
+
+    [AvaloniaFact]
+    public async Task MainWindow_PendingManagerDialogDisablesCommandAndRefusesTabOrWindowClose()
+    {
+        using MainWindowHarness harness = MainWindowHarness.Create();
+        OpenTerrain(harness);
+        await harness.Workspace.NewAsync();
+        Dispatcher.UIThread.RunJobs();
+        MapDocumentViewModel active = harness.Workspace.ActiveDocument;
+        MapDocumentViewModel other = harness.Workspace.Documents[0];
+        harness.Dialogs.TerrainSetsGate = new TaskCompletionSource<TerrainCatalogSaveResult?>();
+        MenuItem command = harness.Window.FindControl<MenuItem>("TerrainSetsCommand")!;
+        command.RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+        Dispatcher.UIThread.RunJobs();
+        Assert.False(command.IsEnabled);
+
+        harness.Window.FindControl<ListBox>("TabStrip")!.SelectedItem = other;
+        Dispatcher.UIThread.RunJobs();
+        Assert.Same(active, harness.Workspace.ActiveDocument);
+        Assert.Same(active, harness.Window.FindControl<ListBox>("TabStrip")!.SelectedItem);
+
+        harness.Window.Close();
+        Dispatcher.UIThread.RunJobs();
+        Assert.True(harness.Window.IsVisible);
+        harness.Dialogs.TerrainSetsGate.SetResult(null);
+        Dispatcher.UIThread.RunJobs();
+    }
+
+    [AvaloniaFact]
+    public void MainWindow_TerrainManagerWarningsUseExactTitleMessageAndPublicationOrder()
+    {
+        using MainWindowHarness harness = MainWindowHarness.Create();
+        TerrainCatalogSaveResult result = SaveThroughPendingManagerWithWarnings(harness);
+
+        harness.Dialogs.TerrainSetsGate!.SetResult(result);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Equal(
+            result.Warnings.Select(warning => ("Terrain Sets warning", $"{warning.Scope}: {warning.Message}")),
+            harness.Dialogs.Infos);
+    }
+
+    [AvaloniaFact]
+    public void MainWindow_TerrainManagerFirstShowInfoFailureStillAttemptsLaterWarningsAndPublishedStateStaysUnchanged()
+    {
+        using MainWindowHarness harness = MainWindowHarness.Create();
+        TerrainCatalogSaveResult result = SaveThroughPendingManagerWithWarnings(harness);
+        harness.Dialogs.ShowInfoExceptions = new Queue<Exception?>(Enumerable.Repeat<Exception?>(null, result.Warnings.Count).Prepend(new InvalidOperationException("first presentation failed")).Take(result.Warnings.Count));
+        string path = Path.Combine(harness.Assets.Current.Cache.AssetDirectory!, "terrain-brushes.json");
+        byte[] fileBefore = File.ReadAllBytes(path);
+        AssetContext contextBefore = harness.Assets.Current;
+        MapDocumentViewModel document = harness.Workspace.ActiveDocument;
+        string? selectionBefore = document.SelectedTerrainId;
+        MapEditTool toolBefore = document.ActiveTool;
+        AssetPaletteMode paletteBefore = document.PaletteMode;
+        byte[] mapBefore = MapCodec.Encode(document.Session.Document);
+        long historyBefore = document.Session.HistoryVersion;
+
+        harness.Dialogs.TerrainSetsGate!.SetResult(result);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Equal(result.Warnings.Count, harness.Dialogs.Infos.Count);
+        Assert.Equal(result.Warnings.Select(warning => $"{warning.Scope}: {warning.Message}"), harness.Dialogs.Infos.Select(info => info.Message));
+        Assert.Equal(fileBefore, File.ReadAllBytes(path));
+        Assert.Same(contextBefore, harness.Assets.Current);
+        Assert.Equal(selectionBefore, document.SelectedTerrainId);
+        Assert.Equal(toolBefore, document.ActiveTool);
+        Assert.Equal(paletteBefore, document.PaletteMode);
+        Assert.Equal(mapBefore, MapCodec.Encode(document.Session.Document));
+        Assert.Equal(historyBefore, document.Session.HistoryVersion);
+    }
+
+    private static TerrainCatalogSaveResult SaveThroughPendingManagerWithWarnings(MainWindowHarness harness)
+    {
+        OpenTerrain(harness);
+        harness.Dialogs.TerrainSetsGate = new TaskCompletionSource<TerrainCatalogSaveResult?>();
+        harness.Window.FindControl<MenuItem>("TerrainSetsCommand")!.RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+        Dispatcher.UIThread.RunJobs();
+        TerrainCatalogManager manager = harness.Dialogs.LastTerrainCatalogManager!;
+        Action failingDocumentObserver = () => throw new InvalidOperationException("document warning");
+        harness.Workspace.ActiveDocument.CanvasInvalidated += failingDocumentObserver;
+        manager.ViewModel.Rename(new(0), "Published name");
+        manager.ViewModel.PropertyChanged += (_, _) => throw new InvalidOperationException("manager warning");
+        TerrainCatalogSaveResult result = manager.Save();
+        harness.Workspace.ActiveDocument.CanvasInvalidated -= failingDocumentObserver;
+        Assert.Equal(TerrainCatalogSaveStatus.Succeeded, result.Status);
+        Assert.True(result.Warnings.Count > 1);
+        return result;
+    }
+
+    private static void OpenTerrain(MainWindowHarness harness, string? catalog = "valid")
+    {
+        string directory = Path.Combine(harness.TempDirectory, $"terrain-manager-assets-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(Path.Combine(directory, "sheets"));
+        File.WriteAllText(Path.Combine(directory, "manifest.json"), "{\"tileSize\":32,\"sheets\":{\"1\":{\"10\":[0,0,32,32]}}}");
+        if (catalog is not null)
+        {
+            string content = catalog == "valid" ? TerrainCatalogJson.Serialize(TerrainTestData.Catalog(("A", 10))) : catalog;
+            File.WriteAllText(Path.Combine(directory, "terrain-brushes.json"), content);
+        }
+        Assert.True(harness.Assets.TryOpen(directory));
+        typeof(MainWindow).GetMethod("SyncAssetDirectory", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.Invoke(harness.Window, null);
     }
 }

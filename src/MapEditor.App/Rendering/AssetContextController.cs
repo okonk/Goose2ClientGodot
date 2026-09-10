@@ -159,12 +159,29 @@ internal sealed class AssetContextController : IDisposable
         AssetContext expectedContext,
         TerrainAssetLoadResult replacement,
         IReadOnlyDictionary<string, string>? idRekeys = null)
+        => PrepareTerrainReplacementCore(expectedContext, replacement, idRekeys, null);
+
+    internal TerrainReplacementPreparation PrepareTerrainReplacement(
+        AssetContext expectedContext,
+        TerrainAssetLoadResult replacement,
+        IReadOnlyDictionary<string, string>? idRekeys,
+        TerrainManagerPublicationPlan managerPublication)
+    {
+        ArgumentNullException.ThrowIfNull(managerPublication);
+        if (managerPublication.IsConsumed)
+            throw new InvalidOperationException("The terrain manager publication plan has already been consumed.");
+        return PrepareTerrainReplacementCore(expectedContext, replacement, idRekeys, managerPublication);
+    }
+
+    private TerrainReplacementPreparation PrepareTerrainReplacementCore(
+        AssetContext expectedContext,
+        TerrainAssetLoadResult replacement,
+        IReadOnlyDictionary<string, string>? idRekeys,
+        TerrainManagerPublicationPlan? managerPublication)
     {
         EnsureThreadAndNotDisposed();
         if (_replacement is not null)
-        {
             throw new InvalidOperationException(BusyMessage);
-        }
 
         ArgumentNullException.ThrowIfNull(expectedContext);
         ArgumentNullException.ThrowIfNull(replacement);
@@ -172,9 +189,7 @@ internal sealed class AssetContextController : IDisposable
             ? null
             : new Dictionary<string, string>(idRekeys, StringComparer.Ordinal);
         if (!ReferenceEquals(_current, expectedContext))
-        {
             return new TerrainReplacementPreparation(false, null, Array.Empty<Exception>());
-        }
 
         TerrainReplacementPlan plan = Reserve();
         try
@@ -182,6 +197,7 @@ internal sealed class AssetContextController : IDisposable
             plan.Replaced = expectedContext;
             plan.Candidate = expectedContext.WithTerrain(replacement);
             plan.Documents = PlanDocuments(plan.Candidate, copiedRekeys, terrainOnly: true);
+            plan.ManagerPublication = managerPublication;
             IReadOnlyList<Exception> failures = CancelTerrainGestures();
             if (failures.Count > 0)
             {
@@ -199,13 +215,28 @@ internal sealed class AssetContextController : IDisposable
     }
 
     internal TerrainPublicationResult PublishTerrain(TerrainReplacementPlan plan)
+        => PublishTerrainCore(plan, null);
+
+    internal TerrainPublicationResult PublishTerrain(
+        TerrainReplacementPlan plan,
+        TerrainManagerPublicationPlan managerPublication)
+    {
+        ArgumentNullException.ThrowIfNull(managerPublication);
+        return PublishTerrainCore(plan, managerPublication);
+    }
+
+    private TerrainPublicationResult PublishTerrainCore(
+        TerrainReplacementPlan plan,
+        TerrainManagerPublicationPlan? managerPublication)
     {
         EnsureThreadAndNotDisposed();
         ValidatePlan(plan);
+        if (!ReferenceEquals(plan.ManagerPublication, managerPublication) || managerPublication?.IsConsumed == true)
+            throw new InvalidOperationException("The terrain manager publication plan does not match the reserved replacement.");
         IReadOnlyList<TerrainOperationWarning> warnings;
         try
         {
-            warnings = PublishCore(plan);
+            warnings = PublishCore(plan, managerPublication);
         }
         finally
         {
@@ -225,6 +256,8 @@ internal sealed class AssetContextController : IDisposable
         }
 
         plan.State = TerrainReplacementPlanState.Abandoned;
+        if (plan.ManagerPublication is not null)
+            plan.ManagerPublication.IsConsumed = true;
         _replacement = null;
         try
         {
@@ -285,7 +318,9 @@ internal sealed class AssetContextController : IDisposable
         return failures.AsReadOnly();
     }
 
-    private IReadOnlyList<TerrainOperationWarning> PublishCore(TerrainReplacementPlan plan)
+    private IReadOnlyList<TerrainOperationWarning> PublishCore(
+        TerrainReplacementPlan plan,
+        TerrainManagerPublicationPlan? managerPublication = null)
     {
         ValidatePlan(plan);
         AssetContext candidate = plan.Candidate!;
@@ -301,6 +336,10 @@ internal sealed class AssetContextController : IDisposable
             documentPlan.Document.CommitAssetState(documentPlan.AssetState);
             documentPlan.Document.CommitTerrainState(documentPlan.TerrainState);
         }
+
+        managerPublication?.Manager.CommitSavedCatalog(managerPublication);
+        if (managerPublication is not null)
+            managerPublication.IsConsumed = true;
 
         var warnings = new List<TerrainOperationWarning>();
         for (var i = 0; i < plan.Documents.Count; i++)
@@ -328,6 +367,15 @@ internal sealed class AssetContextController : IDisposable
                         exception));
                 }
             });
+        }
+
+        if (managerPublication is not null)
+        {
+            managerPublication.Manager.NotifySavedCatalog(managerPublication, (property, exception) =>
+                warnings.Add(new TerrainOperationWarning(
+                    $"terrain-manager:PropertyChanged:{property}",
+                    $"Terrain manager property '{property}' observer failed after catalog publication: {exception.Message}",
+                    exception)));
         }
 
         return warnings.AsReadOnly();
