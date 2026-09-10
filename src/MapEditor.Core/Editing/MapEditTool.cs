@@ -8,5 +8,6 @@ public enum MapEditTool
     Blocked,
     Select,
     MultiSelect,
-    FloodFill
+    FloodFill,
+    Terrain
 }

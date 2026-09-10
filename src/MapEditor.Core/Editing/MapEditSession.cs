@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using MapEditor.Core.Terrain;
 
 namespace MapEditor.Core;
 
@@ -10,6 +11,7 @@ public sealed class MapEditSession
     private readonly MapDocument _document;
     private readonly MapEditHistory _history;
     private MapEditStroke? _stroke;
+    private TerrainMapEditStroke? _terrainStroke;
     private byte _selectedLayers = 1;
     private MapTileLayer _selectedTileLayer;
     private int _currentStateId;
@@ -75,19 +77,19 @@ public sealed class MapEditSession
         set => _selectedTileLayer = value;
     }
 
-    public bool HasActiveStroke => _stroke != null;
+    public bool HasActiveStroke => HasAnyActiveStroke;
 
     public event Action<MapResizeTransform>? Resized;
 
-    public bool CanUndo => _stroke == null && _history.UndoCount > 0;
+    public bool CanUndo => !HasAnyActiveStroke && _history.UndoCount > 0;
 
-    public bool CanRedo => _stroke == null && _history.RedoCount > 0;
+    public bool CanRedo => !HasAnyActiveStroke && _history.RedoCount > 0;
 
     public bool IsDirty
     {
         get
         {
-            if (_stroke is { HasDeltas: true })
+            if (_stroke is { HasDeltas: true } || _terrainStroke is { HasNetChanges: true })
             {
                 return true;
             }
@@ -105,7 +107,7 @@ public sealed class MapEditSession
     {
         ValidateTool(tool);
         ValidateCoordinate(x, y);
-        if (_stroke != null)
+        if (HasAnyActiveStroke)
         {
             throw new InvalidOperationException();
         }
@@ -121,6 +123,48 @@ public sealed class MapEditSession
         }
     }
 
+    public TerrainStrokeUpdate BeginTerrainStroke(
+        TerrainMapResolver resolver,
+        string terrainId,
+        TerrainEditMode mode,
+        int x,
+        int y)
+    {
+        ArgumentNullException.ThrowIfNull(resolver);
+        ArgumentNullException.ThrowIfNull(terrainId);
+        if (string.IsNullOrWhiteSpace(terrainId))
+        {
+            throw new ArgumentException("Terrain ID cannot be empty or whitespace.", nameof(terrainId));
+        }
+
+        if (mode != TerrainEditMode.Paint && mode != TerrainEditMode.Erase)
+        {
+            throw new ArgumentOutOfRangeException(nameof(mode));
+        }
+
+        ValidateCoordinate(x, y);
+        if (!resolver.TryGetEnabledTerrain(terrainId, out TerrainRuntimeSet? terrain))
+        {
+            throw new ArgumentException("Terrain ID is not enabled.", nameof(terrainId));
+        }
+
+        if (HasAnyActiveStroke)
+        {
+            throw new InvalidOperationException();
+        }
+
+        var stroke = new TerrainMapEditStroke(resolver, terrain!, mode, TopLayer, _document.TileCount);
+        TerrainStrokeUpdate update = stroke.ApplyFirstSample(x, y, _document);
+        if (!update.Succeeded)
+        {
+            stroke.Release();
+            return update;
+        }
+
+        _terrainStroke = stroke;
+        return update;
+    }
+
     public void ContinueStroke(int x, int y)
     {
         MapEditStroke stroke = _stroke ?? throw new InvalidOperationException();
@@ -134,25 +178,56 @@ public sealed class MapEditSession
         stroke.ApplySegment(stroke.PreviousSample, new MapCoordinate(x, y), _document);
     }
 
+    public TerrainStrokeUpdate ContinueTerrainStroke(int x, int y)
+    {
+        TerrainMapEditStroke stroke = _terrainStroke ?? throw new InvalidOperationException();
+        ValidateCoordinate(x, y);
+        TerrainStrokeUpdate update = stroke.ApplySegment(x, y, _document);
+        if (update.Succeeded)
+        {
+            return update;
+        }
+
+        stroke.Restore(_document);
+        _terrainStroke = null;
+        stroke.Release();
+        return update;
+    }
+
     public bool CompleteStroke()
     {
-        MapEditStroke stroke = _stroke ?? throw new InvalidOperationException();
-        _stroke = null;
-        if (!stroke.HasDeltas)
+        if (_stroke is { } stroke)
         {
+            _stroke = null;
+            if (!stroke.HasDeltas)
+            {
+                stroke.Release();
+                return false;
+            }
+
+            PushLayerCommand(stroke.LayerChanges!);
             stroke.Release();
+            return true;
+        }
+
+        TerrainMapEditStroke terrainStroke = _terrainStroke ?? throw new InvalidOperationException();
+        MapEditChangeBuffer<MapLayerChange> changes = terrainStroke.BuildChanges();
+        bool hasNetChanges = terrainStroke.HasNetChanges;
+        _terrainStroke = null;
+        terrainStroke.Release();
+        if (!hasNetChanges)
+        {
             return false;
         }
 
-        PushLayerCommand(stroke.LayerChanges!);
-        stroke.Release();
+        PushLayerCommand(changes);
         return true;
     }
 
     public bool ApplyFloodFill(int x, int y)
     {
         ValidateCoordinate(x, y);
-        if (_stroke != null)
+        if (HasAnyActiveStroke)
         {
             throw new InvalidOperationException();
         }
@@ -223,7 +298,7 @@ public sealed class MapEditSession
 
     public bool ApplyLayerPatch(int originX, int originY, int width, int height, MapTileLayer[]?[] layerTiles)
     {
-        if (_stroke != null)
+        if (HasAnyActiveStroke)
         {
             throw new InvalidOperationException();
         }
@@ -283,7 +358,7 @@ public sealed class MapEditSession
 
     public bool ApplyBlockedPatch(MapTileRectangle rect, bool blocked)
     {
-        if (_stroke != null)
+        if (HasAnyActiveStroke)
         {
             throw new InvalidOperationException();
         }
@@ -325,7 +400,7 @@ public sealed class MapEditSession
 
     public bool ApplyResize(MapTileRectangle window)
     {
-        if (_stroke != null)
+        if (HasAnyActiveStroke)
         {
             throw new InvalidOperationException();
         }
@@ -380,24 +455,32 @@ public sealed class MapEditSession
 
     public void CancelStroke()
     {
-        MapEditStroke stroke = _stroke ?? throw new InvalidOperationException();
-        _stroke = null;
-        if (stroke.LayerChanges is { } layerChanges)
+        if (_stroke is { } stroke)
         {
-            new MapLayerChangesCommand(layerChanges, 0, 0).Replay(_document, reverse: true, before: true);
+            _stroke = null;
+            if (stroke.LayerChanges is { } layerChanges)
+            {
+                new MapLayerChangesCommand(layerChanges, 0, 0).Replay(_document, reverse: true, before: true);
+            }
+
+            if (stroke.Tool == MapEditTool.Eyedropper)
+            {
+                _selectedTileLayer = stroke.PreviousBrush;
+            }
+
+            stroke.Release();
+            return;
         }
 
-        if (stroke.Tool == MapEditTool.Eyedropper)
-        {
-            _selectedTileLayer = stroke.PreviousBrush;
-        }
-
-        stroke.Release();
+        TerrainMapEditStroke terrainStroke = _terrainStroke ?? throw new InvalidOperationException();
+        terrainStroke.Restore(_document);
+        _terrainStroke = null;
+        terrainStroke.Release();
     }
 
     public bool Undo()
     {
-        if (_stroke != null)
+        if (HasAnyActiveStroke)
         {
             throw new InvalidOperationException();
         }
@@ -420,7 +503,7 @@ public sealed class MapEditSession
 
     public bool Redo()
     {
-        if (_stroke != null)
+        if (HasAnyActiveStroke)
         {
             throw new InvalidOperationException();
         }
@@ -443,7 +526,7 @@ public sealed class MapEditSession
 
     public void MarkSaved()
     {
-        if (_stroke != null)
+        if (HasAnyActiveStroke)
         {
             throw new InvalidOperationException();
         }
@@ -464,7 +547,7 @@ public sealed class MapEditSession
             throw new ArgumentOutOfRangeException(nameof(bytes));
         }
 
-        if (_stroke != null)
+        if (HasAnyActiveStroke)
         {
             throw new InvalidOperationException();
         }
@@ -475,6 +558,8 @@ public sealed class MapEditSession
     internal MapEditHistory History => _history;
 
     internal MapEditStroke? ActiveStroke => _stroke;
+
+    internal TerrainMapEditStroke? ActiveTerrainStroke => _terrainStroke;
 
     internal int CurrentStateId => _currentStateId;
 
@@ -488,9 +573,11 @@ public sealed class MapEditSession
         _history.PushUndo(new MapLayerChangesCommand(changes, beforeStateId, afterStateId));
     }
 
+    private bool HasAnyActiveStroke => _stroke != null || _terrainStroke != null;
+
     private static void ValidateTool(MapEditTool tool)
     {
-        if (tool < MapEditTool.Pencil || tool > MapEditTool.Eyedropper)
+        if (tool != MapEditTool.Pencil && tool != MapEditTool.Eraser && tool != MapEditTool.Eyedropper)
         {
             throw new ArgumentOutOfRangeException(nameof(tool));
         }
