@@ -114,6 +114,7 @@ public class TerrainMapResolverTests
     [InlineData("unreachable-mask")]
     [InlineData("duplicate-variant")]
     [InlineData("variant-not-member")]
+    [InlineData("variant-graphic-zero")]
     [InlineData("unused-member")]
     [InlineData("cross-enabled-membership")]
     public void Constructor_EachEnabledRuntimeDefectThrowsFirstExactIssue(string defect)
@@ -271,6 +272,13 @@ public class TerrainMapResolverTests
                     members,
                     masks: FourWayMasksWithZero([new TerrainGraphicReference(1, 9)], members)));
                 expected = ("variant-not-member", $"Terrain '{id}' mask 0x00 variant (1,9) is not a member.");
+                break;
+            case "variant-graphic-zero":
+                catalog = TerrainCatalogFixture.CreateCatalog(TerrainCatalogFixture.CreateSet(
+                    TerrainTopology.FourWay,
+                    members,
+                    masks: FourWayMasksWithZero([new TerrainGraphicReference(1, 0)], members)));
+                expected = ("variant-not-member", $"Terrain '{id}' mask 0x00 variant (1,0) is not a member.");
                 break;
             case "unused-member":
                 catalog = TerrainCatalogFixture.CreateCatalog(TerrainCatalogFixture.CreateSet(
