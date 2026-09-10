@@ -117,7 +117,10 @@ public class TerrainMapEditSessionTests
         var session = new MapEditSession(MapDocument.Create(5, 1));
         session.BeginTerrainStroke(resolver, set.Id, TerrainEditMode.Paint, 0, 0);
         session.ContinueTerrainStroke(4, 0);
-        session.ContinueTerrainStroke(0, 0);
+        var update = session.ContinueTerrainStroke(0, 0);
+        Assert.True(update.Succeeded);
+        Assert.False(update.Changed);
+        Assert.True(session.HasActiveStroke);
         Assert.Equal(5, session.ActiveTerrainStroke!.IntentCount);
         Assert.Equal(5, Enumerable.Range(0, 5).Count(i => session.ActiveTerrainStroke.Visited.IsVisited(i)));
         session.CancelStroke();

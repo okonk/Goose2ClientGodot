@@ -7,24 +7,11 @@ namespace MapEditor.Core;
 internal sealed class MapLayerChangeAccumulator
 {
     private readonly SortedDictionary<int, (int X, int Y, MapTileLayer First, MapTileLayer Latest)> _entries = new();
+    private int _netChangeCount;
 
     internal int Count => _entries.Count;
 
-    internal bool HasNetChanges
-    {
-        get
-        {
-            foreach (var entry in _entries.Values)
-            {
-                if (entry.First != entry.Latest)
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-    }
+    internal bool HasNetChanges => _netChangeCount > 0;
 
     internal bool Apply(
         MapDocument document,
@@ -48,13 +35,21 @@ internal sealed class MapLayerChangeAccumulator
 
         foreach (var cell in cells)
         {
-            if (!_entries.TryGetValue(cell.CellIndex, out var entry))
+            bool exists = _entries.TryGetValue(cell.CellIndex, out var entry);
+            bool wasNetChange = exists && entry.First != entry.Latest;
+            if (!exists)
             {
                 entry = (cell.CellIndex % width, cell.CellIndex / width, document.GetTile(cell.CellIndex).GetLayer(layerIndex), cell.Target);
             }
             else
             {
                 entry.Latest = cell.Target;
+            }
+
+            bool isNetChange = entry.First != entry.Latest;
+            if (wasNetChange != isNetChange)
+            {
+                _netChangeCount += isNetChange ? 1 : -1;
             }
 
             _entries[cell.CellIndex] = entry;
