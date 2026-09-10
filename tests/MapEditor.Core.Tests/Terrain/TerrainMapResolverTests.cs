@@ -59,7 +59,7 @@ public class TerrainMapResolverTests
         Assert.Equal(TerrainTopology.FourWay, terrain.Topology);
         Assert.False(resolver.TryGetEnabledTerrain(enabled.Id.ToUpperInvariant(), out _));
         Assert.False(resolver.TryGetEnabledTerrain(disabled.Id, out _));
-        Assert.False(resolver.TryGetEnabledTerrain(null, out _));
+        Assert.False(resolver.TryGetEnabledTerrain(null!, out _));
 
         Assert.True(resolver.TryGetOwner(new TerrainGraphicReference(1, 1), out var owner));
         Assert.Same(terrain, owner);

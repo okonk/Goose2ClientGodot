@@ -42,7 +42,7 @@ internal static class TerrainCatalogFixture
         string? displayName = null,
         TerrainSetMetrics? metrics = null,
         IEnumerable<TerrainMaskDefinition>? masks = null,
-        IEnumerable<TerrainDiagnostic> diagnostics = null)
+        IEnumerable<TerrainDiagnostic>? diagnostics = null)
     {
         var memberList = members.ToList();
         return new TerrainSetDefinition(
