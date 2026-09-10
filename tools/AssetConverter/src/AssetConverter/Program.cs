@@ -60,8 +60,14 @@ if (args.Length >= 1 && args[0] == "aspereta")
 
     var sheets = AsperetaBatchConverter.Convert(
         Paths.AsperetaData, Path.Combine(repoRoot, "Assets", "Sprites", "sheets"));
-    var maps = AsperetaMapConverter.Convert(
-        Paths.AsperetaMaps, Path.Combine(repoRoot, "Assets", "Maps"), mapping);
+    var mapsOutDir = Path.Combine(repoRoot, "Assets", "Maps");
+    var maps = AsperetaMapConverter.Convert(Paths.AsperetaMaps, mapsOutDir, mapping);
+    if (maps.OutputFileNames.Count == 0)
+    {
+        throw new InvalidOperationException(
+            $"No Aspereta maps were converted ({maps.Failures.Count} failed); the terrain map inventory requires at least one successful map.");
+    }
+    TerrainMapInventory.Write(mapsOutDir, maps.OutputFileNames);
     var fx = AsperetaEffectsConverter.Convert(
         Paths.AsperetaData, Paths.AsperetaCompiledEnc, repoRoot);
 

@@ -103,6 +103,19 @@ public class TerrainAllFinalizerTests
         Assert.DoesNotContain("File.WriteAllText(manifestPath", programSource);
     }
 
+    [Fact]
+    public void AsperetaCommandWritesCanonicalInventory()
+    {
+        var programSource = ReadProgramSource();
+        var marker = "args[0] == \"aspereta\"";
+        var start = programSource.IndexOf(marker, StringComparison.Ordinal);
+        Assert.True(start >= 0, "aspereta command not found in Program.cs");
+        var nextCommand = programSource.IndexOf("args[0] ==", start + marker.Length, StringComparison.Ordinal);
+        var blockEnd = nextCommand >= 0 ? nextCommand : programSource.Length;
+        var asperetaBlock = programSource[start..blockEnd];
+        Assert.Contains("TerrainMapInventory.Write", asperetaBlock);
+    }
+
     private static string ReadProgramSource()
     {
         var dir = new DirectoryInfo(Path.GetDirectoryName(typeof(TerrainAllFinalizerTests).Assembly.Location)!);

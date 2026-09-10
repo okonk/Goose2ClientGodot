@@ -45,15 +45,13 @@ public static class TerrainCorpusLoader
         var (frameIndex, manifestBytes) = LoadManifest(fullRoot);
         var mapsDirectory = Path.Combine(fullRoot, TerrainMapInventory.MapsDirectory);
         var mapReader = reader ?? new FileTerrainMapDataReader(mapsDirectory);
-        var inventoryPath = Path.Combine(fullRoot, TerrainMapInventory.RelativePath);
-        var manifestPath = Path.Combine(fullRoot, ManifestRelativePath);
 
         // Fingerprint byte stream: header, then records 0x01 inventory, 0x02 maps in identity order,
-        // 0x03 manifest, 0x04 relevant sheets in numeric order; content is reread from disk at hash
-        // time so no map byte array outlives its scan.
+        // 0x03 manifest, 0x04 relevant sheets in numeric order; each record hashes the exact in-memory
+        // bytes used for inference so the fingerprint identifies the scanned snapshot.
         using var source = new FingerprintStream();
         source.AddBytes(FingerprintHeader);
-        AddRecord(source, 0x01, TerrainMapInventory.RelativePath, inventoryPath, inventory.Content.Length);
+        AddRecord(source, 0x01, TerrainMapInventory.RelativePath, inventory.Content);
 
         var observed = new HashSet<TerrainGraphicReference>();
         var relevantSheets = new HashSet<int>();
@@ -88,7 +86,7 @@ public static class TerrainCorpusLoader
 
             try
             {
-                AddRecord(source, 0x02, identity, mapPath, data.Bytes.Length);
+                AddRecord(source, 0x02, identity, data.Bytes);
 
                 MapDocument document;
                 try
@@ -121,14 +119,14 @@ public static class TerrainCorpusLoader
                 "No eligible layer-0 placements found in the listed maps.");
         }
 
-        AddRecord(source, 0x03, ManifestRelativePath, manifestPath, manifestBytes.Length);
+        AddRecord(source, 0x03, ManifestRelativePath, manifestBytes);
 
         var relevant = relevantSheets.OrderBy(sheet => sheet).ToList();
         foreach (var sheet in relevant)
         {
             var sheetPath = Path.Combine(fullRoot, SheetsRelativeDirectory, sheet + ".png");
             ValidateSheet(sheetPath, frameIndex.GetFrames(sheet));
-            AddRecord(source, 0x04, $"{SheetsRelativeDirectory}/{sheet}.png", sheetPath, new FileInfo(sheetPath).Length);
+            AddRecord(source, 0x04, $"{SheetsRelativeDirectory}/{sheet}.png", File.ReadAllBytes(sheetPath));
         }
 
         using var hash = SHA256.Create();
@@ -439,7 +437,7 @@ public static class TerrainCorpusLoader
         }
     }
 
-    private static void AddRecord(FingerprintStream source, byte kind, string recordPath, string filePath, long contentLength)
+    private static void AddRecord(FingerprintStream source, byte kind, string recordPath, ReadOnlySpan<byte> content)
     {
         var pathBytes = Encoding.UTF8.GetBytes(recordPath);
         Span<byte> header = stackalloc byte[5];
@@ -447,8 +445,8 @@ public static class TerrainCorpusLoader
         BinaryPrimitives.WriteUInt32BigEndian(header.Slice(1, 4), (uint)pathBytes.Length);
         source.AddBytes(header);
         source.AddBytes(pathBytes);
-        source.AddBytes(EncodeContentLength(contentLength));
-        source.AddFile(filePath);
+        source.AddBytes(EncodeContentLength(content.Length));
+        source.AddBytes(content);
     }
 
     private static byte[] EncodeContentLength(long contentLength)
@@ -462,19 +460,12 @@ public static class TerrainCorpusLoader
     {
         private sealed class Segment
         {
-            public byte[]? Inline { get; }
-            public string? FilePath { get; }
-            public Stream? File;
+            public byte[] Inline { get; }
             public int Offset;
 
             public Segment(byte[] inline)
             {
                 Inline = inline;
-            }
-
-            public Segment(string filePath)
-            {
-                FilePath = filePath;
             }
         }
 
@@ -482,8 +473,6 @@ public static class TerrainCorpusLoader
         private int _segmentIndex = -1;
 
         public void AddBytes(ReadOnlySpan<byte> bytes) => _segments.Add(new Segment(bytes.ToArray()));
-
-        public void AddFile(string path) => _segments.Add(new Segment(path));
 
         public override bool CanRead => true;
         public override bool CanSeek => false;
@@ -516,30 +505,13 @@ public static class TerrainCorpusLoader
                 }
 
                 var segment = _segments[_segmentIndex];
-                if (segment.Inline is not null)
+                var toCopy = Math.Min(segment.Inline.Length - segment.Offset, count - total);
+                Buffer.BlockCopy(segment.Inline, segment.Offset, buffer, offset + total, toCopy);
+                segment.Offset += toCopy;
+                total += toCopy;
+                if (segment.Offset >= segment.Inline.Length)
                 {
-                    var toCopy = Math.Min(segment.Inline.Length - segment.Offset, count - total);
-                    Buffer.BlockCopy(segment.Inline, segment.Offset, buffer, offset + total, toCopy);
-                    segment.Offset += toCopy;
-                    total += toCopy;
-                    if (segment.Offset >= segment.Inline.Length)
-                    {
-                        _segmentIndex++;
-                    }
-                }
-                else
-                {
-                    segment.File ??= new FileStream(segment.FilePath, FileMode.Open, FileAccess.Read, FileShare.Read);
-                    var read = segment.File.Read(buffer, offset + total, count - total);
-                    if (read == 0)
-                    {
-                        segment.File.Dispose();
-                        segment.File = null;
-                        _segmentIndex++;
-                        continue;
-                    }
-
-                    total += read;
+                    _segmentIndex++;
                 }
             }
 
@@ -551,19 +523,6 @@ public static class TerrainCorpusLoader
         public override void SetLength(long value) => throw new NotSupportedException();
 
         public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
-
-        protected override void Dispose(bool disposing)
-        {
-            if (disposing)
-            {
-                foreach (var segment in _segments)
-                {
-                    segment.File?.Dispose();
-                }
-            }
-
-            base.Dispose(disposing);
-        }
     }
 
     private static bool TryParseId(string name, out int value)
