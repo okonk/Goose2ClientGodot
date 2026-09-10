@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using MapEditor.App.Terrain;
 using MapEditor.App.Tests.Fixtures;
 using MapEditor.App.ViewModels;
@@ -15,6 +16,25 @@ namespace MapEditor.App.Tests;
 public sealed class TerrainSetsManagerViewModelTests
 {
     private static SpriteManifest Manifest(string frames) => SpriteManifest.Parse($"{{\"tileSize\":32,\"sheets\":{{\"1\":{{{frames}}}}}}}");
+
+    [Fact]
+    public void SelectedSetKey_WrongThreadThrowsBeforeMutationOrNotification()
+    {
+        TerrainCatalogDraft draft = new(TerrainTestData.Catalog(("A", 10)), Manifest("\"10\":[0,0,32,32]"));
+        var manager = new TerrainSetsManagerViewModel(draft);
+        var notifications = 0;
+        manager.PropertyChanged += (_, _) => notifications++;
+        Exception? failure = null;
+        var thread = new Thread(() => failure = Record.Exception(() => manager.SelectedSetKey = new(0)));
+
+        thread.Start();
+        thread.Join();
+
+        Assert.IsType<InvalidOperationException>(failure);
+        Assert.Null(manager.SelectedSetKey);
+        Assert.Null(manager.SelectedSet);
+        Assert.Equal(0, notifications);
+    }
 
     [Fact]
     public void MaskRows_ExposeVisualNeighborhoodAndResolvedFrameState()

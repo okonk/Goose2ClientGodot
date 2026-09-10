@@ -7,6 +7,7 @@ namespace MapEditor.App.Terrain;
 internal sealed class TerrainCatalogDraft
 {
     private readonly SpriteManifest _manifest;
+    private readonly int _creatingThreadId;
     private readonly int _schemaVersion;
     private readonly string _generatorVersion;
     private readonly string _corpusFingerprint;
@@ -28,6 +29,7 @@ internal sealed class TerrainCatalogDraft
     {
         ArgumentNullException.ThrowIfNull(source);
         _manifest = manifest ?? throw new ArgumentNullException(nameof(manifest));
+        _creatingThreadId = Environment.CurrentManagedThreadId;
         _schemaVersion = source.SchemaVersion;
         _generatorVersion = source.GeneratorVersion;
         _corpusFingerprint = source.CorpusFingerprint;
@@ -48,6 +50,7 @@ internal sealed class TerrainCatalogDraft
 
     internal void Rename(TerrainDraftKey key, string displayName)
     {
+        EnsureCreatingThread();
         ArgumentNullException.ThrowIfNull(displayName);
         SetState state = Require(key);
         if (string.Equals(state.Definition.DisplayName, displayName, StringComparison.Ordinal))
@@ -58,6 +61,7 @@ internal sealed class TerrainCatalogDraft
 
     internal TerrainDraftMutationResult RegenerateId(TerrainDraftKey key)
     {
+        EnsureCreatingThread();
         if (!TryGet(key, out SetState state))
             return Invalid(key, "draft-key-invalid", $"Terrain draft key {key.Value} does not exist.");
         if (!TryGeneratedId(state.Definition, out string generated))
@@ -67,6 +71,7 @@ internal sealed class TerrainCatalogDraft
 
     internal TerrainDraftMutationResult ChangeTopology(TerrainDraftKey key, TerrainTopology topology)
     {
+        EnsureCreatingThread();
         if (!TryGet(key, out SetState state))
             return Invalid(key, "draft-key-invalid", $"Terrain draft key {key.Value} does not exist.");
         if (topology is not (TerrainTopology.FourWay or TerrainTopology.EightWay))
@@ -106,6 +111,7 @@ internal sealed class TerrainCatalogDraft
 
     internal TerrainDraftMutationResult AddVariant(TerrainDraftKey key, int mask, TerrainGraphicReference reference)
     {
+        EnsureCreatingThread();
         if (!TryGet(key, out SetState state))
             return Invalid(key, "draft-key-invalid", $"Terrain draft key {key.Value} does not exist.");
         if (state.Definition.Topology is not (TerrainTopology.FourWay or TerrainTopology.EightWay))
@@ -135,6 +141,7 @@ internal sealed class TerrainCatalogDraft
 
     internal TerrainDraftMutationResult RemoveVariant(TerrainDraftKey key, int mask, int index)
     {
+        EnsureCreatingThread();
         if (!TryGet(key, out SetState state))
             return Invalid(key, "draft-key-invalid", $"Terrain draft key {key.Value} does not exist.");
         int rowIndex = FindMask(state.Definition.Masks, mask);
@@ -167,6 +174,7 @@ internal sealed class TerrainCatalogDraft
 
     internal TerrainDraftMutationResult ReorderVariant(TerrainDraftKey key, int mask, int fromIndex, int toIndex)
     {
+        EnsureCreatingThread();
         if (!TryGet(key, out SetState state))
             return Invalid(key, "draft-key-invalid", $"Terrain draft key {key.Value} does not exist.");
         int rowIndex = FindMask(state.Definition.Masks, mask);
@@ -188,6 +196,7 @@ internal sealed class TerrainCatalogDraft
 
     internal TerrainDraftMutationResult RemoveOrphanMask(TerrainDraftKey key, int mask)
     {
+        EnsureCreatingThread();
         if (!TryGet(key, out SetState state))
             return Invalid(key, "draft-key-invalid", $"Terrain draft key {key.Value} does not exist.");
         int index = FindMask(state.Orphans, mask);
@@ -200,6 +209,7 @@ internal sealed class TerrainCatalogDraft
 
     internal TerrainDraftMutationResult RemoveAllOrphanMasks(TerrainDraftKey key)
     {
+        EnsureCreatingThread();
         if (!TryGet(key, out SetState state))
             return Invalid(key, "draft-key-invalid", $"Terrain draft key {key.Value} does not exist.");
         if (state.Orphans.Count == 0)
@@ -209,6 +219,7 @@ internal sealed class TerrainCatalogDraft
 
     internal bool TrySetStatus(TerrainDraftKey key, TerrainReviewStatus status, out IReadOnlyList<TerrainValidationIssue> issues)
     {
+        EnsureCreatingThread();
         if (!TryGet(key, out SetState state))
         {
             issues = Invalid(key, "draft-key-invalid", $"Terrain draft key {key.Value} does not exist.").Issues;
@@ -286,6 +297,12 @@ internal sealed class TerrainCatalogDraft
         CommitAcceptChanges(PlanAcceptChanges());
         Recompute();
         Changed?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void EnsureCreatingThread()
+    {
+        if (Environment.CurrentManagedThreadId != _creatingThreadId)
+            throw new InvalidOperationException("Terrain manager operations must run on the creating thread.");
     }
 
     private TerrainDraftMutationResult RemoveOrphans(SetState state, IEnumerable<TerrainMaskDefinition> remainingOrphans)

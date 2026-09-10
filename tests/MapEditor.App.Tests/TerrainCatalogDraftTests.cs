@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using MapEditor.App.Terrain;
 using MapEditor.App.Tests.Fixtures;
 using MapEditor.Core.Terrain;
@@ -15,6 +16,24 @@ public sealed class TerrainCatalogDraftTests
         $"{{\"tileSize\":32,\"sheets\":{{\"1\":{{{string.Join(',', graphics.Select(x => $"\"{x}\":[0,0,32,32]"))}}}}}}}");
 
     private static TerrainCatalogDraft Draft(TerrainCatalog catalog, params int[] graphics) => new(catalog, Manifest(graphics));
+
+    [Fact]
+    public void Rename_WrongThreadThrowsBeforeMutationOrNotification()
+    {
+        TerrainCatalogDraft draft = Draft(TerrainTestData.Catalog(("A", 10)), 10);
+        var notifications = 0;
+        draft.Changed += (_, _) => notifications++;
+        Exception? failure = null;
+        var thread = new Thread(() => failure = Record.Exception(() => draft.Rename(new(0), "Changed")));
+
+        thread.Start();
+        thread.Join();
+
+        Assert.IsType<InvalidOperationException>(failure);
+        Assert.Equal("A", draft.Build().Sets[0].DisplayName);
+        Assert.False(draft.IsDirty);
+        Assert.Equal(0, notifications);
+    }
 
     [Fact]
     public void CloneBuild_RoundTripsGeneratedMetadataProvenanceAndDiagnostics()

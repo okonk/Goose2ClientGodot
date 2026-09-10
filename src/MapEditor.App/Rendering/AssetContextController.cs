@@ -48,6 +48,8 @@ internal sealed class AssetContextController : IDisposable
 
     public AssetContext Current => _current;
 
+    internal int TerrainGestureCancellationCount => _cancellations.Count;
+
     public bool TryOpen(string path) => TryOpen(path, out _, out _);
 
     internal bool TryOpen(string path, out Exception? failure)
@@ -473,17 +475,18 @@ internal sealed class AssetContextController : IDisposable
 
         public void Dispose()
         {
-            if (!IsActive)
-            {
-                return;
-            }
-
             if (Environment.CurrentManagedThreadId != _owner._creatingThreadId)
             {
                 throw new InvalidOperationException("Asset context operations must run on the creating thread.");
             }
 
+            if (!IsActive || _owner._disposed)
+            {
+                return;
+            }
+
             IsActive = false;
+            _owner._cancellations.Remove(this);
         }
     }
 }

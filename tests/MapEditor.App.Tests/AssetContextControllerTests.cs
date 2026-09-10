@@ -264,9 +264,12 @@ public class AssetContextControllerTests : IDisposable
         using AssetContextController controller = CreateController();
         var calls = 0;
         IDisposable registration = controller.RegisterTerrainGestureCancellation(() => calls++);
+        Assert.Equal(1, controller.TerrainGestureCancellationCount);
+
         registration.Dispose();
         registration.Dispose();
 
+        Assert.Equal(0, controller.TerrainGestureCancellationCount);
         TerrainReplacementPreparation preparation = controller.PrepareTerrainReplacement(
             controller.Current,
             TerrainAssetLoadResult.Unavailable("replacement"));
@@ -274,6 +277,37 @@ public class AssetContextControllerTests : IDisposable
         Assert.True(preparation.Succeeded);
         Assert.Equal(0, calls);
         controller.AbandonTerrainReplacement(preparation.Plan!);
+    }
+
+    [Fact]
+    public void PrepareTerrainReplacement_DisposalDuringInvocationAffectsNextSnapshot()
+    {
+        using AssetContextController controller = CreateController();
+        var calls = new List<int>();
+        IDisposable? second = null;
+        using IDisposable first = controller.RegisterTerrainGestureCancellation(() =>
+        {
+            calls.Add(1);
+            second!.Dispose();
+        });
+        second = controller.RegisterTerrainGestureCancellation(() => calls.Add(2));
+
+        TerrainReplacementPreparation firstPreparation = controller.PrepareTerrainReplacement(
+            controller.Current,
+            TerrainAssetLoadResult.Unavailable("first"));
+
+        Assert.True(firstPreparation.Succeeded);
+        Assert.Equal(new[] { 1, 2 }, calls);
+        Assert.Equal(1, controller.TerrainGestureCancellationCount);
+        controller.AbandonTerrainReplacement(firstPreparation.Plan!);
+
+        TerrainReplacementPreparation secondPreparation = controller.PrepareTerrainReplacement(
+            controller.Current,
+            TerrainAssetLoadResult.Unavailable("second"));
+
+        Assert.True(secondPreparation.Succeeded);
+        Assert.Equal(new[] { 1, 2, 1 }, calls);
+        controller.AbandonTerrainReplacement(secondPreparation.Plan!);
     }
 
     [Fact]

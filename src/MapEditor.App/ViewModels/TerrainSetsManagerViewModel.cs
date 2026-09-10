@@ -7,11 +7,13 @@ namespace MapEditor.App.ViewModels;
 internal sealed class TerrainSetsManagerViewModel : ViewModelBase
 {
     private readonly TerrainCatalogDraft _draft;
+    private readonly int _creatingThreadId;
     private TerrainDraftKey? _selectedSetKey;
 
     internal TerrainSetsManagerViewModel(TerrainCatalogDraft draft)
     {
         _draft = draft ?? throw new ArgumentNullException(nameof(draft));
+        _creatingThreadId = Environment.CurrentManagedThreadId;
         _draft.Changed += OnDraftChanged;
     }
 
@@ -20,6 +22,8 @@ internal sealed class TerrainSetsManagerViewModel : ViewModelBase
         get => _selectedSetKey;
         set
         {
+            if (Environment.CurrentManagedThreadId != _creatingThreadId)
+                throw new InvalidOperationException("Terrain manager operations must run on the creating thread.");
             if (value is { } key && !_draft.Sets.Any(set => set.Key == key))
                 throw new ArgumentOutOfRangeException(nameof(value));
             if (SetField(ref _selectedSetKey, value))
