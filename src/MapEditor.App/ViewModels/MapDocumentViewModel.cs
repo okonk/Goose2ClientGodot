@@ -23,12 +23,6 @@ internal enum EditorRefresh
     Palette = 1 << 3
 }
 
-internal enum AssetPaletteMode
-{
-    Tiles,
-    Terrain
-}
-
 internal sealed record MapDocumentAssetState(
     IReadOnlyList<int> SheetIds,
     int SelectedSheet,
@@ -119,6 +113,8 @@ internal sealed class MapDocumentViewModel : ViewModelBase, IDisposable
 
     public event Action? PaletteInvalidated;
 
+    internal event Action? TerrainInteractionCancellationRequested;
+
     public event Action<ErrorPresentation>? GameDataError;
 
     public MapEditSession Session => _controller.Document.Session;
@@ -153,15 +149,38 @@ internal sealed class MapDocumentViewModel : ViewModelBase, IDisposable
                 throw new ArgumentOutOfRangeException(nameof(value));
             }
 
+            if (value == MapEditTool.Terrain && !IsTerrainAvailable)
+            {
+                SetField(ref _terrainStatus, TerrainDiagnostic ?? "No enabled terrain set is available.", nameof(TerrainStatus));
+                return;
+            }
+
+            if (value == _activeTool && (_gameData is null || _gameData.ActiveTool == GameDataTool.None))
+            {
+                return;
+            }
+
+            TerrainInteractionCancellationRequested?.Invoke();
             if (_gameData is not null)
             {
                 _gameData.ActiveTool = GameDataTool.None;
+            }
+
+            if (value == _activeTool)
+            {
+                return;
             }
 
             if (value != MapEditTool.MultiSelect && _selectionRectangle is not null)
             {
                 SelectionRectangle = null;
                 Refresh(EditorRefresh.Canvas);
+            }
+
+            if (value == MapEditTool.Terrain)
+            {
+                SetField(ref _paletteMode, AssetPaletteMode.Terrain, nameof(PaletteMode));
+                SetField(ref _terrainStatus, null, nameof(TerrainStatus));
             }
 
             SetField(ref _activeTool, value);
@@ -209,14 +228,54 @@ internal sealed class MapDocumentViewModel : ViewModelBase, IDisposable
                 throw new ArgumentOutOfRangeException(nameof(value));
             }
 
+            TerrainInteractionCancellationRequested?.Invoke();
             SetField(ref _paletteMode, value);
+            if (value == AssetPaletteMode.Tiles && _activeTool == MapEditTool.Terrain)
+            {
+                ActiveTool = MapEditTool.Pencil;
+            }
+            else if (value == AssetPaletteMode.Terrain && IsTerrainAvailable)
+            {
+                ActiveTool = MapEditTool.Terrain;
+            }
         }
     }
 
     public string? SelectedTerrainId
     {
         get => _selectedTerrainId;
-        set => SetField(ref _selectedTerrainId, value);
+        set
+        {
+            if (value is not null && !(_terrain.Runtime?.EnabledSets.Any(set => string.Equals(set.Id, value, StringComparison.Ordinal)) ?? false))
+            {
+                throw new ArgumentException("Terrain ID is not enabled.", nameof(value));
+            }
+
+            if (string.Equals(value, _selectedTerrainId, StringComparison.Ordinal) &&
+                (value is null || (_paletteMode == AssetPaletteMode.Terrain && _activeTool == MapEditTool.Terrain)))
+            {
+                return;
+            }
+
+            TerrainInteractionCancellationRequested?.Invoke();
+            bool selectionChanged = SetField(ref _selectedTerrainId, value);
+            if (selectionChanged)
+            {
+                OnPropertyChanged(nameof(IsTerrainAvailable));
+            }
+            if (value is null)
+            {
+                if (_activeTool == MapEditTool.Terrain)
+                {
+                    ActiveTool = MapEditTool.Pencil;
+                }
+            }
+            else
+            {
+                SetField(ref _paletteMode, AssetPaletteMode.Terrain, nameof(PaletteMode));
+                ActiveTool = MapEditTool.Terrain;
+            }
+        }
     }
 
     public TerrainEditMode TerrainMode
@@ -229,7 +288,11 @@ internal sealed class MapDocumentViewModel : ViewModelBase, IDisposable
                 throw new ArgumentOutOfRangeException(nameof(value));
             }
 
-            SetField(ref _terrainMode, value);
+            if (value != _terrainMode)
+            {
+                TerrainInteractionCancellationRequested?.Invoke();
+                SetField(ref _terrainMode, value);
+            }
         }
     }
 
@@ -728,6 +791,40 @@ internal sealed class MapDocumentViewModel : ViewModelBase, IDisposable
 
         Refresh(EditorRefresh.Canvas | EditorRefresh.Commands | EditorRefresh.Title);
         return true;
+    }
+
+    internal TerrainStrokeUpdate BeginTerrainStroke(int x, int y)
+    {
+        if (_selectedTerrainId is null || _terrain.Runtime is null)
+        {
+            throw new InvalidOperationException("No enabled terrain set is selected.");
+        }
+
+        TerrainStrokeUpdate update = _session.BeginTerrainStroke(
+            _terrain.Runtime.Resolver,
+            _selectedTerrainId,
+            _terrainMode,
+            x,
+            y);
+        HandleTerrainUpdate(update);
+        return update;
+    }
+
+    internal TerrainStrokeUpdate ContinueTerrainStroke(int x, int y)
+    {
+        TerrainStrokeUpdate update = _session.ContinueTerrainStroke(x, y);
+        HandleTerrainUpdate(update);
+        return update;
+    }
+
+    private void HandleTerrainUpdate(TerrainStrokeUpdate update)
+    {
+        if (update.Failure is { } failure)
+        {
+            SetField(ref _terrainStatus, $"Terrain '{failure.TerrainId}' is missing mask {failure.Mask}.", nameof(TerrainStatus));
+        }
+
+        Refresh(EditorRefresh.Canvas | EditorRefresh.Commands | EditorRefresh.Title);
     }
 
     internal void CompleteStroke()

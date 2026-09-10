@@ -85,15 +85,26 @@
         <StackPanel DockPanel.Dock="Top" Spacing="8" Margin="12,12,12,10">
           <Button x:Name="LoadAssetsButton" Content="Load assets…" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Click="OnLoadAssets" />
           <TextBlock x:Name="AssetDirectoryText" Classes="muted" FontSize="11" Text="—" TextWrapping="Wrap" TextTrimming="CharacterEllipsis" />
-          <ComboBox x:Name="SheetCombo" ItemsSource="{Binding SheetIds}" SelectedItem="{Binding SelectedSheet, Mode=TwoWay}" />
-          <StackPanel Orientation="Horizontal" Spacing="6">
-            <TextBlock Text="Sheet" Classes="muted" VerticalAlignment="Center" />
-            <TextBox x:Name="BrushSheet" Width="58" />
-            <TextBlock Text="Graphic" Classes="muted" VerticalAlignment="Center" />
-            <TextBox x:Name="BrushGraphic" Width="58" />
+          <StackPanel Orientation="Horizontal" Spacing="4">
+            <ToggleButton x:Name="TilesPaletteTab" Content="Tiles" Click="OnTilesPaletteTab" />
+            <ToggleButton x:Name="TerrainPaletteTab" Content="Terrain" Click="OnTerrainPaletteTab" />
           </StackPanel>
-          <TextBlock x:Name="BrushValidationError" Text="Must be a signed integer."
-                     Foreground="{DynamicResource EditorDangerBrush}" FontSize="11" IsVisible="False" />
+          <StackPanel x:Name="TilePaletteControls" Spacing="8">
+            <ComboBox x:Name="SheetCombo" ItemsSource="{Binding SheetIds}" SelectedItem="{Binding SelectedSheet, Mode=TwoWay}" />
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <TextBlock Text="Sheet" Classes="muted" VerticalAlignment="Center" />
+              <TextBox x:Name="BrushSheet" Width="58" />
+              <TextBlock Text="Graphic" Classes="muted" VerticalAlignment="Center" />
+              <TextBox x:Name="BrushGraphic" Width="58" />
+            </StackPanel>
+            <TextBlock x:Name="BrushValidationError" Text="Must be a signed integer."
+                       Foreground="{DynamicResource EditorDangerBrush}" FontSize="11" IsVisible="False" />
+          </StackPanel>
+          <StackPanel x:Name="TerrainModeControls" Orientation="Horizontal" Spacing="4" IsVisible="False">
+            <ToggleButton x:Name="TerrainPaintMode" Content="Paint" Click="OnTerrainPaintMode" />
+            <ToggleButton x:Name="TerrainEraseMode" Content="Erase" Click="OnTerrainEraseMode" />
+          </StackPanel>
+          <TextBlock x:Name="TerrainStatusText" Classes="muted" FontSize="11" TextWrapping="Wrap" IsVisible="False" />
         </StackPanel>
         <!-- The scrollbar overlays the palette so the tile grid keeps the full panel width. -->
         <Grid x:Name="PaletteHost" Margin="12,0,12,12">
@@ -114,6 +125,7 @@
             <ToggleButton x:Name="EyedropperTool" Classes="tool" Tag="Eyedropper" Content="{StaticResource IconEyedropper}" ToolTip.Tip="Eyedropper (I)" Checked="OnToolChecked" Unchecked="OnToolUnchecked" />
             <ToggleButton x:Name="PencilTool" Classes="tool" Tag="Pencil" IsChecked="True" Content="{StaticResource IconPencil}" ToolTip.Tip="Pencil (P)" Checked="OnToolChecked" Unchecked="OnToolUnchecked" />
             <ToggleButton x:Name="EraserTool" Classes="tool" Tag="Eraser" Content="{StaticResource IconEraser}" ToolTip.Tip="Eraser (E)" Checked="OnToolChecked" Unchecked="OnToolUnchecked" />
+            <ToggleButton x:Name="TerrainTool" Classes="tool" Tag="Terrain" Content="{StaticResource IconTerrain}" ToolTip.Tip="Terrain (T)" Checked="OnToolChecked" Unchecked="OnToolUnchecked" />
             <ToggleButton x:Name="FloodFillTool" Classes="tool" Tag="FloodFill" Content="{StaticResource IconFloodFill}" ToolTip.Tip="Flood fill (B)" Checked="OnToolChecked" Unchecked="OnToolUnchecked" />
             <Rectangle Classes="toolSeparator" />
             <ToggleButton x:Name="BlockedTool" Classes="tool" Tag="Blocked" Content="{StaticResource IconBlocked}" ToolTip.Tip="Blocked (X)" Checked="OnToolChecked" Unchecked="OnToolUnchecked" />

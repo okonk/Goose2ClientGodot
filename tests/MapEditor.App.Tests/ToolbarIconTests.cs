@@ -3,6 +3,7 @@ using System.Linq;
 using Avalonia.Controls.Primitives;
 using Avalonia.Controls.Shapes;
 using Avalonia.Headless.XUnit;
+using Avalonia.Media;
 using Avalonia.VisualTree;
 using Xunit;
 
@@ -13,7 +14,7 @@ public class ToolbarIconTests
     private static readonly string[] ToolNames =
     {
         "SelectTool", "MultiSelectTool", "EyedropperTool",
-        "PencilTool", "EraserTool", "FloodFillTool", "BlockedTool",
+        "PencilTool", "EraserTool", "TerrainTool", "FloodFillTool", "BlockedTool",
         "SpawnTool", "WarpTool"
     };
 
@@ -22,6 +23,19 @@ public class ToolbarIconTests
         ToggleButton button = harness.Window.GetVisualDescendants()
             .OfType<ToggleButton>().First(b => b.Name == name);
         return button.GetVisualDescendants().OfType<Path>().Single();
+    }
+
+    [AvaloniaFact]
+    public void ToolbarIcon_TerrainToolUsesUniqueIconTerrain()
+    {
+        using var harness = MainWindowHarness.Create();
+        Geometry terrain = IconOf(harness, "TerrainTool").Data!;
+
+        Assert.Equal(
+            Geometry.Parse("M3 18 L8 13 L12 16 L17 9 L21 13 M3 21 H21 M7 9 A2 2 0 1 1 11 9 A2 2 0 1 1 7 9").ToString(),
+            terrain.ToString());
+        Assert.DoesNotContain(ToolNames.Where(name => name != "TerrainTool"),
+            name => ReferenceEquals(terrain, IconOf(harness, name).Data));
     }
 
     [AvaloniaFact]

@@ -14,6 +14,7 @@
   <!-- Marquee dashes are drawn as explicit segments rather than a StrokeDashArray so the
        corners always land on a dash and the pattern does not shift with the icon scale. -->
   <StreamGeometry x:Key="IconMultiSelect">M3 3 H8 M10.5 3 H13.5 M16 3 H21 M21 3 V8 M21 10.5 V13.5 M21 16 V21 M21 21 H16 M13.5 21 H10.5 M8 21 H3 M3 21 V16 M3 13.5 V10.5 M3 8 V3</StreamGeometry>
+  <StreamGeometry x:Key="IconTerrain">M3 18 L8 13 L12 16 L17 9 L21 13 M3 21 H21 M7 9 A2 2 0 1 1 11 9 A2 2 0 1 1 7 9</StreamGeometry>
   <StreamGeometry x:Key="IconFloodFill">M11 4.5 L17.9 11.4 A1.5 1.5 0 0 1 17.9 13.6 L12.1 19.4 A1.5 1.5 0 0 1 9.9 19.4 L4.1 13.6 A1.5 1.5 0 0 1 4.1 11.4 Z M4.8 5.3 L10.2 10.7 M20 14.8 C19.4 16.5 18 17.4 18 19 A2 2 0 0 0 22 19 C22 17.4 20.6 16.5 20 14.8 Z</StreamGeometry>
   <StreamGeometry x:Key="IconSpawn">M9 7 A3 3 0 1 1 15 7 A3 3 0 1 1 9 7 M5.5 20 C5.5 15.5 8.2 13.5 12 13.5 C15.8 13.5 18.5 15.5 18.5 20</StreamGeometry>
   <StreamGeometry x:Key="IconWarp">M4 8 H15 M12 5 L15 8 L12 11 M20 16 H9 M12 13 L9 16 L12 19</StreamGeometry>

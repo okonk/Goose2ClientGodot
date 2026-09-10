@@ -61,7 +61,36 @@ internal partial class MainWindow : Window
     // Picker/settings continuations can resume after Closed; publishing then leaks an undisposed context.
     private bool _closed;
 
-    private sealed record DocumentView(MapCanvas Canvas, SpritePaletteControl Palette);
+    private sealed class DocumentView : IDisposable
+    {
+        private bool _disposed;
+
+        internal DocumentView(MapCanvas canvas, SpritePaletteControl spritePalette, TerrainPaletteControl terrainPalette)
+        {
+            Canvas = canvas;
+            SpritePalette = spritePalette;
+            TerrainPalette = terrainPalette;
+        }
+
+        internal MapCanvas Canvas { get; }
+        internal SpritePaletteControl SpritePalette { get; }
+        internal TerrainPaletteControl TerrainPalette { get; }
+
+        public void Dispose()
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
+            _disposed = true;
+            SpritePalette.UnbindScrollBar();
+            TerrainPalette.UnbindScrollBar();
+            Canvas.Dispose();
+            TerrainPalette.Dispose();
+            SpritePalette.Dispose();
+        }
+    }
 
     public MainWindow(IEditorDialogs dialogs, AppSettingsStore settings, WorkspaceViewModel workspace, AssetContextController assets)
     {
@@ -115,7 +144,19 @@ internal partial class MainWindow : Window
         Closing += OnClosing;
         Closed += (sender, e) =>
         {
+            if (_closed)
+            {
+                return;
+            }
+
             _closed = true;
+            CanvasHost.Child = null;
+            PaletteBorder.Child = null;
+            foreach (DocumentView view in _views.Values)
+            {
+                view.Dispose();
+            }
+            _views.Clear();
             _assets.Dispose();
         };
         Opened += OnOpened;
@@ -125,7 +166,9 @@ internal partial class MainWindow : Window
 
     internal MapCanvas Canvas => _views[_document!].Canvas;
 
-    internal SpritePaletteControl Palette => _views[_document!].Palette;
+    internal SpritePaletteControl Palette => _views[_document!].SpritePalette;
+
+    internal TerrainPaletteControl TerrainPalette => _views[_document!].TerrainPalette;
 
     internal int LayerAnchor => _document!.LayerAnchor;
 
@@ -168,12 +211,13 @@ internal partial class MainWindow : Window
                     CanvasHost.Child = null;
                 }
 
-                if (ReferenceEquals(PaletteBorder.Child, view.Palette))
+                if (ReferenceEquals(PaletteBorder.Child, view.SpritePalette) ||
+                    ReferenceEquals(PaletteBorder.Child, view.TerrainPalette))
                 {
                     PaletteBorder.Child = null;
                 }
 
-                view.Palette.UnbindScrollBar();
+                view.Dispose();
                 document.PropertyChanged -= OnAnyDocumentPropertyChanged;
                 document.GameDataError -= OnDocumentGameDataError;
                 _views.Remove(document);
@@ -351,7 +395,7 @@ internal partial class MainWindow : Window
         }
 
         DocumentView? outgoing = _document is { } current ? _views[current] : null;
-        outgoing?.Canvas.FinishInteraction(commit: true);
+        outgoing?.Canvas.FinishForTransition();
         _document?.CancelPasteMode();
         if (_document is { } previous)
         {
@@ -373,10 +417,11 @@ internal partial class MainWindow : Window
         DocumentView view = _views[document];
         DataContext = document;
         CanvasHost.Child = view.Canvas;
-        PaletteBorder.Child = view.Palette;
-        outgoing?.Palette.UnbindScrollBar();
-        view.Palette.BindScrollBar(PaletteBar);
+        outgoing?.SpritePalette.UnbindScrollBar();
+        outgoing?.TerrainPalette.UnbindScrollBar();
+        HostPalette(view, document.PaletteMode);
         SyncToolButtons();
+        SyncPaletteChrome();
         SyncLayerRows();
         SyncBrushFields();
         SyncReadouts();
@@ -406,7 +451,21 @@ internal partial class MainWindow : Window
         => new(key, extra | (isMacOs ? KeyModifiers.Meta : KeyModifiers.Control));
 
     private DocumentView CreateView(MapDocumentViewModel document)
-        => new(new MapCanvas(document, _assets), new SpritePaletteControl(document, _assets));
+        => new(new MapCanvas(document, _assets), new SpritePaletteControl(document, _assets), new TerrainPaletteControl(document, _assets));
+
+    private void HostPalette(DocumentView view, AssetPaletteMode mode)
+    {
+        if (mode == AssetPaletteMode.Tiles)
+        {
+            PaletteBorder.Child = view.SpritePalette;
+            view.SpritePalette.BindScrollBar(PaletteBar);
+        }
+        else
+        {
+            PaletteBorder.Child = view.TerrainPalette;
+            view.TerrainPalette.BindScrollBar(PaletteBar);
+        }
+    }
 
     protected override void OnKeyDown(KeyEventArgs e)
     {
@@ -527,6 +586,10 @@ internal partial class MainWindow : Window
                 break;
             case Key.B:
                 Document.ActiveTool = MapEditTool.FloodFill;
+                e.Handled = true;
+                break;
+            case Key.T:
+                Document.ActiveTool = MapEditTool.Terrain;
                 e.Handled = true;
                 break;
             case Key.Delete:
@@ -685,8 +748,17 @@ internal partial class MainWindow : Window
         if (sender is ToggleButton { Tag: string name } && Enum.TryParse(name, out MapEditTool tool))
         {
             Document.ActiveTool = tool;
+            SyncToolButtons();
         }
     }
+
+    private void OnTilesPaletteTab(object? sender, RoutedEventArgs e) => Document.PaletteMode = AssetPaletteMode.Tiles;
+
+    private void OnTerrainPaletteTab(object? sender, RoutedEventArgs e) => Document.PaletteMode = AssetPaletteMode.Terrain;
+
+    private void OnTerrainPaintMode(object? sender, RoutedEventArgs e) => Document.TerrainMode = MapEditor.Core.Terrain.TerrainEditMode.Paint;
+
+    private void OnTerrainEraseMode(object? sender, RoutedEventArgs e) => Document.TerrainMode = MapEditor.Core.Terrain.TerrainEditMode.Erase;
 
     private void OnToolUnchecked(object? sender, RoutedEventArgs e)
     {
@@ -703,6 +775,7 @@ internal partial class MainWindow : Window
     {
         if (sender is ToggleButton { Tag: string name } && Enum.TryParse(name, out GameDataTool tool))
         {
+            Canvas.CancelTerrainInteraction();
             Document.GameData!.ActiveTool = tool;
         }
     }
@@ -1073,7 +1146,7 @@ internal partial class MainWindow : Window
             return;
         }
 
-        Canvas.FinishInteraction(commit: true);
+        Canvas.FinishForTransition();
         if (_closeApproved)
         {
             return;
@@ -1164,6 +1237,21 @@ internal partial class MainWindow : Window
                 break;
             case nameof(MapDocumentViewModel.ActiveTool):
                 SyncToolButtons();
+                SyncPaletteChrome();
+                break;
+            case nameof(MapDocumentViewModel.PaletteMode):
+                DocumentView view = _views[Document];
+                view.SpritePalette.UnbindScrollBar();
+                view.TerrainPalette.UnbindScrollBar();
+                HostPalette(view, Document.PaletteMode);
+                SyncPaletteChrome();
+                break;
+            case nameof(MapDocumentViewModel.SelectedTerrainId):
+            case nameof(MapDocumentViewModel.IsTerrainAvailable):
+            case nameof(MapDocumentViewModel.TerrainMode):
+            case nameof(MapDocumentViewModel.TerrainDiagnostic):
+            case nameof(MapDocumentViewModel.TerrainStatus):
+                SyncPaletteChrome();
                 break;
             case nameof(MapDocumentViewModel.SelectedLayers):
                 if ((Document.SelectedLayers & (1 << Document.LayerAnchor)) == 0)
@@ -1200,8 +1288,24 @@ internal partial class MainWindow : Window
         SelectTool.IsChecked = gameTool == GameDataTool.None && Document.ActiveTool == MapEditTool.Select;
         MultiSelectTool.IsChecked = gameTool == GameDataTool.None && Document.ActiveTool == MapEditTool.MultiSelect;
         FloodFillTool.IsChecked = gameTool == GameDataTool.None && Document.ActiveTool == MapEditTool.FloodFill;
+        TerrainTool.IsChecked = gameTool == GameDataTool.None && Document.ActiveTool == MapEditTool.Terrain;
         SpawnTool.IsChecked = gameTool == GameDataTool.Spawn;
         WarpTool.IsChecked = gameTool == GameDataTool.Warp;
+    }
+
+    private void SyncPaletteChrome()
+    {
+        bool terrain = Document.PaletteMode == AssetPaletteMode.Terrain;
+        TilesPaletteTab.IsChecked = !terrain;
+        TerrainPaletteTab.IsChecked = terrain;
+        TilePaletteControls.IsVisible = !terrain;
+        TerrainModeControls.IsVisible = terrain;
+        TerrainPaintMode.IsChecked = Document.TerrainMode == MapEditor.Core.Terrain.TerrainEditMode.Paint;
+        TerrainEraseMode.IsChecked = Document.TerrainMode == MapEditor.Core.Terrain.TerrainEditMode.Erase;
+        TerrainPaintMode.IsEnabled = Document.IsTerrainAvailable;
+        TerrainEraseMode.IsEnabled = Document.IsTerrainAvailable;
+        TerrainStatusText.Text = Document.TerrainStatus ?? Document.TerrainDiagnostic;
+        TerrainStatusText.IsVisible = terrain && !string.IsNullOrWhiteSpace(TerrainStatusText.Text);
     }
 
     private void OnGameDataStateChanged()

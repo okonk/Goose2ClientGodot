@@ -37,14 +37,45 @@ public class SpritePaletteControlTests : IDisposable
 
     private readonly string _directory = Directory.CreateTempSubdirectory("map-editor-palette-").FullName;
 
-    private sealed record Harness(
-        SpritePaletteControl Palette,
-        MapDocumentViewModel ViewModel,
-        AssetContextController Assets,
-        Window Window,
-        ScrollBar Bar,
-        CountingSpriteSheetLoader Loader,
-        List<SpriteReference> Resolved);
+    private sealed class Harness : IDisposable
+    {
+        private bool _disposed;
+
+        internal Harness(SpritePaletteControl palette, MapDocumentViewModel viewModel, AssetContextController assets,
+            Window window, ScrollBar bar, CountingSpriteSheetLoader loader, List<SpriteReference> resolved)
+        {
+            Palette = palette;
+            ViewModel = viewModel;
+            Assets = assets;
+            Window = window;
+            Bar = bar;
+            Loader = loader;
+            Resolved = resolved;
+        }
+
+        internal SpritePaletteControl Palette { get; }
+        internal MapDocumentViewModel ViewModel { get; }
+        internal AssetContextController Assets { get; }
+        internal Window Window { get; }
+        internal ScrollBar Bar { get; }
+        internal CountingSpriteSheetLoader Loader { get; }
+        internal List<SpriteReference> Resolved { get; }
+
+        public void Dispose()
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
+            _disposed = true;
+            Window.Content = null;
+            Palette.Dispose();
+            Window.Close();
+            Dispatcher.UIThread.RunJobs();
+            Assets.Dispose();
+        }
+    }
 
     public void Dispose()
         => Directory.Delete(_directory, recursive: true);
@@ -52,7 +83,7 @@ public class SpritePaletteControlTests : IDisposable
     [AvaloniaFact]
     public async Task Render_DrawsOnlyVisibleRowsOfSelectedSheet()
     {
-        Harness harness = await CreateAsync(Manifest((1, 60, 100), (2, 1, 99)));
+        using Harness harness = await CreateAsync(Manifest((1, 60, 100), (2, 1, 99)));
         RecordingMapDrawTarget target = new();
 
         harness.Resolved.Clear();
@@ -79,7 +110,7 @@ public class SpritePaletteControlTests : IDisposable
               "2": { "99": [0, 0, 32, 32] }
             } }
             """;
-        Harness harness = await CreateAsync(json);
+        using Harness harness = await CreateAsync(json);
         RecordingMapDrawTarget target = new();
 
         harness.Resolved.Clear();
@@ -92,7 +123,7 @@ public class SpritePaletteControlTests : IDisposable
     [AvaloniaFact]
     public async Task LeftClick_SelectsExactBrushAfterScrolling()
     {
-        Harness harness = await CreateAsync(Manifest((1, 60, 100)));
+        using Harness harness = await CreateAsync(Manifest((1, 60, 100)));
         byte[] before = MapCodec.Encode(harness.ViewModel.Session.Document);
         harness.Palette.Offset = 88;
 
@@ -106,7 +137,7 @@ public class SpritePaletteControlTests : IDisposable
     [AvaloniaFact]
     public async Task LeftClick_OnEmptyCellKeepsCurrentBrush()
     {
-        Harness harness = await CreateAsync(Manifest((1, 61, 100)));
+        using Harness harness = await CreateAsync(Manifest((1, 61, 100)));
         harness.ViewModel.Brush = new MapTileLayer(1, 100);
         harness.Palette.Offset = 88;
 
@@ -118,7 +149,7 @@ public class SpritePaletteControlTests : IDisposable
     [AvaloniaFact]
     public async Task WheelScrollsAndClampsAtBothEnds()
     {
-        Harness harness = await CreateAsync(Manifest((1, 120, 100)));
+        using Harness harness = await CreateAsync(Manifest((1, 120, 100)));
         harness.Palette.Offset = 340;
 
         Assert.Equal(340, harness.Bar.Value);
@@ -149,7 +180,7 @@ public class SpritePaletteControlTests : IDisposable
     [AvaloniaFact]
     public async Task ScrollBarValue_UpdatesOffset()
     {
-        Harness harness = await CreateAsync(Manifest((1, 60, 100)));
+        using Harness harness = await CreateAsync(Manifest((1, 60, 100)));
 
         harness.Bar.Value = 50;
 
@@ -159,7 +190,7 @@ public class SpritePaletteControlTests : IDisposable
     [AvaloniaFact]
     public async Task SheetChange_ClampsOffsetAndExtent()
     {
-        Harness harness = await CreateAsync(Manifest((1, 60, 100), (2, 12, 200)));
+        using Harness harness = await CreateAsync(Manifest((1, 60, 100), (2, 12, 200)));
         harness.Palette.Offset = 280;
 
         harness.ViewModel.SelectedSheet = 2;
@@ -172,7 +203,7 @@ public class SpritePaletteControlTests : IDisposable
     [AvaloniaFact]
     public async Task Resize_RecomputesColumnsAndClampsOffset()
     {
-        Harness harness = await CreateAsync(Manifest((1, 60, 100)));
+        using Harness harness = await CreateAsync(Manifest((1, 60, 100)));
         harness.Palette.Offset = 280;
 
         harness.Palette.Height = 240;
@@ -189,7 +220,7 @@ public class SpritePaletteControlTests : IDisposable
     [AvaloniaFact]
     public async Task SheetChangeAndSelection_NeverMutateDocument()
     {
-        Harness harness = await CreateAsync(Manifest((1, 60, 100), (2, 12, 200)));
+        using Harness harness = await CreateAsync(Manifest((1, 60, 100), (2, 12, 200)));
         MapEditSession session = harness.ViewModel.Session;
         byte[] before = MapCodec.Encode(session.Document);
         bool dirtyBefore = session.IsDirty;
@@ -209,7 +240,7 @@ public class SpritePaletteControlTests : IDisposable
     [AvaloniaFact]
     public async Task UnavailableContext_RendersNothingAndResolvesNothing()
     {
-        Harness harness = await CreateAsync(null);
+        using Harness harness = await CreateAsync(null);
         RecordingMapDrawTarget target = new();
 
         harness.Palette.RenderPalette(target);
@@ -227,7 +258,7 @@ public class SpritePaletteControlTests : IDisposable
     [AvaloniaFact]
     public async Task MissingSheetImage_DrawsConspicuousPlaceholderPerFrame()
     {
-        Harness harness = await CreateAsync(
+        using Harness harness = await CreateAsync(
             Manifest((1, 2, 5)),
             loaderBehavior: path => SpriteSheetLoadResult.Failure(SpriteSheetLoadStatus.NotFound, "no file"));
         RecordingMapDrawTarget target = new();
@@ -260,7 +291,7 @@ public class SpritePaletteControlTests : IDisposable
         const string json = """
             { "tileSize": 32, "sheets": { "1": { "5": [16, 8, 32, 32] } } }
             """;
-        Harness harness = await CreateAsync(
+        using Harness harness = await CreateAsync(
             json,
             sheetLoader: new AvaloniaSpriteSheetLoader(),
             prepareAssets: directory =>
@@ -282,7 +313,7 @@ public class SpritePaletteControlTests : IDisposable
     [AvaloniaFact]
     public async Task Render_DrawsSelectionBoxAroundBrushFrame()
     {
-        Harness harness = await CreateAsync(Manifest((1, 60, 100)));
+        using Harness harness = await CreateAsync(Manifest((1, 60, 100)));
         harness.ViewModel.Brush = new MapTileLayer(1, 105);
         RecordingMapDrawTarget target = new();
 
@@ -300,7 +331,7 @@ public class SpritePaletteControlTests : IDisposable
     [AvaloniaFact]
     public async Task Render_OmitsSelectionBoxWhenBrushIsOnAnotherSheet()
     {
-        Harness harness = await CreateAsync(Manifest((1, 60, 100), (2, 1, 99)));
+        using Harness harness = await CreateAsync(Manifest((1, 60, 100), (2, 1, 99)));
         harness.ViewModel.Brush = new MapTileLayer(2, 99);
         RecordingMapDrawTarget target = new();
 
@@ -314,7 +345,7 @@ public class SpritePaletteControlTests : IDisposable
     public async Task LargePalette_RenderCallsAreViewportBoundedAndSheetLoaderCalledOnce()
     {
         const int frameCount = 20000;
-        Harness harness = await CreateAsync(Manifest((1, frameCount, 1)));
+        using Harness harness = await CreateAsync(Manifest((1, frameCount, 1)));
         int columns = harness.Palette.Columns;
         int bound = columns * ((int)Math.Ceiling(CanvasHeight / Cell) + 2);
         double maxOffset = harness.Palette.ExtentHeight - CanvasHeight;
@@ -332,6 +363,27 @@ public class SpritePaletteControlTests : IDisposable
 
         Assert.Equal(1, harness.Loader.CallCount);
         Assert.Empty(harness.Palette.GetVisualChildren());
+    }
+
+    [AvaloniaFact]
+    public async Task SpritePaletteControl_DisposeIsIdempotentUnbindsScrollbarAndIgnoresLaterCallbacks()
+    {
+        using Harness harness = await CreateAsync(Manifest((1, 60, 100)));
+        harness.Palette.RenderPalette(new RecordingMapDrawTarget());
+        int resolutions = harness.Resolved.Count;
+        double offset = harness.Palette.Offset;
+
+        harness.Palette.Dispose();
+        harness.Palette.Dispose();
+        harness.Bar.Value = 50;
+        harness.ViewModel.SelectedSheet = 2;
+        TerrainReplacementPlan plan = harness.Assets.PrepareTerrainReplacement(
+            harness.Assets.Current, TerrainTestData.Result(("Later", 100))).Plan!;
+        harness.Assets.PublishTerrain(plan);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Equal(offset, harness.Palette.Offset);
+        Assert.Equal(resolutions, harness.Resolved.Count);
     }
 
     private async Task<Harness> CreateAsync(

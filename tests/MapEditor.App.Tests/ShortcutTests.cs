@@ -13,6 +13,7 @@ using Avalonia.Threading;
 using Avalonia.VisualTree;
 using MapEditor.App.Controls;
 using MapEditor.App.Dialogs;
+using MapEditor.App.Tests.Fixtures;
 using MapEditor.App.ViewModels;
 using MapEditor.Core;
 using MapEditor.GameData.Connectivity;
@@ -60,6 +61,61 @@ public class ShortcutTests
     private static T Control<T>(MainWindowHarness harness, string name) where T : Control
         => harness.Window.FindControl<T>(name)
            ?? throw new InvalidOperationException($"missing control {name}");
+
+    private static void PublishTerrain(MainWindowHarness harness)
+    {
+        var plan = harness.Assets.PrepareTerrainReplacement(
+            harness.Assets.Current, TerrainTestData.Result(("Grass", 10))).Plan!;
+        harness.Assets.PublishTerrain(plan);
+        Dispatcher.UIThread.RunJobs();
+    }
+
+    [AvaloniaFact]
+    public void UnmodifiedT_SelectsTerrainPaletteAndToolWhenAvailable()
+    {
+        using MainWindowHarness harness = MainWindowHarness.Create();
+        PublishTerrain(harness);
+        harness.ViewModel.PaletteMode = AssetPaletteMode.Tiles;
+        harness.ViewModel.ActiveTool = MapEditTool.Eraser;
+        harness.Window.Canvas.Focus();
+
+        harness.Window.KeyPressQwerty(PhysicalKey.T, RawInputModifiers.None);
+
+        Assert.Equal(AssetPaletteMode.Terrain, harness.ViewModel.PaletteMode);
+        Assert.Equal(MapEditTool.Terrain, harness.ViewModel.ActiveTool);
+    }
+
+    [AvaloniaFact]
+    public void UnmodifiedT_ReachesFocusedTextBoxWithoutChangingTool()
+    {
+        using MainWindowHarness harness = MainWindowHarness.Create();
+        PublishTerrain(harness);
+        harness.ViewModel.ActiveTool = MapEditTool.Eraser;
+        TextBox textBox = Control<TextBox>(harness, "BrushGraphic");
+        bool received = false;
+        textBox.KeyDown += (_, e) => received |= e.Key == Key.T;
+        textBox.Focus();
+
+        harness.Window.KeyPressQwerty(PhysicalKey.T, RawInputModifiers.None);
+
+        Assert.True(received);
+        Assert.Equal(MapEditTool.Eraser, harness.ViewModel.ActiveTool);
+        Assert.Equal(AssetPaletteMode.Tiles, harness.ViewModel.PaletteMode);
+    }
+
+    [AvaloniaFact]
+    public void UnmodifiedT_WhenUnavailablePreservesManualToolAndShowsDiagnostic()
+    {
+        using MainWindowHarness harness = MainWindowHarness.Create();
+        harness.ViewModel.ActiveTool = MapEditTool.Eraser;
+        harness.Window.Canvas.Focus();
+
+        harness.Window.KeyPressQwerty(PhysicalKey.T, RawInputModifiers.None);
+
+        Assert.Equal(MapEditTool.Eraser, harness.ViewModel.ActiveTool);
+        Assert.Equal(AssetPaletteMode.Tiles, harness.ViewModel.PaletteMode);
+        Assert.False(string.IsNullOrWhiteSpace(harness.ViewModel.TerrainStatus));
+    }
 
     [AvaloniaFact]
     public async Task ControlT_AddsTab()

@@ -105,6 +105,38 @@ public class MapDocumentViewModelTests : IDisposable
     }
 
     [Fact]
+    public void PublishTerrain_UnavailableFallsBackFromTerrainTool()
+    {
+        TerrainAssetLoadResult available = TerrainResult(("grass", "Grass", 1));
+        _viewModel.CommitTerrainState(_viewModel.PlanTerrainState(available));
+        _viewModel.ActiveTool = MapEditTool.Terrain;
+
+        TerrainAssetLoadResult unavailable = TerrainAssetLoadResult.Unavailable("Reload the terrain catalog.");
+        _viewModel.CommitTerrainState(_viewModel.PlanTerrainState(unavailable));
+
+        Assert.Equal(MapEditTool.Pencil, _viewModel.ActiveTool);
+        Assert.Null(_viewModel.SelectedTerrainId);
+        Assert.Equal("Reload the terrain catalog.", _viewModel.TerrainDiagnostic);
+    }
+
+    [Fact]
+    public void TerrainSelectionAndPaletteTransitionsFollowLockedTable()
+    {
+        TerrainAssetLoadResult available = TerrainResult(("grass", "Grass", 1));
+        _viewModel.CommitTerrainState(_viewModel.PlanTerrainState(available));
+        string id = available.Runtime!.EnabledSets[0].Id;
+
+        _viewModel.SelectedTerrainId = id;
+        Assert.Equal(AssetPaletteMode.Terrain, _viewModel.PaletteMode);
+        Assert.Equal(MapEditTool.Terrain, _viewModel.ActiveTool);
+
+        _viewModel.PaletteMode = AssetPaletteMode.Tiles;
+        Assert.Equal(MapEditTool.Pencil, _viewModel.ActiveTool);
+        Assert.Equal(id, _viewModel.SelectedTerrainId);
+        Assert.Throws<ArgumentException>(() => _viewModel.SelectedTerrainId = id.ToUpperInvariant());
+    }
+
+    [Fact]
     public void InitialState_ReflectsNewCleanDocument()
     {
         Assert.Equal("Goose2 Map Editor — Untitled", _viewModel.Title);

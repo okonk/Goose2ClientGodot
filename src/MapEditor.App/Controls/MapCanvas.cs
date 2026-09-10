@@ -10,15 +10,26 @@ using Avalonia.Rendering;
 using MapEditor.App.Rendering;
 using MapEditor.App.ViewModels;
 using MapEditor.Core;
+using MapEditor.Core.Terrain;
 using MapEditor.GameData.Rows;
 using MapEditor.Rendering;
 
 namespace MapEditor.App.Controls;
 
-internal sealed class MapCanvas : Control, ICustomHitTest
+internal sealed class MapCanvas : Control, ICustomHitTest, IDisposable
 {
+    private enum StrokeGesture
+    {
+        None,
+        Manual,
+        Terrain
+    }
+
     private readonly MapDocumentViewModel _viewModel;
     private readonly AssetContextController _assets;
+    private readonly IDisposable _terrainCancellation;
+    private StrokeGesture _strokeGesture;
+    private bool _disposed;
     private ViewportTransform _viewport = new(new RenderSize(1, 1), new RenderPoint(0, 0), MapZoom.Percent100);
     private bool _stroking;
     private bool _panning;
@@ -38,8 +49,31 @@ internal sealed class MapCanvas : Control, ICustomHitTest
         Focusable = true;
         RenderOptions.SetBitmapInterpolationMode(this, BitmapInterpolationMode.None);
         _viewModel.CanvasInvalidated += OnCanvasInvalidated;
+        _viewModel.TerrainInteractionCancellationRequested += CancelTerrainInteraction;
         _viewModel.GameData?.Changed += OnGameDataChanged;
         SizeChanged += OnSizeChanged;
+        _terrainCancellation = _assets.RegisterTerrainGestureCancellation(CancelTerrainInteraction);
+    }
+
+    public void Dispose()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
+        FinishInteraction(commit: false);
+        _terrainCancellation.Dispose();
+        _viewModel.CanvasInvalidated -= OnCanvasInvalidated;
+        _viewModel.TerrainInteractionCancellationRequested -= CancelTerrainInteraction;
+        _viewModel.GameData?.Changed -= OnGameDataChanged;
+        SizeChanged -= OnSizeChanged;
+        if (_hoverWindow is { } window)
+        {
+            window.PointerMoved -= OnWindowPointerMoved;
+            _hoverWindow = null;
+        }
     }
 
     internal ViewportTransform Viewport => _viewport;
@@ -60,6 +94,7 @@ internal sealed class MapCanvas : Control, ICustomHitTest
             }
         }
 
+        _strokeGesture = StrokeGesture.None;
         _stroking = false;
         _panning = false;
         _spaceDown = false;
@@ -91,6 +126,18 @@ internal sealed class MapCanvas : Control, ICustomHitTest
         _capturedPointer = null;
         _viewModel.CancelPasteMode();
         _viewModel.Refresh(EditorRefresh.Canvas | EditorRefresh.Commands | EditorRefresh.Title);
+    }
+
+    internal void FinishForTransition()
+    {
+        if (_strokeGesture == StrokeGesture.Terrain)
+        {
+            CancelTerrainInteraction();
+        }
+        else
+        {
+            FinishInteraction(commit: true);
+        }
     }
 
     internal void ZoomStep(bool zoomIn)
@@ -256,10 +303,21 @@ internal sealed class MapCanvas : Control, ICustomHitTest
             MapTileCoordinate? tile = TileAt(position);
             if (tile is { } target)
             {
-                MapEditSession session = _viewModel.Session;
-                session.ContinueStroke(target.X, target.Y);
-                _viewModel.Brush = session.SelectedTileLayer;
-                _viewModel.Refresh(EditorRefresh.Canvas | EditorRefresh.Commands | EditorRefresh.Title);
+                if (_strokeGesture == StrokeGesture.Terrain)
+                {
+                    TerrainStrokeUpdate update = _viewModel.ContinueTerrainStroke(target.X, target.Y);
+                    if (!update.Succeeded)
+                    {
+                        ClearStrokeState();
+                    }
+                }
+                else
+                {
+                    MapEditSession session = _viewModel.Session;
+                    session.ContinueStroke(target.X, target.Y);
+                    _viewModel.Brush = session.SelectedTileLayer;
+                    _viewModel.Refresh(EditorRefresh.Canvas | EditorRefresh.Commands | EditorRefresh.Title);
+                }
             }
         }
     }
@@ -300,6 +358,7 @@ internal sealed class MapCanvas : Control, ICustomHitTest
         if (_stroking)
         {
             _viewModel.CompleteStroke();
+            _strokeGesture = StrokeGesture.None;
             _stroking = false;
         }
 
@@ -322,11 +381,19 @@ internal sealed class MapCanvas : Control, ICustomHitTest
 
         if (_stroking)
         {
-            _viewModel.CompleteStroke();
+            if (_strokeGesture == StrokeGesture.Terrain)
+            {
+                _viewModel.CancelStroke();
+            }
+            else
+            {
+                _viewModel.CompleteStroke();
+            }
         }
 
         CancelMarkerDrag();
         CancelRectDrag();
+        _strokeGesture = StrokeGesture.None;
         _stroking = false;
         _panning = false;
         _capturedPointer = null;
@@ -431,6 +498,9 @@ internal sealed class MapCanvas : Control, ICustomHitTest
                     _viewModel.Refresh(EditorRefresh.Canvas | EditorRefresh.Commands | EditorRefresh.Title);
                 }
 
+                break;
+            case MapEditTool.Terrain:
+                BeginTerrainStroke(position);
                 break;
             default:
                 BeginStroke(position);
@@ -549,11 +619,55 @@ internal sealed class MapCanvas : Control, ICustomHitTest
 
         MapEditSession session = _viewModel.Session;
         session.BeginStroke(_viewModel.ActiveTool, cell.X, cell.Y);
+        _strokeGesture = StrokeGesture.Manual;
         _stroking = true;
         _viewModel.SelectedX = cell.X;
         _viewModel.SelectedY = cell.Y;
         _viewModel.Brush = session.SelectedTileLayer;
         _viewModel.Refresh(EditorRefresh.Canvas | EditorRefresh.Commands | EditorRefresh.Title);
+    }
+
+    private void BeginTerrainStroke(Point position)
+    {
+        if (TileAt(position) is not { } cell)
+        {
+            return;
+        }
+
+        TerrainStrokeUpdate update = _viewModel.BeginTerrainStroke(cell.X, cell.Y);
+        if (!update.Succeeded)
+        {
+            return;
+        }
+
+        _strokeGesture = StrokeGesture.Terrain;
+        _stroking = true;
+        _viewModel.SelectedX = cell.X;
+        _viewModel.SelectedY = cell.Y;
+    }
+
+    internal void CancelTerrainInteraction()
+    {
+        if (_strokeGesture != StrokeGesture.Terrain)
+        {
+            return;
+        }
+
+        if (_viewModel.Session.HasActiveStroke)
+        {
+            _viewModel.CancelStroke();
+        }
+
+        ClearStrokeState();
+        _viewModel.Refresh(EditorRefresh.Canvas | EditorRefresh.Commands | EditorRefresh.Title);
+    }
+
+    private void ClearStrokeState()
+    {
+        _strokeGesture = StrokeGesture.None;
+        _stroking = false;
+        _capturedPointer?.Capture(null);
+        _capturedPointer = null;
     }
 
     private void BeginPan(Point position)

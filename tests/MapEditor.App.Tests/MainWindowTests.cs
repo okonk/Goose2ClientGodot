@@ -21,6 +21,7 @@ using MapEditor.App.Documents;
 using MapEditor.App.Rendering;
 using MapEditor.App.Settings;
 using MapEditor.App.Tests.Fakes;
+using MapEditor.App.Tests.Fixtures;
 using MapEditor.App.ViewModels;
 using MapEditor.Core;
 using MapEditor.Rendering;
@@ -141,6 +142,158 @@ public class MainWindowTests : IDisposable
     private Point TileCenter(int x = 0, int y = 0)
         => Window.Canvas.TranslatePoint(new Point(x * 32 + 16, y * 32 + 16), Window).Value;
 
+    private static void PublishTerrain(MainWindowHarness harness, params (string Name, int Graphic)[] definitions)
+    {
+        TerrainReplacementPlan plan = harness.Assets.PrepareTerrainReplacement(
+            harness.Assets.Current, TerrainTestData.Result(definitions)).Plan!;
+        harness.Assets.PublishTerrain(plan);
+        Dispatcher.UIThread.RunJobs();
+    }
+
+    [AvaloniaFact]
+    public async Task TilesTerrainTabs_SwitchHostedPalettePerDocument()
+    {
+        using MainWindowHarness harness = MainWindowHarness.Create();
+        PublishTerrain(harness, ("Grass", 10));
+        MapDocumentViewModel first = harness.ViewModel;
+        first.PaletteMode = AssetPaletteMode.Terrain;
+        TerrainPaletteControl firstPalette = harness.Window.TerrainPalette;
+        MapDocumentViewModel second = await NewDocumentAsync(harness);
+        second.PaletteMode = AssetPaletteMode.Tiles;
+        SpritePaletteControl secondPalette = harness.Window.Palette;
+
+        harness.Workspace.Activate(first);
+        Dispatcher.UIThread.RunJobs();
+        Assert.Same(firstPalette, harness.Window.FindControl<Border>("PaletteBorder")!.Child);
+        Assert.Equal(AssetPaletteMode.Terrain, first.PaletteMode);
+
+        harness.Workspace.Activate(second);
+        Dispatcher.UIThread.RunJobs();
+        Assert.Same(secondPalette, harness.Window.FindControl<Border>("PaletteBorder")!.Child);
+        Assert.Equal(AssetPaletteMode.Tiles, second.PaletteMode);
+    }
+
+    [AvaloniaFact]
+    public void TerrainPaintEraseButtons_AreVisibleAndEnabledExactlyPerTransitionTable()
+    {
+        ToggleButton paint = Find<ToggleButton>("TerrainPaintMode");
+        ToggleButton erase = Find<ToggleButton>("TerrainEraseMode");
+        Find<ToggleButton>("TerrainPaletteTab").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        Assert.True(paint.IsVisible);
+        Assert.True(erase.IsVisible);
+        Assert.False(paint.IsEnabled);
+        Assert.False(erase.IsEnabled);
+
+        PublishTerrain(_harness, ("Grass", 10));
+        Assert.True(paint.IsVisible);
+        Assert.True(erase.IsVisible);
+        Assert.True(paint.IsEnabled);
+        Assert.True(erase.IsEnabled);
+
+        Find<ToggleButton>("TilesPaletteTab").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        Assert.False(Find<StackPanel>("TerrainModeControls").IsVisible);
+    }
+
+    [AvaloniaFact]
+    public void TilesAndTerrainTabs_FollowEveryLockedToolSelectionFallbackTransition()
+    {
+        PublishTerrain(_harness, ("Zulu", 10), ("Alpha", 20));
+        string selected = ViewModel.SelectedTerrainId!;
+        Find<ToggleButton>("TerrainPaletteTab").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        ViewModel.TerrainMode = MapEditor.Core.Terrain.TerrainEditMode.Erase;
+        Assert.Equal(MapEditTool.Terrain, ViewModel.ActiveTool);
+        Assert.Equal(selected, ViewModel.SelectedTerrainId);
+
+        PublishTerrain(_harness, ("Zulu", 10), ("Alpha", 20));
+        Assert.Equal(selected, ViewModel.SelectedTerrainId);
+        Assert.Equal(MapEditTool.Terrain, ViewModel.ActiveTool);
+        Assert.Equal(MapEditor.Core.Terrain.TerrainEditMode.Erase, ViewModel.TerrainMode);
+
+        TerrainAssetLoadResult fallback = TerrainTestData.Result(("Beta", 30), ("Alpha", 40));
+        TerrainReplacementPlan fallbackPlan = _harness.Assets.PrepareTerrainReplacement(
+            _harness.Assets.Current, fallback).Plan!;
+        _harness.Assets.PublishTerrain(fallbackPlan);
+        string alpha = fallback.Runtime!.EnabledSets.Single(set => set.DisplayName == "Alpha").Id;
+        Assert.Equal(alpha, ViewModel.SelectedTerrainId);
+        Assert.Equal(MapEditTool.Terrain, ViewModel.ActiveTool);
+
+        TerrainAssetLoadResult rekeyed = TerrainTestData.Result(("Mapped", 50), ("Other", 60));
+        string mapped = rekeyed.Runtime!.EnabledSets.Single(set => set.DisplayName == "Mapped").Id;
+        TerrainReplacementPlan rekeyPlan = _harness.Assets.PrepareTerrainReplacement(
+            _harness.Assets.Current, rekeyed, new Dictionary<string, string> { [alpha] = mapped }).Plan!;
+        _harness.Assets.PublishTerrain(rekeyPlan);
+        Assert.Equal(mapped, ViewModel.SelectedTerrainId);
+        Assert.Equal(MapEditTool.Terrain, ViewModel.ActiveTool);
+
+        Find<ToggleButton>("TilesPaletteTab").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        Assert.Equal(AssetPaletteMode.Tiles, ViewModel.PaletteMode);
+        Assert.Equal(MapEditTool.Pencil, ViewModel.ActiveTool);
+        Assert.Equal(mapped, ViewModel.SelectedTerrainId);
+
+        ViewModel.SelectedTerrainId = null;
+        Find<ToggleButton>("TerrainPaletteTab").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        Assert.Equal(AssetPaletteMode.Terrain, ViewModel.PaletteMode);
+        Assert.Equal(MapEditTool.Pencil, ViewModel.ActiveTool);
+        Assert.False(Find<ToggleButton>("TerrainPaintMode").IsEnabled);
+
+        TerrainReplacementPlan unavailable = _harness.Assets.PrepareTerrainReplacement(
+            _harness.Assets.Current, TerrainAssetLoadResult.Unavailable("Reload terrain assets.")).Plan!;
+        _harness.Assets.PublishTerrain(unavailable);
+        Find<ToggleButton>("TerrainTool").IsChecked = true;
+        Assert.Equal(MapEditTool.Pencil, ViewModel.ActiveTool);
+        Assert.Equal("Reload terrain assets.", ViewModel.TerrainStatus);
+        ToggleButton checkedTool = Assert.Single(Find<Border>("Toolbar").GetVisualDescendants()
+            .OfType<ToggleButton>(), button => button.IsChecked == true);
+        Assert.Equal("PencilTool", checkedTool.Name);
+    }
+
+    [AvaloniaFact]
+    public void TerrainPaletteTab_ReclickReactivatesToolAndCancelsActivePreview()
+    {
+        PublishTerrain(_harness, ("Grass", 10));
+        ToggleButton terrainTab = Find<ToggleButton>("TerrainPaletteTab");
+        terrainTab.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        Assert.Equal(AssetPaletteMode.Terrain, ViewModel.PaletteMode);
+
+        Find<ToggleButton>("PencilTool").IsChecked = true;
+        Assert.Equal(MapEditTool.Pencil, ViewModel.ActiveTool);
+        Assert.Equal(AssetPaletteMode.Terrain, ViewModel.PaletteMode);
+        terrainTab.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        Assert.Equal(MapEditTool.Terrain, ViewModel.ActiveTool);
+
+        byte[] before = MapCodec.Encode(ViewModel.Session.Document);
+        long version = ViewModel.Session.HistoryVersion;
+        int paletteModeChanges = 0;
+        ViewModel.PropertyChanged += (_, e) => paletteModeChanges += e.PropertyName == nameof(MapDocumentViewModel.PaletteMode) ? 1 : 0;
+        Point tile = TileCenter();
+        Window.MouseDown(tile, MouseButton.Left, RawInputModifiers.None);
+        Assert.NotEqual(before, MapCodec.Encode(ViewModel.Session.Document));
+
+        terrainTab.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+
+        Assert.Equal(before, MapCodec.Encode(ViewModel.Session.Document));
+        Assert.Equal(version, ViewModel.Session.HistoryVersion);
+        Assert.False(ViewModel.Session.HasActiveStroke);
+        Assert.False(ViewModel.Session.CanUndo);
+        Assert.Equal(MapEditTool.Terrain, ViewModel.ActiveTool);
+        Assert.Equal(0, paletteModeChanges);
+    }
+
+    [AvaloniaFact]
+    public void NonTerrainToolbarTools_DoNotSilentlySwitchPaletteMode()
+    {
+        PublishTerrain(_harness, ("Grass", 10));
+        ViewModel.PaletteMode = AssetPaletteMode.Terrain;
+        string selected = ViewModel.SelectedTerrainId!;
+
+        foreach (string name in new[] { "SelectTool", "MultiSelectTool", "EyedropperTool", "PencilTool", "EraserTool", "FloodFillTool", "BlockedTool" })
+        {
+            Find<ToggleButton>(name).IsChecked = true;
+            Assert.Equal(AssetPaletteMode.Terrain, ViewModel.PaletteMode);
+            Assert.Equal(selected, ViewModel.SelectedTerrainId);
+        }
+    }
+
     [AvaloniaFact]
     public void Layout_ContainsNamedMenuToolbarStatusBarAndPanels()
     {
@@ -207,7 +360,7 @@ public class MainWindowTests : IDisposable
         Assert.Equal(MapEditTool.Pencil, ViewModel.ActiveTool);
 
         Assert.Equal(
-            new[] { "SelectTool", "MultiSelectTool", "EyedropperTool", "PencilTool", "EraserTool", "FloodFillTool", "BlockedTool", "SpawnTool", "WarpTool" },
+            new[] { "SelectTool", "MultiSelectTool", "EyedropperTool", "PencilTool", "EraserTool", "TerrainTool", "FloodFillTool", "BlockedTool", "SpawnTool", "WarpTool" },
             Find<Border>("Toolbar").GetVisualDescendants().OfType<ToggleButton>().Select(toggle => toggle.Name).ToArray());
 
         Find<ToggleButton>("EraserTool").IsChecked = true;
