@@ -2,14 +2,18 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using MapEditor.App.Dialogs;
 using MapEditor.App.Documents;
 using MapEditor.App.Tests.Fakes;
 using MapEditor.App.ViewModels;
 using MapEditor.Core;
+using MapEditor.Core.Terrain;
 using MapEditor.GameData.Editing;
 using MapEditor.GameData.Rows;
+using MapEditor.Rendering;
+using MapEditor.Rendering.Terrain;
 using Xunit;
 
 namespace MapEditor.App.Tests;
@@ -56,6 +60,35 @@ public class MapDocumentViewModelTests : IDisposable
         return raised;
     }
 
+    private static TerrainAssetLoadResult TerrainResult(params (string Id, string Name, int Graphic)[] definitions)
+    {
+        var sets = new List<TerrainSetDefinition>();
+        foreach ((string id, string name, int graphic) in definitions)
+        {
+            var reference = new TerrainGraphicReference(1, graphic);
+            sets.Add(new TerrainSetDefinition(
+                TerrainGeneratedId.Create(TerrainTopology.FourWay, new[] { reference }),
+                name,
+                TerrainReviewStatus.Enabled,
+                TerrainTopology.FourWay,
+                new TerrainSetMetrics(1, 1, 1, 1, 0, 1, 0, 1, 1, 0, 1),
+                TerrainMasks.Required(TerrainTopology.FourWay)
+                    .Select(mask => new TerrainMaskDefinition(mask, new[] { reference })),
+                new[] { new TerrainMemberDefinition(reference, TerrainMemberProvenance.MapObserved) },
+                Array.Empty<TerrainDiagnostic>()));
+        }
+
+        var catalog = new TerrainCatalog(
+            TerrainCatalogJson.CurrentSchemaVersion,
+            "test",
+            "sha256:abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789",
+            new TerrainGenerationSettings(2, 1, 1, 1, 1, 0.1, 0.5, 0.5, 0.1, 0.5, 0.9, 0.9),
+            sets,
+            Array.Empty<TerrainDiagnostic>());
+        string frames = string.Join(",", definitions.Select(definition => $"\"{definition.Graphic}\":[0,0,32,32]"));
+        return TerrainAssetCatalog.Validate(catalog, SpriteManifest.Parse($"{{\"tileSize\":32,\"sheets\":{{\"1\":{{{frames}}}}}}}"));
+    }
+
     private void SeedClipboard(int size = 3, MapTileLayer? tile = null)
     {
         tile ??= new MapTileLayer(7, 7);
@@ -94,6 +127,72 @@ public class MapDocumentViewModelTests : IDisposable
         Assert.False(_viewModel.CanUndo);
         Assert.False(_viewModel.CanRedo);
         Assert.False(_viewModel.CanSave);
+        Assert.Equal(AssetPaletteMode.Tiles, _viewModel.PaletteMode);
+        Assert.Null(_viewModel.SelectedTerrainId);
+        Assert.Equal(TerrainEditMode.Paint, _viewModel.TerrainMode);
+        Assert.False(_viewModel.IsTerrainAvailable);
+        Assert.False(string.IsNullOrWhiteSpace(_viewModel.TerrainDiagnostic));
+        Assert.Null(_viewModel.TerrainStatus);
+    }
+
+    [Fact]
+    public void PlanTerrainState_UsesDeterministicFallbackAndIdMapWithoutCallbacks()
+    {
+        TerrainAssetLoadResult first = TerrainResult(("one", "Zulu", 1), ("two", "Alpha", 2));
+        string one = first.Runtime!.EnabledSets.Single(set => set.DisplayName == "Zulu").Id;
+        MapDocumentTerrainState initial = _viewModel.PlanTerrainState(first);
+        _viewModel.CommitTerrainState(initial);
+        _viewModel.SelectedTerrainId = one;
+        TerrainAssetLoadResult replacement = TerrainResult(("three", "Beta", 3), ("four", "Alpha", 4));
+        string three = replacement.Runtime!.EnabledSets.Single(set => set.DisplayName == "Beta").Id;
+        string four = replacement.Runtime.EnabledSets.Single(set => set.DisplayName == "Alpha").Id;
+        var raised = new List<string>();
+        _viewModel.PropertyChanged += (_, e) => raised.Add(e.PropertyName!);
+
+        MapDocumentTerrainState fallback = _viewModel.PlanTerrainState(replacement);
+        _viewModel.CommitTerrainState(fallback);
+
+        Assert.Equal(four, _viewModel.SelectedTerrainId);
+        Assert.Empty(raised);
+
+        _viewModel.CommitTerrainState(_viewModel.PlanTerrainState(first));
+        _viewModel.SelectedTerrainId = one;
+        raised.Clear();
+        MapDocumentTerrainState rekeyed = _viewModel.PlanTerrainState(replacement, new Dictionary<string, string> { [one] = three });
+        _viewModel.CommitTerrainState(rekeyed);
+        Assert.Equal(three, _viewModel.SelectedTerrainId);
+        Assert.Empty(raised);
+    }
+
+    [Fact]
+    public void NotifyAssetPublication_RaisesPlannedPropertiesThenCanvasThenPaletteInOrder()
+    {
+        TerrainAssetLoadResult terrain = TerrainResult(("grass", "Grass", 1));
+        MapDocumentTerrainState state = _viewModel.PlanTerrainState(terrain);
+        var calls = new List<string>();
+        _viewModel.PropertyChanged += (_, e) => calls.Add("PropertyChanged:1:" + e.PropertyName);
+        _viewModel.PropertyChanged += (_, e) => calls.Add("PropertyChanged:2:" + e.PropertyName);
+        _viewModel.CanvasInvalidated += () => calls.Add("CanvasInvalidated:1");
+        _viewModel.CanvasInvalidated += () => calls.Add("CanvasInvalidated:2");
+        _viewModel.PaletteInvalidated += () => calls.Add("PaletteInvalidated:1");
+        _viewModel.PaletteInvalidated += () => calls.Add("PaletteInvalidated:2");
+
+        _viewModel.CommitTerrainState(state);
+        _viewModel.NotifyAssetPublication(state.ChangedProperties, (_, _, exception) => throw exception);
+
+        Assert.Equal(new[]
+        {
+            "PropertyChanged:1:SelectedTerrainId",
+            "PropertyChanged:2:SelectedTerrainId",
+            "PropertyChanged:1:IsTerrainAvailable",
+            "PropertyChanged:2:IsTerrainAvailable",
+            "PropertyChanged:1:TerrainDiagnostic",
+            "PropertyChanged:2:TerrainDiagnostic",
+            "CanvasInvalidated:1",
+            "CanvasInvalidated:2",
+            "PaletteInvalidated:1",
+            "PaletteInvalidated:2"
+        }, calls);
     }
 
     [Fact]

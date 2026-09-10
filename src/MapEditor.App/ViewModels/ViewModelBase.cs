@@ -14,6 +14,28 @@ internal abstract class ViewModelBase : INotifyPropertyChanged
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
     }
 
+    protected void OnPropertyChangedSafely(string propertyName, Action<string, Exception> failure)
+    {
+        PropertyChangedEventHandler? handlers = PropertyChanged;
+        if (handlers is null)
+        {
+            return;
+        }
+
+        var args = new PropertyChangedEventArgs(propertyName);
+        foreach (PropertyChangedEventHandler handler in handlers.GetInvocationList())
+        {
+            try
+            {
+                handler(this, args);
+            }
+            catch (Exception ex)
+            {
+                failure(propertyName, ex);
+            }
+        }
+    }
+
     protected bool SetField<T>(ref T field, T value, [CallerMemberName] string? propertyName = null)
     {
         if (EqualityComparer<T>.Default.Equals(field, value))

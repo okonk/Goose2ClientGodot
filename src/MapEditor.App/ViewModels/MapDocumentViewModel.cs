@@ -6,8 +6,10 @@ using System.Threading.Tasks;
 using MapEditor.App.Dialogs;
 using MapEditor.App.Documents;
 using MapEditor.Core;
+using MapEditor.Core.Terrain;
 using MapEditor.GameData.Editing;
 using MapEditor.GameData.Rows;
+using MapEditor.Rendering.Terrain;
 
 namespace MapEditor.App.ViewModels;
 
@@ -20,6 +22,23 @@ internal enum EditorRefresh
     Canvas = 1 << 2,
     Palette = 1 << 3
 }
+
+internal enum AssetPaletteMode
+{
+    Tiles,
+    Terrain
+}
+
+internal sealed record MapDocumentAssetState(
+    IReadOnlyList<int> SheetIds,
+    int SelectedSheet,
+    IReadOnlyList<string> ChangedProperties);
+
+internal sealed record MapDocumentTerrainState(
+    TerrainAssetLoadResult Terrain,
+    string? SelectedTerrainId,
+    MapEditTool ActiveTool,
+    IReadOnlyList<string> ChangedProperties);
 
 internal sealed class MapDocumentViewModel : ViewModelBase, IDisposable
 {
@@ -34,6 +53,12 @@ internal sealed class MapDocumentViewModel : ViewModelBase, IDisposable
 
     private MapEditTool _activeTool = MapEditTool.Pencil;
     private IReadOnlyList<int> _sheetIds = Array.Empty<int>();
+    private AssetPaletteMode _paletteMode;
+    private string? _selectedTerrainId;
+    private TerrainEditMode _terrainMode;
+    private TerrainAssetLoadResult _terrain = TerrainAssetLoadResult.Unavailable(
+        "Sprite assets are unavailable; load an asset directory to use the terrain tool.");
+    private string? _terrainStatus;
     private int _selectedSheet;
     private byte _layerVisibility = 0b11111;
     private bool _showGrid = true;
@@ -123,7 +148,7 @@ internal sealed class MapDocumentViewModel : ViewModelBase, IDisposable
         get => _activeTool;
         set
         {
-            if (value < MapEditTool.Pencil || value > MapEditTool.FloodFill)
+            if (value < MapEditTool.Pencil || value > MapEditTool.Terrain)
             {
                 throw new ArgumentOutOfRangeException(nameof(value));
             }
@@ -174,12 +199,174 @@ internal sealed class MapDocumentViewModel : ViewModelBase, IDisposable
         }
     }
 
+    public AssetPaletteMode PaletteMode
+    {
+        get => _paletteMode;
+        set
+        {
+            if (value is not AssetPaletteMode.Tiles and not AssetPaletteMode.Terrain)
+            {
+                throw new ArgumentOutOfRangeException(nameof(value));
+            }
+
+            SetField(ref _paletteMode, value);
+        }
+    }
+
+    public string? SelectedTerrainId
+    {
+        get => _selectedTerrainId;
+        set => SetField(ref _selectedTerrainId, value);
+    }
+
+    public TerrainEditMode TerrainMode
+    {
+        get => _terrainMode;
+        set
+        {
+            if (value is not TerrainEditMode.Paint and not TerrainEditMode.Erase)
+            {
+                throw new ArgumentOutOfRangeException(nameof(value));
+            }
+
+            SetField(ref _terrainMode, value);
+        }
+    }
+
+    public bool IsTerrainAvailable => _terrain.Availability.IsToolAvailable && _selectedTerrainId is not null;
+
+    public string? TerrainDiagnostic => _terrain.Availability.Diagnostic;
+
+    public string? TerrainStatus => _terrainStatus;
+
+    internal TerrainAssetLoadResult Terrain => _terrain;
+
     public IReadOnlyList<int> SheetIds => _sheetIds;
 
     internal void SetSheetIds(IReadOnlyList<int> sheetIds)
     {
         _sheetIds = sheetIds ?? throw new ArgumentNullException(nameof(sheetIds));
         OnPropertyChanged(nameof(SheetIds));
+    }
+
+    internal MapDocumentAssetState PlanAssetState()
+        => new(_sheetIds.ToArray(), _selectedSheet, Array.Empty<string>());
+
+    internal MapDocumentAssetState PlanAssetState(IReadOnlyList<int> sheetIds)
+    {
+        ArgumentNullException.ThrowIfNull(sheetIds);
+        IReadOnlyList<int> copied = sheetIds.ToArray();
+        int selectedSheet = copied.Count > 0 ? copied[0] : 0;
+        var changed = new List<string>();
+        if (!_sheetIds.SequenceEqual(copied))
+        {
+            changed.Add(nameof(SheetIds));
+        }
+
+        if (_selectedSheet != selectedSheet)
+        {
+            changed.Add(nameof(SelectedSheet));
+        }
+
+        return new MapDocumentAssetState(copied, selectedSheet, changed.AsReadOnly());
+    }
+
+    internal MapDocumentTerrainState PlanTerrainState(
+        TerrainAssetLoadResult terrain,
+        IReadOnlyDictionary<string, string>? idRekeys = null)
+    {
+        ArgumentNullException.ThrowIfNull(terrain);
+        var enabledIds = new HashSet<string>(
+            terrain.Runtime?.EnabledSets.Select(set => set.Id) ?? Enumerable.Empty<string>(),
+            StringComparer.Ordinal);
+        string? selection = null;
+        if (_selectedTerrainId is { } current)
+        {
+            string candidate = idRekeys is not null && idRekeys.TryGetValue(current, out string? rekeyed)
+                ? rekeyed
+                : current;
+            if (enabledIds.Contains(candidate))
+            {
+                selection = candidate;
+            }
+        }
+
+        selection ??= terrain.Runtime?.EnabledSets.FirstOrDefault()?.Id;
+        MapEditTool activeTool = selection is null && _activeTool == MapEditTool.Terrain
+            ? MapEditTool.Pencil
+            : _activeTool;
+        var changed = new List<string>();
+        if (!string.Equals(_selectedTerrainId, selection, StringComparison.Ordinal))
+        {
+            changed.Add(nameof(SelectedTerrainId));
+        }
+
+        bool oldAvailable = IsTerrainAvailable;
+        bool newAvailable = terrain.Availability.IsToolAvailable && selection is not null;
+        if (oldAvailable != newAvailable)
+        {
+            changed.Add(nameof(IsTerrainAvailable));
+        }
+
+        if (!string.Equals(TerrainDiagnostic, terrain.Availability.Diagnostic, StringComparison.Ordinal))
+        {
+            changed.Add(nameof(TerrainDiagnostic));
+        }
+
+        if (_activeTool != activeTool)
+        {
+            changed.Add(nameof(ActiveTool));
+        }
+
+        return new MapDocumentTerrainState(terrain, selection, activeTool, changed.AsReadOnly());
+    }
+
+    internal void CommitAssetState(MapDocumentAssetState state)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        _sheetIds = state.SheetIds;
+        _selectedSheet = state.SelectedSheet;
+    }
+
+    internal void CommitTerrainState(MapDocumentTerrainState state)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        _terrain = state.Terrain;
+        _selectedTerrainId = state.SelectedTerrainId;
+        _activeTool = state.ActiveTool;
+    }
+
+    internal void NotifyAssetPublication(
+        IReadOnlyList<string> changedProperties,
+        Action<string, string, Exception> failure)
+    {
+        foreach (string property in changedProperties)
+        {
+            OnPropertyChangedSafely(property, (name, exception) => failure("PropertyChanged", name, exception));
+        }
+
+        InvokeSafely(CanvasInvalidated, exception => failure("CanvasInvalidated", string.Empty, exception));
+        InvokeSafely(PaletteInvalidated, exception => failure("PaletteInvalidated", string.Empty, exception));
+    }
+
+    private static void InvokeSafely(Action? handlers, Action<Exception> failure)
+    {
+        if (handlers is null)
+        {
+            return;
+        }
+
+        foreach (Action handler in handlers.GetInvocationList())
+        {
+            try
+            {
+                handler();
+            }
+            catch (Exception ex)
+            {
+                failure(ex);
+            }
+        }
     }
 
     public int SelectedSheet

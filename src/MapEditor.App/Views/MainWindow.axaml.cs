@@ -1035,14 +1035,33 @@ internal partial class MainWindow : Window
             return false;
         }
 
-        if (_assets.TryOpen(path, out Exception? failure))
+        if (_assets.TryOpen(path, out Exception? failure, out IReadOnlyList<TerrainOperationWarning> warnings))
         {
             SyncAssetDirectory();
+            await PresentAssetWarningsAsync(warnings);
             return true;
         }
 
         await _dialogs.ShowErrorAsync(new ErrorPresentation("Load assets", failure is { } ex ? $"{path}: {ex.Message}" : path));
         return false;
+    }
+
+    private async Task PresentAssetWarningsAsync(IReadOnlyList<TerrainOperationWarning> warnings)
+    {
+        foreach (TerrainOperationWarning warning in warnings)
+        {
+            try
+            {
+                await _dialogs.ShowInfoAsync("Load assets warning", $"{warning.Scope}: {warning.Message}");
+            }
+            catch (OutOfMemoryException)
+            {
+                throw;
+            }
+            catch (Exception)
+            {
+            }
+        }
     }
 
     private async void OnClosing(object? sender, WindowClosingEventArgs e)

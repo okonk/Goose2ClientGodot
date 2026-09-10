@@ -130,6 +130,8 @@ public class AppStartupTests : IDisposable
         Assert.Equal(0, dialogs.AssetDirectoryPickShown);
         Assert.True(composed.Assets.Current.IsAvailable);
         Assert.Equal(new[] { 1, 2 }, composed.Workspace.ActiveDocument.SheetIds);
+        Assert.False(composed.Workspace.ActiveDocument.IsTerrainAvailable);
+        Assert.Contains("terrain-brushes.json", composed.Workspace.ActiveDocument.TerrainDiagnostic);
 
         dialogs.DirtyResult = DirtyChoice.Discard;
         composed.Window.Close();

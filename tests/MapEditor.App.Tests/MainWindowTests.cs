@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -23,6 +24,7 @@ using MapEditor.App.Tests.Fakes;
 using MapEditor.App.ViewModels;
 using MapEditor.Core;
 using MapEditor.Rendering;
+using MapEditor.Rendering.Terrain;
 using Xunit;
 
 namespace MapEditor.App.Tests;
@@ -953,6 +955,102 @@ public class MainWindowTests : IDisposable
         Assert.Equal(Path.GetFullPath(_harness.Dialogs.AssetDirectoryPickResult), Find<TextBlock>("AssetDirectoryText").Text);
         Assert.Equal(2, Find<ComboBox>("SheetCombo").Items.Count);
         Assert.Equal(1, ViewModel.SelectedSheet);
+    }
+
+    [AvaloniaFact]
+    public void MainWindow_AssetOpenWarningsUseExactTitleMessageAndReturnedOrder()
+    {
+        _harness.Dialogs.AssetDirectoryPickResult = WriteAssetDirectory("assets-warnings", TwoSheetJson);
+        _harness.ViewModel.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(MapDocumentViewModel.SheetIds))
+            {
+                throw new InvalidOperationException("first warning");
+            }
+        };
+        _harness.ViewModel.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(MapDocumentViewModel.SheetIds))
+            {
+                throw new InvalidOperationException("second warning");
+            }
+        };
+
+        Find<Button>("LoadAssetsButton").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.True(_harness.Assets.Current.IsAvailable);
+        Assert.Equal(new[]
+        {
+            ("Load assets warning", "document:0:PropertyChanged:SheetIds: Document 0 property 'SheetIds' observer failed after asset publication: first warning"),
+            ("Load assets warning", "document:0:PropertyChanged:SheetIds: Document 0 property 'SheetIds' observer failed after asset publication: second warning")
+        }, _harness.Dialogs.Infos);
+    }
+
+    [AvaloniaFact]
+    public void MainWindow_AssetOpenWarningDialogFailureStillAttemptsLaterWarningsAndLeavesPublishedStateUnchanged()
+    {
+        string assetDirectory = WriteAssetDirectory("assets-warning-dialog-failure", TwoSheetJson);
+        _harness.Dialogs.AssetDirectoryPickResult = assetDirectory;
+        AssetContext? publishedContext = null;
+        string? publishedDirectory = null;
+        EditorDocument? publishedDocument = null;
+        TerrainAssetLoadResult? publishedTerrain = null;
+        byte[]? publishedMap = null;
+        long publishedHistory = -1;
+        int[]? publishedSheets = null;
+        int publishedSelectedSheet = -1;
+        string? publishedSelectedTerrainId = null;
+        MapEditTool publishedActiveTool = default;
+        _harness.ViewModel.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(MapDocumentViewModel.SheetIds))
+            {
+                publishedContext = _harness.Assets.Current;
+                publishedDirectory = _harness.Assets.Current.Cache.AssetDirectory;
+                publishedDocument = _harness.ViewModel.Document;
+                publishedTerrain = _harness.ViewModel.Terrain;
+                publishedMap = MapCodec.Encode(_harness.ViewModel.Session.Document);
+                publishedHistory = _harness.ViewModel.Session.HistoryVersion;
+                publishedSheets = _harness.ViewModel.SheetIds.ToArray();
+                publishedSelectedSheet = _harness.ViewModel.SelectedSheet;
+                publishedSelectedTerrainId = _harness.ViewModel.SelectedTerrainId;
+                publishedActiveTool = _harness.ViewModel.ActiveTool;
+                throw new InvalidOperationException("first warning");
+            }
+        };
+        _harness.ViewModel.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(MapDocumentViewModel.SheetIds))
+            {
+                throw new InvalidOperationException("second warning");
+            }
+        };
+        _harness.Dialogs.ShowInfoExceptions = new Queue<Exception?>(new Exception?[]
+        {
+            new InvalidOperationException("presentation failed"),
+            null
+        });
+
+        Find<Button>("LoadAssetsButton").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Equal(new[]
+        {
+            ("Load assets warning", "document:0:PropertyChanged:SheetIds: Document 0 property 'SheetIds' observer failed after asset publication: first warning"),
+            ("Load assets warning", "document:0:PropertyChanged:SheetIds: Document 0 property 'SheetIds' observer failed after asset publication: second warning")
+        }, _harness.Dialogs.Infos);
+        Assert.Same(publishedContext, _harness.Assets.Current);
+        Assert.Equal(publishedDirectory, _harness.Assets.Current.Cache.AssetDirectory);
+        Assert.Equal(Path.GetFullPath(assetDirectory), _harness.Settings.Load().AssetDirectory);
+        Assert.Same(publishedDocument, _harness.ViewModel.Document);
+        Assert.Same(publishedTerrain, _harness.ViewModel.Terrain);
+        Assert.Equal(publishedMap, MapCodec.Encode(_harness.ViewModel.Session.Document));
+        Assert.Equal(publishedHistory, _harness.ViewModel.Session.HistoryVersion);
+        Assert.Equal(publishedSheets, _harness.ViewModel.SheetIds);
+        Assert.Equal(publishedSelectedSheet, _harness.ViewModel.SelectedSheet);
+        Assert.Equal(publishedSelectedTerrainId, _harness.ViewModel.SelectedTerrainId);
+        Assert.Equal(publishedActiveTool, _harness.ViewModel.ActiveTool);
     }
 
     [AvaloniaFact]

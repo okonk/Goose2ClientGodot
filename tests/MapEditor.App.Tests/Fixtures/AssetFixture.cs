@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.IO.Compression;
 using System.Text;
+using MapEditor.Core.Terrain;
 
 namespace MapEditor.App.Tests.Fixtures;
 
@@ -26,6 +27,9 @@ public sealed class AssetFixture : IDisposable
 
     public void WriteCorruptSheet(int sheetId)
         => File.WriteAllText(Path.Combine(AssetDirectory, "sheets", $"{sheetId}.png"), "this is not a png, just text bytes");
+
+    public void WriteTerrainCatalog(TerrainCatalog catalog)
+        => File.WriteAllText(Path.Combine(AssetDirectory, "terrain-brushes.json"), TerrainCatalogJson.Serialize(catalog));
 
     public void Dispose()
         => Directory.Delete(Root, recursive: true);

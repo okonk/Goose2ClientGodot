@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using MapEditor.Rendering;
+using MapEditor.Rendering.Terrain;
 
 namespace MapEditor.App.Rendering;
 
@@ -11,15 +12,22 @@ internal sealed class AssetContext : IDisposable
         MapRenderer renderer,
         IReadOnlyList<int> sheetIds,
         AppearanceAssetCatalog? appearance,
-        AppearanceAvailability appearanceAvailability)
+        AppearanceAvailability appearanceAvailability,
+        TerrainAssetLoadResult terrain,
+        AvaloniaTintedSpriteCache? tintCache = null,
+        bool ownsResources = true)
     {
         Cache = cache;
         Renderer = renderer;
         SheetIds = sheetIds;
         Appearance = appearance;
         AppearanceAvailability = appearanceAvailability;
-        TintCache = new AvaloniaTintedSpriteCache();
+        Terrain = terrain;
+        TintCache = tintCache ?? new AvaloniaTintedSpriteCache();
+        _ownsResources = ownsResources;
     }
+
+    private bool _ownsResources;
 
     public SpriteAssetCache Cache { get; }
 
@@ -30,6 +38,8 @@ internal sealed class AssetContext : IDisposable
     public AppearanceAssetCatalog? Appearance { get; }
 
     public AppearanceAvailability AppearanceAvailability { get; }
+
+    public TerrainAssetLoadResult Terrain { get; }
 
     public AvaloniaTintedSpriteCache TintCache { get; }
 
@@ -45,7 +55,8 @@ internal sealed class AssetContext : IDisposable
             new MapRenderer(cache),
             Array.Empty<int>(),
             null,
-            AppearanceAvailability.Unavailable("Sprite assets are unavailable; load an asset directory to resolve appearance previews."));
+            AppearanceAvailability.Unavailable("Sprite assets are unavailable; load an asset directory to resolve appearance previews."),
+            TerrainAssetLoadResult.Unavailable("Sprite assets are unavailable; load an asset directory to use the terrain tool."));
     }
 
     public static AssetContext Create(string assetDirectory, ISpriteSheetLoader loader)
@@ -64,7 +75,34 @@ internal sealed class AssetContext : IDisposable
             availability = AppearanceAvailability.Unavailable(ex.Message);
         }
 
-        return new(cache, new MapRenderer(cache), sheetIds, appearance, availability);
+        TerrainAssetLoadResult terrain = TerrainAssetCatalog.Load(assetDirectory, cache.Manifest!);
+        return new(cache, new MapRenderer(cache), sheetIds, appearance, availability, terrain);
+    }
+
+    internal AssetContext WithTerrain(TerrainAssetLoadResult terrain)
+    {
+        ArgumentNullException.ThrowIfNull(terrain);
+        return new AssetContext(
+            Cache,
+            Renderer,
+            SheetIds,
+            Appearance,
+            AppearanceAvailability,
+            terrain,
+            TintCache,
+            ownsResources: false);
+    }
+
+    internal void TransferOwnershipTo(AssetContext replacement)
+    {
+        if (!_ownsResources || replacement._ownsResources || !ReferenceEquals(Cache, replacement.Cache) ||
+            !ReferenceEquals(TintCache, replacement.TintCache))
+        {
+            throw new InvalidOperationException("Asset resource ownership cannot be transferred.");
+        }
+
+        _ownsResources = false;
+        replacement._ownsResources = true;
     }
 
     public SpriteResolution Resolve(SpriteReference reference)
@@ -75,7 +113,41 @@ internal sealed class AssetContext : IDisposable
 
     public void Dispose()
     {
-        Cache.Dispose();
-        TintCache.Dispose();
+        if (!_ownsResources)
+        {
+            return;
+        }
+
+        _ownsResources = false;
+        Exception? first = null;
+        try
+        {
+            Cache.Dispose();
+        }
+        catch (Exception ex)
+        {
+            first = ex;
+        }
+
+        try
+        {
+            TintCache.Dispose();
+        }
+        catch (Exception ex)
+        {
+            if (first is null)
+            {
+                first = ex;
+            }
+            else
+            {
+                first.Data["AssetContext.AdditionalDisposeException"] = ex;
+            }
+        }
+
+        if (first is not null)
+        {
+            throw first;
+        }
     }
 }
