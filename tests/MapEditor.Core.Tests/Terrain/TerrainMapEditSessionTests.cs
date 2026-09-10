@@ -174,7 +174,14 @@ public class TerrainMapEditSessionTests
     [Fact]
     public void TerrainStroke_BeginOutOfBoundsUnknownNonEnabledNullOrBlankIdNullResolverOrInvalidModeThrowsWithoutMutation()
     {
-        var (resolver, set) = CreateResolver();
+        var (_, set) = CreateResolver();
+        var pendingMembers = new[] { TerrainCatalogFixture.CreateMember(8, 1) };
+        var pending = TerrainCatalogFixture.CreateSet(
+            TerrainTopology.FourWay,
+            pendingMembers,
+            TerrainReviewStatus.Pending,
+            masks: TerrainCatalogFixture.CreateFullMasks(TerrainTopology.FourWay, pendingMembers));
+        var resolver = new TerrainMapResolver(TerrainCatalogFixture.CreateCatalog(set, pending));
         var session = new MapEditSession(MapDocument.Create(2, 2));
         var before = MapCodec.Encode(session.Document);
         Assert.Equal("resolver", Assert.Throws<ArgumentNullException>(() => session.BeginTerrainStroke(null!, set.Id, TerrainEditMode.Paint, 0, 0)).ParamName);
@@ -184,6 +191,8 @@ public class TerrainMapEditSessionTests
         Assert.Equal("x", Assert.Throws<ArgumentOutOfRangeException>(() => session.BeginTerrainStroke(resolver, set.Id, TerrainEditMode.Paint, -1, 3)).ParamName);
         Assert.Equal("y", Assert.Throws<ArgumentOutOfRangeException>(() => session.BeginTerrainStroke(resolver, set.Id, TerrainEditMode.Paint, 0, 2)).ParamName);
         Assert.Equal("terrainId", Assert.Throws<ArgumentException>(() => session.BeginTerrainStroke(resolver, set.Id.ToUpperInvariant(), TerrainEditMode.Paint, 0, 0)).ParamName);
+        Assert.Equal("terrainId", Assert.Throws<ArgumentException>(() => session.BeginTerrainStroke(resolver, "terrain-does-not-exist", TerrainEditMode.Paint, 0, 0)).ParamName);
+        Assert.Equal("terrainId", Assert.Throws<ArgumentException>(() => session.BeginTerrainStroke(resolver, pending.Id, TerrainEditMode.Paint, 0, 0)).ParamName);
         Assert.Equal(before, MapCodec.Encode(session.Document));
         Assert.False(session.HasActiveStroke);
     }

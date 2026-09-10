@@ -80,6 +80,7 @@ internal sealed class TerrainMapEditStroke
             }
         }
 
+        newlyVisited.Sort();
         var request = new TerrainStrokeResolveRequest(
             document,
             _layerIndex,
