@@ -1039,6 +1039,8 @@ dotnet run --project src/MapEditor.App/MapEditor.App.csproj
 
 Manual checklist: load `Assets/Sprites`; inspect all manager statuses/diagnostics; paint and erase grass, water, path, and shoreline on layer 0 and a higher layer; verify drag previews, one-step undo/redo, Escape/capture-loss rollback, save-during-preview cancellation, restart persistence, and subsequent Pencil/Eraser map save/reopen. If the full corpus is unavailable, use Part 1's temporary synthetic/Illutia-only root. Never weaken validation merely to produce enabled sets.
 
+Environment verification on 2026-09-10: the configured Illutia data and maps were available, but the configured Aspereta data and maps were absent. Illutia-only conversion and terrain generation completed in a temporary root without changing repository `Assets/`; its conservatively generated catalog had no enabled sets, so terrain painting was not forced by weakening validation. Launching the desktop editor was blocked because `libX11.so.6` is unavailable in this headless environment; the Avalonia headless end-to-end tests provide the editor-path proof here.
+
 **Step 5: Red-team review**
 
 - Confirm UI-thread-only mutation/publication; no lock, dispatch wait, worker, or file watcher.
