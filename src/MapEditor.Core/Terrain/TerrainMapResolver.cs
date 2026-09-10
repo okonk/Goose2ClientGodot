@@ -115,25 +115,25 @@ public sealed class TerrainMapResolver
         _owners = owners;
     }
 
-    internal bool TryGetEnabledTerrain(string terrainId, out TerrainRuntimeSet terrain)
+    internal bool TryGetEnabledTerrain(string terrainId, out TerrainRuntimeSet? terrain)
     {
         if (terrainId is not null && _byId.TryGetValue(terrainId, out terrain))
         {
             return true;
         }
 
-        terrain = null!;
+        terrain = null;
         return false;
     }
 
-    internal bool TryGetOwner(TerrainGraphicReference reference, out TerrainRuntimeSet terrain)
+    internal bool TryGetOwner(TerrainGraphicReference reference, out TerrainRuntimeSet? terrain)
     {
         if (_owners.TryGetValue(reference, out terrain))
         {
             return true;
         }
 
-        terrain = null!;
+        terrain = null;
         return false;
     }
 

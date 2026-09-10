@@ -20,7 +20,7 @@ public class TerrainMapResolverTests
     private static TerrainRuntimeSet GetTerrain(TerrainMapResolver resolver, string id)
     {
         Assert.True(resolver.TryGetEnabledTerrain(id, out var terrain));
-        return terrain;
+        return terrain!;
     }
 
     private static IReadOnlyList<TerrainMaskDefinition> FourWayMasksWithZero(
@@ -55,7 +55,7 @@ public class TerrainMapResolverTests
         var resolver = new TerrainMapResolver(TerrainCatalogFixture.CreateCatalog(enabled, pending, disabled));
 
         Assert.True(resolver.TryGetEnabledTerrain(enabled.Id, out var terrain));
-        Assert.Equal(enabled.Id, terrain.Id);
+        Assert.Equal(enabled.Id, terrain!.Id);
         Assert.Equal(TerrainTopology.FourWay, terrain.Topology);
         Assert.False(resolver.TryGetEnabledTerrain(enabled.Id.ToUpperInvariant(), out _));
         Assert.False(resolver.TryGetEnabledTerrain(disabled.Id, out _));
@@ -397,7 +397,7 @@ public class TerrainMapResolverTests
         Assert.False(resolver.TryGetOwner(new TerrainGraphicReference(0, 1), out _));
 
         Assert.True(resolver.TryGetOwner(new TerrainGraphicReference(1, 1), out var owner));
-        Assert.Equal(set.Id, owner.Id);
+        Assert.Equal(set.Id, owner!.Id);
     }
 
     [Fact]
