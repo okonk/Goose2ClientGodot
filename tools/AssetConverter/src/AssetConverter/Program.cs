@@ -4,6 +4,7 @@ using Goose2.AssetConverter.Manifest;
 using Goose2.AssetConverter.Maps;
 using Goose2.AssetConverter.Tiles;
 using Goose2.AssetConverter.SpriteFrames;
+using Goose2.AssetConverter.Terrain;
 
 static string ResolveAsperetaMappingPath(string? repoRoot = null)
 {
@@ -121,6 +122,10 @@ if (args.Length >= 1 && args[0] == "maps")
         : Path.GetFullPath(Path.Combine("..", "..", "Assets", "Maps"));
 
     var result = MapCopyConverter.Convert(Paths.IllutiaMaps, outDir);
+    if (result.OutputFileNames.Count > 0)
+    {
+        TerrainMapInventory.Write(outDir, result.OutputFileNames);
+    }
     Console.WriteLine($"Copied {result.Copied} maps -> {outDir}");
     foreach (var f in result.Failures) Console.WriteLine($"  FAIL {f}");
     return;
@@ -134,6 +139,16 @@ if (args.Length >= 1 && args[0] == "manifest")
     Directory.CreateDirectory(Path.GetDirectoryName(outPath)!);
     File.WriteAllText(outPath, FrameManifestBuilder.Build(Paths.IllutiaData));
     Console.WriteLine($"Wrote {outPath}");
+    return;
+}
+
+if (args.Length >= 1 && args[0] == "terrain")
+{
+    string repoRoot = args.Length >= 2
+        ? args[1]
+        : Path.GetFullPath(Path.Combine("..", ".."));
+
+    TerrainCommand.Execute(repoRoot, Console.Out);
     return;
 }
 
@@ -182,11 +197,19 @@ if (args.Length >= 1 && args[0] == "all")
     var fx = AsperetaEffectsConverter.Convert(
         Paths.AsperetaData, Paths.AsperetaCompiledEnc, repoRoot);
 
-    // Combined frame manifest
     string manifestPath = Path.Combine(repoRoot, "Assets", "Sprites", "manifest.json");
-    Directory.CreateDirectory(Path.GetDirectoryName(manifestPath)!);
-    File.WriteAllText(manifestPath,
-        FrameManifestBuilder.BuildCombined(Paths.IllutiaData, Paths.AsperetaData));
+    var successfulMapNames = maps.OutputFileNames.Concat(aspMaps.OutputFileNames).ToList();
+    if (successfulMapNames.Count == 0)
+    {
+        throw new InvalidOperationException(
+            $"No maps were converted (Illutia: {maps.Failures.Count} failed; Aspereta: {aspMaps.Failures.Count} failed); the terrain map inventory requires at least one successful map.");
+    }
+    TerrainAllFinalizer.Execute(
+        repoRoot,
+        successfulMapNames,
+        () => FrameManifestBuilder.BuildCombined(Paths.IllutiaData, Paths.AsperetaData),
+        Console.Out,
+        TerrainCommand.Execute);
 
     Console.WriteLine($"Sheets: {sheets.Succeeded} ok, {sheets.Failed} failed");
     Console.WriteLine($"Animations: {animations.ResourcesWritten} character, {animations.EffectsWritten} effects, {animations.Failed} failed");
@@ -217,4 +240,4 @@ if (args.Length >= 1 && args[0] == "tiles")
     return;
 }
 
-Console.WriteLine("Usage: AssetConverter batch [outDir] | frames <id> | animations [repoRoot] | maps [outDir] | manifest [outPath] | aspereta-mapping [outPath] | aspereta [repoRoot] | tiles [repoRoot] | all [repoRoot]");
+Console.WriteLine("Usage: AssetConverter batch [outDir] | frames <id> | animations [repoRoot] | maps [outDir] | manifest [outPath] | aspereta-mapping [outPath] | aspereta [repoRoot] | tiles [repoRoot] | terrain [repoRoot] | all [repoRoot]");

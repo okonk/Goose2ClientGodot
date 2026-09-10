@@ -1,7 +1,10 @@
 namespace Goose2.AssetConverter.Maps;
 
 /// <summary>Result of a map-copy conversion run.</summary>
-public sealed record MapCopyResult(int Copied, IReadOnlyList<string> Failures);
+public sealed record MapCopyResult(
+    int Copied,
+    IReadOnlyList<string> Failures,
+    IReadOnlyList<string> OutputFileNames);
 
 /// <summary>Copies *.map files from a source directory into a Godot-friendly layout.
 /// Unity naming rule: <c>Map100.map</c> → <c>Map100.map</c> (M + basename[1:] + .map).</summary>
@@ -12,6 +15,7 @@ public static class MapCopyConverter
     public static MapCopyResult Convert(string sourceMapsDir, string outMapsDir)
     {
         var failures = new List<string>();
+        var outputFileNames = new List<string>();
         int copied = 0;
 
         Directory.CreateDirectory(outMapsDir);
@@ -38,6 +42,7 @@ public static class MapCopyConverter
 
                 File.Copy(file, outPath, overwrite: true);
                 copied++;
+                outputFileNames.Add(godotName);
             }
             catch (Exception ex)
             {
@@ -45,6 +50,9 @@ public static class MapCopyConverter
             }
         }
 
-        return new MapCopyResult(copied, failures);
+        return new MapCopyResult(
+            copied,
+            failures,
+            outputFileNames.Distinct(StringComparer.Ordinal).OrderBy(name => name, StringComparer.Ordinal).ToList());
     }
 }
