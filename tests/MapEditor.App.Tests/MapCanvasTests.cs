@@ -38,6 +38,13 @@ public class MapCanvasTests
     private static readonly Color BlockPreviewColor = Color.FromArgb(0x60, 0xFF, 0x00, 0x00);
     private static readonly Color UnblockPreviewColor = Color.FromArgb(0x60, 0x00, 0xFF, 0x00);
 
+    private const string TwoSheetJson = """
+        { "tileSize": 32, "sheets": {
+          "1": { "10": [0, 0, 32, 32], "11": [32, 0, 32, 32] },
+          "2": { "20": [0, 0, 32, 32] }
+        } }
+        """;
+
     private sealed record Harness(MapCanvas Canvas, MapDocumentViewModel ViewModel, FakeEditorDialogs Dialogs, Window Window, AssetContextController Assets);
 
     [AvaloniaFact]
@@ -323,6 +330,83 @@ public class MapCanvasTests
         Assert.Equal(1, harness.ViewModel.SelectedY);
         Assert.False(session.HasActiveStroke);
         Assert.False(session.CanUndo);
+    }
+
+    [AvaloniaFact]
+    public async Task EyedropperPick_SelectsThePickedSheetInThePaletteAndRefreshesIt()
+    {
+        Harness harness = CreateSmallMapAsync();
+        using AssetFixture fixture = new();
+        fixture.WriteManifest(TwoSheetJson);
+        fixture.WriteSheet(1, 64, 32);
+        fixture.WriteSheet(2, 32, 32);
+        Assert.True(harness.Assets.TryOpen(fixture.AssetDirectory));
+
+        MapDocument document = harness.ViewModel.Session.Document;
+        document.SetLayer(1, 1, 0, new MapTileLayer(2, 20));
+        harness.ViewModel.Brush = new MapTileLayer(1, 10);
+        harness.ViewModel.ActiveTool = MapEditTool.Eyedropper;
+        int paletteRefreshes = 0;
+        harness.ViewModel.PaletteInvalidated += () => paletteRefreshes++;
+        Point tile = new(2 * Cell - Cell / 2, 2 * Cell - Cell / 2);
+
+        harness.Window.MouseDown(tile, MouseButton.Left, RawInputModifiers.None);
+
+        Assert.Equal(new MapTileLayer(2, 20), harness.ViewModel.Brush);
+        Assert.Equal(2, harness.ViewModel.SelectedSheet);
+        Assert.True(paletteRefreshes > 0);
+
+        harness.Window.MouseUp(tile, MouseButton.Left, RawInputModifiers.None);
+
+        Assert.Equal(new MapTileLayer(2, 20), harness.ViewModel.Brush);
+        Assert.Equal(2, harness.ViewModel.SelectedSheet);
+    }
+
+    [AvaloniaFact]
+    public async Task EyedropperEscape_RestoresThePaletteSelection()
+    {
+        Harness harness = CreateSmallMapAsync();
+        using AssetFixture fixture = new();
+        fixture.WriteManifest(TwoSheetJson);
+        fixture.WriteSheet(1, 64, 32);
+        fixture.WriteSheet(2, 32, 32);
+        Assert.True(harness.Assets.TryOpen(fixture.AssetDirectory));
+
+        MapDocument document = harness.ViewModel.Session.Document;
+        document.SetLayer(1, 1, 0, new MapTileLayer(2, 20));
+        harness.ViewModel.Brush = new MapTileLayer(1, 10);
+        harness.ViewModel.ActiveTool = MapEditTool.Eyedropper;
+        harness.Canvas.Focus();
+        Point tile = new(2 * Cell - Cell / 2, 2 * Cell - Cell / 2);
+
+        harness.Window.MouseDown(tile, MouseButton.Left, RawInputModifiers.None);
+        Assert.Equal(new MapTileLayer(2, 20), harness.ViewModel.Brush);
+        Assert.Equal(2, harness.ViewModel.SelectedSheet);
+
+        harness.Window.KeyPressQwerty(PhysicalKey.Escape, RawInputModifiers.None);
+
+        Assert.Equal(new MapTileLayer(1, 10), harness.ViewModel.Brush);
+        Assert.Equal(1, harness.ViewModel.SelectedSheet);
+        Assert.False(harness.ViewModel.Session.HasActiveStroke);
+    }
+
+    [AvaloniaFact]
+    public async Task EyedropperPick_KeepsTheDisplayedSheetWhenThePickedSheetHasNoAssets()
+    {
+        Harness harness = CreateSmallMapAsync();
+        using AssetFixture fixture = new();
+        fixture.WriteManifest(TwoSheetJson);
+        Assert.True(harness.Assets.TryOpen(fixture.AssetDirectory));
+
+        MapDocument document = harness.ViewModel.Session.Document;
+        document.SetLayer(1, 1, 0, new MapTileLayer(9, 9));
+        harness.ViewModel.Brush = new MapTileLayer(1, 10);
+        harness.ViewModel.ActiveTool = MapEditTool.Eyedropper;
+
+        harness.Window.MouseDown(new Point(2 * Cell - Cell / 2, 2 * Cell - Cell / 2), MouseButton.Left, RawInputModifiers.None);
+
+        Assert.Equal(new MapTileLayer(9, 9), harness.ViewModel.Brush);
+        Assert.Equal(1, harness.ViewModel.SelectedSheet);
     }
 
     [AvaloniaFact]

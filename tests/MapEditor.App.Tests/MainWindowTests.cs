@@ -20,6 +20,7 @@ using MapEditor.App.Documents;
 using MapEditor.App.Rendering;
 using MapEditor.App.Settings;
 using MapEditor.App.Tests.Fakes;
+using MapEditor.App.Tests.Fixtures;
 using MapEditor.App.ViewModels;
 using MapEditor.Core;
 using MapEditor.Rendering;
@@ -996,6 +997,37 @@ public class MainWindowTests : IDisposable
         ViewModel.SelectedSheet = 2;
         Assert.Equal(2, combo.SelectedItem);
         Assert.Equal(2, Window.Palette.FrameCount);
+    }
+
+    [AvaloniaFact]
+    public void EyedropperPick_MovesThePaletteSelectionToThePickedTile()
+    {
+        string directory = WriteAssetDirectory("assets-eyedropper", TwoSheetJson);
+        File.WriteAllBytes(Path.Combine(directory, "sheets", "1.png"), AssetFixture.PngSheet.Create(64, 32));
+        File.WriteAllBytes(Path.Combine(directory, "sheets", "2.png"), AssetFixture.PngSheet.Create(32, 32));
+        _harness.Dialogs.AssetDirectoryPickResult = directory;
+        Find<Button>("LoadAssetsButton").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal(1, ViewModel.SelectedSheet);
+
+        ViewModel.Session.Document.SetLayer(0, 0, 0, new MapTileLayer(2, 20));
+        ViewModel.Brush = new MapTileLayer(1, 10);
+        ViewModel.ActiveTool = MapEditTool.Eyedropper;
+        RecordingMapDrawTarget target = new();
+
+        Window.MouseDown(TileCenter(), MouseButton.Left, RawInputModifiers.None);
+        Window.Palette.RenderPalette(target);
+
+        Assert.Equal(new MapTileLayer(2, 20), ViewModel.Brush);
+        Assert.Equal(2, Find<ComboBox>("SheetCombo").SelectedItem);
+        Assert.Single(target.Images);
+        Assert.Equal(1, Window.Palette.FrameCount);
+        RecordingMapDrawTarget.RectangleDraw selection = Assert.Single(target.Rectangles);
+        Assert.Equal(
+            new Rect(1, 1, SpritePaletteControl.CellSize - 2, SpritePaletteControl.CellSize - 2),
+            selection.Bounds);
+        Pen stroke = Assert.IsType<Pen>(selection.Stroke);
+        Assert.Equal(Color.FromArgb(0xFF, 0x33, 0x99, 0xFF), Assert.IsType<SolidColorBrush>(stroke.Brush).Color);
     }
 
     [AvaloniaFact]

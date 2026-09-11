@@ -174,6 +174,18 @@ internal sealed class MapDocumentViewModel : ViewModelBase, IDisposable
         }
     }
 
+    internal void SyncPaletteToBrush()
+    {
+        MapTileLayer brush = _session.SelectedTileLayer;
+        if (brush.Sheet != _selectedSheet && _sheetIds.Contains(brush.Sheet))
+        {
+            SelectedSheet = brush.Sheet;
+        }
+
+        OnPropertyChanged(nameof(Brush));
+        Refresh(EditorRefresh.Palette);
+    }
+
     public IReadOnlyList<int> SheetIds => _sheetIds;
 
     internal void SetSheetIds(IReadOnlyList<int> sheetIds)

@@ -21,6 +21,7 @@ internal sealed class MapCanvas : Control, ICustomHitTest
     private readonly AssetContextController _assets;
     private ViewportTransform _viewport = new(new RenderSize(1, 1), new RenderPoint(0, 0), MapZoom.Percent100);
     private bool _stroking;
+    private bool _eyedropperStroke;
     private bool _panning;
     private bool _spaceDown;
     private RectDrag? _rectDrag;
@@ -57,10 +58,15 @@ internal sealed class MapCanvas : Control, ICustomHitTest
             else
             {
                 _viewModel.CancelStroke();
+                if (_eyedropperStroke)
+                {
+                    _viewModel.SyncPaletteToBrush();
+                }
             }
         }
 
         _stroking = false;
+        _eyedropperStroke = false;
         _panning = false;
         _spaceDown = false;
         if (_rectDrag is not null)
@@ -258,7 +264,11 @@ internal sealed class MapCanvas : Control, ICustomHitTest
             {
                 MapEditSession session = _viewModel.Session;
                 session.ContinueStroke(target.X, target.Y);
-                _viewModel.Brush = session.SelectedTileLayer;
+                if (_eyedropperStroke)
+                {
+                    _viewModel.SyncPaletteToBrush();
+                }
+
                 _viewModel.Refresh(EditorRefresh.Canvas | EditorRefresh.Commands | EditorRefresh.Title);
             }
         }
@@ -301,6 +311,7 @@ internal sealed class MapCanvas : Control, ICustomHitTest
         {
             _viewModel.CompleteStroke();
             _stroking = false;
+            _eyedropperStroke = false;
         }
 
         CommitMarkerDrag();
@@ -328,6 +339,7 @@ internal sealed class MapCanvas : Control, ICustomHitTest
         CancelMarkerDrag();
         CancelRectDrag();
         _stroking = false;
+        _eyedropperStroke = false;
         _panning = false;
         _capturedPointer = null;
         _viewModel.Refresh(EditorRefresh.Canvas | EditorRefresh.Commands | EditorRefresh.Title);
@@ -548,11 +560,17 @@ internal sealed class MapCanvas : Control, ICustomHitTest
         }
 
         MapEditSession session = _viewModel.Session;
-        session.BeginStroke(_viewModel.ActiveTool, cell.X, cell.Y);
+        MapEditTool tool = _viewModel.ActiveTool;
+        session.BeginStroke(tool, cell.X, cell.Y);
         _stroking = true;
+        _eyedropperStroke = tool == MapEditTool.Eyedropper;
         _viewModel.SelectedX = cell.X;
         _viewModel.SelectedY = cell.Y;
-        _viewModel.Brush = session.SelectedTileLayer;
+        if (_eyedropperStroke)
+        {
+            _viewModel.SyncPaletteToBrush();
+        }
+
         _viewModel.Refresh(EditorRefresh.Canvas | EditorRefresh.Commands | EditorRefresh.Title);
     }
 
