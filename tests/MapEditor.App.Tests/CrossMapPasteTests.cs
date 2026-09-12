@@ -172,7 +172,7 @@ public class CrossMapPasteTests : IDisposable
     [Fact]
     public void CopyTiles_ReplacesGameDataPayload()
     {
-        _clipboard.Current = EditorClipboardPayload.FromSpawn(1, "sheet");
+        _clipboard.Current = EditorClipboardPayload.FromSpawn(1, string.Empty, "sheet");
         _a.SelectionRectangle = new MapTileRectangle(0, 0, 2, 2);
         _a.CopySelection();
 
@@ -183,7 +183,7 @@ public class CrossMapPasteTests : IDisposable
     [Fact]
     public void BeginPasteMode_WithSpawnPayload_DoesNotEnterPasteMode()
     {
-        _clipboard.Current = EditorClipboardPayload.FromSpawn(1, "sheet");
+        _clipboard.Current = EditorClipboardPayload.FromSpawn(1, string.Empty, "sheet");
 
         _b.BeginPasteMode();
         _b.ApplyPasteAt(0, 0);

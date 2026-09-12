@@ -57,14 +57,14 @@ public class GameDataClipboardTests : IDisposable
         return _workspace.ActiveDocument;
     }
 
-    private static GameDataSyncSession Session(string spreadsheetId, int mapId)
+    private static GameDataSyncSession Session(string spreadsheetId, int mapId, string spawnProperties = "")
     {
         var data = new RemoteGameData(
             Maps,
             new Dictionary<int, NpcAppearance> { [1] = Npc1 },
             new List<RemoteRow<NpcSpawnRow>>
             {
-                new(2, new NpcSpawnRow(1, mapId, 3, 4)),
+                new(2, new NpcSpawnRow(1, mapId, 3, 4, spawnProperties)),
                 new(3, new NpcSpawnRow(1, mapId, 7, 8))
             },
             new List<RemoteRow<WarpRow>> { new(2, new WarpRow(mapId, 5, 6, 20, 7, 8)) });
@@ -263,6 +263,47 @@ public class GameDataClipboardTests : IDisposable
         Assert.Equal(3, spawns.Count);
         Assert.Equal(new NpcSpawnRow(1, 10, 1, 1), spawns[2]);
         Assert.False(_source.PasteMode);
+    }
+
+    [Fact]
+    public void A_pasted_spawn_keeps_the_properties_of_the_row_it_was_copied_from()
+    {
+        const string properties = "{\"facing\":\"north\",\"scale\":2}";
+        _source.GameData!.AttachSession(Session("sheet-a", 10, properties));
+        SelectSpawn(_source, 0);
+        _source.CopySelection();
+
+        _source.PasteSelection();
+        _source.ApplyPasteAt(9, 10);
+
+        var spawns = _source.GameData.Session!.Edits.Spawns;
+        Assert.Equal(3, spawns.Count);
+        Assert.Equal(new NpcSpawnRow(1, 10, 3, 4, properties), spawns[0]);
+        Assert.Equal(new NpcSpawnRow(1, 10, 9, 10, properties), spawns[2]);
+        Assert.Equal(properties, spawns[2].Properties);
+
+        SelectSpawn(_source, 2);
+        _source.CutSelection();
+        _source.PasteSelection();
+        _source.ApplyPasteAt(11, 12);
+
+        spawns = _source.GameData.Session.Edits.Spawns;
+        Assert.Equal(3, spawns.Count);
+        Assert.Equal(new NpcSpawnRow(1, 10, 11, 12, properties), spawns[2]);
+        Assert.Equal(properties, spawns[2].Properties);
+    }
+
+    [Fact]
+    public void A_newly_placed_spawn_has_no_properties()
+    {
+        _source.GameData!.SelectedNpcId = 1;
+
+        _source.AddSpawnAt(5, 6);
+
+        var spawns = _source.GameData.Session!.Edits.Spawns;
+        Assert.Equal(3, spawns.Count);
+        Assert.Equal(new NpcSpawnRow(1, 10, 5, 6), spawns[2]);
+        Assert.Equal(string.Empty, spawns[2].Properties);
     }
 
     [Fact]

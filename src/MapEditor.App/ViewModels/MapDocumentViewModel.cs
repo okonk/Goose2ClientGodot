@@ -351,7 +351,7 @@ internal sealed class MapDocumentViewModel : ViewModelBase, IDisposable
                 if (state.SelectedSpawn is { } spawnIndex && spawnIndex < session.Edits.Spawns.Count)
                 {
                     NpcSpawnRow row = session.Edits.Spawns[spawnIndex];
-                    _clipboard.Current = EditorClipboardPayload.FromSpawn(row.NpcId, session.SpreadsheetId);
+                    _clipboard.Current = EditorClipboardPayload.FromSpawn(row.NpcId, row.Properties, session.SpreadsheetId);
                 }
                 return;
             }
@@ -381,7 +381,7 @@ internal sealed class MapDocumentViewModel : ViewModelBase, IDisposable
                 if (state.SelectedSpawn is { } spawnIndex && spawnIndex < session.Edits.Spawns.Count)
                 {
                     NpcSpawnRow row = session.Edits.Spawns[spawnIndex];
-                    _clipboard.Current = EditorClipboardPayload.FromSpawn(row.NpcId, session.SpreadsheetId);
+                    _clipboard.Current = EditorClipboardPayload.FromSpawn(row.NpcId, row.Properties, session.SpreadsheetId);
                     state.SelectedSpawn = null;
                     session.Edits.RemoveSpawnAt(spawnIndex);
                 }
@@ -978,7 +978,7 @@ internal sealed class MapDocumentViewModel : ViewModelBase, IDisposable
         if (payload.Kind == EditorClipboardKind.Spawn)
         {
             int spawnIndex = session.Edits.Spawns.Count;
-            session.Edits.AddSpawn(new NpcSpawnRow(payload.SpawnNpcId!.Value, session.MapId, x, y));
+            session.Edits.AddSpawn(new NpcSpawnRow(payload.SpawnNpcId!.Value, session.MapId, x, y, payload.SpawnProperties ?? string.Empty));
             state.SelectedSpawn = spawnIndex;
             return;
         }

@@ -13,6 +13,7 @@ internal sealed class EditorClipboardPayload
         EditorClipboardKind kind,
         TileClipboard? tiles,
         int? spawnNpcId,
+        string? spawnProperties,
         int? warpDestinationMapId,
         int? warpDestinationX,
         int? warpDestinationY,
@@ -21,6 +22,7 @@ internal sealed class EditorClipboardPayload
         Kind = kind;
         Tiles = tiles;
         SpawnNpcId = spawnNpcId;
+        SpawnProperties = spawnProperties;
         WarpDestinationMapId = warpDestinationMapId;
         WarpDestinationX = warpDestinationX;
         WarpDestinationY = warpDestinationY;
@@ -33,6 +35,8 @@ internal sealed class EditorClipboardPayload
 
     public int? SpawnNpcId { get; }
 
+    public string? SpawnProperties { get; }
+
     public int? WarpDestinationMapId { get; }
 
     public int? WarpDestinationX { get; }
@@ -42,11 +46,11 @@ internal sealed class EditorClipboardPayload
     public string? SourceSpreadsheetId { get; }
 
     public static EditorClipboardPayload FromTiles(TileClipboard tiles)
-        => new(EditorClipboardKind.Tiles, tiles, null, null, null, null, null);
+        => new(EditorClipboardKind.Tiles, tiles, null, null, null, null, null, null);
 
-    public static EditorClipboardPayload FromSpawn(int npcId, string sourceSpreadsheetId)
-        => new(EditorClipboardKind.Spawn, null, npcId, null, null, null, sourceSpreadsheetId);
+    public static EditorClipboardPayload FromSpawn(int npcId, string properties, string sourceSpreadsheetId)
+        => new(EditorClipboardKind.Spawn, null, npcId, properties, null, null, null, sourceSpreadsheetId);
 
     public static EditorClipboardPayload FromWarp(int destinationMapId, int destinationX, int destinationY, string sourceSpreadsheetId)
-        => new(EditorClipboardKind.Warp, null, null, destinationMapId, destinationX, destinationY, sourceSpreadsheetId);
+        => new(EditorClipboardKind.Warp, null, null, null, destinationMapId, destinationX, destinationY, sourceSpreadsheetId);
 }
