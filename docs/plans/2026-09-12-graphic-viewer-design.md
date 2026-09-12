@@ -26,7 +26,7 @@ The sidecar will contain:
 
 - Sheet-to-category membership.
 - Equipment category and equipment ID mappings.
-- Animation IDs.
+- Animation IDs, identified internally by owning sheet plus ID because source IDs are not globally unique.
 - Ordered `(sheet, graphic)` frame references.
 - An 8 FPS playback rate matching the current runtime convention.
 
@@ -35,9 +35,9 @@ The map editor rendering library will parse the sidecar into backend-neutral mod
 - Category to eligible sheets.
 - Sheet to category and equipment metadata.
 - Frame reference to matching animations.
-- Animation ID to ordered frame sequence.
+- Owning-sheet/animation-ID pair to ordered frame sequence.
 
-The `Spells` category will retain the legacy viewer's behavior: sheets with standalone animations that are not assigned to compiled equipment. This can include emotes or other animated effects because the source data does not distinguish them reliably.
+For Illutia, `Spells` retains the legacy viewer's behavior: sheets with standalone animations that are not assigned to compiled equipment. This can include emotes or other animated effects because the source data does not distinguish them reliably. Aspereta stores most animation definitions on one sheet, so its Body and Spells membership is assigned to the frame-bearing sheets reached from compiled monster entries and the converter's established effect-ID ranges.
 
 Both converter commands that generate the sprite manifest, including the full `all` flow, will also generate the animation sidecar. Output will be deterministic. The viewer will strictly cross-validate sidecar frame references against `manifest.json` rather than introducing a multi-file transaction system.
 
