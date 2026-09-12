@@ -146,6 +146,33 @@ public class GoogleSheetsGatewayTests
     }
 
     [Fact]
+    public async Task ReadGameData_NonBlankSpawnProperties_MapsTheJsonOntoTheSpawnRow()
+    {
+        const string properties = "{\"facing\":\"north\",\"scale\":2}";
+        var operations = new FakeSheetsTransport
+        {
+            Metadata = ValidMetadata(),
+            ValuesResponse = Values(
+                ("'Maps'!A1:Q", new[] { HeaderRow("Maps") }),
+                ("'NPCs'!A1:BG", new[] { HeaderRow("NPCs") }),
+                ("'NPC Spawns'!A1:E",
+                    new[]
+                    {
+                        HeaderRow("NPC Spawns"),
+                        Row("NPC Spawns", ("npc_id", "10"), ("map_id", "1"), ("map_x", "6"), ("map_y", "7"), ("properties", properties))
+                    }),
+                ("'Warptiles'!A1:F", new[] { HeaderRow("Warptiles") }))
+        };
+
+        var data = await CreateGateway(operations).ReadGameDataAsync(SpreadsheetId, 1, CancellationToken.None);
+
+        var spawn = Assert.Single(data.Spawns);
+        Assert.Equal(2, spawn.WorksheetRowNumber);
+        Assert.Equal(properties, spawn.Value.Properties);
+        Assert.Equal(new NpcSpawnRow(10, 1, 5, 6, properties), spawn.Value);
+    }
+
+    [Fact]
     public async Task ReadGameData_BlankAndShortRows_PreserveWorksheetRowNumbers()
     {
         var mapsRows = new object?[][]

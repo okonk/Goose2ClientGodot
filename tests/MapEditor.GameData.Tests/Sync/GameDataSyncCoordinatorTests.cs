@@ -27,8 +27,8 @@ public class GameDataSyncCoordinatorTests
     private static NpcAppearance Npc(int id) =>
         new(id, $"npc-{id}", 0, 0, new RgbaValue(0, 0, 0, 255), 0, 0, new RgbaValue(0, 0, 0, 255), "");
 
-    private static RemoteRow<NpcSpawnRow> Spawn(int row, int npcId, int mapId, int x, int y)
-        => new(row, new NpcSpawnRow(npcId, mapId, x, y));
+    private static RemoteRow<NpcSpawnRow> Spawn(int row, int npcId, int mapId, int x, int y, string properties = "")
+        => new(row, new NpcSpawnRow(npcId, mapId, x, y, properties));
 
     private static RemoteRow<WarpRow> Warp(int row, int mapId, int x, int y, int warpId, int warpX, int warpY)
         => new(row, new WarpRow(mapId, x, y, warpId, warpX, warpY));
@@ -410,6 +410,28 @@ public class GameDataSyncCoordinatorTests
         var result = await coordinator.PushAsync(session, Dimensions, NoOpenMaps, null, null, CancellationToken.None);
 
         Assert.IsType<PushedResult>(result);
+        Assert.False(session.Edits.IsDirty);
+        Assert.DoesNotContain(gateway.Calls, call => call.Method == "ReplaceOwnedRowsAsync");
+    }
+
+    [Fact]
+    public async Task Push_IdenticalNonBlankSpawnProperties_NoGatewayWrite_MarksPushed()
+    {
+        const string properties = "{\"facing\":\"north\",\"scale\":2}";
+        var (coordinator, gateway, _) = NewCoordinator();
+        var session = new GameDataSyncSession(Sheet, Map, new RemoteGameData(
+            new[] { MapRef(Map), MapRef(10) },
+            new Dictionary<int, NpcAppearance> { [1] = Npc(1), [2] = Npc(2) },
+            new[] { Spawn(2, 1, Map, 1, 2, properties), Spawn(3, 2, Map, 5, 6, properties) },
+            new[] { Warp(2, Map, 3, 4, 10, 5, 6), Warp(3, Map, 7, 8, 10, 9, 10) }));
+        gateway.EnqueueOwnedRows(new RemoteOwnedRows(
+            new[] { Spawn(9, 2, Map, 5, 6, properties), Spawn(8, 1, Map, 1, 2, properties) },
+            new[] { Warp(9, Map, 7, 8, 10, 9, 10), Warp(8, Map, 3, 4, 10, 5, 6) }));
+
+        var result = await coordinator.PushAsync(session, Dimensions, NoOpenMaps, null, null, CancellationToken.None);
+
+        var pushed = Assert.IsType<PushedResult>(result);
+        Assert.Equal(0, pushed.ChangedRows);
         Assert.False(session.Edits.IsDirty);
         Assert.DoesNotContain(gateway.Calls, call => call.Method == "ReplaceOwnedRowsAsync");
     }

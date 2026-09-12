@@ -119,6 +119,26 @@ public class GoogleBatchBuilderTests
     }
 
     [Fact]
+    public void Build_AppendRow_KeepsNonBlankPropertiesAsTheFifthCell()
+    {
+        const string properties = "{\"facing\":\"north\",\"scale\":2}";
+        var plan = new ReplacementPlan(
+            "NPC Spawns",
+            Array.Empty<RowDelete>(),
+            new[] { new RowInsert(new string?[] { "10", "1", "5", "6", properties }) });
+
+        var request = GoogleBatchBuilder.Build(SheetIds, plan, EmptyPlan("Warptiles"));
+
+        var append = request.Requests.Single().AppendCells;
+        Assert.Equal(7, append.SheetId);
+        var row = Assert.Single(append.Rows).Values;
+        Assert.Equal(5, row.Count);
+        Assert.Equal(
+            new[] { "10", "1", "5", "6", properties },
+            row.Select(cell => cell.UserEnteredValue.StringValue).ToArray());
+    }
+
+    [Fact]
     public void Build_NeverTargetsUnplannedRowsOrOtherSheetIds()
     {
         var spawnPlan = new ReplacementPlan(
