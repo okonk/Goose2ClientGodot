@@ -43,6 +43,9 @@
         <MenuItem x:Name="PreviewMenuItem" Header="Preview" ToggleType="CheckBox" IsChecked="{Binding GameData.PreviewMode, Mode=TwoWay}" />
         <MenuItem x:Name="ShowNamesMenuItem" Header="Show names" ToggleType="CheckBox" IsChecked="{Binding GameData.ShowNames, Mode=TwoWay}" />
       </MenuItem>
+      <MenuItem x:Name="ToolsMenu" Header="_Tools">
+        <MenuItem x:Name="GraphicViewerCommand" Header="Graphic _Viewer" Click="OnGraphicViewer" />
+      </MenuItem>
     </Menu>
     <ListBox x:Name="TabStrip" DockPanel.Dock="Top"
              SelectionMode="Single"

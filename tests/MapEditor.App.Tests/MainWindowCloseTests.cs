@@ -14,13 +14,16 @@ using Avalonia.Threading;
 using Avalonia.VisualTree;
 using MapEditor.App.Connectivity;
 using MapEditor.App.Dialogs;
+using MapEditor.App.Rendering;
 using MapEditor.App.Tests.Fakes;
+using MapEditor.App.Tests.Fixtures;
 using MapEditor.App.ViewModels;
 using MapEditor.Core;
 using MapEditor.GameData.Connectivity;
 using MapEditor.GameData.Replacement;
 using MapEditor.GameData.Rows;
 using MapEditor.GameData.Sync;
+using MapEditor.Rendering;
 using Xunit;
 
 namespace MapEditor.App.Tests;
@@ -243,6 +246,35 @@ public class MainWindowCloseTests
     }
 
     [AvaloniaFact]
+    public void Close_WithOpenViewer_ClosesTheViewerBeforeDisposingAssets()
+    {
+        using MainWindowHarness harness = MainWindowHarness.Create();
+        harness.Dialogs.DirtyResult = DirtyChoice.Discard;
+        string directory = WriteViewerAssetDirectory(harness.TempDirectory);
+        Assert.True(harness.Assets.TryOpen(directory));
+        Dispatcher.UIThread.RunJobs();
+
+        MenuItem command = harness.Window.FindControl<MenuItem>("GraphicViewerCommand")
+            ?? throw new InvalidOperationException("missing GraphicViewerCommand menu item");
+        command.RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+        Dispatcher.UIThread.RunJobs();
+        GraphicViewerWindow viewer = Assert.IsType<GraphicViewerWindow>(harness.Window.GraphicViewer);
+        AvaloniaSpriteSheetImage sheetImage = viewer.SheetImage!;
+
+        bool assetsDisposedAtViewerClose = true;
+        viewer.Closed += (sender, e) => assetsDisposedAtViewerClose = harness.Assets.Current.IsDisposed;
+
+        harness.Window.Close();
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.False(harness.Window.IsVisible);
+        Assert.False(viewer.IsVisible);
+        Assert.False(assetsDisposedAtViewerClose);
+        Assert.True(harness.Assets.Current.IsDisposed);
+        Assert.Equal(1, sheetImage.DisposeCount);
+    }
+
+    [AvaloniaFact]
     public void Close_Canceled_KeepsAssetContextUsable()
     {
         using MainWindowHarness harness = MainWindowHarness.Create();
@@ -405,6 +437,21 @@ public class MainWindowCloseTests
         Directory.CreateDirectory(Path.Combine(directory, "sheets"));
         File.WriteAllText(Path.Combine(directory, "manifest.json"),
             """{ "tileSize": 32, "sheets": { "1": { "10": [0, 0, 32, 32] } } }""");
+        return directory;
+    }
+
+    private static string WriteViewerAssetDirectory(string root)
+    {
+        string directory = Path.Combine(root, "assets-viewer");
+        Directory.CreateDirectory(Path.Combine(directory, "sheets"));
+        File.WriteAllText(Path.Combine(directory, "manifest.json"),
+            """{ "tileSize": 32, "sheets": { "1": { "10": [0, 0, 32, 32], "11": [32, 0, 32, 32] } } }""");
+        File.WriteAllText(Path.Combine(directory, GraphicAnimationManifest.FileName),
+            """
+            { "version": 1, "sheets": { "1": { "categories": [ { "name": "Body", "id": 1 } ] } },
+            "animations": [ { "ownerSheet": 1, "id": 10, "fps": 8, "frames": [[1, 10], [1, 11]] } ] }
+            """);
+        File.WriteAllBytes(Path.Combine(directory, "sheets", "1.png"), AssetFixture.PngSheet.Create(64, 32));
         return directory;
     }
 

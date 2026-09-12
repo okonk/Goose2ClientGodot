@@ -1225,3 +1225,229 @@ public class MainWindowTests : IDisposable
         Assert.True(document.Session.CompleteStroke());
     }
 }
+
+public class MainWindowGraphicViewerTests : IDisposable
+{
+    private const string ManifestA = """
+        { "tileSize": 32, "sheets": { "1": { "10": [0, 0, 32, 32], "11": [32, 0, 32, 32] } } }
+        """;
+
+    private const string AnimationA = """
+        { "version": 1,
+          "sheets": { "1": { "categories": [ { "name": "Body", "id": 1 } ] } },
+          "animations": [ { "ownerSheet": 1, "id": 10, "fps": 8, "frames": [[1, 10], [1, 11]] } ] }
+        """;
+
+    private const string InvalidAnimationA = """
+        { "version": 1,
+          "sheets": { "1": { "categories": [ { "name": "Body", "id": 1 } ] } },
+          "animations": [ { "ownerSheet": 1, "id": 10, "fps": 8, "frames": [[1, 99]] } ] }
+        """;
+
+    private const string ManifestB = """
+        { "tileSize": 32, "sheets": { "5": { "50": [0, 0, 32, 32], "51": [32, 0, 32, 32] } } }
+        """;
+
+    private const string AnimationB = """
+        { "version": 1,
+          "sheets": { "5": { "categories": [ { "name": "Tiles" } ] } },
+          "animations": [ { "ownerSheet": 5, "id": 10, "fps": 8, "frames": [[5, 50], [5, 51]] } ] }
+        """;
+
+    private readonly MainWindowHarness _harness = MainWindowHarness.Create();
+
+    public void Dispose() => _harness.Dispose();
+
+    private MainWindow Window => _harness.Window;
+
+    private string WriteAssetDirectory(string name, string manifestJson, string? animationJson, int sheetId)
+    {
+        string directory = Path.Combine(_harness.TempDirectory, name);
+        Directory.CreateDirectory(Path.Combine(directory, "sheets"));
+        File.WriteAllText(Path.Combine(directory, "manifest.json"), manifestJson);
+        if (animationJson is not null)
+        {
+            File.WriteAllText(Path.Combine(directory, GraphicAnimationManifest.FileName), animationJson);
+        }
+
+        File.WriteAllBytes(Path.Combine(directory, "sheets", $"{sheetId}.png"), AssetFixture.PngSheet.Create(64, 32));
+        return directory;
+    }
+
+    private void OpenValidAssets(string name = "assets-a")
+    {
+        string directory = WriteAssetDirectory(name, ManifestA, AnimationA, 1);
+        Assert.True(_harness.Assets.TryOpen(directory));
+        Dispatcher.UIThread.RunJobs();
+    }
+
+    private void ClickGraphicViewer()
+    {
+        MenuItem command = Window.FindControl<MenuItem>("GraphicViewerCommand")
+            ?? throw new InvalidOperationException("missing GraphicViewerCommand menu item");
+        command.RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+        Dispatcher.UIThread.RunJobs();
+    }
+
+    private GraphicViewerWindow OpenViewer()
+    {
+        OpenValidAssets();
+        ClickGraphicViewer();
+        return Assert.IsType<GraphicViewerWindow>(Window.GraphicViewer);
+    }
+
+    [AvaloniaFact]
+    public void Layout_ContainsToolsMenuWithGraphicViewerCommand()
+    {
+        Assert.NotNull(Window.FindControl<MenuItem>("ToolsMenu"));
+        Assert.NotNull(Window.FindControl<MenuItem>("GraphicViewerCommand"));
+        Assert.Null(Window.GraphicViewer);
+    }
+
+    [AvaloniaFact]
+    public void GraphicViewer_WithoutLoadedAssets_ShowsOneErrorAndCreatesNoViewer()
+    {
+        ClickGraphicViewer();
+
+        ErrorPresentation error = Assert.Single(_harness.Dialogs.Errors);
+        Assert.Equal("Graphic Viewer", error.Title);
+        Assert.False(_harness.Assets.Current.IsAvailable);
+        Assert.Null(Window.GraphicViewer);
+    }
+
+    [AvaloniaFact]
+    public void GraphicViewer_MissingSidecar_ShowsTheExactAvailabilityReasonAndCreatesNoViewer()
+    {
+        string directory = WriteAssetDirectory("assets-nosidecar", ManifestA, null, 1);
+        Assert.True(_harness.Assets.TryOpen(directory));
+        Dispatcher.UIThread.RunJobs();
+        Assert.False(_harness.Assets.Current.GraphicViewerAvailability.IsAvailable);
+
+        ClickGraphicViewer();
+
+        ErrorPresentation error = Assert.Single(_harness.Dialogs.Errors);
+        Assert.Equal("Graphic Viewer", error.Title);
+        Assert.Equal(_harness.Assets.Current.GraphicViewerAvailability.Diagnostic, error.Message);
+        Assert.Null(Window.GraphicViewer);
+    }
+
+    [AvaloniaFact]
+    public void GraphicViewer_InvalidSidecar_ShowsTheExactAvailabilityReasonAndCreatesNoViewer()
+    {
+        string directory = WriteAssetDirectory("assets-badsidecar", ManifestA, InvalidAnimationA, 1);
+        Assert.True(_harness.Assets.TryOpen(directory));
+        Dispatcher.UIThread.RunJobs();
+        Assert.False(_harness.Assets.Current.GraphicViewerAvailability.IsAvailable);
+
+        ClickGraphicViewer();
+
+        ErrorPresentation error = Assert.Single(_harness.Dialogs.Errors);
+        Assert.Equal("Graphic Viewer", error.Title);
+        Assert.Equal(_harness.Assets.Current.GraphicViewerAvailability.Diagnostic, error.Message);
+        Assert.Contains("missing from the sprite manifest", error.Message);
+        Assert.Null(Window.GraphicViewer);
+    }
+
+    [AvaloniaFact]
+    public void GraphicViewer_ValidAssets_CreatesAnOwnedModelessViewer()
+    {
+        GraphicViewerWindow viewer = OpenViewer();
+
+        Assert.True(viewer.IsVisible);
+        Assert.Same(Window, viewer.Owner);
+        Assert.True(Window.IsVisible);
+        Assert.True(Window.IsEnabled);
+        Assert.Empty(_harness.Dialogs.Errors);
+        Assert.Equal(new[] { 1 }, viewer.ViewModel.Sheets);
+    }
+
+    [AvaloniaFact]
+    public void GraphicViewer_RepeatedCommand_ActivatesTheSameInstanceWithoutDuplicates()
+    {
+        GraphicViewerWindow viewer = OpenViewer();
+
+        ClickGraphicViewer();
+        ClickGraphicViewer();
+
+        Assert.Same(viewer, Window.GraphicViewer);
+        Assert.True(viewer.IsVisible);
+        Assert.Empty(_harness.Dialogs.Errors);
+    }
+
+    [AvaloniaFact]
+    public void GraphicViewer_ClosedByUser_ClearsOwnershipSoTheNextCommandCreatesAFreshInstance()
+    {
+        GraphicViewerWindow viewer = OpenViewer();
+        AvaloniaSpriteSheetImage sheetImage = viewer.SheetImage!;
+        viewer.Close();
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Null(Window.GraphicViewer);
+        Assert.Equal(1, sheetImage.DisposeCount);
+
+        ClickGraphicViewer();
+        GraphicViewerWindow second = Assert.IsType<GraphicViewerWindow>(Window.GraphicViewer);
+        Assert.NotSame(viewer, second);
+        Assert.True(second.IsVisible);
+        Assert.False(viewer.IsVisible);
+    }
+
+    [AvaloniaFact]
+    public void GraphicViewer_AssetReplacementWithValidMetadata_UpdatesTheOpenViewer()
+    {
+        GraphicViewerWindow viewer = OpenViewer();
+        AvaloniaSpriteSheetImage oldSheet = viewer.SheetImage!;
+
+        string directoryB = WriteAssetDirectory("assets-b", ManifestB, AnimationB, 5);
+        Assert.True(_harness.Assets.TryOpen(directoryB));
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.True(viewer.IsVisible);
+        Assert.True(viewer.ViewModel.IsAvailable);
+        Assert.Equal(new[] { 5 }, viewer.ViewModel.Sheets);
+        AvaloniaSpriteSheetImage newSheet = Assert.IsType<AvaloniaSpriteSheetImage>(viewer.SheetImage);
+        Assert.NotSame(oldSheet, newSheet);
+        Assert.Same(newSheet, viewer.SheetControl.Image);
+        Assert.Equal(1, oldSheet.DisposeCount);
+    }
+
+    [AvaloniaFact]
+    public void GraphicViewer_AssetReplacementWithInvalidMetadata_LeavesItOpenAndUnavailable()
+    {
+        GraphicViewerWindow viewer = OpenViewer();
+        AvaloniaSpriteSheetImage oldSheet = viewer.SheetImage!;
+
+        string directoryB = WriteAssetDirectory("assets-bad", ManifestA, InvalidAnimationA, 1);
+        Assert.True(_harness.Assets.TryOpen(directoryB));
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.True(viewer.IsVisible);
+        Assert.False(viewer.ViewModel.IsAvailable);
+        Assert.False(_harness.Assets.Current.GraphicViewerAvailability.IsAvailable);
+        Assert.Equal(1, oldSheet.DisposeCount);
+    }
+
+    [AvaloniaFact]
+    public void GraphicViewer_SelectionAndPlayback_LeaveTheActiveDocumentUntouched()
+    {
+        OpenValidAssets();
+        MapDocumentViewModel document = _harness.ViewModel;
+        document.Session.Document.SetLayer(0, 0, 0, new MapTileLayer(7, 7));
+        MapTileLayer brush = new MapTileLayer(3, 9);
+        document.Brush = brush;
+
+        ClickGraphicViewer();
+        GraphicViewerWindow viewer = Assert.IsType<GraphicViewerWindow>(Window.GraphicViewer);
+        Assert.True(viewer.ViewModel.TrySelectFrameAt(16, 16));
+        viewer.ViewModel.Play();
+        viewer.ViewModel.Zoom = 4.0;
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Equal(new MapTileLayer(7, 7), document.Session.Document[0, 0].GetLayer(0));
+        Assert.Equal(brush, document.Brush);
+        Assert.False(document.Session.IsDirty);
+        Assert.False(document.CanUndo);
+        Assert.False(document.CanRedo);
+        Assert.Equal(100, document.ZoomPercent);
+    }
+}

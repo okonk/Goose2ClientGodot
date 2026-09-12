@@ -39,6 +39,7 @@ internal partial class MainWindow : Window
     private readonly AppSettingsStore _settings;
     private readonly WorkspaceViewModel _workspace;
     private readonly AssetContextController _assets;
+    private GraphicViewerWindow? _graphicViewer;
     private readonly INotifyCollectionChanged _documents;
     // The workspace owns the view models' lifetime; the window must never dispose them.
     private readonly Dictionary<MapDocumentViewModel, DocumentView> _views = new();
@@ -116,6 +117,13 @@ internal partial class MainWindow : Window
         Closed += (sender, e) =>
         {
             _closed = true;
+            if (_graphicViewer is { } viewer)
+            {
+                _graphicViewer = null;
+                viewer.Closed -= OnGraphicViewerClosed;
+                viewer.Close();
+            }
+
             _assets.Dispose();
         };
         Opened += OnOpened;
@@ -134,6 +142,8 @@ internal partial class MainWindow : Window
     internal AppSettingsStore Settings => _settings;
 
     internal AssetContextController Assets => _assets;
+
+    internal GraphicViewerWindow? GraphicViewer => _graphicViewer;
 
     internal bool HasViewFor(MapDocumentViewModel document) => _views.ContainsKey(document);
 
@@ -952,6 +962,42 @@ internal partial class MainWindow : Window
                 await TryOpenAssetsAsync(directory);
             }
         });
+
+    private void OnGraphicViewer(object? sender, RoutedEventArgs e) => _ = RunCommandAsync(OpenGraphicViewerAsync);
+
+    private async Task OpenGraphicViewerAsync()
+    {
+        if (_graphicViewer is { } viewer)
+        {
+            viewer.Activate();
+            return;
+        }
+
+        GraphicViewerAvailability availability = _assets.Current.GraphicViewerAvailability;
+        if (!availability.IsAvailable)
+        {
+            await _dialogs.ShowErrorAsync(new ErrorPresentation("Graphic Viewer", availability.Diagnostic!));
+            return;
+        }
+
+        var window = new GraphicViewerWindow(_assets);
+        window.Closed += OnGraphicViewerClosed;
+        _graphicViewer = window;
+        window.Show(this);
+    }
+
+    private void OnGraphicViewerClosed(object? sender, EventArgs e)
+    {
+        if (sender is GraphicViewerWindow viewer)
+        {
+            viewer.Closed -= OnGraphicViewerClosed;
+        }
+
+        if (ReferenceEquals(_graphicViewer, sender))
+        {
+            _graphicViewer = null;
+        }
+    }
 
     private void OnThemeSelected(object? sender, RoutedEventArgs e)
     {
