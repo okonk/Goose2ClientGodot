@@ -131,9 +131,11 @@ if (args.Length >= 1 && args[0] == "manifest")
     string outPath = args.Length >= 2
         ? args[1]
         : Path.GetFullPath(Path.Combine("..", "..", "Assets", "Sprites", "manifest.json"));
-    Directory.CreateDirectory(Path.GetDirectoryName(outPath)!);
-    File.WriteAllText(outPath, FrameManifestBuilder.Build(Paths.IllutiaData));
+    ManifestFileStore.Write(outPath,
+        () => FrameManifestBuilder.Build(Paths.IllutiaData),
+        () => AnimationManifestBuilder.Build(Paths.IllutiaData, Paths.CompiledEnc));
     Console.WriteLine($"Wrote {outPath}");
+    Console.WriteLine($"Wrote {Path.Combine(Path.GetDirectoryName(Path.GetFullPath(outPath))!, ManifestFileStore.AnimationFileName)}");
     return;
 }
 
@@ -182,11 +184,11 @@ if (args.Length >= 1 && args[0] == "all")
     var fx = AsperetaEffectsConverter.Convert(
         Paths.AsperetaData, Paths.AsperetaCompiledEnc, repoRoot);
 
-    // Combined frame manifest
-    string manifestPath = Path.Combine(repoRoot, "Assets", "Sprites", "manifest.json");
-    Directory.CreateDirectory(Path.GetDirectoryName(manifestPath)!);
-    File.WriteAllText(manifestPath,
-        FrameManifestBuilder.BuildCombined(Paths.IllutiaData, Paths.AsperetaData));
+    // Combined frame + animation manifests
+    ManifestFileStore.WriteCombined(repoRoot,
+        () => FrameManifestBuilder.BuildCombined(Paths.IllutiaData, Paths.AsperetaData),
+        () => AnimationManifestBuilder.BuildCombined(
+            Paths.IllutiaData, Paths.CompiledEnc, Paths.AsperetaData, Paths.AsperetaCompiledEnc));
 
     Console.WriteLine($"Sheets: {sheets.Succeeded} ok, {sheets.Failed} failed");
     Console.WriteLine($"Animations: {animations.ResourcesWritten} character, {animations.EffectsWritten} effects, {animations.Failed} failed");
@@ -199,7 +201,8 @@ if (args.Length >= 1 && args[0] == "all")
     foreach (var w in aspMaps.Warnings) Console.WriteLine($"  WARN {w}");
     foreach (var f in aspBatch.Failures.Concat(aspMaps.Failures).Concat(fx.Failures))
         Console.WriteLine($"  FAIL {f}");
-    Console.WriteLine($"Manifest: {manifestPath}");
+    Console.WriteLine($"Manifest: {Path.Combine(repoRoot, "Assets", "Sprites", "manifest.json")}");
+    Console.WriteLine($"Animation manifest: {Path.Combine(repoRoot, "Assets", "Sprites", ManifestFileStore.AnimationFileName)}");
     Console.WriteLine($"Appearance manifest: {Path.Combine(repoRoot, AppearanceManifestFileStore.RelativePath)}");
     return;
 }
