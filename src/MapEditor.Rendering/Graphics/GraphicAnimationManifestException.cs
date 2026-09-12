@@ -24,7 +24,9 @@ public enum GraphicAnimationManifestError
     DuplicateAnimation,
     EmptyAnimationFrames,
     InvalidFrame,
-    EmptyFrameGraphic
+    EmptyFrameGraphic,
+    UnknownSheet,
+    UnknownFrameReference
 }
 
 public sealed class GraphicAnimationManifestException : IOException
