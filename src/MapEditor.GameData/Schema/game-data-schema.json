@@ -110,20 +110,24 @@
         {
           "name": "attack_speed",
           "header": "attack speed (2)",
-          "kind": "Decimal",
-          "sql": "DECIMAL(9,4)",
+          "kind": "Double",
+          "sql": "REAL",
           "default": "2",
           "required": false,
-          "pk": false
+          "pk": false,
+          "scale": 4,
+          "max": 99999.9999
         },
         {
           "name": "move_speed",
           "header": "move speed (2)",
-          "kind": "Decimal",
-          "sql": "DECIMAL(9,4)",
+          "kind": "Double",
+          "sql": "REAL",
           "default": "2",
           "required": false,
-          "pk": false
+          "pk": false,
+          "scale": 4,
+          "max": 99999.9999
         },
         {
           "name": "stationary",
@@ -444,11 +448,13 @@
         {
           "name": "hp_percent_regen",
           "header": "hp % reg",
-          "kind": "Decimal",
-          "sql": "DECIMAL(9,4)",
+          "kind": "Double",
+          "sql": "REAL",
           "default": "0",
           "required": false,
-          "pk": false
+          "pk": false,
+          "scale": 4,
+          "max": 99999.9999
         },
         {
           "name": "hp_static_regen",
@@ -462,11 +468,13 @@
         {
           "name": "mp_percent_regen",
           "header": "mp % reg",
-          "kind": "Decimal",
-          "sql": "DECIMAL(9,4)",
+          "kind": "Double",
+          "sql": "REAL",
           "default": "0",
           "required": false,
-          "pk": false
+          "pk": false,
+          "scale": 4,
+          "max": 99999.9999
         },
         {
           "name": "mp_static_regen",
