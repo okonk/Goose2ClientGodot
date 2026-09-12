@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.IO.Compression;
 using System.Text;
+using MapEditor.Rendering;
 
 namespace MapEditor.App.Tests.Fixtures;
 
@@ -26,6 +27,32 @@ public sealed class AssetFixture : IDisposable
 
     public void WriteCorruptSheet(int sheetId)
         => File.WriteAllText(Path.Combine(AssetDirectory, "sheets", $"{sheetId}.png"), "this is not a png, just text bytes");
+
+    public const string ManifestJson = """
+        { "tileSize": 32, "sheets": {
+          "1": { "10": [0, 0, 32, 32], "11": [32, 0, 32, 32] },
+          "2": { "20": [0, 0, 32, 32] }
+        } }
+        """;
+
+    public const string AnimationSidecarJson = """
+        { "version": 1,
+          "sheets": { "1": { "categories": [ { "name": "Body", "id": 1 }, { "name": "Tiles" } ] } },
+          "animations": [ { "ownerSheet": 1, "id": 10, "fps": 8, "frames": [[1, 10], [1, 11]] } ] }
+        """;
+
+    public static string WriteAssetDirectory(string root, string name)
+    {
+        string assetDirectory = Path.Combine(root, name);
+        Directory.CreateDirectory(Path.Combine(assetDirectory, "sheets"));
+        File.WriteAllText(Path.Combine(assetDirectory, "manifest.json"), ManifestJson);
+        File.WriteAllBytes(Path.Combine(assetDirectory, "sheets", "1.png"), PngSheet.Create(64, 64));
+        File.WriteAllBytes(Path.Combine(assetDirectory, "sheets", "2.png"), PngSheet.Create(64, 64));
+        return assetDirectory;
+    }
+
+    public static void WriteAnimationSidecar(string assetDirectory, string json)
+        => File.WriteAllText(Path.Combine(assetDirectory, GraphicAnimationManifest.FileName), json);
 
     public void Dispose()
         => Directory.Delete(Root, recursive: true);

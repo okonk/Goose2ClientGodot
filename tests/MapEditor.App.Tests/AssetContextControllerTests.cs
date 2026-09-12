@@ -153,6 +153,9 @@ public class AssetContextControllerTests : IDisposable
         Assert.Equal(new[] { 1, 2 }, _viewModel.SheetIds);
         Assert.Equal(2, context.GetFrames(1).Count);
         Assert.Equal(SpriteResolutionStatus.Ready, context.Resolve(new SpriteReference(1, 10)).Status);
+        Assert.Null(context.Graphics);
+        Assert.False(context.GraphicViewerAvailability.IsAvailable);
+        Assert.Equal("Animation manifest not found: " + Path.GetFullPath(Path.Combine(assetDirectory, "animation-manifest.json")), context.GraphicViewerAvailability.Diagnostic);
         Assert.Equal(Path.GetFullPath(assetDirectory), new AppSettingsStore(_settingsPath).Load().AssetDirectory);
     }
 
@@ -207,6 +210,129 @@ public class AssetContextControllerTests : IDisposable
         Assert.Equal(new SpriteReference(2, 20), equip.Reference);
         Assert.Same(noEquip.Image, context.Resolve(new SpriteReference(1, 10)).Image);
         controller.Dispose();
+    }
+
+    [AvaloniaFact]
+    public void TryOpen_ValidAnimationSidecar_ProducesGraphicCatalogAndAvailableViewer()
+    {
+        using AssetContextController controller = CreateController();
+        string assetDirectory = AssetFixture.WriteAssetDirectory(_directory, "assets-graphics");
+        AssetFixture.WriteAnimationSidecar(assetDirectory, AssetFixture.AnimationSidecarJson);
+
+        bool opened = controller.TryOpen(assetDirectory);
+
+        Assert.True(opened);
+        AssetContext context = controller.Current;
+        Assert.True(context.IsAvailable);
+        Assert.NotNull(context.Graphics);
+        Assert.True(context.GraphicViewerAvailability.IsAvailable);
+        Assert.Null(context.GraphicViewerAvailability.Diagnostic);
+        Assert.Equal(new[] { 1, 2 }, context.Graphics.GetSheets(null).ToArray());
+        Assert.Equal(new[] { 1 }, context.Graphics.GetSheets(GraphicCategory.Body).ToArray());
+        Assert.Equal(new[] { new GraphicCategoryMapping(GraphicCategory.Body, 1), new GraphicCategoryMapping(GraphicCategory.Tiles, null) }, context.Graphics.GetMappings(1));
+        Assert.True(context.Graphics.TryGetAnimation(new GraphicAnimationKey(1, 10), out GraphicAnimation animation));
+        Assert.Equal(new[] { new SpriteReference(1, 10), new SpriteReference(1, 11) }, animation.Frames);
+        Assert.Equal(new[] { animation }, context.Graphics.GetAnimations(new SpriteReference(1, 11)));
+        Assert.Equal(SpriteResolutionStatus.Ready, context.Resolve(new SpriteReference(1, 10)).Status);
+    }
+
+    [AvaloniaTheory]
+    [InlineData("not json", "Animation manifest is not valid JSON: ")]
+    [InlineData("""{ "version": 2, "sheets": {}, "animations": [] }""", "Root property 'version' must be 1.")]
+    [InlineData("""{ "version": 1, "sheets": { "9": { "categories": [ { "name": "Tiles" } ] } }, "animations": [] }""", "Categorized sheet 9 is missing from the sprite manifest.")]
+    public void TryOpen_InvalidAnimationSidecar_KeepsSpritesUsableWithTypedDiagnostic(string sidecarJson, string diagnostic)
+    {
+        using AssetContextController controller = CreateController();
+        string assetDirectory = AssetFixture.WriteAssetDirectory(_directory, "assets-bad-graphics");
+        AssetFixture.WriteAnimationSidecar(assetDirectory, sidecarJson);
+
+        bool opened = controller.TryOpen(assetDirectory);
+
+        Assert.True(opened);
+        AssetContext context = controller.Current;
+        Assert.True(context.IsAvailable);
+        Assert.Null(context.Graphics);
+        Assert.False(context.GraphicViewerAvailability.IsAvailable);
+        Assert.Contains(diagnostic, context.GraphicViewerAvailability.Diagnostic);
+        Assert.Equal(new[] { 1, 2 }, context.SheetIds);
+        Assert.Equal(2, context.GetFrames(1).Count);
+        Assert.Equal(SpriteResolutionStatus.Ready, context.Resolve(new SpriteReference(1, 10)).Status);
+    }
+
+    [Fact]
+    public void InitialContext_GraphicViewerIsUnavailableWithActionableDiagnostic()
+    {
+        using AssetContextController controller = CreateController();
+        AssetContext context = controller.Current;
+
+        Assert.Null(context.Graphics);
+        Assert.False(context.GraphicViewerAvailability.IsAvailable);
+        Assert.Equal("Sprite assets are unavailable; load an asset directory to resolve graphic viewer previews.", context.GraphicViewerAvailability.Diagnostic);
+    }
+
+    [Fact]
+    public void TryOpen_SecondSuccess_RaisesCurrentChangedOnceAfterSwapBeforeOldDisposal()
+    {
+        using AssetContextController controller = CreateController();
+        string firstDirectory = WriteAssetDirectory("assets-first", TwoSheetJson);
+        Assert.True(controller.TryOpen(firstDirectory));
+        AssetContext first = controller.Current;
+        int events = 0;
+        AssetContext? observedCurrent = null;
+        bool observedOldDisposed = true;
+        controller.CurrentChanged += (_, _) =>
+        {
+            events++;
+            observedCurrent = controller.Current;
+            observedOldDisposed = first.IsDisposed;
+        };
+        string secondDirectory = WriteAssetDirectory("assets-second", TwoSheetJson);
+
+        bool opened = controller.TryOpen(secondDirectory);
+
+        Assert.True(opened);
+        AssetContext second = controller.Current;
+        Assert.Equal(1, events);
+        Assert.Same(second, observedCurrent);
+        Assert.False(observedOldDisposed);
+        Assert.True(first.IsDisposed);
+        Assert.False(second.IsDisposed);
+    }
+
+    [Fact]
+    public void TryOpen_ThrowingCurrentChangedSubscriber_CannotPreventOldContextDisposal()
+    {
+        using AssetContextController controller = CreateController();
+        string firstDirectory = WriteAssetDirectory("assets-first", TwoSheetJson);
+        Assert.True(controller.TryOpen(firstDirectory));
+        AssetContext first = controller.Current;
+        controller.CurrentChanged += (_, _) => throw new InvalidOperationException("subscriber failure");
+        string secondDirectory = WriteAssetDirectory("assets-second", TwoSheetJson);
+
+        Assert.Throws<InvalidOperationException>(() => controller.TryOpen(secondDirectory));
+
+        Assert.NotSame(first, controller.Current);
+        Assert.True(first.IsDisposed);
+        Assert.False(controller.Current.IsDisposed);
+    }
+
+    [Fact]
+    public void TryOpen_FailedManifestOpen_RaisesNoCurrentChangedEvent()
+    {
+        using AssetContextController controller = CreateController();
+        string firstDirectory = WriteAssetDirectory("assets-first", TwoSheetJson);
+        Assert.True(controller.TryOpen(firstDirectory));
+        AssetContext first = controller.Current;
+        int events = 0;
+        controller.CurrentChanged += (_, _) => events++;
+        string badDirectory = WriteAssetDirectory("assets-bad", "this is not json");
+
+        bool opened = controller.TryOpen(badDirectory);
+
+        Assert.False(opened);
+        Assert.Equal(0, events);
+        Assert.Same(first, controller.Current);
+        Assert.False(first.IsDisposed);
     }
 
     [Fact]

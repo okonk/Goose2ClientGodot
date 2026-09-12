@@ -32,6 +32,8 @@ internal sealed class AssetContextController : IDisposable
 
     public AssetContext Current => _current;
 
+    public event EventHandler? CurrentChanged;
+
     public bool TryOpen(string path) => TryOpen(path, out _);
 
     internal bool TryOpen(string path, out Exception? failure)
@@ -79,7 +81,14 @@ internal sealed class AssetContextController : IDisposable
         {
         }
 
-        replaced.Dispose();
+        try
+        {
+            CurrentChanged?.Invoke(this, EventArgs.Empty);
+        }
+        finally
+        {
+            replaced.Dispose();
+        }
         return true;
     }
 

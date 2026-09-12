@@ -11,13 +11,17 @@ internal sealed class AssetContext : IDisposable
         MapRenderer renderer,
         IReadOnlyList<int> sheetIds,
         AppearanceAssetCatalog? appearance,
-        AppearanceAvailability appearanceAvailability)
+        AppearanceAvailability appearanceAvailability,
+        GraphicAssetCatalog? graphics,
+        GraphicViewerAvailability graphicViewerAvailability)
     {
         Cache = cache;
         Renderer = renderer;
         SheetIds = sheetIds;
         Appearance = appearance;
         AppearanceAvailability = appearanceAvailability;
+        Graphics = graphics;
+        GraphicViewerAvailability = graphicViewerAvailability;
         TintCache = new AvaloniaTintedSpriteCache();
     }
 
@@ -30,6 +34,10 @@ internal sealed class AssetContext : IDisposable
     public AppearanceAssetCatalog? Appearance { get; }
 
     public AppearanceAvailability AppearanceAvailability { get; }
+
+    public GraphicAssetCatalog? Graphics { get; }
+
+    public GraphicViewerAvailability GraphicViewerAvailability { get; }
 
     public AvaloniaTintedSpriteCache TintCache { get; }
 
@@ -45,7 +53,9 @@ internal sealed class AssetContext : IDisposable
             new MapRenderer(cache),
             Array.Empty<int>(),
             null,
-            AppearanceAvailability.Unavailable("Sprite assets are unavailable; load an asset directory to resolve appearance previews."));
+            AppearanceAvailability.Unavailable("Sprite assets are unavailable; load an asset directory to resolve appearance previews."),
+            null,
+            GraphicViewerAvailability.Unavailable("Sprite assets are unavailable; load an asset directory to resolve graphic viewer previews."));
     }
 
     public static AssetContext Create(string assetDirectory, ISpriteSheetLoader loader)
@@ -64,7 +74,19 @@ internal sealed class AssetContext : IDisposable
             availability = AppearanceAvailability.Unavailable(ex.Message);
         }
 
-        return new(cache, new MapRenderer(cache), sheetIds, appearance, availability);
+        GraphicAssetCatalog? graphics = null;
+        GraphicViewerAvailability graphicViewerAvailability;
+        try
+        {
+            graphics = GraphicAssetCatalog.Create(cache.Manifest!, GraphicAnimationManifest.Load(assetDirectory));
+            graphicViewerAvailability = GraphicViewerAvailability.Available;
+        }
+        catch (GraphicAnimationManifestException ex)
+        {
+            graphicViewerAvailability = GraphicViewerAvailability.Unavailable(ex.Message);
+        }
+
+        return new(cache, new MapRenderer(cache), sheetIds, appearance, availability, graphics, graphicViewerAvailability);
     }
 
     public SpriteResolution Resolve(SpriteReference reference)
