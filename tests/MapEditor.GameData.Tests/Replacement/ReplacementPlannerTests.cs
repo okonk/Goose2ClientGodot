@@ -462,7 +462,8 @@ public class ReplacementPlannerTests
             {"name":"map_y","header":"y","kind":"Int","sql":"SMALLINT","required":true,"pk":false},
             {"name":"npc_id","header":"npc","kind":"Id","sql":"INT","required":true,"pk":false},
             {"name":"map_x","header":"x","kind":"Int","sql":"SMALLINT","required":true,"pk":false},
-            {"name":"map_id","header":"map","kind":"Id","sql":"SMALLINT","required":true,"pk":false}
+            {"name":"map_id","header":"map","kind":"Id","sql":"SMALLINT","required":true,"pk":false},
+            {"name":"properties","header":"props","kind":"Text","sql":"TEXT","default":"''","required":false,"pk":false}
           ]},
           {"sheet":"Warptiles","table":"warptiles","columns":[
             {"name":"warp_y","header":"wy","kind":"Int","sql":"SMALLINT","required":true,"pk":false},

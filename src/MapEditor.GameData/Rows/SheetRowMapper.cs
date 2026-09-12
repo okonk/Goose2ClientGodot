@@ -34,6 +34,7 @@ public sealed class SheetRowMapper
     private readonly Field _spawnMapId;
     private readonly Field _spawnMapX;
     private readonly Field _spawnMapY;
+    private readonly Field _spawnProperties;
 
     private readonly Field _warpMapId;
     private readonly Field _warpMapX;
@@ -73,6 +74,7 @@ public sealed class SheetRowMapper
         _spawnMapId = Resolve(spawns, "map_id");
         _spawnMapX = Resolve(spawns, "map_x");
         _spawnMapY = Resolve(spawns, "map_y");
+        _spawnProperties = Resolve(spawns, "properties");
 
         _warpMapId = Resolve(warptiles, "map_id");
         _warpMapX = Resolve(warptiles, "map_x");
@@ -119,7 +121,8 @@ public sealed class SheetRowMapper
             ReadInt(_spawnNpcId, cells),
             ReadInt(_spawnMapId, cells),
             ReadInt(_spawnMapX, cells) - 1,
-            ReadInt(_spawnMapY, cells) - 1);
+            ReadInt(_spawnMapY, cells) - 1,
+            ReadText(_spawnProperties, cells));
     }
 
     public WarpRow MapWarp(IReadOnlyList<string?> cells)
@@ -140,6 +143,7 @@ public sealed class SheetRowMapper
         cells[_spawnMapId.Index] = Format(row.MapId);
         cells[_spawnMapX.Index] = Format(row.MapX + 1);
         cells[_spawnMapY.Index] = Format(row.MapY + 1);
+        cells[_spawnProperties.Index] = row.Properties;
         return new ReadOnlyCollection<string?>(cells);
     }
 

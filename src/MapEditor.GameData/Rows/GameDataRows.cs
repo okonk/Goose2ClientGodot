@@ -15,7 +15,8 @@ public readonly record struct NpcAppearance(
     RgbaValue HairTint,
     string EquippedItems);
 
-public readonly record struct NpcSpawnRow(int NpcId, int MapId, int MapX, int MapY);
+public readonly record struct NpcSpawnRow(int NpcId, int MapId, int MapX, int MapY,
+                                          string Properties = "");
 
 public readonly record struct WarpRow(int MapId, int MapX, int MapY, int WarpId, int WarpX, int WarpY);
 

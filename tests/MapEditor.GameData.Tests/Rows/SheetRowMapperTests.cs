@@ -118,7 +118,8 @@ public class SheetRowMapperTests
             {"name":"map_y","header":"y","kind":"Int","sql":"SMALLINT","required":true,"pk":false},
             {"name":"npc_id","header":"npc","kind":"Id","sql":"INT","required":true,"pk":false},
             {"name":"map_x","header":"x","kind":"Int","sql":"SMALLINT","required":true,"pk":false},
-            {"name":"map_id","header":"map","kind":"Id","sql":"SMALLINT","required":true,"pk":false}
+            {"name":"map_id","header":"map","kind":"Id","sql":"SMALLINT","required":true,"pk":false},
+            {"name":"properties","header":"props","kind":"Text","sql":"TEXT","default":"''","required":false,"pk":false}
           ]},
           {"sheet":"Warptiles","table":"warptiles","columns":[
             {"name":"warp_y","header":"wy","kind":"Int","sql":"SMALLINT","required":true,"pk":false},
@@ -312,6 +313,33 @@ public class SheetRowMapperTests
     }
 
     [Fact]
+    public void MapSpawn_BlankPropertiesCell_YieldsTheRecordDefault()
+    {
+        var schema = GameDataSchema.LoadEmbedded();
+        var mapper = new SheetRowMapper(schema);
+        var spawns = schema.GetRequiredSheet("NPC Spawns");
+
+        var cells = Row(spawns, ("npc_id", "7"), ("map_id", "1"), ("map_x", "2"), ("map_y", "3"));
+
+        Assert.Equal(new NpcSpawnRow(7, 1, 1, 2), mapper.MapSpawn(cells));
+        Assert.Equal(string.Empty, mapper.MapSpawn(cells).Properties);
+    }
+
+    [Fact]
+    public void ToCells_Spawn_WritesAndRoundTripsProperties()
+    {
+        var schema = GameDataSchema.LoadEmbedded();
+        var mapper = new SheetRowMapper(schema);
+        var spawns = schema.GetRequiredSheet("NPC Spawns");
+
+        var row = new NpcSpawnRow(7, 1, 2, 3, "{\"canMove\":true}");
+        var cells = mapper.ToCells(row);
+
+        Assert.Equal("{\"canMove\":true}", cells[spawns.GetColumnIndex("properties")]);
+        Assert.Equal(row, mapper.MapSpawn(cells));
+    }
+
+    [Fact]
     public void ToCells_Warp_PreservesValuesAndRoundTrips()
     {
         var schema = GameDataSchema.LoadEmbedded();
@@ -383,7 +411,8 @@ public class SheetRowMapperTests
             {"name":"map_y","header":"y","kind":"Int","sql":"SMALLINT","required":true,"pk":false},
             {"name":"npc_id","header":"npc","kind":"Id","sql":"INT","required":true,"pk":false},
             {"name":"map_x","header":"x","kind":"Int","sql":"SMALLINT","required":true,"pk":false},
-            {"name":"map_id","header":"map","kind":"Id","sql":"SMALLINT","required":true,"pk":false}
+            {"name":"map_id","header":"map","kind":"Id","sql":"SMALLINT","required":true,"pk":false},
+            {"name":"properties","header":"props","kind":"Text","sql":"TEXT","default":"''","required":false,"pk":false}
           ]},
           {"sheet":"Warptiles","table":"warptiles","columns":[
             {"name":"warp_y","header":"wy","kind":"Int","sql":"SMALLINT","required":true,"pk":false},
@@ -441,7 +470,8 @@ public class SheetRowMapperTests
             {"name":"npc_id","header":"npc","kind":"Id","sql":"INT","required":true,"pk":false},
             {"name":"map_id","header":"map","kind":"Id","sql":"SMALLINT","required":true,"pk":false},
             {"name":"map_x","header":"x","kind":"Int","sql":"SMALLINT","required":true,"pk":false},
-            {"name":"map_y","header":"y","kind":"Int","sql":"SMALLINT","required":true,"pk":false}
+            {"name":"map_y","header":"y","kind":"Int","sql":"SMALLINT","required":true,"pk":false},
+            {"name":"properties","header":"props","kind":"Text","sql":"TEXT","default":"''","required":false,"pk":false}
           ]},
           {"sheet":"Warptiles","table":"warptiles","columns":[
             {"name":"map_id","header":"map","kind":"Id","sql":"SMALLINT","required":true,"pk":false},
@@ -495,7 +525,8 @@ public class SheetRowMapperTests
             {"name":"npc_id","header":"npc","kind":"Id","sql":"INT","required":true,"pk":false},
             {"name":"map_id","header":"map","kind":"Id","sql":"SMALLINT","required":true,"pk":false},
             {"name":"map_x","header":"x","kind":"Int","sql":"SMALLINT","required":true,"pk":false},
-            {"name":"map_y","header":"y","kind":"Int","sql":"SMALLINT","required":true,"pk":false}
+            {"name":"map_y","header":"y","kind":"Int","sql":"SMALLINT","required":true,"pk":false},
+            {"name":"properties","header":"props","kind":"Text","sql":"TEXT","default":"''","required":false,"pk":false}
           ]},
           {"sheet":"Warptiles","table":"warptiles","columns":[
             {"name":"map_id","header":"map","kind":"Id","sql":"SMALLINT","required":true,"pk":false},
@@ -552,7 +583,8 @@ public class SheetRowMapperTests
             {"name":"npc_id","header":"npc","kind":"Id","sql":"INT","required":true,"pk":false},
             {"name":"map_id","header":"map","kind":"Id","sql":"SMALLINT","required":true,"pk":false},
             {"name":"map_x","header":"x","kind":"Int","sql":"SMALLINT","required":true,"pk":false},
-            {"name":"map_y","header":"y","kind":"Int","sql":"SMALLINT","required":true,"pk":false}
+            {"name":"map_y","header":"y","kind":"Int","sql":"SMALLINT","required":true,"pk":false},
+            {"name":"properties","header":"props","kind":"Text","sql":"TEXT","default":"''","required":false,"pk":false}
           ]},
           {"sheet":"Warptiles","table":"warptiles","columns":[
             {"name":"map_id","header":"map","kind":"Id","sql":"SMALLINT","required":true,"pk":false},
@@ -594,7 +626,8 @@ public class SheetRowMapperTests
             {"name":"npc_id","header":"npc","kind":"Id","sql":"INT","required":true,"pk":false},
             {"name":"map_id","header":"map","kind":"Id","sql":"SMALLINT","required":true,"pk":false},
             {"name":"map_x","header":"x","kind":"Int","sql":"SMALLINT","required":true,"pk":false},
-            {"name":"map_y","header":"y","kind":"Int","sql":"SMALLINT","required":true,"pk":false}
+            {"name":"map_y","header":"y","kind":"Int","sql":"SMALLINT","required":true,"pk":false},
+            {"name":"properties","header":"props","kind":"Text","sql":"TEXT","default":"''","required":false,"pk":false}
           ]},
           {"sheet":"Warptiles","table":"warptiles","columns":[
             {"name":"map_id","header":"map","kind":"Id","sql":"SMALLINT","required":true,"pk":false},
