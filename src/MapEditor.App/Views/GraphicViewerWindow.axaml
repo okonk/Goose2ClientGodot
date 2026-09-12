@@ -11,7 +11,7 @@
         <TextBlock Text="Category" Classes="muted" VerticalAlignment="Center" />
         <ComboBox x:Name="CategoryCombo" Width="120" />
         <TextBlock Text="Sheet" Classes="muted" VerticalAlignment="Center" />
-        <ComboBox x:Name="SheetCombo" Width="80" />
+        <ComboBox x:Name="SheetCombo" Width="110" />
         <TextBlock Text="Zoom" Classes="muted" VerticalAlignment="Center" />
         <ComboBox x:Name="ZoomCombo" Width="80" />
         <Button x:Name="FitButton" Content="Fit" Click="OnFit" />
@@ -62,7 +62,7 @@
             </ComboBox>
           </StackPanel>
           <StackPanel DockPanel.Dock="Bottom" Spacing="8">
-            <Border x:Name="PreviewHost" Classes="sunken" />
+            <Border x:Name="PreviewHost" Classes="sunken" Height="220" />
             <StackPanel Orientation="Horizontal" Spacing="6">
               <Button x:Name="PlayPauseButton" Content="Play" Click="OnPlayPause" />
               <Button x:Name="PreviousButton" Content="Prev" Click="OnPrevious" />

@@ -39,7 +39,6 @@ internal sealed class AnimationPreviewControl : Control
             }
 
             _assets = value ?? throw new ArgumentNullException(nameof(value));
-            InvalidateMeasure();
             InvalidateVisual();
         }
     }
@@ -55,16 +54,21 @@ internal sealed class AnimationPreviewControl : Control
             return;
         }
 
-        Size area = PreviewSize;
+        Size area = Bounds.Size;
         SpriteResolution resolution = _assets.Resolve(reference.Value);
         if (resolution.Image is AvaloniaSpriteSheetImage image)
         {
             SetDiagnostic(null);
             SpriteSourceRect source = resolution.SourceRect;
+            int scale = Math.Max(1, (int)Math.Floor(Math.Min(
+                area.Width / _assets.Cache.MaxFrameWidth,
+                area.Height / _assets.Cache.MaxFrameHeight)));
+            double destinationWidth = source.Width * scale;
+            double destinationHeight = source.Height * scale;
             target.DrawImage(
                 image.Bitmap,
                 new Rect(source.X, source.Y, source.Width, source.Height),
-                new Rect((area.Width - source.Width) / 2.0, area.Height - source.Height, source.Width, source.Height));
+                new Rect((area.Width - destinationWidth) / 2.0, (area.Height - destinationHeight) / 2.0, destinationWidth, destinationHeight));
             return;
         }
 
@@ -74,23 +78,13 @@ internal sealed class AnimationPreviewControl : Control
         target.DrawText(diagnostic, new Point(area.Width / 2.0, area.Height / 2.0), 12.0, DiagnosticFill, null);
     }
 
-    protected override Size MeasureOverride(Size availableSize) => PreviewSize;
+    protected override Size MeasureOverride(Size availableSize)
+        => new(Math.Max(0.0, availableSize.Width), Math.Max(0.0, availableSize.Height));
 
     public override void Render(DrawingContext context)
     {
         base.Render(context);
         RenderPreview(new DrawingContextMapDrawTarget(context));
-    }
-
-    private Size PreviewSize
-    {
-        get
-        {
-            SpriteManifest? manifest = _assets.Cache.Manifest;
-            return manifest is null
-                ? new Size(0, 0)
-                : new Size(manifest.MaxFrameWidth, manifest.MaxFrameHeight);
-        }
     }
 
     private void SetDiagnostic(string? diagnostic)

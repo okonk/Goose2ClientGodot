@@ -23,6 +23,7 @@ internal partial class GraphicViewerWindow : Window
     private readonly GraphicSheetControl _sheetControl;
     private readonly AnimationPreviewControl _previewControl;
     private AvaloniaSpriteSheetImage? _sheetImage;
+    private bool _pendingFit;
 
     public GraphicViewerWindow(AssetContextController assets)
         : this(assets, new AvaloniaSpriteSheetLoader(), new DispatcherPlaybackClock())
@@ -62,6 +63,16 @@ internal partial class GraphicViewerWindow : Window
     internal AnimationPreviewControl PreviewControl => _previewControl;
 
     internal AvaloniaSpriteSheetImage? SheetImage => _sheetImage;
+
+    protected override void OnOpened(EventArgs e)
+    {
+        base.OnOpened(e);
+        if (_pendingFit)
+        {
+            _pendingFit = false;
+            ApplyFitZoom();
+        }
+    }
 
     protected override void OnKeyDown(KeyEventArgs e)
     {
@@ -178,6 +189,7 @@ internal partial class GraphicViewerWindow : Window
         _sheetControl.Image = image;
         InvalidateMeasure();
         InvalidateVisual();
+        ApplyFitZoom();
     }
 
     private void SyncClock()
@@ -252,16 +264,25 @@ internal partial class GraphicViewerWindow : Window
         }
     }
 
-    private void OnFit(object? sender, RoutedEventArgs e)
+    private void OnFit(object? sender, RoutedEventArgs e) => ApplyFitZoom();
+
+    private void ApplyFitZoom()
     {
         if (_sheetImage is not { } image)
         {
             return;
         }
 
-        double viewportWidth = SheetScroll.Viewport.Width - SheetHost.Padding.Left - SheetHost.Padding.Right;
-        double viewportHeight = SheetScroll.Viewport.Height - SheetHost.Padding.Top - SheetHost.Padding.Bottom;
-        _viewModel.FitToViewport(viewportWidth, viewportHeight, image.PixelWidth, image.PixelHeight);
+        double usableWidth = SheetScroll.Viewport.Width - SheetHost.Padding.Left - SheetHost.Padding.Right;
+        double usableHeight = SheetScroll.Viewport.Height - SheetHost.Padding.Top - SheetHost.Padding.Bottom;
+        if (usableWidth <= 0 || usableHeight <= 0)
+        {
+            _pendingFit = true;
+            return;
+        }
+
+        _pendingFit = false;
+        _viewModel.FitToViewport(usableWidth, usableHeight, image.PixelWidth, image.PixelHeight);
     }
 
     private void OnPercent100(object? sender, RoutedEventArgs e)

@@ -16,6 +16,9 @@ namespace MapEditor.App.Tests;
 
 public class AnimationPreviewControlTests : IDisposable
 {
+    private const double Area = 220;
+    private const int Scale = 6;
+
     private const string ManifestJson = """
         { "tileSize": 32, "sheets": {
           "1": { "10": [0, 0, 16, 24], "11": [0, 0, 32, 32] },
@@ -35,9 +38,10 @@ public class AnimationPreviewControlTests : IDisposable
         => Directory.Delete(_directory, recursive: true);
 
     [AvaloniaFact]
-    public void RenderPreview_DrawsCurrentFrameFromCacheAtNativeSize()
+    public void RenderPreview_DrawsCurrentFrameScaledAndCentered()
     {
         Harness harness = Create();
+        Arrange(harness);
         RecordingMapDrawTarget target = new();
 
         harness.Control.RenderPreview(target);
@@ -45,38 +49,40 @@ public class AnimationPreviewControlTests : IDisposable
         Assert.Single(target.Images);
         RecordingMapDrawTarget.ImageDraw image = target.Images[0];
         Assert.Equal(new Rect(0, 0, 16, 24), image.Source);
-        Assert.Equal(new Rect(8, 8, 16, 24), image.Destination);
+        Assert.Equal(new Rect(62, 38, 16 * Scale, 24 * Scale), image.Destination);
         Assert.Equal(BitmapInterpolationMode.None, RenderOptions.GetBitmapInterpolationMode(harness.Control));
         ISpriteSheetImage cached = harness.Context.Resolve(new SpriteReference(1, 10)).Image!;
         Assert.Same(((AvaloniaSpriteSheetImage)cached).Bitmap, image.Image);
     }
 
     [AvaloniaFact]
-    public void RenderPreview_MixedFrameSizes_AnchorsBottomCenterInStableArea()
+    public void RenderPreview_MixedFrameSizes_UseTheSameScaleFromMaxFrameDimsAndCenterOnBothAxes()
     {
         Harness harness = Create();
-        RecordingMapDrawTarget target = new();
+        Arrange(harness);
 
-        harness.Control.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
-        Assert.Equal(new Size(32, 32), harness.Control.DesiredSize);
+        harness.Control.Measure(new Size(Area, Area));
+        Assert.Equal(new Size(Area, Area), harness.Control.DesiredSize);
 
-        harness.Control.RenderPreview(target);
-        Assert.Equal(new Rect(8, 8, 16, 24), target.Images[0].Destination);
+        var first = new RecordingMapDrawTarget();
+        harness.Control.RenderPreview(first);
+        Assert.Equal(new Rect(62, 38, 16 * Scale, 24 * Scale), first.Images[0].Destination);
 
         harness.ViewModel.StepNext();
-        target.Images.Clear();
-        harness.Control.RenderPreview(target);
-        Assert.Equal(new Rect(0, 0, 24, 32), target.Images[0].Source);
-        Assert.Equal(new Rect(4, 0, 24, 32), target.Images[0].Destination);
+        var second = new RecordingMapDrawTarget();
+        harness.Control.RenderPreview(second);
+        Assert.Equal(new Rect(0, 0, 24, 32), second.Images[0].Source);
+        Assert.Equal(new Rect(38, 14, 24 * Scale, 32 * Scale), second.Images[0].Destination);
 
-        harness.Control.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
-        Assert.Equal(new Size(32, 32), harness.Control.DesiredSize);
+        harness.Control.Measure(new Size(Area, Area));
+        Assert.Equal(new Size(Area, Area), harness.Control.DesiredSize);
     }
 
     [AvaloniaFact]
     public void RenderPreview_CrossSheetFrames_ResolveInOrder()
     {
         Harness harness = Create();
+        Arrange(harness);
         RecordingMapDrawTarget target = new();
 
         harness.Control.RenderPreview(target);
@@ -93,6 +99,7 @@ public class AnimationPreviewControlTests : IDisposable
     public void RenderPreview_MissingSheetImage_SurfacesDiagnosticWithoutThrowing()
     {
         Harness harness = Create(loaderBehavior: path => SpriteSheetLoadResult.Failure(SpriteSheetLoadStatus.NotFound, "no file"));
+        Arrange(harness);
         string? seen = null;
         harness.Control.DiagnosticChanged += (_, _) => seen = harness.Control.Diagnostic;
         RecordingMapDrawTarget target = new();
@@ -104,6 +111,7 @@ public class AnimationPreviewControlTests : IDisposable
         Assert.Equal(harness.Control.Diagnostic, seen);
         Assert.Single(target.Texts);
         Assert.Equal(harness.Control.Diagnostic, target.Texts[0].Text);
+        Assert.Equal(new Point(Area / 2.0, Area / 2.0), target.Texts[0].Center);
     }
 
     [AvaloniaFact]
@@ -115,6 +123,7 @@ public class AnimationPreviewControlTests : IDisposable
             path.EndsWith("1.png")
                 ? SpriteSheetLoadResult.Success(sheet1)
                 : SpriteSheetLoadResult.Success(sheet2));
+        Arrange(harness);
         RecordingMapDrawTarget target = new();
 
         harness.Control.RenderPreview(target);
@@ -134,6 +143,7 @@ public class AnimationPreviewControlTests : IDisposable
     public void RenderPreview_WithoutCurrentFrame_DrawsNothingAndClearsDiagnostic()
     {
         Harness harness = Create(selectAnimation: false);
+        Arrange(harness);
         RecordingMapDrawTarget target = new();
 
         harness.Control.RenderPreview(target);
@@ -161,6 +171,7 @@ public class AnimationPreviewControlTests : IDisposable
         first.Control.Assets = second;
         first.Context.Dispose();
 
+        Arrange(first);
         RecordingMapDrawTarget target = new();
         first.Control.RenderPreview(target);
 
@@ -168,6 +179,12 @@ public class AnimationPreviewControlTests : IDisposable
         Assert.Single(target.Images);
         Assert.Equal(new Rect(0, 0, 16, 24), target.Images[0].Source);
         Assert.Single(secondLoader.LoadedPaths);
+    }
+
+    private static void Arrange(Harness harness)
+    {
+        harness.Control.Measure(new Size(Area, Area));
+        harness.Control.Arrange(new Rect(0, 0, Area, Area));
     }
 
     private Harness Create(Func<string, SpriteSheetLoadResult>? loaderBehavior = null, bool selectAnimation = true)

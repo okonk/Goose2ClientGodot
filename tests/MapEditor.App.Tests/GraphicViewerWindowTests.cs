@@ -96,6 +96,13 @@ public sealed class SpySpriteSheetLoader : ISpriteSheetLoader
     }
 }
 
+internal sealed class PerSheetSizeSpriteSheetLoader : ISpriteSheetLoader
+{
+    public SpriteSheetLoadResult Load(string path)
+        => SpriteSheetLoadResult.Success(new AvaloniaSpriteSheetImage(new Bitmap(new MemoryStream(
+            AssetFixture.PngSheet.Create(path.EndsWith("1.png") ? 64 : 96, path.EndsWith("1.png") ? 32 : 48)))));
+}
+
 public class GraphicViewerWindowTests
 {
     private const string ManifestA = """
@@ -310,6 +317,101 @@ public class GraphicViewerWindowTests
         Find<Button>(harness, "FitButton").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
 
         Assert.Equal(4.0, harness.ViewModel.Zoom);
+    }
+
+    [AvaloniaFact]
+    public void InitialState_DefaultsToFitZoomForTheFirstSheet()
+    {
+        using var harness = OpenAssetsA();
+        double viewportWidth = harness.Window.SheetScroll.Viewport.Width;
+        double viewportHeight = harness.Window.SheetScroll.Viewport.Height;
+        Assert.True(viewportWidth > 0 && viewportHeight > 0);
+
+        double expected = Math.Clamp(
+            Math.Min((viewportWidth - 32) / 64.0, (viewportHeight - 32) / 32.0),
+            GraphicViewerViewModel.MinZoom, GraphicViewerViewModel.MaxZoom);
+        Assert.NotEqual(1.0, expected);
+        Assert.Equal(expected, harness.ViewModel.Zoom);
+    }
+
+    [AvaloniaFact]
+    public void WindowOpenedWithAssetsAlreadyLoaded_FitsTheFirstSheetOnOpen()
+    {
+        string tempDirectory = Directory.CreateTempSubdirectory("map-editor-viewer-").FullName;
+        var settings = new AppSettingsStore(Path.Combine(tempDirectory, "settings.json"));
+        var workspace = new WorkspaceViewModel(new FakeEditorDialogs(), new MapFileStore());
+        var assets = new AssetContextController(workspace, settings, path => AssetContext.Create(path, new AvaloniaSpriteSheetLoader()));
+        var loader = new SpySpriteSheetLoader();
+        var clock = new ManualPlaybackClock();
+
+        string directory = Path.Combine(tempDirectory, "assets-a");
+        Directory.CreateDirectory(Path.Combine(directory, "sheets"));
+        File.WriteAllText(Path.Combine(directory, "manifest.json"), ManifestA);
+        File.WriteAllText(Path.Combine(directory, GraphicAnimationManifest.FileName), AnimationA);
+        WritePng(directory, 1);
+        WritePng(directory, 2);
+        Assert.True(assets.TryOpen(directory));
+
+        var window = new GraphicViewerWindow(assets, loader, clock);
+        try
+        {
+            window.Show();
+            Dispatcher.UIThread.RunJobs();
+
+            double viewportWidth = window.SheetScroll.Viewport.Width;
+            double viewportHeight = window.SheetScroll.Viewport.Height;
+            Assert.True(viewportWidth > 0 && viewportHeight > 0);
+
+            double expected = Math.Clamp(
+                Math.Min((viewportWidth - 32) / 64.0, (viewportHeight - 32) / 32.0),
+                GraphicViewerViewModel.MinZoom, GraphicViewerViewModel.MaxZoom);
+            Assert.NotEqual(1.0, expected);
+            Assert.Equal(expected, window.ViewModel.Zoom);
+        }
+        finally
+        {
+            if (window.IsVisible)
+            {
+                window.Close();
+                Dispatcher.UIThread.RunJobs();
+            }
+
+            assets.Dispose();
+            Directory.Delete(tempDirectory, recursive: true);
+        }
+    }
+
+    [AvaloniaFact]
+    public void SheetChange_ReFitsToTheNewSheetSize()
+    {
+        using var harness = OpenAssetsA(new PerSheetSizeSpriteSheetLoader());
+        double viewportWidth = harness.Window.SheetScroll.Viewport.Width;
+        double viewportHeight = harness.Window.SheetScroll.Viewport.Height;
+        Assert.True(viewportWidth > 0 && viewportHeight > 0);
+
+        double firstFit = Math.Clamp(
+            Math.Min((viewportWidth - 32) / 64.0, (viewportHeight - 32) / 32.0),
+            GraphicViewerViewModel.MinZoom, GraphicViewerViewModel.MaxZoom);
+        Assert.Equal(firstFit, harness.ViewModel.Zoom);
+
+        SetSheet(harness, 2);
+
+        double secondFit = Math.Clamp(
+            Math.Min((viewportWidth - 32) / 96.0, (viewportHeight - 32) / 48.0),
+            GraphicViewerViewModel.MinZoom, GraphicViewerViewModel.MaxZoom);
+        Assert.NotEqual(firstFit, secondFit);
+        Assert.Equal(secondFit, harness.ViewModel.Zoom);
+    }
+
+    [AvaloniaFact]
+    public void Percent100_ResetsToExactlyOneAfterFit()
+    {
+        using var harness = OpenAssetsA();
+        Assert.NotEqual(1.0, harness.ViewModel.Zoom);
+
+        Find<Button>(harness, "Percent100Button").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+
+        Assert.Equal(1.0, harness.ViewModel.Zoom);
     }
 
     [AvaloniaFact]
