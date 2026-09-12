@@ -50,6 +50,15 @@ public class GameDataSchemaTests
         var mapId = schema.GetRequiredSheet("Maps").GetRequiredColumn("map_id");
         Assert.True(mapId.IsPrimaryKey);
         Assert.Equal("id", mapId.Header);
+
+        var properties = schema.GetRequiredSheet("NPC Spawns").GetRequiredColumn("properties");
+        Assert.Equal("properties", properties.Header);
+        Assert.Equal("Text", properties.Kind);
+        Assert.Equal("TEXT", properties.Sql);
+        Assert.Equal("''", properties.Default);
+        Assert.False(properties.Required);
+        Assert.False(properties.IsPrimaryKey);
+        Assert.Null(properties.RefSheet);
     }
 
     [Fact]
@@ -68,7 +77,7 @@ public class GameDataSchemaTests
 
         var sheet = schema.GetRequiredSheet("NPC Spawns");
         Assert.Equal("npc_spawns", sheet.Table);
-        Assert.Equal(4, sheet.Columns.Count);
+        Assert.Equal(5, sheet.Columns.Count);
     }
 
     [Fact]
@@ -86,6 +95,7 @@ public class GameDataSchemaTests
 
         Assert.Equal(0, sheet.GetColumnIndex("npc_id"));
         Assert.Equal(3, sheet.GetColumnIndex("map_y"));
+        Assert.Equal(4, sheet.GetColumnIndex("properties"));
     }
 
     [Fact]
