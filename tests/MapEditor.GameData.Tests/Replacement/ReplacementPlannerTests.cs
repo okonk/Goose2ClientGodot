@@ -55,7 +55,8 @@ public class ReplacementPlannerTests
 
         Assert.Equal(new[] { new RowDelete(2) }, plan.Deletes);
         Assert.Single(plan.Inserts);
-        Assert.Equal(new[] { "1", "5", "100", "100" }, plan.Inserts[0].CellValues);
+        Assert.Equal(new[] { "1", "5", "100", "100" }, plan.Inserts[0].CellValues.Take(4));
+        Assert.Equal(5, plan.Inserts[0].CellValues.Count);
     }
 
     [Fact]
@@ -74,7 +75,8 @@ public class ReplacementPlannerTests
         Assert.Empty(plan.Deletes);
         Assert.Equal(
             new[] { new[] { "1", "5", "11", "12" } },
-            plan.Inserts.Select(i => i.CellValues));
+            plan.Inserts.Select(i => i.CellValues.Take(4).ToArray()));
+        Assert.Equal(new[] { 5 }, plan.Inserts.Select(i => i.CellValues.Count));
     }
 
     [Fact]
@@ -128,7 +130,10 @@ public class ReplacementPlannerTests
         var plan = planner.PlanSpawnReplacement(remote, desired, 5);
 
         Assert.Empty(plan.Deletes);
-        Assert.Equal(new[] { new[] { "2", "5", "21", "22" } }, plan.Inserts.Select(i => i.CellValues));
+        Assert.Equal(
+            new[] { new[] { "2", "5", "21", "22" } },
+            plan.Inserts.Select(i => i.CellValues.Take(4).ToArray()));
+        Assert.Equal(new[] { 5 }, plan.Inserts.Select(i => i.CellValues.Count));
     }
 
     [Fact]
@@ -174,7 +179,8 @@ public class ReplacementPlannerTests
                 new[] { "3", "5", "31", "32" },
                 new[] { "4", "5", "41", "42" }
             },
-            plan.Inserts.Select(i => i.CellValues));
+            plan.Inserts.Select(i => i.CellValues.Take(4).ToArray()));
+        Assert.Equal(new[] { 5, 5, 5 }, plan.Inserts.Select(i => i.CellValues.Count));
     }
 
     [Theory]
