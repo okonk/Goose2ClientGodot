@@ -55,8 +55,7 @@ public class ReplacementPlannerTests
 
         Assert.Equal(new[] { new RowDelete(2) }, plan.Deletes);
         Assert.Single(plan.Inserts);
-        Assert.Equal(new[] { "1", "5", "100", "100" }, plan.Inserts[0].CellValues.Take(4));
-        Assert.Equal(5, plan.Inserts[0].CellValues.Count);
+        Assert.Equal(new[] { "1", "5", "100", "100", "" }, plan.Inserts[0].CellValues);
     }
 
     [Fact]
@@ -74,9 +73,8 @@ public class ReplacementPlannerTests
 
         Assert.Empty(plan.Deletes);
         Assert.Equal(
-            new[] { new[] { "1", "5", "11", "12" } },
-            plan.Inserts.Select(i => i.CellValues.Take(4).ToArray()));
-        Assert.Equal(new[] { 5 }, plan.Inserts.Select(i => i.CellValues.Count));
+            new[] { new[] { "1", "5", "11", "12", "" } },
+            plan.Inserts.Select(i => i.CellValues.ToArray()));
     }
 
     [Fact]
@@ -131,9 +129,8 @@ public class ReplacementPlannerTests
 
         Assert.Empty(plan.Deletes);
         Assert.Equal(
-            new[] { new[] { "2", "5", "21", "22" } },
-            plan.Inserts.Select(i => i.CellValues.Take(4).ToArray()));
-        Assert.Equal(new[] { 5 }, plan.Inserts.Select(i => i.CellValues.Count));
+            new[] { new[] { "2", "5", "21", "22", "" } },
+            plan.Inserts.Select(i => i.CellValues.ToArray()));
     }
 
     [Fact]
@@ -175,12 +172,38 @@ public class ReplacementPlannerTests
         Assert.Equal(
             new[]
             {
-                new[] { "2", "5", "21", "22" },
-                new[] { "3", "5", "31", "32" },
-                new[] { "4", "5", "41", "42" }
+                new[] { "2", "5", "21", "22", "" },
+                new[] { "3", "5", "31", "32", "" },
+                new[] { "4", "5", "41", "42", "" }
             },
-            plan.Inserts.Select(i => i.CellValues.Take(4).ToArray()));
-        Assert.Equal(new[] { 5, 5, 5 }, plan.Inserts.Select(i => i.CellValues.Count));
+            plan.Inserts.Select(i => i.CellValues.ToArray()));
+    }
+
+    [Fact]
+    public void PlanSpawn_MovedRow_KeepsItsPropertiesInTheInsert()
+    {
+        var planner = Planner();
+        var remote = new[] { new RemoteRow<NpcSpawnRow>(2, new NpcSpawnRow(1, 5, 10, 11, "{\"canMove\":true}")) };
+        var desired = new[] { new NpcSpawnRow(1, 5, 12, 13, "{\"canMove\":true}") };
+
+        var plan = planner.PlanSpawnReplacement(remote, desired, 5);
+
+        Assert.Equal(new RowDelete(2), Assert.Single(plan.Deletes));
+        Assert.Equal(new[] { "1", "5", "13", "14", "{\"canMove\":true}" },
+            Assert.Single(plan.Inserts).CellValues);
+    }
+
+    [Fact]
+    public void PlanSpawn_SamePositionDifferentProperties_YieldsDeleteAndInsert()
+    {
+        var planner = Planner();
+        var remote = new[] { new RemoteRow<NpcSpawnRow>(2, new NpcSpawnRow(1, 5, 10, 11)) };
+        var desired = new[] { new NpcSpawnRow(1, 5, 10, 11, "{\"canMove\":true}") };
+
+        var plan = planner.PlanSpawnReplacement(remote, desired, 5);
+
+        Assert.Equal(new RowDelete(2), Assert.Single(plan.Deletes));
+        Assert.Single(plan.Inserts);
     }
 
     [Theory]

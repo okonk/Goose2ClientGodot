@@ -515,8 +515,7 @@ public class GameDataSyncCoordinatorTests
         Assert.Equal("NPC Spawns", write.SpawnPlan.Sheet);
         Assert.Equal(new[] { new RowDelete(3) }, write.SpawnPlan.Deletes);
         var insert = Assert.Single(write.SpawnPlan.Inserts);
-        Assert.Equal(new[] { "2", "5", "10", "10" }, insert.CellValues.Take(4));
-        Assert.Equal(5, insert.CellValues.Count);
+        Assert.Equal(new[] { "2", "5", "10", "10", "" }, insert.CellValues);
         Assert.Equal("Warptiles", write.WarpPlan.Sheet);
         Assert.Empty(write.WarpPlan.Deletes);
         Assert.Empty(write.WarpPlan.Inserts);
@@ -560,8 +559,7 @@ public class GameDataSyncCoordinatorTests
         Assert.NotNull(write.SpawnPlan);
         Assert.Equal(new[] { new RowDelete(3) }, write.SpawnPlan.Deletes);
         var insert = Assert.Single(write.SpawnPlan.Inserts);
-        Assert.Equal(new[] { "2", "5", "6", "7" }, insert.CellValues.Take(4));
-        Assert.Equal(5, insert.CellValues.Count);
+        Assert.Equal(new[] { "2", "5", "6", "7", "" }, insert.CellValues);
         Assert.NotNull(write.WarpPlan);
         Assert.Empty(write.WarpPlan.Deletes);
         Assert.Empty(write.WarpPlan.Inserts);
@@ -607,8 +605,7 @@ public class GameDataSyncCoordinatorTests
         Assert.NotNull(write.SpawnPlan);
         Assert.Empty(write.SpawnPlan.Deletes);
         var cells = Assert.Single(write.SpawnPlan.Inserts).CellValues;
-        Assert.Equal(new[] { "2", "5", "10", "10" }, cells.Take(4));
-        Assert.Equal(5, cells.Count);
+        Assert.Equal(new[] { "2", "5", "10", "10", "" }, cells);
         Assert.Empty(delays);
     }
 
@@ -643,8 +640,7 @@ public class GameDataSyncCoordinatorTests
         Assert.NotNull(write.WarpPlan);
         Assert.Equal(new[] { new RowDelete(4) }, write.SpawnPlan.Deletes);
         var cells = Assert.Single(write.SpawnPlan.Inserts).CellValues;
-        Assert.Equal(new[] { "2", "5", "10", "10" }, cells.Take(4));
-        Assert.Equal(5, cells.Count);
+        Assert.Equal(new[] { "2", "5", "10", "10", "" }, cells);
         Assert.Empty(write.WarpPlan.Deletes);
         Assert.Empty(write.WarpPlan.Inserts);
     }
