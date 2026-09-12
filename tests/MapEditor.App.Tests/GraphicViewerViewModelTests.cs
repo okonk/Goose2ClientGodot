@@ -394,25 +394,39 @@ public class GraphicViewerViewModelTests
     public void FitToViewport_UsesSmallerScaleAndClamps()
     {
         GraphicViewerViewModel viewer = CreateViewer();
-        viewer.TrySelectSheet(10);
 
-        viewer.FitToViewport(16, 8);
+        viewer.FitToViewport(16, 8, 8, 4);
         Assert.Equal(2.0, viewer.Zoom);
-        viewer.FitToViewport(4, 100);
+        viewer.FitToViewport(4, 100, 8, 4);
         Assert.Equal(0.5, viewer.Zoom);
-        viewer.FitToViewport(100, 100);
+        viewer.FitToViewport(100, 100, 8, 4);
         Assert.Equal(8.0, viewer.Zoom);
-        viewer.FitToViewport(2, 2);
+        viewer.FitToViewport(2, 2, 8, 4);
         Assert.Equal(0.25, viewer.Zoom);
     }
 
     [Fact]
-    public void FitToViewport_WithoutSheetLeavesZoomUnchanged()
+    public void FitToViewport_UsesImageDimensionsNotFrameExtents()
+    {
+        GraphicViewerViewModel viewer = CreateViewer();
+        viewer.TrySelectSheet(10);
+
+        viewer.FitToViewport(100, 50, 50, 25);
+
+        Assert.Equal(2.0, viewer.Zoom);
+    }
+
+    [Fact]
+    public void FitToViewport_WithNonPositiveOrNaNDimensionsIsANoOp()
     {
         GraphicViewerViewModel viewer = CreateViewer();
         viewer.Zoom = 3.0;
 
-        viewer.FitToViewport(100, 100);
+        viewer.FitToViewport(100, 100, 0, 4);
+        viewer.FitToViewport(100, 100, -1, 4);
+        viewer.FitToViewport(100, 100, double.NaN, 4);
+        viewer.FitToViewport(100, 100, 8, double.NaN);
+        viewer.FitToViewport(0, 100, 8, 4);
 
         Assert.Equal(3.0, viewer.Zoom);
     }

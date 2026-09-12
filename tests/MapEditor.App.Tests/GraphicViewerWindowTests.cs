@@ -76,12 +76,21 @@ internal sealed class GraphicViewerWindowHarness : IDisposable
 
 public sealed class SpySpriteSheetLoader : ISpriteSheetLoader
 {
+    private readonly int _width;
+    private readonly int _height;
+
+    public SpySpriteSheetLoader(int width = 64, int height = 32)
+    {
+        _width = width;
+        _height = height;
+    }
+
     public List<string> LoadedPaths { get; } = new();
 
     public SpriteSheetLoadResult Load(string path)
     {
         LoadedPaths.Add(path);
-        return SpriteSheetLoadResult.Success(new AvaloniaSpriteSheetImage(new Bitmap(new MemoryStream(AssetFixture.PngSheet.Create(64, 32)))));
+        return SpriteSheetLoadResult.Success(new AvaloniaSpriteSheetImage(new Bitmap(new MemoryStream(AssetFixture.PngSheet.Create(_width, _height)))));
     }
 }
 
@@ -141,9 +150,9 @@ public class GraphicViewerWindowTests
         Dispatcher.UIThread.RunJobs();
     }
 
-    private static GraphicViewerWindowHarness OpenAssetsA()
+    private static GraphicViewerWindowHarness OpenAssetsA(ISpriteSheetLoader? windowLoader = null)
     {
-        var harness = GraphicViewerWindowHarness.Create();
+        var harness = GraphicViewerWindowHarness.Create(windowLoader);
         string directory = WriteAssetDirectory(harness, "assets-a", ManifestA, AnimationA);
         WritePng(directory, 1);
         WritePng(directory, 2);
@@ -259,8 +268,40 @@ public class GraphicViewerWindowTests
         harness.ViewModel.Zoom = 4.0;
         Find<Button>(harness, "FitButton").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
         Assert.Equal(
-            Math.Clamp(Math.Min(viewportWidth / 64.0, viewportHeight / 32.0), GraphicViewerViewModel.MinZoom, GraphicViewerViewModel.MaxZoom),
+            Math.Clamp(Math.Min((viewportWidth - 32) / 64.0, (viewportHeight - 32) / 32.0), GraphicViewerViewModel.MinZoom, GraphicViewerViewModel.MaxZoom),
             harness.ViewModel.Zoom);
+    }
+
+    [AvaloniaFact]
+    public void Fit_UsesTheRenderedSheetSizeNotTheFrameExtents()
+    {
+        using var harness = OpenAssetsA(new SpySpriteSheetLoader(96, 48));
+        double viewportWidth = harness.Window.SheetScroll.Viewport.Width;
+        double viewportHeight = harness.Window.SheetScroll.Viewport.Height;
+        Assert.True(viewportWidth > 0 && viewportHeight > 0);
+
+        harness.ViewModel.Zoom = 4.0;
+        Find<Button>(harness, "FitButton").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+
+        double expected = Math.Clamp(
+            Math.Min((viewportWidth - 32) / 96.0, (viewportHeight - 32) / 48.0),
+            GraphicViewerViewModel.MinZoom,
+            GraphicViewerViewModel.MaxZoom);
+        Assert.Equal(expected, harness.ViewModel.Zoom);
+        Assert.True(harness.Window.SheetScroll.Extent.Width <= viewportWidth);
+        Assert.True(harness.Window.SheetScroll.Extent.Height <= viewportHeight);
+    }
+
+    [AvaloniaFact]
+    public void Fit_WithoutALoadedSheetImageIsANoOp()
+    {
+        using var harness = GraphicViewerWindowHarness.Create();
+        Assert.Null(harness.Window.SheetImage);
+
+        harness.ViewModel.Zoom = 4.0;
+        Find<Button>(harness, "FitButton").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+
+        Assert.Equal(4.0, harness.ViewModel.Zoom);
     }
 
     [AvaloniaFact]

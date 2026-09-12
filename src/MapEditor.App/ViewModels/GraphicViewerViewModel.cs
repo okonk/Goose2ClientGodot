@@ -201,22 +201,11 @@ internal sealed class GraphicViewerViewModel : ViewModelBase
     public void ResetZoom()
         => Zoom = 1.0;
 
-    public void FitToViewport(double viewportWidth, double viewportHeight)
+    public void FitToViewport(double viewportWidth, double viewportHeight, double imageWidth, double imageHeight)
     {
-        if (viewportWidth <= 0 || viewportHeight <= 0)
-        {
-            return;
-        }
-
-        double imageWidth = 0;
-        double imageHeight = 0;
-        foreach (SpriteFrame frame in _frames)
-        {
-            imageWidth = Math.Max(imageWidth, frame.SourceRect.X + frame.SourceRect.Width);
-            imageHeight = Math.Max(imageHeight, frame.SourceRect.Y + frame.SourceRect.Height);
-        }
-
-        if (imageWidth <= 0 || imageHeight <= 0)
+        if (viewportWidth <= 0 || viewportHeight <= 0 || imageWidth <= 0 || imageHeight <= 0
+            || double.IsNaN(viewportWidth) || double.IsNaN(viewportHeight)
+            || double.IsNaN(imageWidth) || double.IsNaN(imageHeight))
         {
             return;
         }

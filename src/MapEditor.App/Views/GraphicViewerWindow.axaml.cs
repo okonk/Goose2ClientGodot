@@ -276,7 +276,16 @@ internal partial class GraphicViewerWindow : Window
     }
 
     private void OnFit(object? sender, RoutedEventArgs e)
-        => _viewModel.FitToViewport(SheetScroll.Viewport.Width, SheetScroll.Viewport.Height);
+    {
+        if (_sheetImage is not { } image)
+        {
+            return;
+        }
+
+        double viewportWidth = SheetScroll.Viewport.Width - SheetHost.Padding.Left - SheetHost.Padding.Right;
+        double viewportHeight = SheetScroll.Viewport.Height - SheetHost.Padding.Top - SheetHost.Padding.Bottom;
+        _viewModel.FitToViewport(viewportWidth, viewportHeight, image.PixelWidth, image.PixelHeight);
+    }
 
     private void OnPercent100(object? sender, RoutedEventArgs e)
         => _viewModel.ResetZoom();
