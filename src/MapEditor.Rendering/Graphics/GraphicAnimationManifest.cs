@@ -331,7 +331,7 @@ public sealed class GraphicAnimationManifest
                 throw Fail(GraphicAnimationManifestError.InvalidCategoryMapping, sourcePath, $"Category '{name}' in sheet {sheetId} requires an integer 'id' property.");
             }
 
-            if (!equipment && id is not null)
+            if (!equipment && idCount > 0)
             {
                 throw Fail(GraphicAnimationManifestError.InvalidCategoryMapping, sourcePath, $"Category '{name}' in sheet {sheetId} must not have an 'id' property.");
             }

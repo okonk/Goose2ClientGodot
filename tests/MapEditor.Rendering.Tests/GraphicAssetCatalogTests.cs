@@ -109,6 +109,26 @@ public class GraphicAssetCatalogTests
     }
 
     [Fact]
+    public void Create_SheetWithTwoMappingsOfSameCategoryAppearsOnceInGetSheets()
+    {
+        string json = """
+            { "version": 1,
+              "sheets": { "10": { "categories": [ { "name": "Helm", "id": 126 }, { "name": "Helm", "id": 127 } ] } },
+              "animations": [ { "ownerSheet": 10, "id": 1, "fps": 8, "frames": [[10, 1]] } ] }
+            """;
+
+        GraphicAssetCatalog catalog = GraphicAssetCatalog.Create(
+            SpriteManifest.Parse(SpriteJson), GraphicAnimationManifest.Parse(json));
+
+        Assert.Equal(new[] { 10 }, catalog.GetSheets(GraphicCategory.Helm));
+        Assert.Equal(new[]
+        {
+            new GraphicCategoryMapping(GraphicCategory.Helm, 126),
+            new GraphicCategoryMapping(GraphicCategory.Helm, 127)
+        }, catalog.GetMappings(10));
+    }
+
+    [Fact]
     public void Create_MissingCategorizedSheetIsRejected()
     {
         string json = """

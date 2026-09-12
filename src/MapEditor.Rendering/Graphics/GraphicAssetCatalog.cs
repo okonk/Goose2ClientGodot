@@ -65,7 +65,10 @@ public sealed class GraphicAssetCatalog
                     sheetsByCategory[mapping.Category] = sheets = new List<int>();
                 }
 
-                sheets.Add(sheetId);
+                if (!sheets.Contains(sheetId))
+                {
+                    sheets.Add(sheetId);
+                }
             }
         }
 

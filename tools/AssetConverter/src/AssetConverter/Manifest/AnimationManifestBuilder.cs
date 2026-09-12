@@ -24,9 +24,8 @@ public static class AnimationManifestBuilder
         var sheetCategories = CollectSheetCategories(new CompiledEnc(compiledEncPath));
         var (sheets, animations, animatedSheets) = CollectSheets(illutiaDataDir);
 
-        foreach (var sheet in sheetCategories.Keys)
-            if (!sheets.ContainsKey(sheet))
-                sheets[sheet] = new AnimationManifestSheet();
+        foreach (var sheet in sheetCategories.Keys.Where(s => !sheets.ContainsKey(s)).ToList())
+            sheetCategories.Remove(sheet);
 
         return Serialize(sheets, animations, sheetCategories, animatedSheets);
     }
@@ -43,11 +42,10 @@ public static class AnimationManifestBuilder
             LoadAspereta(asperetaDataDir, asperetaCompiledEncPath);
 
         var sheets = new SortedDictionary<int, AnimationManifestSheet>(illutiaSheets);
-        foreach (var sheet in illutiaCategories.Keys)
-            if (!sheets.ContainsKey(sheet))
-                sheets[sheet] = new AnimationManifestSheet();
         foreach (var (number, sheet) in asperetaSheets)
             sheets[number] = sheet;
+        foreach (var sheet in illutiaCategories.Keys.Where(s => !sheets.ContainsKey(s)).ToList())
+            illutiaCategories.Remove(sheet);
 
         var categories = new Dictionary<int, List<(string Name, int? Id)>>(illutiaCategories);
         foreach (var (number, list) in asperetaCategories)
@@ -105,7 +103,9 @@ public static class AnimationManifestBuilder
                 if (sheet == 0) continue;
                 if (!categories.TryGetValue(sheet, out var list))
                     categories[sheet] = list = new List<(string Name, int? Id)>();
-                list.Add((animation.Type.ToString(), (int?)animation.Id));
+                var mapping = (animation.Type.ToString(), (int?)animation.Id);
+                if (!list.Contains(mapping))
+                    list.Add(mapping);
             }
         return categories;
     }

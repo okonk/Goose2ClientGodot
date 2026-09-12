@@ -226,6 +226,8 @@ public class GraphicAnimationManifestTests
     [InlineData("""{ "version": 1, "sheets": { "1": { "categories": [ { "name": "Body", "id": 1.5 } ] } }, "animations": [] }""")]
     [InlineData("""{ "version": 1, "sheets": { "1": { "categories": [ { "name": "Tiles", "id": 1 } ] } }, "animations": [] }""")]
     [InlineData("""{ "version": 1, "sheets": { "1": { "categories": [ { "name": "Spells", "id": 2 } ] } }, "animations": [] }""")]
+    [InlineData("""{ "version": 1, "sheets": { "1": { "categories": [ { "name": "Tiles", "id": null } ] } }, "animations": [] }""")]
+    [InlineData("""{ "version": 1, "sheets": { "1": { "categories": [ { "name": "Spells", "id": "x" } ] } }, "animations": [] }""")]
     [InlineData("""{ "version": 1, "sheets": { "1": { "categories": [ { "name": "Body", "id": 1, "id": 1 } ] } }, "animations": [] }""")]
     [InlineData("""{ "version": 1, "sheets": { "1": { "categories": [ "Body" ] } }, "animations": [] }""")]
     public void Parse_CategoryIdPresenceRulesAreEnforced(string json)

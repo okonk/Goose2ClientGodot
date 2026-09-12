@@ -88,6 +88,56 @@ public class AnimationManifestBuilderTests
     }
 
     [Fact]
+    public void Build_DuplicateCompiledMapping_IsEmittedOnce()
+    {
+        var root = AnimationSourceFixture.CreateDirectory();
+        try
+        {
+            AnimationSourceFixture.WriteAdf(AnimationSourceFixture.DataDir(root), 115, 3205, 4);
+            AnimationSourceFixture.WriteCompiledEnc(AnimationSourceFixture.CompiledEncPath(root),
+                (AnimationType.Body, 1, new[] { 115 }),
+                (AnimationType.Body, 1, new[] { 115 }));
+
+            using var doc = JsonDocument.Parse(Build(root));
+            var categories = doc.RootElement.GetProperty("sheets").GetProperty("115").GetProperty("categories");
+            Assert.Equal(1, categories.GetArrayLength());
+            Assert.Equal("Body", categories[0].GetProperty("name").GetString());
+            Assert.Equal(1, categories[0].GetProperty("id").GetInt32());
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Build_CompiledSheetsWithoutGraphicAdf_AreNotEmitted()
+    {
+        var root = AnimationSourceFixture.CreateDirectory();
+        try
+        {
+            AnimationSourceFixture.WriteAdf(AnimationSourceFixture.DataDir(root), 115, 3205, 4);
+            AnimationSourceFixture.WriteSoundAdf(AnimationSourceFixture.DataDir(root), 6746);
+            AnimationSourceFixture.WriteCompiledEnc(AnimationSourceFixture.CompiledEncPath(root),
+                (AnimationType.Body, 1, new[] { 115 }),
+                (AnimationType.Helm, 2, new[] { 6746, 6747 }));
+
+            using var doc = JsonDocument.Parse(Build(root));
+            var sheetKeys = doc.RootElement.GetProperty("sheets")
+                .EnumerateObject().Select(p => p.Name).ToArray();
+            Assert.Equal(new[] { "115" }, sheetKeys);
+            var categories = doc.RootElement.GetProperty("sheets").GetProperty("115").GetProperty("categories");
+            Assert.Equal(1, categories.GetArrayLength());
+            Assert.Equal("Body", categories[0].GetProperty("name").GetString());
+            Assert.Equal(1, categories[0].GetProperty("id").GetInt32());
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
     public void Build_EquipmentSheetWithLocalAnimations_IsNotAlsoSpells()
     {
         var root = AnimationSourceFixture.CreateDirectory();
