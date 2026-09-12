@@ -16,6 +16,8 @@ internal sealed class AvaloniaSpriteSheetImage : ISpriteSheetImage
 
     public Bitmap Bitmap => _bitmap;
 
+    internal int DisposeCount { get; private set; }
+
     public int PixelWidth
     {
         get
@@ -42,6 +44,7 @@ internal sealed class AvaloniaSpriteSheetImage : ISpriteSheetImage
         }
 
         _disposed = true;
+        DisposeCount++;
         _bitmap.Dispose();
     }
 }

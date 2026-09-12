@@ -15,7 +15,7 @@ internal sealed class AnimationPreviewControl : Control
     private static readonly Brush DiagnosticFill = new SolidColorBrush(Color.FromArgb(0xFF, 0xFF, 0x99, 0x66));
 
     private readonly GraphicViewerViewModel _viewModel;
-    private readonly AssetContext _assets;
+    private AssetContext _assets;
     private string? _diagnostic;
 
     public AnimationPreviewControl(GraphicViewerViewModel viewModel, AssetContext assets)
@@ -27,6 +27,22 @@ internal sealed class AnimationPreviewControl : Control
     }
 
     public string? Diagnostic => _diagnostic;
+
+    internal AssetContext Assets
+    {
+        get => _assets;
+        set
+        {
+            if (ReferenceEquals(_assets, value))
+            {
+                return;
+            }
+
+            _assets = value ?? throw new ArgumentNullException(nameof(value));
+            InvalidateMeasure();
+            InvalidateVisual();
+        }
+    }
 
     public event EventHandler? DiagnosticChanged;
 

@@ -161,12 +161,12 @@ internal sealed class GraphicViewerViewModel : ViewModelBase
     {
         if (_selectedAnimation is not null)
         {
-            SetField(ref _isPlaying, true);
+            SetField(ref _isPlaying, true, nameof(IsPlaying));
         }
     }
 
     public void Pause()
-        => SetField(ref _isPlaying, false);
+        => SetField(ref _isPlaying, false, nameof(IsPlaying));
 
     public void StepNext()
         => Step(1);

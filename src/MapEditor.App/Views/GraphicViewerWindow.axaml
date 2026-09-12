@@ -1,0 +1,80 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="MapEditor.App.GraphicViewerWindow"
+        Title="Graphic Viewer"
+        Width="1100"
+        Height="750"
+        FontFamily="Inter, $Default">
+  <DockPanel>
+    <Border x:Name="Toolbar" Classes="chrome" DockPanel.Dock="Top" Padding="10,8" BorderThickness="0,0,0,1">
+      <StackPanel Orientation="Horizontal" Spacing="8">
+        <TextBlock Text="Category" Classes="muted" VerticalAlignment="Center" />
+        <ComboBox x:Name="CategoryCombo" Width="120" />
+        <TextBlock Text="Sheet" Classes="muted" VerticalAlignment="Center" />
+        <TextBox x:Name="SheetField" Width="60" />
+        <TextBlock x:Name="SheetFieldError" Text="Must be a sheet id."
+                   Foreground="{DynamicResource EditorDangerBrush}" FontSize="11" IsVisible="False" />
+        <TextBlock Text="Zoom" Classes="muted" VerticalAlignment="Center" />
+        <ComboBox x:Name="ZoomCombo" Width="80" />
+        <Button x:Name="FitButton" Content="Fit" Click="OnFit" />
+        <Button x:Name="Percent100Button" Content="100%" Click="OnPercent100" />
+      </StackPanel>
+    </Border>
+    <Border x:Name="Diagnostics" Classes="chrome" DockPanel.Dock="Bottom" Padding="10,6" BorderThickness="0,1,0,0">
+      <StackPanel Orientation="Horizontal" Spacing="18">
+        <TextBlock x:Name="AvailabilityText" Classes="mono muted" Text="—" />
+        <TextBlock x:Name="LoadDiagnosticText" Classes="mono muted" Text="—" TextTrimming="CharacterEllipsis" />
+      </StackPanel>
+    </Border>
+    <Grid>
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="*" />
+        <ColumnDefinition Width="340" />
+      </Grid.ColumnDefinitions>
+      <ScrollViewer x:Name="SheetScroll" Grid.Column="0"
+                    Background="{DynamicResource EditorArtboardBrush}"
+                    HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+        <Border x:Name="SheetHost" Background="{DynamicResource EditorArtboardBrush}" Padding="16"
+                HorizontalAlignment="Left" VerticalAlignment="Top" />
+      </ScrollViewer>
+      <Border Grid.Column="1" Classes="panel" Padding="12">
+        <DockPanel>
+          <StackPanel DockPanel.Dock="Top" Spacing="6">
+            <TextBlock Text="GRAPHIC" Classes="section" />
+            <TextBlock x:Name="GraphicIdText" Classes="mono" Text="—" />
+            <TextBlock x:Name="SourceRectText" Classes="mono muted" Text="—" />
+            <TextBlock Text="MAPPINGS" Classes="section" Margin="0,6,0,0" />
+            <ItemsControl x:Name="MappingsList">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <StackPanel Orientation="Horizontal" Spacing="8">
+                    <TextBlock Classes="mono" Text="{Binding Category}" />
+                    <TextBlock Classes="mono muted" Text="{Binding Id}" />
+                  </StackPanel>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <TextBlock Text="ANIMATIONS" Classes="section" Margin="0,6,0,0" />
+            <ComboBox x:Name="AnimationCombo">
+              <ComboBox.ItemTemplate>
+                <DataTemplate>
+                  <TextBlock><Run Text="{Binding Key.OwnerSheet}" />/<Run Text="{Binding Key.AnimationId}" /><Run Text=" (" /><Run Text="{Binding FramesPerSecond}" /> fps)</TextBlock>
+                </DataTemplate>
+              </ComboBox.ItemTemplate>
+            </ComboBox>
+          </StackPanel>
+          <StackPanel DockPanel.Dock="Bottom" Spacing="8">
+            <Border x:Name="PreviewHost" Classes="sunken" />
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <Button x:Name="PlayPauseButton" Content="Play" Click="OnPlayPause" />
+              <Button x:Name="PreviousButton" Content="Prev" Click="OnPrevious" />
+              <Button x:Name="NextButton" Content="Next" Click="OnNext" />
+              <TextBlock x:Name="FramePositionText" Classes="mono muted" VerticalAlignment="Center" Text="—" />
+            </StackPanel>
+            <TextBlock x:Name="PreviewDiagnosticText" Classes="muted" FontSize="11" TextWrapping="Wrap" IsVisible="False" />
+          </StackPanel>
+        </DockPanel>
+      </Border>
+    </Grid>
+  </DockPanel>
+</Window>

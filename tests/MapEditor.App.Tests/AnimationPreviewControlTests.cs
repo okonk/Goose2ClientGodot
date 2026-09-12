@@ -143,6 +143,33 @@ public class AnimationPreviewControlTests : IDisposable
         Assert.Null(harness.Control.Diagnostic);
     }
 
+    [AvaloniaFact]
+    public void Assets_RetractedToTheReplacementContext_KeepsRenderingWithTheNewContext()
+    {
+        Harness first = Create();
+        string secondDirectory = Path.Combine(_directory, Guid.NewGuid().ToString("n"));
+        Directory.CreateDirectory(secondDirectory);
+        File.WriteAllText(Path.Combine(secondDirectory, "manifest.json"), ManifestJson);
+        File.WriteAllText(Path.Combine(secondDirectory, GraphicAnimationManifest.FileName), AnimationJson);
+        CountingSpriteSheetLoader secondLoader = new(_ =>
+            SpriteSheetLoadResult.Success(new AvaloniaSpriteSheetImage(new Bitmap(new MemoryStream(AssetFixture.PngSheet.Create(64, 64))))));
+        AssetContext second = AssetContext.Create(secondDirectory, secondLoader);
+        GraphicAssetCatalog secondCatalog = GraphicAssetCatalog.Create(second.Cache.Manifest!, GraphicAnimationManifest.Load(secondDirectory));
+        first.ViewModel.Bind(second.Cache.Manifest!, secondCatalog);
+        first.ViewModel.SelectAnimation(secondCatalog.GetAnimations(new SpriteReference(1, 10))[0]);
+
+        first.Control.Assets = second;
+        first.Context.Dispose();
+
+        RecordingMapDrawTarget target = new();
+        first.Control.RenderPreview(target);
+
+        Assert.Same(second, first.Control.Assets);
+        Assert.Single(target.Images);
+        Assert.Equal(new Rect(0, 0, 16, 24), target.Images[0].Source);
+        Assert.Single(secondLoader.LoadedPaths);
+    }
+
     private Harness Create(Func<string, SpriteSheetLoadResult>? loaderBehavior = null, bool selectAnimation = true)
     {
         string assetDirectory = Path.Combine(_directory, Guid.NewGuid().ToString("n"));
