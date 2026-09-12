@@ -15,6 +15,10 @@ public static class AnimationSourceFixture
 
     public static string CompiledEncPath(string root) => Path.Combine(root, "compiled.enc");
 
+    public static string AsperetaDataDir(string root) => Path.Combine(root, "aspereta");
+
+    public static string AsperetaCompiledEncPath(string root) => Path.Combine(root, "aspereta_compiled.enc");
+
     public static void WriteAdf(
         string dataDir, int fileNumber, int firstFrameIndex, int frameCount,
         params (int Id, int[] FrameIndices)[] animations)
@@ -71,6 +75,70 @@ public static class AnimationSourceFixture
                 writer.Write(0);
             for (int i = 0; i < 11; i++)
                 writer.Write(i < files.Length ? files[i] : 0);
+        }
+    }
+
+    public static void WriteAsperetaAdf(
+        string dataDir, int fileNumber,
+        (int Index, int X, int Y, int W, int H)[] frames,
+        (int Id, int[] FrameIds)[] animations)
+    {
+        Directory.CreateDirectory(dataDir);
+        using var writer = new BinaryWriter(File.Create(Path.Combine(dataDir, $"{fileNumber}.adf")));
+        writer.Write((byte)AdfType.Graphic);
+        writer.Write(0);
+        writer.Write((byte)0);
+        writer.Write(frames.Length + animations.Length);
+        foreach (var (index, x, y, w, h) in frames)
+        {
+            writer.Write(index);
+            writer.Write((byte)1);
+            writer.Write(x);
+            writer.Write(y);
+            writer.Write(w);
+            writer.Write(h);
+        }
+        foreach (var (id, frameIds) in animations)
+        {
+            writer.Write(id);
+            writer.Write((byte)frameIds.Length);
+            foreach (var frameId in frameIds)
+                writer.Write(frameId);
+            writer.Write((byte)0);
+        }
+        writer.Write(0);
+        writer.Write(new byte[] { 0, 0 });
+    }
+
+    public static void WriteAsperetaSoundAdf(string dataDir, int fileNumber)
+    {
+        Directory.CreateDirectory(dataDir);
+        using var writer = new BinaryWriter(File.Create(Path.Combine(dataDir, $"{fileNumber}.adf")));
+        writer.Write((byte)AdfType.Sound);
+        writer.Write(0);
+        writer.Write((byte)0);
+        writer.Write(0);
+        writer.Write(0);
+        writer.Write(new byte[] { 0, 0 });
+    }
+
+    public static void WriteAsperetaMalformedAdf(string dataDir, int fileNumber)
+    {
+        Directory.CreateDirectory(dataDir);
+        File.WriteAllBytes(Path.Combine(dataDir, $"{fileNumber}.adf"), new byte[] { 1 });
+    }
+
+    public static void WriteAsperetaCompiledEnc(
+        string path, params (AnimationType Type, int Id, int[] Indexes)[] records)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        using var writer = new BinaryWriter(File.Create(path));
+        foreach (var (type, id, indexes) in records)
+        {
+            writer.Write((short)((int)type + 1));
+            writer.Write(id);
+            for (int i = 0; i < 32; i++)
+                writer.Write(i < indexes.Length ? indexes[i] : 0);
         }
     }
 }
