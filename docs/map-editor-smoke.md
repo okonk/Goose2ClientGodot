@@ -91,8 +91,9 @@ and `animation-manifest.json`.
 1. **Regenerate assets.** Regenerate the assets so both manifests exist in the asset root.
 2. **Open the viewer.** Load the asset directory and open Tools → Graphic Viewer. The
    viewer opens modeless and the editor window stays enabled and usable.
-3. **Navigation and zoom.** Exercise every category filter, direct numeric sheet entry,
-   Fit, 100%, the minimum and maximum zoom, and scrolling the sheet.
+3. **Navigation and zoom.** Exercise every category filter, sheet selection from the
+   category-filtered dropdown, Fit, 100%, the minimum and maximum zoom, and scrolling
+   the sheet.
 4. **Selection.** Select normal, overlapping, and non-animated graphics and verify the
    graphic id, source-rect readout, and preview.
 5. **Playback.** Choose multiple matching animations and verify play/pause/step and

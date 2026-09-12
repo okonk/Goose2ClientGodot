@@ -1,6 +1,8 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
@@ -142,13 +144,14 @@ public class GraphicViewerWindowTests
     private static void WritePng(string directory, int sheetId)
         => File.WriteAllBytes(Path.Combine(directory, "sheets", $"{sheetId}.png"), AssetFixture.PngSheet.Create(64, 32));
 
-    private static void SetSheet(GraphicViewerWindowHarness harness, string text)
+    private static void SetSheet(GraphicViewerWindowHarness harness, int sheetId)
     {
-        TextBox field = Find<TextBox>(harness, "SheetField");
-        field.Text = text;
-        field.RaiseEvent(new RoutedEventArgs(InputElement.LostFocusEvent));
+        Find<ComboBox>(harness, "SheetCombo").SelectedItem = sheetId;
         Dispatcher.UIThread.RunJobs();
     }
+
+    private static int[] SheetItems(ComboBox combo)
+        => ((IEnumerable)combo.ItemsSource!).Cast<int>().ToArray();
 
     private static GraphicViewerWindowHarness OpenAssetsA(ISpriteSheetLoader? windowLoader = null)
     {
@@ -219,7 +222,9 @@ public class GraphicViewerWindowTests
         Assert.Single(loader.LoadedPaths);
         Assert.EndsWith("sheets/1.png", loader.LoadedPaths[0]);
         Assert.False(harness.Clock.IsRunning);
-        Assert.Equal("1", Find<TextBox>(harness, "SheetField").Text);
+        ComboBox sheetCombo = Find<ComboBox>(harness, "SheetCombo");
+        Assert.Equal(new[] { 1, 2 }, SheetItems(sheetCombo));
+        Assert.Equal(1, sheetCombo.SelectedItem);
         Assert.Same(harness.ViewModel.Mappings, Find<ItemsControl>(harness, "MappingsList").ItemsSource);
         Assert.Single(harness.ViewModel.Mappings);
         Assert.Equal("available", Find<TextBlock>(harness, "AvailabilityText").Text);
@@ -235,7 +240,7 @@ public class GraphicViewerWindowTests
         harness.ViewModel.TrySelectFrameAt(16, 16);
         Assert.True(harness.Clock.IsRunning);
 
-        SetSheet(harness, "2");
+        SetSheet(harness, 2);
 
         Assert.Equal(2, harness.ViewModel.SelectedSheetId);
         Assert.False(harness.Clock.IsRunning);
@@ -251,6 +256,9 @@ public class GraphicViewerWindowTests
     public void ToolbarControls_PropagateToTheViewModel()
     {
         using var harness = OpenAssetsA();
+
+        SetSheet(harness, 2);
+        Assert.Equal(2, harness.ViewModel.SelectedSheetId);
 
         Find<ComboBox>(harness, "CategoryCombo").SelectedItem = GraphicViewerCategoryFilter.Body;
         Assert.Equal(GraphicViewerCategoryFilter.Body, harness.ViewModel.Category);
@@ -363,7 +371,7 @@ public class GraphicViewerWindowTests
         Assert.True(harness.Clock.IsRunning);
         Assert.Equal(TimeSpan.FromMilliseconds(250), harness.Clock.Interval);
 
-        SetSheet(harness, "2");
+        SetSheet(harness, 2);
         Assert.False(harness.Clock.IsRunning);
         Assert.False(harness.ViewModel.IsPlaying);
     }
@@ -401,7 +409,7 @@ public class GraphicViewerWindowTests
         Assert.Null(harness.Window.SheetImage);
         Assert.Null(harness.Window.SheetControl.Image);
 
-        SetSheet(harness, "2");
+        SetSheet(harness, 2);
 
         Assert.Equal(2, harness.ViewModel.SelectedSheetId);
         Assert.NotNull(harness.Window.SheetImage);
@@ -506,7 +514,28 @@ public class GraphicViewerWindowTests
     }
 
     [AvaloniaFact]
-    public void UnmodifiedSpace_TogglesPlayback_UnlessTheSheetFieldIsFocused()
+    public void SheetCombo_ShowsOnlyTheSelectedCategorysSheets()
+    {
+        using var harness = OpenAssetsA();
+        ComboBox sheets = Find<ComboBox>(harness, "SheetCombo");
+        Assert.Equal(new[] { 1, 2 }, SheetItems(sheets));
+        Assert.Equal(1, sheets.SelectedItem);
+
+        Find<ComboBox>(harness, "CategoryCombo").SelectedItem = GraphicViewerCategoryFilter.Body;
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal(new[] { 1 }, SheetItems(sheets));
+        Assert.Equal(1, sheets.SelectedItem);
+        Assert.Equal(1, harness.ViewModel.SelectedSheetId);
+
+        Find<ComboBox>(harness, "CategoryCombo").SelectedItem = GraphicViewerCategoryFilter.Hair;
+        Dispatcher.UIThread.RunJobs();
+        Assert.Empty(SheetItems(sheets));
+        Assert.Null(sheets.SelectedItem);
+        Assert.Null(harness.ViewModel.SelectedSheetId);
+    }
+
+    [AvaloniaFact]
+    public void UnmodifiedSpace_TogglesPlayback_ExceptWithTheSheetComboFocused()
     {
         using var harness = OpenAssetsA();
         harness.Window.SheetControl.Focus();
@@ -521,8 +550,10 @@ public class GraphicViewerWindowTests
         Assert.True(harness.ViewModel.IsPlaying);
         Assert.True(harness.Clock.IsRunning);
 
-        Find<TextBox>(harness, "SheetField").Focus();
+        ComboBox sheetCombo = Find<ComboBox>(harness, "SheetCombo");
+        sheetCombo.Focus();
         harness.Window.KeyPressQwerty(PhysicalKey.Space, RawInputModifiers.None);
+        Assert.True(sheetCombo.IsDropDownOpen);
         Assert.True(harness.ViewModel.IsPlaying);
         Assert.True(harness.Clock.IsRunning);
     }

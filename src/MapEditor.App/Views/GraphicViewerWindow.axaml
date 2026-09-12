@@ -11,9 +11,7 @@
         <TextBlock Text="Category" Classes="muted" VerticalAlignment="Center" />
         <ComboBox x:Name="CategoryCombo" Width="120" />
         <TextBlock Text="Sheet" Classes="muted" VerticalAlignment="Center" />
-        <TextBox x:Name="SheetField" Width="60" />
-        <TextBlock x:Name="SheetFieldError" Text="Must be a sheet id."
-                   Foreground="{DynamicResource EditorDangerBrush}" FontSize="11" IsVisible="False" />
+        <ComboBox x:Name="SheetCombo" Width="80" />
         <TextBlock Text="Zoom" Classes="muted" VerticalAlignment="Center" />
         <ComboBox x:Name="ZoomCombo" Width="80" />
         <Button x:Name="FitButton" Content="Fit" Click="OnFit" />

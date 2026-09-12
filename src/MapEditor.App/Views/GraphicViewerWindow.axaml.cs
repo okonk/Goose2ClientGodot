@@ -5,7 +5,6 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Markup.Xaml;
-using Avalonia.Media;
 using MapEditor.App.Controls;
 using MapEditor.App.Rendering;
 using MapEditor.App.ViewModels;
@@ -16,7 +15,6 @@ namespace MapEditor.App;
 internal partial class GraphicViewerWindow : Window
 {
     private static readonly double[] ZoomOptions = { 0.25, 0.5, 1.0, 2.0, 4.0, 8.0 };
-    private static readonly IBrush FieldErrorBrush = new SolidColorBrush(Color.FromRgb(0xE0, 0x55, 0x55));
 
     private readonly AssetContextController _assets;
     private readonly ISpriteSheetLoader _loader;
@@ -48,8 +46,7 @@ internal partial class GraphicViewerWindow : Window
         ZoomCombo.ItemsSource = ZoomOptions;
         ZoomCombo.SelectionChanged += OnZoomSelectionChanged;
         AnimationCombo.SelectionChanged += OnAnimationSelectionChanged;
-        SheetField.KeyDown += OnSheetFieldKeyDown;
-        SheetField.LostFocus += OnSheetFieldLostFocus;
+        SheetCombo.SelectionChanged += OnSheetSelectionChanged;
         _previewControl.DiagnosticChanged += OnPreviewDiagnosticChanged;
         _clock.Tick += OnClockTick;
         _assets.CurrentChanged += OnAssetsChanged;
@@ -112,8 +109,14 @@ internal partial class GraphicViewerWindow : Window
         switch (e.PropertyName)
         {
             case nameof(GraphicViewerViewModel.SelectedSheetId):
-                SyncSheetField();
+                SheetCombo.SelectedItem = _viewModel.SelectedSheetId is int id ? id : null;
                 LoadSheetImage(_viewModel.SelectedSheetId);
+                break;
+            case nameof(GraphicViewerViewModel.Sheets):
+                // Replacing ItemsSource clears the combo selection, and the view model does not
+                // re-raise SelectedSheetId when the first sheet is already selected.
+                SheetCombo.ItemsSource = _viewModel.Sheets;
+                SheetCombo.SelectedItem = _viewModel.SelectedSheetId is int active ? active : null;
                 break;
             case nameof(GraphicViewerViewModel.IsPlaying):
                 SyncClock();
@@ -216,15 +219,6 @@ internal partial class GraphicViewerWindow : Window
         SourceRectText.Text = $"{rect.X}, {rect.Y}  {rect.Width} × {rect.Height}";
     }
 
-    private void SyncSheetField()
-    {
-        string text = _viewModel.SelectedSheetId?.ToString() ?? string.Empty;
-        if (SheetField.Text != text)
-        {
-            SheetField.Text = text;
-        }
-    }
-
     private void SyncZoomCombo()
     {
         double zoom = _viewModel.Zoom;
@@ -250,29 +244,12 @@ internal partial class GraphicViewerWindow : Window
     private void OnAnimationSelectionChanged(object? sender, SelectionChangedEventArgs e)
         => _viewModel.SelectAnimation(AnimationCombo.SelectedItem as GraphicAnimation);
 
-    private void OnSheetFieldKeyDown(object? sender, KeyEventArgs e)
+    private void OnSheetSelectionChanged(object? sender, SelectionChangedEventArgs e)
     {
-        if (e.Key == Key.Enter)
+        if (SheetCombo.SelectedItem is int id && id != _viewModel.SelectedSheetId)
         {
-            CommitSheetField();
-            e.Handled = true;
+            _viewModel.TrySelectSheet(id);
         }
-    }
-
-    private void OnSheetFieldLostFocus(object? sender, RoutedEventArgs e)
-        => CommitSheetField();
-
-    private void CommitSheetField()
-    {
-        if (int.TryParse(SheetField.Text, out int sheetId) && _viewModel.TrySelectSheet(sheetId))
-        {
-            SheetField.BorderBrush = null;
-            SheetFieldError.IsVisible = false;
-            return;
-        }
-
-        SheetField.BorderBrush = FieldErrorBrush;
-        SheetFieldError.IsVisible = true;
     }
 
     private void OnFit(object? sender, RoutedEventArgs e)
