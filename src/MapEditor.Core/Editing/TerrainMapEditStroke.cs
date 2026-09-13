@@ -106,6 +106,8 @@ internal sealed class TerrainMapEditStroke
 
         _active = false;
         _accumulator.Restore();
+        _centerOverrides.Clear();
+        _visited.Clear();
     }
 
     private TerrainEditResult ApplySegment(MapCoordinate from, MapCoordinate to)
@@ -172,9 +174,14 @@ internal sealed class TerrainMapEditStroke
 
     private void ValidateCoordinate(int x, int y)
     {
-        if (x < 0 || x >= _document.Width || y < 0 || y >= _document.Height)
+        if (x < 0 || x >= _document.Width)
         {
             throw new ArgumentOutOfRangeException(nameof(x));
+        }
+
+        if (y < 0 || y >= _document.Height)
+        {
+            throw new ArgumentOutOfRangeException(nameof(y));
         }
     }
 }
