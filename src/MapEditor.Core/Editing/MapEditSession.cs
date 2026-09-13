@@ -152,6 +152,11 @@ public sealed class MapEditSession
         int x,
         int y)
     {
+        if (mode is not (TerrainEditMode.Paint or TerrainEditMode.Erase))
+        {
+            throw new ArgumentOutOfRangeException(nameof(mode));
+        }
+
         if (HasActiveGesture)
         {
             throw new InvalidOperationException();

@@ -156,6 +156,46 @@ public class TerrainPatternScorerTests
     }
 
     [Fact]
+    public void Select_DuplicatePatternsWithDisjointVariantsMergeAcrossGroupOrderings()
+    {
+        var desired = AllPeers(1, 2, 3, 4, 1, 2, 3, 4);
+        desired = desired with { Center = Ids[0] };
+        var pattern = AllPeers(1, 2, 3, 4, 1, 2, 3, 4);
+        var candidates = new List<TerrainPatternCandidateGroup>
+        {
+            Group(pattern, (0, 1)),
+            Group(pattern, (0, 2)),
+            Group(pattern, (0, 3))
+        };
+
+        var baseline = TerrainPatternScorer.Select(desired, 4, 4, candidates);
+        Assert.Equal(1, baseline.TiedPatternCount);
+        Assert.Equal(3, baseline.VariantCount);
+
+        var shuffled = new Random(77);
+        for (var i = 0; i < 5; i++)
+        {
+            for (var j = candidates.Count - 1; j > 0; j--)
+            {
+                var k = shuffled.Next(j + 1);
+                (candidates[j], candidates[k]) = (candidates[k], candidates[j]);
+            }
+
+            Assert.Equal(baseline, TerrainPatternScorer.Select(desired, 4, 4, candidates));
+        }
+
+        var emptyFirst = new List<TerrainPatternCandidateGroup>
+        {
+            Group(pattern),
+            Group(pattern, (0, 2))
+        };
+
+        var resolved = TerrainPatternScorer.Select(desired, 4, 4, emptyFirst);
+        Assert.Equal(pattern, resolved.Pattern);
+        Assert.Equal(1, resolved.VariantCount);
+    }
+
+    [Fact]
     public void Select_HighestScoringPatternWinsOverTies()
     {
         var desired = AllPeers(1, 2, 3, 4, 1, 2, 3, 4);

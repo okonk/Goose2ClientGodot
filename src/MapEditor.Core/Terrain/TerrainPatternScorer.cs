@@ -79,17 +79,23 @@ public static class TerrainPatternScorer
         }
 
         var centerId = desired.Center.Value;
-        var best = int.MinValue;
-        var tied = new List<(TerrainPattern Pattern, IReadOnlyList<TerrainGraphicDefinition> Variants)>();
-        var seenPatterns = new HashSet<TerrainPattern>();
+        var merged = new Dictionary<TerrainPattern, List<TerrainGraphicDefinition>>();
         foreach (var group in candidates)
         {
-            if (!seenPatterns.Add(group.Pattern))
+            if (!merged.TryGetValue(group.Pattern, out var mergedVariants))
             {
-                continue;
+                mergedVariants = [];
+                merged[group.Pattern] = mergedVariants;
             }
 
-            var score = Score(desired, group.Pattern);
+            mergedVariants.AddRange(group.Variants);
+        }
+
+        var best = int.MinValue;
+        var tied = new List<(TerrainPattern Pattern, IReadOnlyList<TerrainGraphicDefinition> Variants)>();
+        foreach (var (pattern, mergedVariants) in merged)
+        {
+            var score = Score(desired, pattern);
             if (score > best)
             {
                 best = score;
@@ -98,7 +104,7 @@ public static class TerrainPatternScorer
 
             if (score == best)
             {
-                tied.Add((group.Pattern, group.Variants));
+                tied.Add((pattern, mergedVariants));
             }
         }
 

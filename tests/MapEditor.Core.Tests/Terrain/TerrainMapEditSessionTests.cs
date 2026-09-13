@@ -64,6 +64,21 @@ public class TerrainMapEditSessionTests
     }
 
     [Fact]
+    public void BeginTerrainStroke_UndefinedMode_ThrowsWithoutActiveGesture()
+    {
+        var session = new MapEditSession(MapDocument.Create(3, 3));
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => session.BeginTerrainStroke(Resolver(), Grass, (TerrainEditMode)99, 0, 0));
+        Assert.False(session.HasActiveStroke);
+        Assert.Null(session.ActiveTerrainStroke);
+        Assert.False(session.IsDirty);
+
+        session.SelectedTileLayer = new MapTileLayer(1, 1);
+        session.BeginStroke(MapEditTool.Pencil, 0, 0);
+        Assert.True(session.CompleteStroke());
+    }
+
+    [Fact]
     public void BeginStroke_WithTerrainTool_Throws()
     {
         var session = new MapEditSession(MapDocument.Create(3, 3));
