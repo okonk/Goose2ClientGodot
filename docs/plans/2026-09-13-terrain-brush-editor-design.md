@@ -268,3 +268,4 @@ A smoke pass will:
 - Oversized or multi-cell terrain graphics.
 - User-authored variant weights or per-stroke randomization.
 - Pixel screenshot tests.
+- Long-stroke resolution performance: Part 2's stateless `TryResolvePatch` re-validates and re-sorts the full cumulative center-override set on every segment (O(K log K), K = cumulative visited cells; O(N² log N) per stroke, plus per-segment clone allocations). Realistic strokes stay sub-millisecond per event, but a single gesture visiting tens of thousands of cells on a large map degrades progressively (CPU + GC pressure). A fix needs a stateful/incremental resolution fast path (validated cumulative state + only newly staged entries) or stroke-side persistent overrides with rollback — both require relaxing Part 2's locked resolver contract. Surfaced by the Part 2 final review.
