@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
+using MapEditor.Core;
 using MapEditor.Rendering;
 
 namespace MapEditor.App.Rendering;
@@ -13,7 +15,8 @@ internal sealed class AssetContext : IDisposable
         AppearanceAssetCatalog? appearance,
         AppearanceAvailability appearanceAvailability,
         GraphicAssetCatalog? graphics,
-        GraphicViewerAvailability graphicViewerAvailability)
+        GraphicViewerAvailability graphicViewerAvailability,
+        TerrainCatalogLoadResult terrain)
     {
         Cache = cache;
         Renderer = renderer;
@@ -22,6 +25,7 @@ internal sealed class AssetContext : IDisposable
         AppearanceAvailability = appearanceAvailability;
         Graphics = graphics;
         GraphicViewerAvailability = graphicViewerAvailability;
+        Terrain = terrain;
         TintCache = new AvaloniaTintedSpriteCache();
     }
 
@@ -39,6 +43,8 @@ internal sealed class AssetContext : IDisposable
 
     public GraphicViewerAvailability GraphicViewerAvailability { get; }
 
+    public TerrainCatalogLoadResult Terrain { get; }
+
     public AvaloniaTintedSpriteCache TintCache { get; }
 
     public bool IsAvailable => Cache.IsAvailable;
@@ -55,7 +61,8 @@ internal sealed class AssetContext : IDisposable
             null,
             AppearanceAvailability.Unavailable("Sprite assets are unavailable; load an asset directory to resolve appearance previews."),
             null,
-            GraphicViewerAvailability.Unavailable("Sprite assets are unavailable; load an asset directory to resolve graphic viewer previews."));
+            GraphicViewerAvailability.Unavailable("Sprite assets are unavailable; load an asset directory to resolve graphic viewer previews."),
+            TerrainCatalogLoadResult.Unavailable(TerrainAssetCatalog.FileName));
     }
 
     public static AssetContext Create(string assetDirectory, ISpriteSheetLoader loader)
@@ -86,7 +93,22 @@ internal sealed class AssetContext : IDisposable
             graphicViewerAvailability = GraphicViewerAvailability.Unavailable(ex.Message);
         }
 
-        return new(cache, new MapRenderer(cache), sheetIds, appearance, availability, graphics, graphicViewerAvailability);
+        string terrainSourcePath = Path.Combine(Path.GetFullPath(assetDirectory), TerrainAssetCatalog.FileName);
+        TerrainCatalogLoadResult terrain;
+        try
+        {
+            terrain = TerrainAssetCatalog.Load(assetDirectory, cache.Manifest!);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            terrain = TerrainCatalogLoadResult.Invalid(
+                terrainSourcePath,
+                TerrainFileRevision.Missing,
+                Array.Empty<TerrainValidationIssue>(),
+                $"Failed to load terrain catalog: {ex.Message}");
+        }
+
+        return new(cache, new MapRenderer(cache), sheetIds, appearance, availability, graphics, graphicViewerAvailability, terrain);
     }
 
     public SpriteResolution Resolve(SpriteReference reference)

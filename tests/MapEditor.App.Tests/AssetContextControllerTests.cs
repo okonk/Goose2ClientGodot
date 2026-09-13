@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Security.Cryptography;
 using System.Threading.Tasks;
 using Avalonia.Headless.XUnit;
 using Avalonia.Media.Imaging;
@@ -210,6 +211,218 @@ public class AssetContextControllerTests : IDisposable
         Assert.Equal(new SpriteReference(2, 20), equip.Reference);
         Assert.Same(noEquip.Image, context.Resolve(new SpriteReference(1, 10)).Image);
         controller.Dispose();
+    }
+
+    [Fact]
+    public void InitialContext_TerrainIsUnavailableWithActionableDiagnostic()
+    {
+        using AssetContextController controller = CreateController();
+        TerrainCatalogLoadResult terrain = controller.Current.Terrain;
+
+        Assert.False(terrain.IsValid);
+        Assert.False(terrain.CanAuthor);
+        Assert.False(terrain.CanPaint);
+        Assert.Null(terrain.Catalog);
+        Assert.Null(terrain.Index);
+        Assert.Equal(TerrainFileRevision.Missing, terrain.Revision);
+        Assert.False(string.IsNullOrEmpty(terrain.Diagnostic));
+    }
+
+    [Fact]
+    public void TryOpen_MissingTerrainSidecar_PublishesValidEmptyTerrainWithExactSourcePath()
+    {
+        using AssetContextController controller = CreateController();
+        string assetDirectory = WriteAssetDirectory("assets-no-terrain", TwoSheetJson);
+
+        bool opened = controller.TryOpen(assetDirectory);
+
+        Assert.True(opened);
+        TerrainCatalogLoadResult terrain = controller.Current.Terrain;
+        Assert.True(terrain.IsValid);
+        Assert.True(terrain.CanAuthor);
+        Assert.False(terrain.CanPaint);
+        Assert.Null(terrain.Catalog);
+        Assert.Null(terrain.Index);
+        Assert.Empty(terrain.Issues);
+        Assert.Equal(TerrainFileRevision.Missing, terrain.Revision);
+        Assert.Equal(Path.GetFullPath(Path.Combine(assetDirectory, TerrainAssetCatalog.FileName)), terrain.SourcePath);
+        Assert.Null(terrain.Diagnostic);
+    }
+
+    [Fact]
+    public void TryOpen_ValidTerrainSidecar_ExposesCatalogIndexRevisionAndSourcePath()
+    {
+        using AssetContextController controller = CreateController();
+        string assetDirectory = WriteAssetDirectory("assets-terrain", TwoSheetJson);
+        File.WriteAllBytes(Path.Combine(assetDirectory, "sheets", "1.png"), AssetFixture.PngSheet.Create(64, 64));
+        AssetFixture.WriteTerrainSidecar(assetDirectory, AssetFixture.TerrainCatalogJson);
+        string expectedHash = Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(Path.Combine(assetDirectory, TerrainAssetCatalog.FileName)))).ToLowerInvariant();
+
+        bool opened = controller.TryOpen(assetDirectory);
+
+        Assert.True(opened);
+        TerrainCatalogLoadResult terrain = controller.Current.Terrain;
+        Assert.True(terrain.IsValid);
+        Assert.True(terrain.CanAuthor);
+        Assert.True(terrain.CanPaint);
+        Assert.NotNull(terrain.Catalog);
+        Assert.NotNull(terrain.Index);
+        Assert.Single(terrain.Catalog.Terrains);
+        Assert.Equal(new TerrainFileRevision(true, expectedHash), terrain.Revision);
+        Assert.Equal(Path.GetFullPath(Path.Combine(assetDirectory, TerrainAssetCatalog.FileName)), terrain.SourcePath);
+        Assert.Null(terrain.Diagnostic);
+    }
+
+    [AvaloniaFact]
+    public void TryOpen_MalformedTerrain_KeepsSpriteContextUsable()
+    {
+        using AssetContextController controller = CreateController();
+        string assetDirectory = WriteAssetDirectory("assets-bad-terrain", TwoSheetJson);
+        File.WriteAllBytes(Path.Combine(assetDirectory, "sheets", "1.png"), AssetFixture.PngSheet.Create(64, 64));
+        File.WriteAllBytes(Path.Combine(assetDirectory, "sheets", "2.png"), AssetFixture.PngSheet.Create(64, 64));
+        AssetFixture.WriteAnimationSidecar(assetDirectory, AssetFixture.AnimationSidecarJson);
+        AssetFixture.WriteTerrainSidecar(assetDirectory, "not json");
+
+        bool opened = controller.TryOpen(assetDirectory);
+
+        Assert.True(opened);
+        AssetContext context = controller.Current;
+        Assert.True(context.IsAvailable);
+        Assert.False(context.Terrain.IsValid);
+        Assert.False(context.Terrain.CanPaint);
+        Assert.Contains("Malformed JSON", context.Terrain.Diagnostic);
+        Assert.Equal(new[] { 1, 2 }, context.SheetIds);
+        Assert.Equal(new[] { 1, 2 }, _viewModel.SheetIds);
+        Assert.Equal(1, _viewModel.SelectedSheet);
+        Assert.Equal(2, context.GetFrames(1).Count);
+        Assert.Equal(SpriteResolutionStatus.Ready, context.Resolve(new SpriteReference(1, 10)).Status);
+        Assert.Null(context.Appearance);
+        Assert.False(context.AppearanceAvailability.IsAvailable);
+        Assert.NotNull(context.Graphics);
+        Assert.True(context.GraphicViewerAvailability.IsAvailable);
+    }
+
+    [AvaloniaFact]
+    public void TryOpen_UnsupportedVersionTerrain_KeepsSpriteContextUsableWithTypedDiagnostic()
+    {
+        using AssetContextController controller = CreateController();
+        string assetDirectory = WriteAssetDirectory("assets-terrain-v2", TwoSheetJson);
+        File.WriteAllBytes(Path.Combine(assetDirectory, "sheets", "1.png"), AssetFixture.PngSheet.Create(64, 64));
+        AssetFixture.WriteTerrainSidecar(assetDirectory, AssetFixture.TerrainCatalogJson.Replace("\"version\": 1", "\"version\": 2"));
+
+        bool opened = controller.TryOpen(assetDirectory);
+
+        Assert.True(opened);
+        AssetContext context = controller.Current;
+        Assert.False(context.Terrain.IsValid);
+        Assert.False(context.Terrain.CanPaint);
+        Assert.Contains("Unsupported version 2.", context.Terrain.Diagnostic);
+        Assert.Equal(new[] { 1, 2 }, context.SheetIds);
+        Assert.Equal(SpriteResolutionStatus.Ready, context.Resolve(new SpriteReference(1, 10)).Status);
+    }
+
+    [AvaloniaFact]
+    public void TryOpen_SemanticallyInvalidTerrain_KeepsSpriteContextUsableWithTypedDiagnostic()
+    {
+        using AssetContextController controller = CreateController();
+        string assetDirectory = WriteAssetDirectory("assets-terrain-unknown-peer", TwoSheetJson);
+        File.WriteAllBytes(Path.Combine(assetDirectory, "sheets", "1.png"), AssetFixture.PngSheet.Create(64, 64));
+        AssetFixture.WriteTerrainSidecar(assetDirectory, AssetFixture.TerrainCatalogJson.Replace("\"center\": \"11111111-1111-1111-1111-111111111111\"", "\"center\": \"22222222-2222-2222-2222-222222222222\""));
+
+        bool opened = controller.TryOpen(assetDirectory);
+
+        Assert.True(opened);
+        AssetContext context = controller.Current;
+        Assert.False(context.Terrain.IsValid);
+        Assert.False(context.Terrain.CanPaint);
+        Assert.Contains("references unknown terrain", context.Terrain.Diagnostic);
+        Assert.Equal(new[] { 1, 2 }, context.SheetIds);
+        Assert.Equal(SpriteResolutionStatus.Ready, context.Resolve(new SpriteReference(1, 10)).Status);
+    }
+
+    [AvaloniaFact]
+    public void TryOpen_ManifestInvalidTerrain_KeepsSpriteContextUsableWithTypedDiagnostic()
+    {
+        using AssetContextController controller = CreateController();
+        string assetDirectory = WriteAssetDirectory("assets-terrain-bad-sheet", TwoSheetJson);
+        File.WriteAllBytes(Path.Combine(assetDirectory, "sheets", "1.png"), AssetFixture.PngSheet.Create(64, 64));
+        AssetFixture.WriteTerrainSidecar(assetDirectory, AssetFixture.TerrainCatalogJson.Replace("\"sheet\": 1", "\"sheet\": 9"));
+
+        bool opened = controller.TryOpen(assetDirectory);
+
+        Assert.True(opened);
+        AssetContext context = controller.Current;
+        Assert.False(context.Terrain.IsValid);
+        Assert.False(context.Terrain.CanPaint);
+        Assert.Contains("is not declared in the sprite manifest", context.Terrain.Diagnostic);
+        Assert.Equal(new[] { 1, 2 }, context.SheetIds);
+        Assert.Equal(SpriteResolutionStatus.Ready, context.Resolve(new SpriteReference(1, 10)).Status);
+    }
+
+    [Fact]
+    public void TryOpen_TerrainLoadDoesNotDecodeMissingSheets()
+    {
+        using AssetContextController controller = CreateController();
+        string assetDirectory = WriteAssetDirectory("assets-no-sheets", TwoSheetJson);
+        AssetFixture.WriteTerrainSidecar(assetDirectory, AssetFixture.TerrainCatalogJson);
+
+        bool opened = controller.TryOpen(assetDirectory);
+
+        Assert.True(opened);
+        Assert.True(controller.Current.Terrain.IsValid);
+    }
+
+    [Fact]
+    public void TryOpen_SecondSuccess_WithTerrainSidecar_RaisesCurrentChangedOnceAndDisposesOnlyReplaced()
+    {
+        using AssetContextController controller = CreateController();
+        string firstDirectory = WriteAssetDirectory("assets-first", TwoSheetJson);
+        Assert.True(controller.TryOpen(firstDirectory));
+        AssetContext first = controller.Current;
+        int events = 0;
+        AssetContext? observedCurrent = null;
+        bool observedOldDisposed = true;
+        controller.CurrentChanged += (_, _) =>
+        {
+            events++;
+            observedCurrent = controller.Current;
+            observedOldDisposed = first.IsDisposed;
+        };
+        string secondDirectory = WriteAssetDirectory("assets-second", TwoSheetJson);
+        AssetFixture.WriteTerrainSidecar(secondDirectory, AssetFixture.TerrainCatalogJson);
+
+        bool opened = controller.TryOpen(secondDirectory);
+
+        Assert.True(opened);
+        AssetContext second = controller.Current;
+        Assert.Equal(1, events);
+        Assert.Same(second, observedCurrent);
+        Assert.False(observedOldDisposed);
+        Assert.True(first.IsDisposed);
+        Assert.False(second.IsDisposed);
+        Assert.False(first.Terrain.CanPaint);
+        Assert.True(second.Terrain.IsValid);
+        Assert.True(second.Terrain.CanPaint);
+    }
+
+    [Fact]
+    public void TryOpen_InvalidBaseManifest_PreservesCurrent()
+    {
+        using AssetContextController controller = CreateController();
+        string oldDirectory = WriteAssetDirectory("assets-old", TwoSheetJson);
+        Assert.True(controller.TryOpen(oldDirectory));
+        AssetContext oldContext = controller.Current;
+        int events = 0;
+        controller.CurrentChanged += (_, _) => events++;
+        string badDirectory = WriteAssetDirectory("assets-bad-manifest", "this is not json");
+        AssetFixture.WriteTerrainSidecar(badDirectory, AssetFixture.TerrainCatalogJson);
+
+        bool opened = controller.TryOpen(badDirectory);
+
+        Assert.False(opened);
+        Assert.Equal(0, events);
+        Assert.Same(oldContext, controller.Current);
+        Assert.False(oldContext.IsDisposed);
     }
 
     [AvaloniaFact]

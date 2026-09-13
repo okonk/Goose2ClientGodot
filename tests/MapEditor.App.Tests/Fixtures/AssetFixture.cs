@@ -54,6 +54,17 @@ public sealed class AssetFixture : IDisposable
     public static void WriteAnimationSidecar(string assetDirectory, string json)
         => File.WriteAllText(Path.Combine(assetDirectory, GraphicAnimationManifest.FileName), json);
 
+    public const string TerrainCatalogJson = """
+        { "version": 1,
+          "terrains": [ { "id": "11111111-1111-1111-1111-111111111111", "name": "Grass", "color": null } ],
+          "graphics": [ { "sheet": 1, "graphic": 10, "center": "11111111-1111-1111-1111-111111111111",
+            "north": null, "east": null, "south": null, "west": null,
+            "northEast": null, "southEast": null, "southWest": null, "northWest": null } ] }
+        """;
+
+    public static void WriteTerrainSidecar(string assetDirectory, string json)
+        => File.WriteAllText(Path.Combine(assetDirectory, TerrainAssetCatalog.FileName), json);
+
     public void Dispose()
         => Directory.Delete(Root, recursive: true);
 
