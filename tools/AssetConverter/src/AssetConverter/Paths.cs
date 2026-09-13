@@ -23,6 +23,26 @@ public static class Paths
         "/home/agent/workspace/illutiagooseserver/tools/SpriteBundle/sheets.json");
     public static string AsperetaCompiledEnc => Path.Combine(AsperetaData, "compiled.enc");
 
+    // Resolved relative to the build output (bin/<config>/net10.0) so it is CWD-independent.
+    public static string ItemTileSheets
+        => Environment.GetEnvironmentVariable("ITEM_TILE_SHEETS") is { Length: > 0 } v
+            ? v
+            : DefaultItemTileSheets;
+
+    private static string DefaultItemTileSheets
+    {
+        get
+        {
+            for (var dir = new DirectoryInfo(AppContext.BaseDirectory); dir != null; dir = dir.Parent)
+            {
+                if (dir.Name == "AssetConverter" && dir.Parent?.Name == "tools")
+                    return Path.Combine(dir.FullName, "data", "item-tile-sheets.json");
+            }
+            throw new InvalidOperationException(
+                $"could not locate tools/AssetConverter relative to {AppContext.BaseDirectory}");
+        }
+    }
+
     public static string Adf(int fileNumber) => Path.Combine(IllutiaData, $"{fileNumber}.adf");
     public static string UnityPng(int fileNumber) =>
         Path.Combine(UnitySpritesheets, $"{fileNumber}.png");

@@ -287,6 +287,150 @@ public class AnimationManifestBuilderTests
     }
 
     [Fact]
+    public void Build_ItemSheetWithoutEncCategory_GetsFallbackPlusItemTiles()
+    {
+        var root = AnimationSourceFixture.CreateDirectory();
+        try
+        {
+            AnimationSourceFixture.WriteAdf(AnimationSourceFixture.DataDir(root), 200, 3205, 4,
+                (3205, new[] { 3205 }));
+            AnimationSourceFixture.WriteAdf(AnimationSourceFixture.DataDir(root), 300, 4000, 4);
+            AnimationSourceFixture.WriteCompiledEnc(AnimationSourceFixture.CompiledEncPath(root));
+
+            using var doc = JsonDocument.Parse(Build(root, new[] { 200, 300 }));
+            var sheets = doc.RootElement.GetProperty("sheets");
+            Assert.Equal(new[] { "ItemTiles", "Spells" }, Names(sheets, 200));
+            Assert.Equal(new[] { "ItemTiles", "Tiles" }, Names(sheets, 300));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Build_ItemSheetWithEncCategory_GetsBothInNameOrder()
+    {
+        var root = AnimationSourceFixture.CreateDirectory();
+        try
+        {
+            AnimationSourceFixture.WriteAdf(AnimationSourceFixture.DataDir(root), 115, 3205, 4);
+            AnimationSourceFixture.WriteCompiledEnc(AnimationSourceFixture.CompiledEncPath(root),
+                (AnimationType.Body, 1, new[] { 115 }));
+
+            using var doc = JsonDocument.Parse(Build(root, new[] { 115 }));
+            var categories = doc.RootElement.GetProperty("sheets").GetProperty("115").GetProperty("categories");
+            Assert.Equal(2, categories.GetArrayLength());
+            Assert.Equal("Body", categories[0].GetProperty("name").GetString());
+            Assert.Equal(1, categories[0].GetProperty("id").GetInt32());
+            Assert.Equal("ItemTiles", categories[1].GetProperty("name").GetString());
+            Assert.False(categories[1].TryGetProperty("id", out _));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Build_SheetNotInItemSet_DoesNotGetItemTiles()
+    {
+        var root = AnimationSourceFixture.CreateDirectory();
+        try
+        {
+            AnimationSourceFixture.WriteAdf(AnimationSourceFixture.DataDir(root), 300, 4000, 4);
+            AnimationSourceFixture.WriteCompiledEnc(AnimationSourceFixture.CompiledEncPath(root));
+
+            using var doc = JsonDocument.Parse(Build(root, new[] { 999 }));
+            Assert.Equal(new[] { "Tiles" }, Names(doc.RootElement.GetProperty("sheets"), 300));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Build_ItemSheetsAbsentFromSheetSet_AreIgnored()
+    {
+        var root = AnimationSourceFixture.CreateDirectory();
+        try
+        {
+            AnimationSourceFixture.WriteAdf(AnimationSourceFixture.DataDir(root), 300, 4000, 4);
+            AnimationSourceFixture.WriteCompiledEnc(AnimationSourceFixture.CompiledEncPath(root));
+
+            using var doc = JsonDocument.Parse(Build(root, new[] { 300, 20107, 20444 }));
+            var sheetKeys = doc.RootElement.GetProperty("sheets")
+                .EnumerateObject().Select(p => p.Name).ToArray();
+            Assert.Equal(new[] { "300" }, sheetKeys);
+            Assert.Equal(new[] { "ItemTiles", "Tiles" }, Names(doc.RootElement.GetProperty("sheets"), 300));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Build_MissingItemTileSheetsFile_ThrowsNamingPath()
+    {
+        var root = AnimationSourceFixture.CreateDirectory();
+        try
+        {
+            var path = Path.Combine(root, "missing.json");
+            var ex = Assert.Throws<FileNotFoundException>(() =>
+                AnimationManifestBuilder.Build(
+                    AnimationSourceFixture.DataDir(root),
+                    AnimationSourceFixture.CompiledEncPath(root),
+                    path));
+            Assert.Contains(path, ex.Message);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Build_MalformedItemTileSheetsFile_ThrowsNamingPath()
+    {
+        var root = AnimationSourceFixture.CreateDirectory();
+        try
+        {
+            var path = Path.Combine(root, "item-tile-sheets.json");
+            File.WriteAllText(path, "not json");
+            var ex = Assert.Throws<InvalidOperationException>(() =>
+                AnimationManifestBuilder.Build(
+                    AnimationSourceFixture.DataDir(root),
+                    AnimationSourceFixture.CompiledEncPath(root),
+                    path));
+            Assert.Contains(path, ex.Message);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Build_EmptyItemTileSheets_NoSheetGetsItemTiles()
+    {
+        var root = AnimationSourceFixture.CreateDirectory();
+        try
+        {
+            AnimationSourceFixture.WriteAdf(AnimationSourceFixture.DataDir(root), 300, 4000, 4);
+            AnimationSourceFixture.WriteCompiledEnc(AnimationSourceFixture.CompiledEncPath(root));
+
+            using var doc = JsonDocument.Parse(Build(root, Array.Empty<int>()));
+            Assert.Equal(new[] { "Tiles" }, Names(doc.RootElement.GetProperty("sheets"), 300));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
     public void Build_SkipsNonGraphicAndNonNumericFiles()
     {
         var root = AnimationSourceFixture.CreateDirectory();
@@ -309,21 +453,37 @@ public class AnimationManifestBuilderTests
         }
     }
 
-    private static string Build(string root) =>
+    private static string Build(string root, int[] itemSheets = null) =>
         AnimationManifestBuilder.Build(
             AnimationSourceFixture.DataDir(root),
-            AnimationSourceFixture.CompiledEncPath(root));
+            AnimationSourceFixture.CompiledEncPath(root),
+            WriteItemTileSheets(root, itemSheets));
+
+    private static string WriteItemTileSheets(string root, int[] itemSheets)
+    {
+        var path = Path.Combine(root, "item-tile-sheets.json");
+        File.WriteAllText(path, JsonSerializer.Serialize(itemSheets ?? Array.Empty<int>()));
+        return path;
+    }
+
+    private static string[] Names(JsonElement sheets, int sheet)
+    {
+        var categories = sheets.GetProperty(sheet.ToString()).GetProperty("categories");
+        return categories.EnumerateArray()
+            .Select(c => c.GetProperty("name").GetString()).ToArray();
+    }
 
     private static void WriteSheet(string root, int sheet) =>
         AnimationSourceFixture.WriteAdf(AnimationSourceFixture.DataDir(root), sheet, 3205, 4,
             (3205, new[] { 3205 }));
 
-    private static string BuildCombined(string root) =>
+    private static string BuildCombined(string root, int[] itemSheets = null) =>
         AnimationManifestBuilder.BuildCombined(
             AnimationSourceFixture.DataDir(root),
             AnimationSourceFixture.CompiledEncPath(root),
             AnimationSourceFixture.AsperetaDataDir(root),
-            AnimationSourceFixture.AsperetaCompiledEncPath(root));
+            AnimationSourceFixture.AsperetaCompiledEncPath(root),
+            WriteItemTileSheets(root, itemSheets));
 
     private static void WriteIllutia(string root) =>
         AnimationSourceFixture.WriteAdf(AnimationSourceFixture.DataDir(root), 115, 3205, 4,
@@ -544,6 +704,32 @@ public class AnimationManifestBuilderTests
             var sheets = doc.RootElement.GetProperty("sheets");
             Assert.Equal("Spells", sheets.GetProperty("20000").GetProperty("categories")[0].GetProperty("name").GetString());
             Assert.Equal("Spells", sheets.GetProperty("20001").GetProperty("categories")[0].GetProperty("name").GetString());
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void BuildCombined_TagsItemSheetsInBothDataSets()
+    {
+        var root = AnimationSourceFixture.CreateDirectory();
+        try
+        {
+            WriteIllutia(root);
+            AnimationSourceFixture.WriteCompiledEnc(AnimationSourceFixture.CompiledEncPath(root),
+                (AnimationType.Body, 1, new[] { 115 }));
+
+            var aspData = AnimationSourceFixture.AsperetaDataDir(root);
+            AnimationSourceFixture.WriteAsperetaAdf(aspData, 1,
+                new[] { (1200, 0, 0, 24, 48) }, Array.Empty<(int, int[])>());
+            AnimationSourceFixture.WriteAsperetaCompiledEnc(AnimationSourceFixture.AsperetaCompiledEncPath(root));
+
+            using var doc = JsonDocument.Parse(BuildCombined(root, new[] { 115, 20000 }));
+            var sheets = doc.RootElement.GetProperty("sheets");
+            Assert.Equal(new[] { "Body", "ItemTiles" }, Names(sheets, 115));
+            Assert.Equal(new[] { "ItemTiles", "Tiles" }, Names(sheets, 20000));
         }
         finally
         {

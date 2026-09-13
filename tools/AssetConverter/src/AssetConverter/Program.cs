@@ -133,7 +133,7 @@ if (args.Length >= 1 && args[0] == "manifest")
         : Path.GetFullPath(Path.Combine("..", "..", "Assets", "Sprites", "manifest.json"));
     ManifestFileStore.Write(outPath,
         () => FrameManifestBuilder.Build(Paths.IllutiaData),
-        () => AnimationManifestBuilder.Build(Paths.IllutiaData, Paths.CompiledEnc));
+        () => AnimationManifestBuilder.Build(Paths.IllutiaData, Paths.CompiledEnc, Paths.ItemTileSheets));
     Console.WriteLine($"Wrote {outPath}");
     Console.WriteLine($"Wrote {Path.Combine(Path.GetDirectoryName(Path.GetFullPath(outPath))!, ManifestFileStore.AnimationFileName)}");
     return;
@@ -188,7 +188,8 @@ if (args.Length >= 1 && args[0] == "all")
     ManifestFileStore.WriteCombined(repoRoot,
         () => FrameManifestBuilder.BuildCombined(Paths.IllutiaData, Paths.AsperetaData),
         () => AnimationManifestBuilder.BuildCombined(
-            Paths.IllutiaData, Paths.CompiledEnc, Paths.AsperetaData, Paths.AsperetaCompiledEnc));
+            Paths.IllutiaData, Paths.CompiledEnc, Paths.AsperetaData, Paths.AsperetaCompiledEnc,
+            Paths.ItemTileSheets));
 
     Console.WriteLine($"Sheets: {sheets.Succeeded} ok, {sheets.Failed} failed");
     Console.WriteLine($"Animations: {animations.ResourcesWritten} character, {animations.EffectsWritten} effects, {animations.Failed} failed");

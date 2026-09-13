@@ -12,6 +12,7 @@ public static class AnimationManifestBuilder
     private const string BodyCategory = "Body";
     private const string SpellsCategory = "Spells";
     private const string TilesCategory = "Tiles";
+    private const string ItemTilesCategory = "ItemTiles";
 
     private static readonly JsonSerializerOptions SerializerOptions = new()
     {
@@ -19,23 +20,26 @@ public static class AnimationManifestBuilder
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
     };
 
-    public static string Build(string illutiaDataDir, string compiledEncPath)
+    public static string Build(string illutiaDataDir, string compiledEncPath, string itemTileSheetsPath)
     {
+        var itemSheets = LoadItemTileSheets(itemTileSheetsPath);
         var sheetCategories = CollectSheetCategories(new CompiledEnc(compiledEncPath));
         var (sheets, animations, animatedSheets) = CollectSheets(illutiaDataDir);
 
         foreach (var sheet in sheetCategories.Keys.Where(s => !sheets.ContainsKey(s)).ToList())
             sheetCategories.Remove(sheet);
 
-        return Serialize(sheets, animations, sheetCategories, animatedSheets);
+        return Serialize(sheets, animations, sheetCategories, animatedSheets, itemSheets);
     }
 
     public static string BuildCombined(
         string illutiaDataDir,
         string illutiaCompiledEncPath,
         string asperetaDataDir,
-        string asperetaCompiledEncPath)
+        string asperetaCompiledEncPath,
+        string itemTileSheetsPath)
     {
+        var itemSheets = LoadItemTileSheets(itemTileSheetsPath);
         var illutiaCategories = CollectSheetCategories(new CompiledEnc(illutiaCompiledEncPath));
         var (illutiaSheets, illutiaAnimations, illutiaAnimated) = CollectSheets(illutiaDataDir);
         var (asperetaSheets, asperetaAnimations, asperetaCategories) =
@@ -54,31 +58,46 @@ public static class AnimationManifestBuilder
         var animations = new List<AnimationManifestAnimation>(illutiaAnimations);
         animations.AddRange(asperetaAnimations);
 
-        return Serialize(sheets, animations, categories, illutiaAnimated);
+        return Serialize(sheets, animations, categories, illutiaAnimated, itemSheets);
+    }
+
+    private static HashSet<int> LoadItemTileSheets(string path)
+    {
+        if (!File.Exists(path))
+            throw new FileNotFoundException($"item tile sheets file not found: {path}", path);
+        int[] sheets;
+        try
+        {
+            sheets = JsonSerializer.Deserialize<int[]>(File.ReadAllText(path))
+                ?? throw new InvalidOperationException($"malformed item tile sheets file: {path}");
+        }
+        catch (JsonException ex)
+        {
+            throw new InvalidOperationException($"malformed item tile sheets file: {path}", ex);
+        }
+        return new HashSet<int>(sheets);
     }
 
     private static string Serialize(
         SortedDictionary<int, AnimationManifestSheet> sheets,
         List<AnimationManifestAnimation> animations,
         Dictionary<int, List<(string Name, int? Id)>> categories,
-        HashSet<int> animatedSheets)
+        HashSet<int> animatedSheets,
+        HashSet<int> itemSheets)
     {
         foreach (var (sheet, entry) in sheets)
         {
-            if (categories.TryGetValue(sheet, out var list))
-            {
-                foreach (var (name, id) in list
-                    .OrderBy(c => c.Name, StringComparer.Ordinal)
-                    .ThenBy(c => c.Id))
-                    entry.Categories.Add(new AnimationManifestCategory { Name = name, Id = id });
-            }
+            var list = new List<(string Name, int? Id)>();
+            if (categories.TryGetValue(sheet, out var existing))
+                list.AddRange(existing);
             else
-            {
-                entry.Categories.Add(new AnimationManifestCategory
-                {
-                    Name = animatedSheets.Contains(sheet) ? SpellsCategory : TilesCategory,
-                });
-            }
+                list.Add((animatedSheets.Contains(sheet) ? SpellsCategory : TilesCategory, null));
+            if (itemSheets.Contains(sheet) && !list.Any(c => c.Name == ItemTilesCategory))
+                list.Add((ItemTilesCategory, null));
+            foreach (var (name, id) in list
+                .OrderBy(c => c.Name, StringComparer.Ordinal)
+                .ThenBy(c => c.Id))
+                entry.Categories.Add(new AnimationManifestCategory { Name = name, Id = id });
         }
 
         animations.Sort(static (a, b) =>
