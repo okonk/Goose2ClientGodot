@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.Linq;
 using MapEditor.App.Terrain;
 using MapEditor.Core;
@@ -124,7 +123,7 @@ internal sealed class TerrainEditorViewModel : ViewModelBase, IDisposable
         {
             if (SetField(ref _pendingName, value))
             {
-                SetField(ref _nameError, null);
+                SetField(ref _nameError, null, nameof(NameError));
             }
         }
     }
@@ -136,7 +135,7 @@ internal sealed class TerrainEditorViewModel : ViewModelBase, IDisposable
         {
             if (SetField(ref _pendingColorText, value))
             {
-                SetField(ref _colorError, null);
+                SetField(ref _colorError, null, nameof(ColorError));
             }
         }
     }
@@ -333,13 +332,22 @@ internal sealed class TerrainEditorViewModel : ViewModelBase, IDisposable
             return false;
         }
 
-        if (!int.TryParse(
-            trimmed.AsSpan(1),
-            NumberStyles.HexNumber,
-            CultureInfo.InvariantCulture,
-            out var value))
+        var value = 0;
+        for (var i = 1; i < 7; i++)
         {
-            return false;
+            var digit = trimmed[i] switch
+            {
+                >= '0' and <= '9' => trimmed[i] - '0',
+                >= 'a' and <= 'f' => trimmed[i] - 'a' + 10,
+                >= 'A' and <= 'F' => trimmed[i] - 'A' + 10,
+                _ => -1
+            };
+            if (digit < 0)
+            {
+                return false;
+            }
+
+            value = value * 16 + digit;
         }
 
         color = new TerrainColor((byte)(value >> 16), (byte)(value >> 8), (byte)value);
@@ -394,8 +402,8 @@ internal sealed class TerrainEditorViewModel : ViewModelBase, IDisposable
 
     private void SyncPendingText()
     {
-        SetField(ref _pendingName, _selected?.Name ?? string.Empty);
-        SetField(ref _pendingColorText, _selected?.ColorOverrideText ?? string.Empty);
+        SetField(ref _pendingName, _selected?.Name ?? string.Empty, nameof(Name));
+        SetField(ref _pendingColorText, _selected?.ColorOverrideText ?? string.Empty, nameof(ColorOverrideText));
     }
 
     private void RefreshDiagnostics()

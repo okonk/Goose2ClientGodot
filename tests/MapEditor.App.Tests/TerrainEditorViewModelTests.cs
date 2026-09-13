@@ -494,6 +494,66 @@ public class TerrainEditorViewModelTests
     }
 
     [Fact]
+    public void SelectionChange_RaisesExactMetadataPropertyNames()
+    {
+        var (vm, _, _) = CreateViewModel();
+        vm.SelectedTerrain = Item(vm, DirtId);
+        vm.Name = "Dirt2";
+        vm.ColorOverrideText = "#000001";
+        var changes = new List<string>();
+        vm.PropertyChanged += (_, e) => changes.Add(e.PropertyName ?? string.Empty);
+
+        vm.SelectedTerrain = Item(vm, GrassId);
+
+        Assert.Contains(nameof(TerrainEditorViewModel.Name), changes);
+        Assert.Contains(nameof(TerrainEditorViewModel.ColorOverrideText), changes);
+        Assert.DoesNotContain("SyncPendingText", changes);
+        Assert.Equal("Grass", vm.Name);
+        Assert.Equal(string.Empty, vm.ColorOverrideText);
+    }
+
+    [Fact]
+    public void TypingAfterValidationError_RaisesExactErrorPropertyNames()
+    {
+        var (vm, _, _) = CreateViewModel();
+        vm.SelectedTerrain = Item(vm, GrassId);
+        vm.Name = "Dirt";
+        Assert.False(vm.CommitPending());
+        Assert.NotNull(vm.NameError);
+        vm.ColorOverrideText = "nope";
+        Assert.False(vm.CommitPending());
+        Assert.NotNull(vm.ColorError);
+
+        var changes = new List<string>();
+        vm.PropertyChanged += (_, e) => changes.Add(e.PropertyName ?? string.Empty);
+
+        vm.Name = "Fresh";
+        Assert.Equal(
+            new[] { nameof(TerrainEditorViewModel.Name), nameof(TerrainEditorViewModel.NameError) },
+            changes);
+        Assert.Null(vm.NameError);
+
+        changes.Clear();
+        vm.ColorOverrideText = "#123456";
+        Assert.Equal(
+            new[] { nameof(TerrainEditorViewModel.ColorOverrideText), nameof(TerrainEditorViewModel.ColorError) },
+            changes);
+        Assert.Null(vm.ColorError);
+    }
+
+    [Fact]
+    public void TryParseColorOverride_RejectsSignedHex()
+    {
+        foreach (var text in new[] { "#+12345", "#-12345" })
+        {
+            Assert.False(TerrainEditorViewModel.TryParseColorOverride(text, out _), text);
+        }
+
+        Assert.True(TerrainEditorViewModel.TryParseColorOverride("#123456", out var color));
+        Assert.Equal(new TerrainColor(0x12, 0x34, 0x56), color);
+    }
+
+    [Fact]
     public void ErrorsAndWarnings_AreSurfacedSeparately()
     {
         var (vm, session, _) = CreateViewModel();
