@@ -418,6 +418,25 @@ public class TerrainMapEditStrokeTests
     }
 
     [Fact]
+    public void Begin_AfterCancel_OnCancelledCell_RepaintsCell()
+    {
+        var (_, resolver) = Catalog();
+        var document = MapDocument.Create(3, 3);
+        var stroke = new TerrainMapEditStroke(document, resolver, 0, Grass, TerrainEditMode.Paint);
+
+        stroke.Begin(1, 1);
+        stroke.Cancel();
+
+        var result = stroke.Begin(1, 1);
+
+        Assert.Equal(new TerrainEditResult(true, true, null), result);
+        Assert.Equal(Tile(0, 1), document[1, 1].GetLayer(0));
+        Assert.Equal(1, stroke.IntentCount);
+        Assert.True(stroke.TryGetIntent(4, out var intent));
+        Assert.Equal(Grass, intent);
+    }
+
+    [Fact]
     public void Erase_RecognizedCell_ErasesAndRepairsNeighbors()
     {
         var (_, resolver) = Catalog();
