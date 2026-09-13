@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using MapEditor.App.ViewModels;
 using MapEditor.Core;
 using MapEditor.GameData.Editing;
@@ -9,7 +10,22 @@ namespace MapEditor.App.Tests;
 
 public class DocumentEditTimelineTests
 {
+    private static readonly Guid GrassId = Guid.Parse("aaaaaaaa-0000-0000-0000-000000000001");
+
     private static NpcSpawnRow Spawn(int npcId, int mapX, int mapY) => new(npcId, 10, mapX, mapY);
+
+    private static TerrainMapResolver TerrainResolver()
+    {
+        var catalog = new TerrainCatalog(
+            new[] { new TerrainDefinition(GrassId, "Grass", null) },
+            new[]
+            {
+                new TerrainGraphicDefinition(new TerrainGraphicReference(0, 1), new TerrainPattern(Center: GrassId)),
+                new TerrainGraphicDefinition(new TerrainGraphicReference(0, 2), new TerrainPattern(Center: GrassId, West: GrassId)),
+                new TerrainGraphicDefinition(new TerrainGraphicReference(0, 3), new TerrainPattern(Center: GrassId, East: GrassId))
+            });
+        return new TerrainMapResolver(TerrainCatalogValidator.Validate(catalog).Index!);
+    }
 
     private static void Paint(MapEditSession session, int x, int y, int layerIndex, MapTileLayer tile)
     {
@@ -381,6 +397,87 @@ public class DocumentEditTimelineTests
         Assert.Equal(new[] { Spawn(3, 9, 10), Spawn(1, 5, 6), Spawn(4, 11, 12) }, sheet.Spawns);
         Assert.False(timeline.CanRedo);
         Assert.True(timeline.CanUndo);
+    }
+
+    [Fact]
+    public void Timeline_TerrainGesture_UsesOneMapEntry()
+    {
+        var map = new MapEditSession(MapDocument.Create(4, 4));
+        var sheet = new SheetEditSession(Array.Empty<NpcSpawnRow>(), Array.Empty<WarpRow>());
+        var timeline = new DocumentEditTimeline(map, sheet);
+
+        Paint(map, 0, 0, 1, new MapTileLayer(1, 2));
+        map.SelectedLayers = (byte)(1 << 0);
+
+        var begin = map.BeginTerrainStroke(TerrainResolver(), GrassId, TerrainEditMode.Paint, 1, 1);
+        Assert.True(begin.IsActive);
+        Assert.True(map.ContinueTerrainStroke(2, 1).IsActive);
+        Assert.True(map.CompleteStroke());
+        byte[] painted = MapCodec.Encode(map.Document);
+        Assert.NotEqual(default, map.Document[1, 1].GetLayer(0));
+        Assert.NotEqual(default, map.Document[2, 1].GetLayer(0));
+
+        sheet.AddSpawn(Spawn(1, 5, 6));
+        Paint(map, 3, 3, 2, new MapTileLayer(9, 9));
+
+        Assert.True(timeline.Undo());
+        Assert.Equal(new MapTileLayer(0, 0), map.Document[3, 3].GetLayer(2));
+        Assert.Equal(new[] { Spawn(1, 5, 6) }, sheet.Spawns);
+        Assert.Equal(painted, MapCodec.Encode(map.Document));
+
+        Assert.True(timeline.Undo());
+        Assert.Empty(sheet.Spawns);
+        Assert.Equal(painted, MapCodec.Encode(map.Document));
+
+        Assert.True(timeline.Undo());
+        Assert.Equal(new MapTileLayer(0, 0), map.Document[1, 1].GetLayer(0));
+        Assert.Equal(new MapTileLayer(0, 0), map.Document[2, 1].GetLayer(0));
+
+        Assert.True(timeline.Undo());
+        Assert.Equal(new MapTileLayer(0, 0), map.Document[0, 0].GetLayer(1));
+
+        Assert.False(timeline.CanUndo);
+        Assert.True(timeline.CanRedo);
+
+        Assert.True(timeline.Redo());
+        Assert.Equal(new MapTileLayer(1, 2), map.Document[0, 0].GetLayer(1));
+
+        Assert.True(timeline.Redo());
+        Assert.Equal(painted, MapCodec.Encode(map.Document));
+
+        Assert.True(timeline.Redo());
+        Assert.Equal(new[] { Spawn(1, 5, 6) }, sheet.Spawns);
+
+        Assert.True(timeline.Redo());
+        Assert.Equal(new MapTileLayer(9, 9), map.Document[3, 3].GetLayer(2));
+        Assert.False(timeline.CanRedo);
+        Assert.True(timeline.CanUndo);
+    }
+
+    [Fact]
+    public void Timeline_CancelledTerrainStroke_AddsNoEntry()
+    {
+        var map = new MapEditSession(MapDocument.Create(4, 4));
+        var sheet = new SheetEditSession(Array.Empty<NpcSpawnRow>(), Array.Empty<WarpRow>());
+        var timeline = new DocumentEditTimeline(map, sheet);
+
+        Paint(map, 0, 0, 1, new MapTileLayer(1, 2));
+        map.SelectedLayers = (byte)(1 << 0);
+
+        var begin = map.BeginTerrainStroke(TerrainResolver(), GrassId, TerrainEditMode.Paint, 1, 1);
+        Assert.True(begin.IsActive);
+        Assert.True(map.IsDirty);
+
+        map.CancelStroke();
+
+        Assert.True(timeline.CanUndo);
+        Assert.False(timeline.CanRedo);
+        Assert.True(timeline.Undo());
+        Assert.Equal(new MapTileLayer(0, 0), map.Document[0, 0].GetLayer(1));
+        Assert.All(
+            Enumerable.Range(0, map.Document.TileCount),
+            index => Assert.Equal(default, map.Document.GetTile(index).GetLayer(0)));
+        Assert.False(timeline.CanUndo);
     }
 
     [Fact]
