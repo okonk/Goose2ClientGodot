@@ -84,7 +84,11 @@ internal sealed class AssetContextController : IDisposable, ITerrainCatalogPubli
             throw new InvalidOperationException($"The prepared terrain catalog is invalid: {FirstValidationMessage(validation)}.");
         }
 
-        var publication = new TerrainPublication();
+        var publication = new TerrainPublication
+        {
+            PreparedCatalog = preparedSave.Catalog,
+            PreparedIndex = preparedSave.Index
+        };
         _publication = publication;
         try
         {
@@ -232,9 +236,7 @@ internal sealed class AssetContextController : IDisposable, ITerrainCatalogPubli
 
         foreach (TerrainDocumentReconciliation plan in plans)
         {
-            NotifyGuarded(errors, plan.NotifyProperty);
-            NotifyGuarded(errors, plan.NotifyCanvas);
-            NotifyGuarded(errors, plan.NotifyPalette);
+            plan.Notify(errors);
         }
 
         if (participant is not null)
@@ -250,7 +252,7 @@ internal sealed class AssetContextController : IDisposable, ITerrainCatalogPubli
             }
             catch (Exception ex)
             {
-                errors.Add(ex);
+                errors.TryAdd(ex);
             }
         }
 
@@ -260,7 +262,7 @@ internal sealed class AssetContextController : IDisposable, ITerrainCatalogPubli
         }
         catch (Exception ex)
         {
-            errors.Add(ex);
+            errors.TryAdd(ex);
         }
 
         LastPublicationNotificationErrors = errors;
@@ -345,9 +347,7 @@ internal sealed class AssetContextController : IDisposable, ITerrainCatalogPubli
 
         foreach (TerrainDocumentReconciliation plan in plans)
         {
-            NotifyGuarded(errors, plan.NotifyProperty);
-            NotifyGuarded(errors, plan.NotifyCanvas);
-            NotifyGuarded(errors, plan.NotifyPalette);
+            plan.Notify(errors);
         }
 
         foreach (Delegate handler in catalogChangedHandlers)
@@ -358,7 +358,7 @@ internal sealed class AssetContextController : IDisposable, ITerrainCatalogPubli
             }
             catch (Exception ex)
             {
-                errors.Add(ex);
+                errors.TryAdd(ex);
             }
         }
 
@@ -390,7 +390,7 @@ internal sealed class AssetContextController : IDisposable, ITerrainCatalogPubli
         }
         catch (Exception ex)
         {
-            errors.Add(ex);
+            errors.TryAdd(ex);
         }
     }
 

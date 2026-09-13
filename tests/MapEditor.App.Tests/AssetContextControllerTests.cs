@@ -847,6 +847,23 @@ public class AssetContextControllerTerrainPublicationTests : IDisposable
         } }
         """;
 
+    private const string TwoTerrainCatalogJson = """
+        { "version": 1,
+          "terrains": [
+            { "id": "11111111-1111-1111-1111-111111111111", "name": "Grass", "color": null },
+            { "id": "22222222-2222-2222-2222-222222222222", "name": "Water", "color": null } ],
+          "graphics": [
+            { "sheet": 1, "graphic": 10, "center": "11111111-1111-1111-1111-111111111111",
+              "north": null, "east": null, "south": null, "west": null,
+              "northEast": null, "southEast": null, "southWest": null, "northWest": null },
+            { "sheet": 1, "graphic": 11, "center": "22222222-2222-2222-2222-222222222222",
+              "north": null, "east": null, "south": null, "west": null,
+              "northEast": null, "southEast": null, "southWest": null, "northWest": null } ] }
+        """;
+
+    private static readonly Guid GrassId = new("11111111-1111-1111-1111-111111111111");
+    private static readonly Guid WaterId = new("22222222-2222-2222-2222-222222222222");
+
     private readonly string _directory = Directory.CreateTempSubdirectory("map-editor-terrain-pub-").FullName;
     private readonly FakeEditorDialogs _dialogs = new();
     private readonly WorkspaceViewModel _workspace;
@@ -1503,6 +1520,156 @@ public class AssetContextControllerTerrainPublicationTests : IDisposable
         Assert.NotNull(controller.LastPublicationNotificationErrors);
         Assert.Equal(5, controller.LastPublicationNotificationErrors.Count);
         Assert.Equal("image disposal failure", controller.LastPublicationNotificationErrors[4].Message);
+    }
+
+    [Fact]
+    public async Task CommitTerrain_PerDocumentSelectionsSurvivePublication()
+    {
+        await AddDocumentAsync();
+        MapDocumentViewModel second = _workspace.ActiveDocument;
+        using AssetContextController controller = CreateController();
+        string assetDirectory = WriteAssetDirectory("assets-selection-survive");
+        AssetFixture.WriteTerrainSidecar(assetDirectory, TwoTerrainCatalogJson);
+        Assert.True(controller.TryOpen(assetDirectory));
+        AssetContext context = controller.Current;
+        _viewModel.SelectTerrain(GrassId);
+        second.SelectTerrain(WaterId);
+        TerrainCatalog catalog = TerrainCatalogJson.Parse(TwoTerrainCatalogJson);
+        TerrainCatalogPreparedSave prepared = PrepareSave(assetDirectory, context, catalog, context.Terrain.Revision);
+        using TerrainOperationLease operation = await controller.Gate.AcquireAsync();
+        ITerrainCatalogSavePublication publication = controller.PrepareSave(operation, context, prepared);
+
+        publication.Commit(SaveResult(prepared, TerrainFileRevision.FromBytes(prepared.CanonicalBytes)));
+
+        Assert.Equal(GrassId, _viewModel.SelectedTerrainId);
+        Assert.Equal(WaterId, second.SelectedTerrainId);
+        Assert.Equal(MapEditTool.Terrain, _viewModel.ActiveTool);
+        Assert.Equal(MapEditTool.Terrain, second.ActiveTool);
+        Assert.Same(context.Terrain, _viewModel.Terrain);
+        Assert.Same(context.Terrain, second.Terrain);
+        Assert.NotNull(controller.LastPublicationNotificationErrors);
+        Assert.Equal(0, controller.LastPublicationNotificationErrors.Count);
+    }
+
+    [Fact]
+    public void CommitLoaded_RemovedSelectedTerrain_FallsBackToPencilAndPreservesMapBytes()
+    {
+        using AssetContextController controller = CreateController();
+        string assetDirectory = WriteAssetDirectory("assets-selection-removed");
+        File.WriteAllBytes(Path.Combine(assetDirectory, "sheets", "1.png"), AssetFixture.PngSheet.Create(64, 64));
+        AssetFixture.WriteTerrainSidecar(assetDirectory, TwoTerrainCatalogJson);
+        Assert.True(controller.TryOpen(assetDirectory));
+        AssetContext context = controller.Current;
+        _viewModel.SelectTerrain(GrassId);
+        MapEditSession session = _viewModel.Session;
+        session.SelectedTileLayer = new MapTileLayer(5, 5);
+        session.BeginStroke(MapEditTool.Pencil, 0, 0);
+        Assert.True(session.CompleteStroke());
+        byte[] bytesBefore = MapCodec.Encode(session.Document);
+        bool canUndoBefore = _viewModel.CanUndo;
+        bool dirtyBefore = _viewModel.IsDirty;
+        TerrainCatalog waterOnly = new(
+            new[] { new TerrainDefinition(WaterId, "Water", null) },
+            new[] { new TerrainGraphicDefinition(new TerrainGraphicReference(1, 11), new TerrainPattern(Center: WaterId)) });
+        TerrainCatalogValidationResult validation = TerrainAssetCatalog.Validate(waterOnly, context.Cache.Manifest!);
+        var loaded = TerrainCatalogLoadResult.Valid(
+            Path.Combine(assetDirectory, TerrainAssetCatalog.FileName),
+            new TerrainFileRevision(true, "water-only"),
+            waterOnly,
+            validation.Index!,
+            validation.Issues);
+        using TerrainOperationLease operation = controller.Gate.AcquireAsync().GetAwaiter().GetResult();
+        ITerrainCatalogLoadedPublication publication = controller.PrepareLoaded(operation, context, loaded, TerrainLoadedPublicationKind.ValidReload);
+
+        publication.Commit();
+
+        Assert.Null(_viewModel.SelectedTerrainId);
+        Assert.Equal(MapEditTool.Pencil, _viewModel.ActiveTool);
+        Assert.Equal(bytesBefore, MapCodec.Encode(session.Document));
+        Assert.Equal(canUndoBefore, _viewModel.CanUndo);
+        Assert.Equal(dirtyBefore, _viewModel.IsDirty);
+        Assert.Throws<InvalidOperationException>(() => _viewModel.ActiveTool = MapEditTool.Terrain);
+    }
+
+    [Fact]
+    public void CommitLoaded_RemovedGraphics_DoesNotMutateMapCells()
+    {
+        using AssetContextController controller = CreateController();
+        string assetDirectory = WriteAssetDirectory("assets-removed-graphics");
+        File.WriteAllBytes(Path.Combine(assetDirectory, "sheets", "1.png"), AssetFixture.PngSheet.Create(64, 64));
+        AssetFixture.WriteTerrainSidecar(assetDirectory, TwoTerrainCatalogJson);
+        Assert.True(controller.TryOpen(assetDirectory));
+        AssetContext context = controller.Current;
+        _viewModel.SelectTerrain(GrassId);
+        MapEditSession session = _viewModel.Session;
+        session.SelectedTileLayer = new MapTileLayer(5, 5);
+        session.BeginStroke(MapEditTool.Pencil, 0, 0);
+        Assert.True(session.CompleteStroke());
+        byte[] bytesBefore = MapCodec.Encode(session.Document);
+        bool canUndoBefore = _viewModel.CanUndo;
+        bool dirtyBefore = _viewModel.IsDirty;
+        var removedCatalog = new TerrainCatalog(
+            new[]
+            {
+                new TerrainDefinition(GrassId, "Grass", null),
+                new TerrainDefinition(WaterId, "Water", null)
+            },
+            new[] { new TerrainGraphicDefinition(new TerrainGraphicReference(1, 10), new TerrainPattern(Center: GrassId)) });
+        TerrainCatalogValidationResult validation = TerrainAssetCatalog.Validate(removedCatalog, context.Cache.Manifest!);
+        Assert.False(validation.IsValid);
+        var loaded = TerrainCatalogLoadResult.Invalid(
+            Path.Combine(assetDirectory, TerrainAssetCatalog.FileName),
+            new TerrainFileRevision(true, "removed-graphics"),
+            validation.Issues,
+            "Terrain validation failed");
+        using TerrainOperationLease operation = controller.Gate.AcquireAsync().GetAwaiter().GetResult();
+        ITerrainCatalogLoadedPublication publication = controller.PrepareLoaded(operation, context, loaded, TerrainLoadedPublicationKind.ConfirmedMalformedReload);
+
+        publication.Commit();
+
+        Assert.Equal(bytesBefore, MapCodec.Encode(session.Document));
+        Assert.Equal(canUndoBefore, _viewModel.CanUndo);
+        Assert.Equal(dirtyBefore, _viewModel.IsDirty);
+        Assert.Null(_viewModel.SelectedTerrainId);
+        Assert.Equal(MapEditTool.Pencil, _viewModel.ActiveTool);
+        Assert.Empty(_viewModel.Terrains);
+        Assert.Same(context.Cache, controller.Current.Cache);
+    }
+
+    [Fact]
+    public void CommitLoaded_MalformedTerrain_DisablesOnlyTerrainProperties()
+    {
+        using AssetContextController controller = CreateController();
+        string assetDirectory = WriteAssetDirectory("assets-malformed-only-terrain");
+        File.WriteAllBytes(Path.Combine(assetDirectory, "sheets", "1.png"), AssetFixture.PngSheet.Create(64, 64));
+        AssetFixture.WriteTerrainSidecar(assetDirectory, TwoTerrainCatalogJson);
+        Assert.True(controller.TryOpen(assetDirectory));
+        AssetContext context = controller.Current;
+        _viewModel.SelectTerrain(GrassId);
+        Assert.Equal(MapEditTool.Terrain, _viewModel.ActiveTool);
+        var loaded = TerrainCatalogLoadResult.Invalid(
+            Path.Combine(assetDirectory, TerrainAssetCatalog.FileName),
+            new TerrainFileRevision(true, "malformed"),
+            new[] { new TerrainValidationIssue(TerrainValidationSeverity.Error, TerrainValidationCode.MissingSpriteFrame, "boom") },
+            "Terrain validation failed");
+        using TerrainOperationLease operation = controller.Gate.AcquireAsync().GetAwaiter().GetResult();
+        ITerrainCatalogLoadedPublication publication = controller.PrepareLoaded(operation, context, loaded, TerrainLoadedPublicationKind.ConfirmedMalformedReload);
+
+        publication.Commit();
+
+        Assert.Null(_viewModel.SelectedTerrainId);
+        Assert.Empty(_viewModel.Terrains);
+        Assert.False(_viewModel.TerrainAvailability!.IsValid);
+        Assert.Equal("Terrain validation failed", _viewModel.TerrainAvailability.Diagnostic);
+        Assert.Equal(MapEditTool.Pencil, _viewModel.ActiveTool);
+        Assert.Throws<InvalidOperationException>(() => _viewModel.ActiveTool = MapEditTool.Terrain);
+        _viewModel.ActiveTool = MapEditTool.Eraser;
+        Assert.Equal(MapEditTool.Eraser, _viewModel.ActiveTool);
+        _viewModel.Brush = new MapTileLayer(9, 9);
+        Assert.Equal(new MapTileLayer(9, 9), _viewModel.Brush);
+        Assert.Equal(new[] { 1, 2 }, _viewModel.SheetIds);
+        Assert.True(controller.Current.IsAvailable);
+        Assert.Same(context.Cache, controller.Current.Cache);
     }
 
     private sealed class RecordingReconciliation : IPreparedAssetReconciliation

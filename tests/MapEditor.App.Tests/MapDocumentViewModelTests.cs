@@ -5,11 +5,13 @@ using System.IO;
 using System.Threading.Tasks;
 using MapEditor.App.Dialogs;
 using MapEditor.App.Documents;
+using MapEditor.App.Rendering;
 using MapEditor.App.Tests.Fakes;
 using MapEditor.App.ViewModels;
 using MapEditor.Core;
 using MapEditor.GameData.Editing;
 using MapEditor.GameData.Rows;
+using MapEditor.Rendering;
 using Xunit;
 
 namespace MapEditor.App.Tests;
@@ -38,6 +40,31 @@ public class MapDocumentViewModelTests : IDisposable
         => new(new EditorDocumentController(_dialogs, new MapFileStore(),
             new EditorDocument(new MapEditSession(MapDocument.Create(4, 4), initiallyDirty: false), null, null)),
             new SharedTileClipboard());
+
+    private static readonly Guid GrassId = new("11111111-1111-1111-1111-111111111111");
+    private static readonly Guid WaterId = new("22222222-2222-2222-2222-222222222222");
+
+    private static TerrainCatalogLoadResult ValidTerrainCatalog(params Guid[] terrainIds)
+    {
+        var definitions = new List<TerrainDefinition>();
+        var graphics = new List<TerrainGraphicDefinition>();
+        int graphic = 10;
+        foreach (Guid id in terrainIds)
+        {
+            definitions.Add(new TerrainDefinition(id, $"Terrain {graphic}", null));
+            graphics.Add(new TerrainGraphicDefinition(new TerrainGraphicReference(1, graphic), new TerrainPattern(Center: id)));
+            graphic += 2;
+        }
+
+        var catalog = new TerrainCatalog(definitions, graphics);
+        TerrainCatalogValidationResult validation = TerrainCatalogValidator.Validate(catalog);
+        return TerrainCatalogLoadResult.Valid(
+            "terrain-brushes.json",
+            new TerrainFileRevision(true, "unit-test"),
+            catalog,
+            validation.Index,
+            validation.Issues);
+    }
 
     private List<string> RaisedProperties(Action action)
     {
@@ -929,5 +956,329 @@ public class MapDocumentViewModelTests : IDisposable
         Assert.Equal(3, session.Document.Width);
         Assert.Equal(3, session.Document.Height);
         Assert.Equal(new MapTileLayer(1, 2), session.Document[0, 0].GetLayer(0));
+    }
+
+    [Fact]
+    public void InitialState_TerrainSelectionIsNullWithEmptyChoicesAndNoAvailability()
+    {
+        Assert.Null(_viewModel.SelectedTerrainId);
+        Assert.Empty(_viewModel.Terrains);
+        Assert.Null(_viewModel.TerrainAvailability);
+    }
+
+    [Fact]
+    public void SelectTerrain_ValidId_StoresSelectionAndActivatesTerrainTool()
+    {
+        _viewModel.SetTerrain(ValidTerrainCatalog(GrassId, WaterId));
+
+        var raised = RaisedProperties(() => _viewModel.SelectTerrain(GrassId));
+
+        Assert.Equal(GrassId, _viewModel.SelectedTerrainId);
+        Assert.Equal(MapEditTool.Terrain, _viewModel.ActiveTool);
+        Assert.Equal(
+            new[] { nameof(MapDocumentViewModel.SelectedTerrainId), nameof(MapDocumentViewModel.ActiveTool) },
+            raised);
+    }
+
+    [Fact]
+    public void SelectTerrain_SecondSelection_KeepsTerrainToolActive()
+    {
+        _viewModel.SetTerrain(ValidTerrainCatalog(GrassId, WaterId));
+        _viewModel.SelectTerrain(GrassId);
+
+        _viewModel.SelectTerrain(WaterId);
+
+        Assert.Equal(WaterId, _viewModel.SelectedTerrainId);
+        Assert.Equal(MapEditTool.Terrain, _viewModel.ActiveTool);
+    }
+
+    [Fact]
+    public void SelectTerrain_IdAbsentFromIndex_ThrowsWithoutChangingSelectionOrTool()
+    {
+        _viewModel.SetTerrain(ValidTerrainCatalog(GrassId));
+        var raised = new List<string>();
+        _viewModel.PropertyChanged += (sender, e) => raised.Add(e.PropertyName ?? string.Empty);
+
+        Assert.Throws<ArgumentException>(() => _viewModel.SelectTerrain(WaterId));
+
+        Assert.Null(_viewModel.SelectedTerrainId);
+        Assert.Equal(MapEditTool.Pencil, _viewModel.ActiveTool);
+        Assert.Empty(raised);
+    }
+
+    [Fact]
+    public void SelectTerrain_WithoutTerrain_ThrowsWithoutChangingSelectionOrTool()
+    {
+        Assert.Throws<ArgumentException>(() => _viewModel.SelectTerrain(GrassId));
+
+        Assert.Null(_viewModel.SelectedTerrainId);
+        Assert.Equal(MapEditTool.Pencil, _viewModel.ActiveTool);
+    }
+
+    [Fact]
+    public void SelectTerrain_IsIndependentPerDocument()
+    {
+        MapDocumentViewModel other = new(new EditorDocumentController(_dialogs, new MapFileStore(), InitialDocument()), new SharedTileClipboard());
+        _viewModel.SetTerrain(ValidTerrainCatalog(GrassId, WaterId));
+        other.SetTerrain(ValidTerrainCatalog(GrassId, WaterId));
+
+        _viewModel.SelectTerrain(GrassId);
+        other.SelectTerrain(WaterId);
+
+        Assert.Equal(GrassId, _viewModel.SelectedTerrainId);
+        Assert.Equal(WaterId, other.SelectedTerrainId);
+        Assert.Equal(MapEditTool.Terrain, _viewModel.ActiveTool);
+        Assert.Equal(MapEditTool.Terrain, other.ActiveTool);
+    }
+
+    [Fact]
+    public void ActiveTool_Terrain_WithoutSelection_ThrowsBeforeChangingAnyField()
+    {
+        _viewModel.SetTerrain(ValidTerrainCatalog(GrassId));
+        var raised = new List<string>();
+        _viewModel.PropertyChanged += (sender, e) => raised.Add(e.PropertyName ?? string.Empty);
+
+        Assert.Throws<InvalidOperationException>(() => _viewModel.ActiveTool = MapEditTool.Terrain);
+
+        Assert.Equal(MapEditTool.Pencil, _viewModel.ActiveTool);
+        Assert.Null(_viewModel.SelectedTerrainId);
+        Assert.Empty(raised);
+    }
+
+    [Fact]
+    public void ActiveTool_Terrain_WithSelection_SetsTool()
+    {
+        _viewModel.SetTerrain(ValidTerrainCatalog(GrassId));
+        _viewModel.SelectTerrain(GrassId);
+        _viewModel.ActiveTool = MapEditTool.Eraser;
+
+        var raised = RaisedProperties(() => _viewModel.ActiveTool = MapEditTool.Terrain);
+
+        Assert.Equal(MapEditTool.Terrain, _viewModel.ActiveTool);
+        Assert.Equal(new[] { nameof(MapDocumentViewModel.ActiveTool) }, raised);
+    }
+
+    [Fact]
+    public void ApplyTerrainReconciliation_WithChoices_LeavesSelectionNull()
+    {
+        _viewModel.SetTerrain(ValidTerrainCatalog(GrassId, WaterId));
+
+        TerrainDocumentReconciliation plan = _viewModel.PrepareTerrainReconciliation(ValidTerrainCatalog(GrassId, WaterId));
+        _viewModel.ApplyTerrainReconciliation(plan);
+
+        Assert.Null(_viewModel.SelectedTerrainId);
+        Assert.Equal(MapEditTool.Pencil, _viewModel.ActiveTool);
+        Assert.Equal(2, _viewModel.Terrains.Count);
+        Assert.True(_viewModel.TerrainAvailability!.IsValid);
+    }
+
+    [Fact]
+    public void ApplyTerrainReconciliation_SelectionSurvivesPublication()
+    {
+        _viewModel.SetTerrain(ValidTerrainCatalog(GrassId, WaterId));
+        _viewModel.SelectTerrain(GrassId);
+
+        TerrainDocumentReconciliation plan = _viewModel.PrepareTerrainReconciliation(ValidTerrainCatalog(GrassId, WaterId));
+        _viewModel.ApplyTerrainReconciliation(plan);
+
+        Assert.Equal(GrassId, _viewModel.SelectedTerrainId);
+        Assert.Equal(MapEditTool.Terrain, _viewModel.ActiveTool);
+    }
+
+    [Fact]
+    public void ApplyTerrainReconciliation_RemovedSelectedId_FallsBackOnlyFromTerrain()
+    {
+        _viewModel.SetTerrain(ValidTerrainCatalog(GrassId, WaterId));
+        _viewModel.SelectTerrain(GrassId);
+        Assert.Equal(MapEditTool.Terrain, _viewModel.ActiveTool);
+
+        TerrainDocumentReconciliation plan = _viewModel.PrepareTerrainReconciliation(ValidTerrainCatalog(WaterId));
+        _viewModel.ApplyTerrainReconciliation(plan);
+
+        Assert.Null(_viewModel.SelectedTerrainId);
+        Assert.Equal(MapEditTool.Pencil, _viewModel.ActiveTool);
+    }
+
+    [Fact]
+    public void ApplyTerrainReconciliation_RemovedSelectedId_PreservesNonTerrainTool()
+    {
+        _viewModel.SetTerrain(ValidTerrainCatalog(GrassId, WaterId));
+        _viewModel.SelectTerrain(GrassId);
+        _viewModel.ActiveTool = MapEditTool.Eraser;
+
+        TerrainDocumentReconciliation plan = _viewModel.PrepareTerrainReconciliation(ValidTerrainCatalog(WaterId));
+        _viewModel.ApplyTerrainReconciliation(plan);
+
+        Assert.Null(_viewModel.SelectedTerrainId);
+        Assert.Equal(MapEditTool.Eraser, _viewModel.ActiveTool);
+    }
+
+    [Fact]
+    public void ApplyTerrainReconciliation_PreservesBytesHistoryAndDirtyState()
+    {
+        MapEditSession session = _viewModel.Session;
+        session.SelectedTileLayer = new MapTileLayer(3, 4);
+        session.BeginStroke(MapEditTool.Pencil, 0, 0);
+        Assert.True(session.CompleteStroke());
+        _viewModel.Refresh(EditorRefresh.Commands);
+        byte[] bytesBefore = MapCodec.Encode(session.Document);
+        bool canUndoBefore = _viewModel.CanUndo;
+        bool canRedoBefore = _viewModel.CanRedo;
+        bool dirtyBefore = _viewModel.IsDirty;
+
+        TerrainDocumentReconciliation plan = _viewModel.PrepareTerrainReconciliation(ValidTerrainCatalog(GrassId, WaterId));
+        _viewModel.ApplyTerrainReconciliation(plan);
+        _viewModel.NotifyTerrainReconciliation(plan, new PublicationNotificationErrors(8));
+
+        Assert.Equal(bytesBefore, MapCodec.Encode(session.Document));
+        Assert.Equal(canUndoBefore, _viewModel.CanUndo);
+        Assert.Equal(canRedoBefore, _viewModel.CanRedo);
+        Assert.Equal(dirtyBefore, _viewModel.IsDirty);
+    }
+
+    [Fact]
+    public void NotifyTerrainReconciliation_RaisesExactChangedPropertiesAndInvalidatesCanvasAndPalette()
+    {
+        var raised = new List<string>();
+        int canvas = 0;
+        int palette = 0;
+        _viewModel.PropertyChanged += (sender, e) => raised.Add(e.PropertyName ?? string.Empty);
+        _viewModel.CanvasInvalidated += () => canvas++;
+        _viewModel.PaletteInvalidated += () => palette++;
+        TerrainDocumentReconciliation plan = _viewModel.PrepareTerrainReconciliation(ValidTerrainCatalog(GrassId, WaterId));
+        _viewModel.ApplyTerrainReconciliation(plan);
+
+        _viewModel.NotifyTerrainReconciliation(plan, new PublicationNotificationErrors(8));
+
+        Assert.Equal(
+            new[] { nameof(MapDocumentViewModel.TerrainAvailability), nameof(MapDocumentViewModel.Terrains) },
+            raised);
+        Assert.Equal(1, canvas);
+        Assert.Equal(1, palette);
+    }
+
+    [Fact]
+    public void NotifyTerrainReconciliation_SelectionAndToolFallback_RaiseExactProperties()
+    {
+        _viewModel.SetTerrain(ValidTerrainCatalog(GrassId, WaterId));
+        _viewModel.SelectTerrain(GrassId);
+        var raised = new List<string>();
+        _viewModel.PropertyChanged += (sender, e) => raised.Add(e.PropertyName ?? string.Empty);
+        TerrainDocumentReconciliation plan = _viewModel.PrepareTerrainReconciliation(ValidTerrainCatalog(WaterId));
+        _viewModel.ApplyTerrainReconciliation(plan);
+
+        _viewModel.NotifyTerrainReconciliation(plan, new PublicationNotificationErrors(8));
+
+        Assert.Equal(
+            new[]
+            {
+                nameof(MapDocumentViewModel.TerrainAvailability),
+                nameof(MapDocumentViewModel.Terrains),
+                nameof(MapDocumentViewModel.SelectedTerrainId),
+                nameof(MapDocumentViewModel.ActiveTool)
+            },
+            raised);
+    }
+
+    [Fact]
+    public void NotifyTerrainReconciliation_NoStateChange_RaisesNoProperties()
+    {
+        TerrainCatalogLoadResult terrain = ValidTerrainCatalog(GrassId);
+        _viewModel.SetTerrain(terrain);
+        var raised = new List<string>();
+        _viewModel.PropertyChanged += (sender, e) => raised.Add(e.PropertyName ?? string.Empty);
+        int canvas = 0;
+        _viewModel.CanvasInvalidated += () => canvas++;
+        TerrainDocumentReconciliation plan = _viewModel.PrepareTerrainReconciliation(terrain);
+        _viewModel.ApplyTerrainReconciliation(plan);
+
+        _viewModel.NotifyTerrainReconciliation(plan, new PublicationNotificationErrors(8));
+
+        Assert.Empty(raised);
+        Assert.Equal(1, canvas);
+    }
+
+    [Fact]
+    public void NotifyTerrainReconciliation_ThrowingPropertyHandler_RecordsFailureAndNotifiesRemainingHandlers()
+    {
+        _viewModel.SetTerrain(ValidTerrainCatalog(GrassId));
+        int remaining = 0;
+        _viewModel.PropertyChanged += (_, _) => throw new InvalidOperationException("first handler failure");
+        _viewModel.PropertyChanged += (_, _) => remaining++;
+        var errors = new PublicationNotificationErrors(4);
+        TerrainDocumentReconciliation plan = _viewModel.PrepareTerrainReconciliation(ValidTerrainCatalog(GrassId, WaterId));
+        _viewModel.ApplyTerrainReconciliation(plan);
+
+        _viewModel.NotifyTerrainReconciliation(plan, errors);
+
+        Assert.Equal(2, remaining);
+        Assert.Equal(1, errors.Count);
+        Assert.IsType<InvalidOperationException>(errors[0]);
+    }
+
+    [Fact]
+    public void ApplyTerrainReconciliation_RemovedGraphics_DoesNotMutateMapCells()
+    {
+        MapEditSession session = _viewModel.Session;
+        session.SelectedTileLayer = new MapTileLayer(5, 5);
+        session.BeginStroke(MapEditTool.Pencil, 0, 0);
+        Assert.True(session.CompleteStroke());
+        _viewModel.Refresh(EditorRefresh.Commands);
+        _viewModel.SetTerrain(ValidTerrainCatalog(GrassId, WaterId));
+        _viewModel.SelectTerrain(GrassId);
+        byte[] bytesBefore = MapCodec.Encode(session.Document);
+        bool canUndoBefore = _viewModel.CanUndo;
+
+        var catalog = new TerrainCatalog(
+            new[]
+            {
+                new TerrainDefinition(GrassId, "Grass", null),
+                new TerrainDefinition(WaterId, "Water", null)
+            },
+            new[] { new TerrainGraphicDefinition(new TerrainGraphicReference(1, 10), new TerrainPattern(Center: GrassId)) });
+        TerrainCatalogValidationResult validation = TerrainCatalogValidator.Validate(catalog);
+        Assert.False(validation.IsValid);
+        var removed = TerrainCatalogLoadResult.Invalid(
+            "terrain-brushes.json",
+            new TerrainFileRevision(true, "removed-graphics"),
+            validation.Issues,
+            "Terrain validation failed");
+        TerrainDocumentReconciliation plan = _viewModel.PrepareTerrainReconciliation(removed);
+        _viewModel.ApplyTerrainReconciliation(plan);
+        _viewModel.NotifyTerrainReconciliation(plan, new PublicationNotificationErrors(8));
+
+        Assert.Equal(bytesBefore, MapCodec.Encode(session.Document));
+        Assert.Equal(canUndoBefore, _viewModel.CanUndo);
+        Assert.Null(_viewModel.SelectedTerrainId);
+        Assert.Equal(MapEditTool.Pencil, _viewModel.ActiveTool);
+        Assert.Empty(_viewModel.Terrains);
+        Assert.False(_viewModel.TerrainAvailability!.IsValid);
+    }
+
+    [Fact]
+    public void ApplyTerrainReconciliation_MalformedTerrain_DisablesOnlyTerrainProperties()
+    {
+        _viewModel.SetTerrain(ValidTerrainCatalog(GrassId));
+        _viewModel.SelectTerrain(GrassId);
+        var malformed = TerrainCatalogLoadResult.Invalid(
+            "terrain-brushes.json",
+            new TerrainFileRevision(true, "malformed"),
+            new[] { new TerrainValidationIssue(TerrainValidationSeverity.Error, TerrainValidationCode.MissingSpriteFrame, "boom") },
+            "Malformed JSON");
+
+        TerrainDocumentReconciliation plan = _viewModel.PrepareTerrainReconciliation(malformed);
+        _viewModel.ApplyTerrainReconciliation(plan);
+        _viewModel.NotifyTerrainReconciliation(plan, new PublicationNotificationErrors(8));
+
+        Assert.Null(_viewModel.SelectedTerrainId);
+        Assert.Empty(_viewModel.Terrains);
+        Assert.False(_viewModel.TerrainAvailability!.IsValid);
+        Assert.Equal("Malformed JSON", _viewModel.TerrainAvailability.Diagnostic);
+        Assert.Equal(MapEditTool.Pencil, _viewModel.ActiveTool);
+        Assert.Throws<InvalidOperationException>(() => _viewModel.ActiveTool = MapEditTool.Terrain);
+        _viewModel.ActiveTool = MapEditTool.Eraser;
+        Assert.Equal(MapEditTool.Eraser, _viewModel.ActiveTool);
+        _viewModel.Brush = new MapTileLayer(9, 9);
+        Assert.Equal(new MapTileLayer(9, 9), _viewModel.Brush);
     }
 }

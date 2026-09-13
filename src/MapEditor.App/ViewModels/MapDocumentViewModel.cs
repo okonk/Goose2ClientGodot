@@ -24,9 +24,12 @@ internal enum EditorRefresh
     Palette = 1 << 3
 }
 
+internal sealed record TerrainChoice(Guid Id, string Name, TerrainColor Color, TerrainGraphicDefinition? Representative);
+
 internal sealed class MapDocumentViewModel : ViewModelBase, ITerrainDocumentReconciler, IDisposable
 {
     private const string UntitledName = "Untitled";
+    private static readonly Delegate[] EmptyDelegates = Array.Empty<Delegate>();
 
     private readonly EditorDocumentController _controller;
     private readonly SharedTileClipboard _clipboard;
@@ -39,6 +42,8 @@ internal sealed class MapDocumentViewModel : ViewModelBase, ITerrainDocumentReco
     private IReadOnlyList<int> _sheetIds = Array.Empty<int>();
     private int _selectedSheet;
     private TerrainCatalogLoadResult? _terrain;
+    private IReadOnlyList<TerrainChoice> _terrainChoices = Array.Empty<TerrainChoice>();
+    private Guid? _selectedTerrainId;
     private byte _layerVisibility = 0b11111;
     private bool _showGrid = true;
     private bool _showBlocked;
@@ -127,9 +132,14 @@ internal sealed class MapDocumentViewModel : ViewModelBase, ITerrainDocumentReco
         get => _activeTool;
         set
         {
-            if (value < MapEditTool.Pencil || value > MapEditTool.FloodFill)
+            if (value < MapEditTool.Pencil || value > MapEditTool.Terrain)
             {
                 throw new ArgumentOutOfRangeException(nameof(value));
+            }
+
+            if (value == MapEditTool.Terrain && _selectedTerrainId is null)
+            {
+                throw new InvalidOperationException("A terrain must be selected before activating the Terrain tool.");
             }
 
             if (_gameData is not null)
@@ -194,44 +204,198 @@ internal sealed class MapDocumentViewModel : ViewModelBase, ITerrainDocumentReco
 
     internal TerrainCatalogLoadResult? Terrain => _terrain;
 
-    internal void SetTerrain(TerrainCatalogLoadResult? terrain) => _terrain = terrain;
+    public TerrainCatalogLoadResult? TerrainAvailability => _terrain;
+
+    public IReadOnlyList<TerrainChoice> Terrains => _terrainChoices;
+
+    public Guid? SelectedTerrainId => _selectedTerrainId;
+
+    internal void SetTerrain(TerrainCatalogLoadResult? terrain)
+    {
+        _terrain = terrain;
+        _terrainChoices = BuildTerrainChoices(terrain?.Catalog, terrain?.Index);
+    }
+
+    public void SelectTerrain(Guid terrainId)
+    {
+        if (_terrain?.Index is not { } index || !index.TryGetTerrain(terrainId, out _))
+        {
+            throw new ArgumentException("The terrain is not in the current terrain catalog.", nameof(terrainId));
+        }
+
+        SetField(ref _selectedTerrainId, terrainId, nameof(SelectedTerrainId));
+        if (_activeTool != MapEditTool.Terrain)
+        {
+            ActiveTool = MapEditTool.Terrain;
+        }
+    }
 
     public TerrainDocumentReconciliation PrepareRootPublication(AssetContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
         int selectedSheet = context.SheetIds.Count > 0 ? context.SheetIds[0] : 0;
         int previousSelectedSheet = _selectedSheet;
-        var sheetArgs = new PropertyChangedEventArgs(nameof(SheetIds));
-        var selectedSheetArgs = new PropertyChangedEventArgs(nameof(SelectedSheet));
-        var terrainArgs = new PropertyChangedEventArgs(nameof(Terrain));
-        return new TerrainDocumentReconciliation(
-            () =>
-            {
-                _sheetIds = context.SheetIds;
-                _selectedSheet = selectedSheet;
-                _terrain = context.Terrain;
-            },
-            () =>
-            {
-                OnPropertyChanged(sheetArgs);
-                if (previousSelectedSheet != selectedSheet)
-                {
-                    OnPropertyChanged(selectedSheetArgs);
-                }
-            },
-            () => CanvasInvalidated?.Invoke(),
-            () => PaletteInvalidated?.Invoke());
+        var propertyArguments = new List<PropertyChangedEventArgs>
+        {
+            new PropertyChangedEventArgs(nameof(SheetIds))
+        };
+        if (previousSelectedSheet != selectedSheet)
+        {
+            propertyArguments.Add(new PropertyChangedEventArgs(nameof(SelectedSheet)));
+        }
+
+        return PrepareTerrainPlan(
+            context.SheetIds,
+            selectedSheet,
+            context.Terrain,
+            () => context.Terrain,
+            context.Terrain.Catalog,
+            context.Terrain.Index,
+            propertyArguments);
     }
 
     public TerrainDocumentReconciliation PrepareTerrainPublication(TerrainPublication publication)
     {
         ArgumentNullException.ThrowIfNull(publication);
-        var terrainArgs = new PropertyChangedEventArgs(nameof(Terrain));
+        TerrainCatalogLoadResult? result = publication.Result;
+        if (result is not null)
+        {
+            return PrepareTerrainReconciliation(result);
+        }
+
+        // The save's durable revision is unknown until Commit; the result is resolved
+        // from the publication when the plan is applied.
+        return PrepareTerrainPlan(
+            _sheetIds,
+            _selectedSheet,
+            null,
+            () => publication.Result!,
+            publication.PreparedCatalog,
+            publication.PreparedIndex,
+            new List<PropertyChangedEventArgs>(4));
+    }
+
+    internal TerrainDocumentReconciliation PrepareTerrainReconciliation(TerrainCatalogLoadResult result)
+    {
+        ArgumentNullException.ThrowIfNull(result);
+        return PrepareTerrainPlan(
+            _sheetIds,
+            _selectedSheet,
+            result,
+            () => result,
+            result.Catalog,
+            result.Index,
+            new List<PropertyChangedEventArgs>(4));
+    }
+
+    private TerrainDocumentReconciliation PrepareTerrainPlan(
+        IReadOnlyList<int> sheetIds,
+        int selectedSheet,
+        TerrainCatalogLoadResult? result,
+        Func<TerrainCatalogLoadResult> terrain,
+        TerrainCatalog? catalog,
+        TerrainCatalogIndex? index,
+        List<PropertyChangedEventArgs> propertyArguments)
+    {
+        bool sameResult = result is not null && ReferenceEquals(_terrain, result);
+        IReadOnlyList<TerrainChoice> choices = sameResult ? _terrainChoices : BuildTerrainChoices(catalog, index);
+        Guid? selection = ReconcileSelectedTerrainId(index);
+        MapEditTool tool = selection is null && _activeTool == MapEditTool.Terrain ? MapEditTool.Pencil : _activeTool;
+        if (!sameResult)
+        {
+            propertyArguments.Add(new PropertyChangedEventArgs(nameof(TerrainAvailability)));
+        }
+
+        if (!ReferenceEquals(_terrainChoices, choices))
+        {
+            propertyArguments.Add(new PropertyChangedEventArgs(nameof(Terrains)));
+        }
+
+        if (_selectedTerrainId != selection)
+        {
+            propertyArguments.Add(new PropertyChangedEventArgs(nameof(SelectedTerrainId)));
+        }
+
+        if (_activeTool != tool)
+        {
+            propertyArguments.Add(new PropertyChangedEventArgs(nameof(ActiveTool)));
+        }
+
         return new TerrainDocumentReconciliation(
-            () => _terrain = publication.Result,
-            () => OnPropertyChanged(terrainArgs),
-            () => CanvasInvalidated?.Invoke(),
-            () => PaletteInvalidated?.Invoke());
+            this,
+            sheetIds,
+            selectedSheet,
+            terrain,
+            choices,
+            selection,
+            tool,
+            propertyArguments.ToArray(),
+            PropertyChangedHandlers,
+            CanvasInvalidated?.GetInvocationList() ?? EmptyDelegates,
+            PaletteInvalidated?.GetInvocationList() ?? EmptyDelegates);
+    }
+
+    internal void ApplyTerrainReconciliation(TerrainDocumentReconciliation plan)
+    {
+        _sheetIds = plan.SheetIds;
+        _selectedSheet = plan.SelectedSheet;
+        _terrain = plan.Terrain;
+        _terrainChoices = plan.Choices;
+        _selectedTerrainId = plan.SelectedTerrainId;
+        _activeTool = plan.ActiveTool;
+    }
+
+    internal void NotifyTerrainReconciliation(TerrainDocumentReconciliation plan, PublicationNotificationErrors errors)
+    {
+        RaisePropertyChangedSafely(plan.PropertyArguments, plan.PropertyHandlers, errors);
+        InvokeSafely(plan.CanvasHandlers, errors);
+        InvokeSafely(plan.PaletteHandlers, errors);
+    }
+
+    private static IReadOnlyList<TerrainChoice> BuildTerrainChoices(TerrainCatalog? catalog, TerrainCatalogIndex? index)
+    {
+        if (catalog is null || index is null)
+        {
+            return Array.Empty<TerrainChoice>();
+        }
+
+        var choices = new List<TerrainChoice>(catalog.Terrains.Count);
+        foreach (TerrainDefinition terrain in catalog.Terrains)
+        {
+            IReadOnlyList<TerrainGraphicDefinition> representatives = index.GetRepresentatives(terrain.Id);
+            choices.Add(new TerrainChoice(
+                terrain.Id,
+                terrain.Name,
+                terrain.DisplayColor,
+                representatives.Count > 0 ? representatives[0] : null));
+        }
+
+        return choices;
+    }
+
+    private Guid? ReconcileSelectedTerrainId(TerrainCatalogIndex? index)
+    {
+        if (_selectedTerrainId is not { } id)
+        {
+            return null;
+        }
+
+        return index is not null && index.TryGetTerrain(id, out _) ? id : null;
+    }
+
+    private static void InvokeSafely(Delegate[] handlers, PublicationNotificationErrors errors)
+    {
+        foreach (Delegate handler in handlers)
+        {
+            try
+            {
+                ((Action)handler)();
+            }
+            catch (Exception ex)
+            {
+                errors.TryAdd(ex);
+            }
+        }
     }
 
     internal void SetSheetIds(IReadOnlyList<int> sheetIds)
