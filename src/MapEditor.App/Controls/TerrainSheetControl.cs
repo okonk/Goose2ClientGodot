@@ -34,8 +34,6 @@ internal sealed class TerrainSheetControl : Control, ICustomHitTest, IDisposable
 
     private bool _painting;
     private IPointer? _paintPointer;
-    private Guid? _paintValue;
-    private int? _paintSheet;
     private double _paintZoom;
     private Size _paintSheetSize;
     private IReadOnlyList<SpriteFrame> _paintFrames = NoFrames;
@@ -191,8 +189,6 @@ internal sealed class TerrainSheetControl : Control, ICustomHitTest, IDisposable
 
         _viewModel.BeginRegionStroke(value);
         _painting = true;
-        _paintValue = value;
-        _paintSheet = _viewModel.SelectedSheet;
         _paintZoom = zoom;
         _paintSheetSize = new Size(image.PixelWidth, image.PixelHeight);
         _paintFrames = frames;
@@ -282,8 +278,6 @@ internal sealed class TerrainSheetControl : Control, ICustomHitTest, IDisposable
             _viewModel.CancelRegionStroke();
         }
 
-        _paintValue = null;
-        _paintSheet = null;
         _paintFrames = NoFrames;
         _lastSourcePoint = default;
         IPointer? pointer = _paintPointer;

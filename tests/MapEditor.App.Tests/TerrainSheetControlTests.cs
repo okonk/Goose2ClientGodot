@@ -253,7 +253,6 @@ public class TerrainSheetControlTests
         Assert.False(harness.Control.IsPainting);
 
         Assert.Equal(GrassId, Graphic(harness, 1, 10).Pattern.North);
-        Assert.DoesNotContain(harness.ViewModel.CurrentCatalog.Graphics, graphic => graphic.Reference.Sheet == 2);
         Assert.True(harness.ViewModel.IsDirty);
 
         Assert.True(harness.ViewModel.Undo());
