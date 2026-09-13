@@ -20,6 +20,8 @@ internal sealed class TerrainSheetControl : Control, ICustomHitTest, IDisposable
     private const double WheelZoomStep = 1.25;
     private const byte OverlayAlpha = 0xCC;
 
+    private static readonly IReadOnlyList<SpriteFrame> NoFrames = Array.Empty<SpriteFrame>();
+
     private static readonly TerrainPeer[] PeerSlots =
     {
         TerrainPeer.Center, TerrainPeer.North, TerrainPeer.East, TerrainPeer.South, TerrainPeer.West,
@@ -29,6 +31,15 @@ internal sealed class TerrainSheetControl : Control, ICustomHitTest, IDisposable
     private readonly TerrainEditorViewModel _viewModel;
     private readonly TerrainSheetImageController _images;
     private bool _disposed;
+
+    private bool _painting;
+    private IPointer? _paintPointer;
+    private Guid? _paintValue;
+    private int? _paintSheet;
+    private double _paintZoom;
+    private Size _paintSheetSize;
+    private IReadOnlyList<SpriteFrame> _paintFrames = NoFrames;
+    private Point _lastSourcePoint;
 
     public TerrainSheetControl(TerrainEditorViewModel viewModel, string assetDirectory)
         : this(viewModel, assetDirectory, new AvaloniaSpriteSheetLoader())
@@ -51,6 +62,8 @@ internal sealed class TerrainSheetControl : Control, ICustomHitTest, IDisposable
 
     public string? Diagnostic => _images.Diagnostic;
 
+    internal bool IsPainting => _painting;
+
     public void Dispose()
     {
         if (_disposed)
@@ -59,6 +72,11 @@ internal sealed class TerrainSheetControl : Control, ICustomHitTest, IDisposable
         }
 
         _disposed = true;
+        if (_painting)
+        {
+            EndPaintGesture(commit: false);
+        }
+
         _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
         _viewModel.CanvasInvalidated -= OnCanvasInvalidated;
         _images.ImageChanged -= OnImageChanged;
@@ -133,7 +151,7 @@ internal sealed class TerrainSheetControl : Control, ICustomHitTest, IDisposable
     protected override void OnPointerWheelChanged(PointerWheelEventArgs e)
     {
         base.OnPointerWheelChanged(e);
-        if (!e.KeyModifiers.HasFlag(KeyModifiers.Control) || e.Delta.Y == 0)
+        if (_painting || !e.KeyModifiers.HasFlag(KeyModifiers.Control) || e.Delta.Y == 0)
         {
             return;
         }
@@ -141,6 +159,161 @@ internal sealed class TerrainSheetControl : Control, ICustomHitTest, IDisposable
         _viewModel.Zoom *= e.Delta.Y > 0 ? WheelZoomStep : 1.0 / WheelZoomStep;
         e.Handled = true;
     }
+
+    protected override void OnPointerPressed(PointerPressedEventArgs e)
+    {
+        base.OnPointerPressed(e);
+        if (_painting || !e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
+        {
+            return;
+        }
+
+        if (_images.Image is not { } image || _viewModel.EligibleFrames.Count == 0)
+        {
+            return;
+        }
+
+        bool clear = e.KeyModifiers.HasFlag(KeyModifiers.Shift);
+        Guid? value = clear ? null : _viewModel.SelectedTerrain?.Id;
+        if (value is null && !clear)
+        {
+            return;
+        }
+
+        double zoom = _viewModel.Zoom;
+        Point source = e.GetCurrentPoint(this).Position / zoom;
+        IReadOnlyList<SpriteFrame> frames = _viewModel.EligibleFrames;
+        if (HitFrame(source, frames) is not { } frame
+            || TerrainRegionGeometry.HitTestSource(source - new Point(frame.SourceRect.X, frame.SourceRect.Y)) is not { } peer)
+        {
+            return;
+        }
+
+        _viewModel.BeginRegionStroke(value);
+        _painting = true;
+        _paintValue = value;
+        _paintSheet = _viewModel.SelectedSheet;
+        _paintZoom = zoom;
+        _paintSheetSize = new Size(image.PixelWidth, image.PixelHeight);
+        _paintFrames = frames;
+        _lastSourcePoint = source;
+        _paintPointer = e.Pointer;
+        _viewModel.VisitRegion(RegionKey(frame, peer));
+        e.Pointer.Capture(this);
+        e.Handled = true;
+    }
+
+    protected override void OnPointerMoved(PointerEventArgs e)
+    {
+        base.OnPointerMoved(e);
+        if (!_painting)
+        {
+            return;
+        }
+
+        Point position = e.GetCurrentPoint(this).Position;
+        if (position.X < 0 || position.Y < 0
+            || position.X >= _paintSheetSize.Width * _paintZoom
+            || position.Y >= _paintSheetSize.Height * _paintZoom)
+        {
+            return;
+        }
+
+        Point source = position / _paintZoom;
+        List<Point> samples = new();
+        TerrainSheetLine.AppendSamples(_lastSourcePoint, source, samples);
+        foreach (Point sample in samples)
+        {
+            if (HitFrame(sample, _paintFrames) is { } frame
+                && TerrainRegionGeometry.HitTestSource(sample - new Point(frame.SourceRect.X, frame.SourceRect.Y)) is { } peer)
+            {
+                _viewModel.VisitRegion(RegionKey(frame, peer));
+            }
+        }
+
+        _lastSourcePoint = source;
+    }
+
+    protected override void OnPointerReleased(PointerReleasedEventArgs e)
+    {
+        base.OnPointerReleased(e);
+        if (!_painting)
+        {
+            return;
+        }
+
+        EndPaintGesture(commit: true);
+        e.Handled = true;
+    }
+
+    protected override void OnPointerCaptureLost(PointerCaptureLostEventArgs e)
+    {
+        base.OnPointerCaptureLost(e);
+        if (!_painting)
+        {
+            return;
+        }
+
+        EndPaintGesture(commit: false);
+        e.Handled = true;
+    }
+
+    protected override void OnKeyDown(KeyEventArgs e)
+    {
+        base.OnKeyDown(e);
+        if (e.Key == Key.Escape && _painting)
+        {
+            EndPaintGesture(commit: false);
+            e.Handled = true;
+        }
+    }
+
+    // Flags clear before Capture(null): releasing capture can reenter
+    // OnPointerCaptureLost synchronously and must not cancel a finished stroke.
+    private void EndPaintGesture(bool commit)
+    {
+        _painting = false;
+        if (commit)
+        {
+            _viewModel.CompleteRegionStroke();
+        }
+        else
+        {
+            _viewModel.CancelRegionStroke();
+        }
+
+        _paintValue = null;
+        _paintSheet = null;
+        _paintFrames = NoFrames;
+        _lastSourcePoint = default;
+        IPointer? pointer = _paintPointer;
+        _paintPointer = null;
+        pointer?.Capture(null);
+    }
+
+    // Matches GraphicViewerViewModel's frame selection: half-open source rect,
+    // lowest graphic id wins on overlap.
+    private static SpriteFrame? HitFrame(Point source, IReadOnlyList<SpriteFrame> frames)
+    {
+        SpriteFrame? hit = null;
+        foreach (SpriteFrame frame in frames)
+        {
+            SpriteSourceRect rect = frame.SourceRect;
+            if (source.X >= rect.X && source.X < rect.X + rect.Width
+                && source.Y >= rect.Y && source.Y < rect.Y + rect.Height)
+            {
+                if (hit is null || frame.Reference.Graphic < hit.Value.Reference.Graphic)
+                {
+                    hit = frame;
+                }
+            }
+        }
+
+        return hit;
+    }
+
+    private static TerrainRegionKey RegionKey(SpriteFrame frame, TerrainPeer peer)
+        => new(new TerrainGraphicReference(frame.Reference.Sheet, frame.Reference.Graphic), peer);
 
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {

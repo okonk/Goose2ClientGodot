@@ -109,6 +109,247 @@ public class TerrainSheetControlTests
         return new TerrainColor(color.R, color.G, color.B);
     }
 
+    private static TerrainGraphicDefinition Graphic(Harness harness, int sheet, int graphic)
+        => harness.ViewModel.CurrentCatalog.Graphics.Single(entry => entry.Reference.Sheet == sheet && entry.Reference.Graphic == graphic);
+
+    private static void SelectGrass(Harness harness)
+        => harness.ViewModel.SelectedTerrain = harness.ViewModel.Terrains.Single(item => item.Id == GrassId);
+
+    [AvaloniaFact]
+    public void Drag_LeftPaint_CommitsSingleCommandOnRelease()
+    {
+        Harness harness = Create();
+        SelectGrass(harness);
+
+        harness.Window.MouseDown(new Point(16, 4), MouseButton.Left, RawInputModifiers.None);
+        Assert.True(harness.Control.IsPainting);
+        Assert.False(harness.ViewModel.IsDirty);
+        Assert.False(harness.ViewModel.CanUndo);
+
+        harness.Window.MouseMove(new Point(20, 4), RawInputModifiers.None);
+        Assert.False(harness.ViewModel.IsDirty);
+
+        harness.Window.MouseUp(new Point(20, 4), MouseButton.Left, RawInputModifiers.None);
+        Assert.False(harness.Control.IsPainting);
+        Assert.Equal(GrassId, Graphic(harness, 1, 10).Pattern.North);
+        Assert.True(harness.ViewModel.IsDirty);
+        Assert.True(harness.ViewModel.CanUndo);
+
+        Assert.True(harness.ViewModel.Undo());
+        Assert.Equal(DirtId, Graphic(harness, 1, 10).Pattern.North);
+        Assert.False(harness.ViewModel.IsDirty);
+    }
+
+    [AvaloniaFact]
+    public void Drag_ShiftLeft_ClearsRegionAndCommits()
+    {
+        Harness harness = Create();
+        SelectGrass(harness);
+
+        harness.Window.MouseDown(new Point(16, 4), MouseButton.Left, RawInputModifiers.Shift);
+        Assert.True(harness.Control.IsPainting);
+
+        harness.Window.MouseUp(new Point(16, 4), MouseButton.Left, RawInputModifiers.Shift);
+        Assert.Null(Graphic(harness, 1, 10).Pattern.North);
+        Assert.True(harness.ViewModel.IsDirty);
+        Assert.True(harness.ViewModel.CanUndo);
+
+        Assert.True(harness.ViewModel.Undo());
+        Assert.Equal(DirtId, Graphic(harness, 1, 10).Pattern.North);
+    }
+
+    [AvaloniaFact]
+    public void Drag_Escape_CancelsAndRestoresPreview()
+    {
+        Harness harness = Create();
+        SelectGrass(harness);
+
+        harness.Window.MouseDown(new Point(16, 4), MouseButton.Left, RawInputModifiers.None);
+        harness.Window.MouseMove(new Point(20, 4), RawInputModifiers.None);
+        Assert.True(harness.Control.IsPainting);
+        Assert.False(harness.ViewModel.IsDirty);
+
+        harness.Window.KeyPressQwerty(PhysicalKey.Escape, RawInputModifiers.None);
+        Assert.False(harness.Control.IsPainting);
+        Assert.Equal(DirtId, Graphic(harness, 1, 10).Pattern.North);
+        Assert.False(harness.ViewModel.IsDirty);
+        Assert.False(harness.ViewModel.CanUndo);
+
+        harness.Window.MouseUp(new Point(20, 4), MouseButton.Left, RawInputModifiers.None);
+        Assert.Equal(DirtId, Graphic(harness, 1, 10).Pattern.North);
+        Assert.False(harness.ViewModel.CanUndo);
+    }
+
+    [AvaloniaFact]
+    public void CaptureLoss_RestoresDraftAndHistory()
+    {
+        Harness harness = Create();
+        SelectGrass(harness);
+
+        harness.Window.MouseDown(new Point(16, 4), MouseButton.Left, RawInputModifiers.None);
+        harness.Window.MouseMove(new Point(20, 4), RawInputModifiers.None);
+        Assert.True(harness.Control.IsPainting);
+        Assert.False(harness.ViewModel.IsDirty);
+        Assert.False(harness.ViewModel.CanUndo);
+
+        harness.Window.Content = new Border();
+
+        Assert.False(harness.Control.IsPainting);
+        Assert.Equal(DirtId, Graphic(harness, 1, 10).Pattern.North);
+        Assert.False(harness.ViewModel.IsDirty);
+        Assert.False(harness.ViewModel.CanUndo);
+    }
+
+    [AvaloniaFact]
+    public void Drag_SparseMovement_VisitsEveryCrossedRegion()
+    {
+        Harness harness = Create();
+        SelectGrass(harness);
+
+        harness.Window.MouseDown(new Point(16, 4), MouseButton.Left, RawInputModifiers.None);
+        harness.Window.MouseMove(new Point(48, 4), RawInputModifiers.None);
+        harness.Window.MouseUp(new Point(48, 4), MouseButton.Left, RawInputModifiers.None);
+
+        Assert.Equal(GrassId, Graphic(harness, 1, 10).Pattern.North);
+        Assert.Equal(GrassId, Graphic(harness, 1, 11).Pattern.North);
+        Assert.True(harness.ViewModel.CanUndo);
+
+        Assert.True(harness.ViewModel.Undo());
+        Assert.Equal(DirtId, Graphic(harness, 1, 10).Pattern.North);
+        Assert.Null(Graphic(harness, 1, 11).Pattern.North);
+        Assert.False(harness.ViewModel.IsDirty);
+
+        Harness zoomed = Create(zoom: 2.0);
+        SelectGrass(zoomed);
+
+        zoomed.Window.MouseDown(new Point(32, 8), MouseButton.Left, RawInputModifiers.None);
+        zoomed.Window.MouseMove(new Point(96, 8), RawInputModifiers.None);
+        zoomed.Window.MouseUp(new Point(96, 8), MouseButton.Left, RawInputModifiers.None);
+
+        Assert.Equal(GrassId, Graphic(zoomed, 1, 10).Pattern.North);
+        Assert.Equal(GrassId, Graphic(zoomed, 1, 11).Pattern.North);
+    }
+
+    [AvaloniaFact]
+    public void Drag_ActiveGesture_DisablesStateChangesAndUsesCapturedValues()
+    {
+        Harness harness = Create(zoom: 2.0);
+        SelectGrass(harness);
+
+        harness.Window.MouseDown(new Point(32, 8), MouseButton.Left, RawInputModifiers.None);
+        Assert.True(harness.Control.IsPainting);
+
+        harness.ViewModel.Zoom = 1.0;
+        harness.ViewModel.SelectedSheet = 2;
+        harness.ViewModel.SelectedTerrain = harness.ViewModel.Terrains.Single(item => item.Id == DirtId);
+        Dispatcher.UIThread.RunJobs();
+
+        harness.Window.MouseWheel(new Point(50, 50), new Vector(0, -1), RawInputModifiers.Control);
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal(1.0, harness.ViewModel.Zoom);
+
+        harness.Window.MouseMove(new Point(40, 8), RawInputModifiers.None);
+        harness.Window.MouseUp(new Point(40, 8), MouseButton.Left, RawInputModifiers.None);
+        Assert.False(harness.Control.IsPainting);
+
+        Assert.Equal(GrassId, Graphic(harness, 1, 10).Pattern.North);
+        Assert.DoesNotContain(harness.ViewModel.CurrentCatalog.Graphics, graphic => graphic.Reference.Sheet == 2);
+        Assert.True(harness.ViewModel.IsDirty);
+
+        Assert.True(harness.ViewModel.Undo());
+        Assert.Equal(DirtId, Graphic(harness, 1, 10).Pattern.North);
+        Assert.False(harness.ViewModel.IsDirty);
+    }
+
+    [AvaloniaFact]
+    public void Drag_RepeatRegion_CommitsNoCommand()
+    {
+        Harness harness = Create();
+        SelectGrass(harness);
+
+        harness.Window.MouseDown(new Point(16, 16), MouseButton.Left, RawInputModifiers.None);
+        Assert.True(harness.Control.IsPainting);
+        harness.Window.MouseMove(new Point(20, 16), RawInputModifiers.None);
+        harness.Window.MouseUp(new Point(20, 16), MouseButton.Left, RawInputModifiers.None);
+
+        Assert.False(harness.ViewModel.IsDirty);
+        Assert.False(harness.ViewModel.CanUndo);
+        Assert.Equal(GrassId, Graphic(harness, 1, 10).Pattern.Center);
+    }
+
+    [AvaloniaFact]
+    public void Press_WithoutImageRegionOrSelection_StartsNoCapture()
+    {
+        Harness missing = Create(missingSheets: true);
+        SelectGrass(missing);
+        missing.Window.MouseDown(new Point(16, 4), MouseButton.Left, RawInputModifiers.None);
+        Assert.False(missing.Control.IsPainting);
+        missing.Window.MouseUp(new Point(16, 4), MouseButton.Left, RawInputModifiers.None);
+        Assert.False(missing.ViewModel.IsDirty);
+
+        Harness noRegion = Create();
+        SelectGrass(noRegion);
+        noRegion.Window.MouseDown(new Point(16, 48), MouseButton.Left, RawInputModifiers.None);
+        Assert.False(noRegion.Control.IsPainting);
+        noRegion.Window.MouseUp(new Point(16, 48), MouseButton.Left, RawInputModifiers.None);
+        Assert.False(noRegion.ViewModel.IsDirty);
+        Assert.False(noRegion.ViewModel.CanUndo);
+
+        Harness noSelection = Create();
+        noSelection.ViewModel.SelectedTerrain = null;
+        noSelection.Window.MouseDown(new Point(16, 4), MouseButton.Left, RawInputModifiers.None);
+        Assert.False(noSelection.Control.IsPainting);
+        noSelection.Window.MouseUp(new Point(16, 4), MouseButton.Left, RawInputModifiers.None);
+        Assert.False(noSelection.ViewModel.IsDirty);
+    }
+
+    [AvaloniaFact]
+    public void Drag_LeaveControlPreservesLastPointAndReentryInterpolates()
+    {
+        Harness harness = Create();
+        SelectGrass(harness);
+
+        harness.Window.MouseDown(new Point(16, 4), MouseButton.Left, RawInputModifiers.None);
+        harness.Window.MouseMove(new Point(150, 150), RawInputModifiers.None);
+        Assert.True(harness.Control.IsPainting);
+        harness.Window.MouseMove(new Point(48, 4), RawInputModifiers.None);
+        harness.Window.MouseUp(new Point(48, 4), MouseButton.Left, RawInputModifiers.None);
+
+        Assert.Equal(GrassId, Graphic(harness, 1, 10).Pattern.North);
+        Assert.Equal(GrassId, Graphic(harness, 1, 11).Pattern.North);
+    }
+
+    [AvaloniaFact]
+    public void Dispose_WithActiveStroke_CancelsPreview()
+    {
+        Harness harness = Create();
+        SelectGrass(harness);
+
+        harness.Window.MouseDown(new Point(16, 4), MouseButton.Left, RawInputModifiers.None);
+        harness.Window.MouseMove(new Point(20, 4), RawInputModifiers.None);
+        Assert.True(harness.Control.IsPainting);
+
+        harness.Control.Dispose();
+
+        Assert.Equal(DirtId, Graphic(harness, 1, 10).Pattern.North);
+        Assert.False(harness.ViewModel.IsDirty);
+        Assert.False(harness.ViewModel.CanUndo);
+    }
+
+    [Fact]
+    public void Line_SamplesCeilOfMaxDeltaStepsIncludingEndpoints()
+    {
+        List<Point> samples = new();
+        TerrainSheetLine.AppendSamples(new Point(0, 0), new Point(31, 5), samples);
+        Assert.Equal(32, samples.Count);
+        Assert.Equal(new Point(0, 0), samples[0]);
+        Assert.Equal(new Point(31, 5), samples[^1]);
+
+        samples.Clear();
+        TerrainSheetLine.AppendSamples(new Point(7.5, 3.25), new Point(7.5, 3.25), samples);
+        Assert.Equal(new[] { new Point(7.5, 3.25) }, samples);
+    }
+
     [AvaloniaFact]
     public void Render_DrawsImageBeforeAlphaCcPolygons()
     {

@@ -238,6 +238,18 @@ internal sealed class TerrainEditorViewModel : ViewModelBase, IDisposable
         return _session.Redo();
     }
 
+    public void BeginRegionStroke(Guid? value)
+        => _session.BeginRegionStroke(value);
+
+    public void VisitRegion(TerrainRegionKey key)
+        => _session.VisitRegion(key);
+
+    public bool CompleteRegionStroke()
+        => _session.CompleteRegionStroke();
+
+    public void CancelRegionStroke()
+        => _session.CancelRegionStroke();
+
     public void Revert()
     {
         if (!CommitPending())
