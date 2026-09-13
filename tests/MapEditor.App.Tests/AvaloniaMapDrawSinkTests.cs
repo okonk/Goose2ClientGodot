@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using Avalonia;
 using Avalonia.Controls;
@@ -12,6 +13,7 @@ using MapEditor.App.Controls;
 using MapEditor.App.Documents;
 using MapEditor.App.Rendering;
 using MapEditor.App.Settings;
+using MapEditor.App.Terrain;
 using MapEditor.App.Tests.Fakes;
 using MapEditor.App.Tests.Fixtures;
 using MapEditor.App.ViewModels;
@@ -246,6 +248,51 @@ public class AvaloniaMapDrawSinkTests
         (MapCanvas canvas, _, _) = CreateCanvas();
 
         Assert.Equal(BitmapInterpolationMode.None, RenderOptions.GetBitmapInterpolationMode(canvas));
+    }
+
+    [AvaloniaFact]
+    public void DrawPolygon_ThroughRealDrawingAdapter_RendersWithoutException()
+    {
+        PolygonRenderControl control = new();
+        Window window = new() { Content = control };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        using RenderTargetBitmap target = new(new PixelSize(64, 64));
+        target.Render(control);
+
+        Assert.True(control.Drew);
+    }
+
+    [AvaloniaFact]
+    public void DrawPolygon_RecordingTarget_CopiesPointsExactly()
+    {
+        RecordingMapDrawTarget target = new();
+        IReadOnlyList<Point> points = TerrainRegionGeometry.ToScreenPolygon(
+            TerrainPeer.Center, new Point(100, 200), 2.0);
+
+        target.DrawPolygon(new SolidColorBrush(Colors.Red), new Pen(new SolidColorBrush(Colors.Black), 1.0), points);
+
+        Assert.Single(target.Polygons);
+        Assert.Equal(points, target.Polygons[0].Points);
+        Assert.IsType<SolidColorBrush>(target.Polygons[0].Fill);
+        Assert.IsType<Pen>(target.Polygons[0].Stroke);
+    }
+
+    private sealed class PolygonRenderControl : Control
+    {
+        public bool Drew { get; private set; }
+
+        public override void Render(DrawingContext context)
+        {
+            base.Render(context);
+            DrawingContextMapDrawTarget target = new(context);
+            target.DrawPolygon(
+                new SolidColorBrush(Colors.Red),
+                new Pen(new SolidColorBrush(Colors.Black), 1.0),
+                TerrainRegionGeometry.ToScreenPolygon(TerrainPeer.Center, new Point(0, 0), 2.0));
+            Drew = true;
+        }
     }
 
     private static (MapCanvas Canvas, MapDocumentViewModel ViewModel, Window Window) CreateCanvas()

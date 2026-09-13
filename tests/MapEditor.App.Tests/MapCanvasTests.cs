@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
@@ -1018,6 +1019,8 @@ public class MapCanvasTests
         public void DrawLine(Pen pen, Point start, Point end) => throw new InvalidOperationException("sink failure");
 
         public void DrawRectangle(Brush fill, Pen? stroke, Rect rect) => throw new InvalidOperationException("sink failure");
+
+        public void DrawPolygon(Brush fill, Pen? stroke, IReadOnlyList<Point> points) => throw new InvalidOperationException("sink failure");
 
         public void DrawText(string text, Point center, double fontSize, Brush fill, Brush? stroke) => throw new InvalidOperationException("sink failure");
 

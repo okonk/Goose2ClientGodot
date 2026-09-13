@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using Avalonia;
 using Avalonia.Media;
@@ -21,6 +22,21 @@ internal sealed class DrawingContextMapDrawTarget : IMapDrawTarget
 
     public void DrawRectangle(Brush fill, Pen? stroke, Rect rect)
         => _context.DrawRectangle(fill, stroke, rect);
+
+    public void DrawPolygon(Brush fill, Pen? stroke, IReadOnlyList<Point> points)
+    {
+        StreamGeometry geometry = new();
+        using (StreamGeometryContext context = geometry.Open())
+        {
+            context.BeginFigure(points[0], true);
+            for (int i = 1; i < points.Count; i++)
+            {
+                context.LineTo(points[i], true);
+            }
+        }
+
+        _context.DrawGeometry(fill, stroke, geometry);
+    }
 
     public void DrawText(string text, Point center, double fontSize, Brush fill, Brush? stroke)
     {
