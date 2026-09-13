@@ -923,6 +923,26 @@ public class AssetContextControllerTerrainPublicationTests : IDisposable
     }
 
     [Fact]
+    public void CommitSave_FromOtherThread_Throws()
+    {
+        using AssetContextController controller = CreateController();
+        string assetDirectory = WriteAssetDirectory("assets-thread-commit-terrain");
+        AssetFixture.WriteTerrainSidecar(assetDirectory, AssetFixture.TerrainCatalogJson);
+        Assert.True(controller.TryOpen(assetDirectory));
+        AssetContext context = controller.Current;
+        TerrainCatalogLoadResult before = context.Terrain;
+        TerrainCatalogPreparedSave prepared = PrepareSave(assetDirectory, context, ParseCatalog(), before.Revision);
+        using TerrainOperationLease operation = controller.Gate.AcquireAsync().GetAwaiter().GetResult();
+        ITerrainCatalogSavePublication publication = controller.PrepareSave(operation, context, prepared);
+        TerrainCatalogSaveResult result = SaveResult(prepared, TerrainFileRevision.FromBytes(prepared.CanonicalBytes));
+
+        Assert.ThrowsAny<InvalidOperationException>(() => Task.Run(() => publication.Commit(result)).GetAwaiter().GetResult());
+
+        Assert.Same(before, context.Terrain);
+        publication.Dispose();
+    }
+
+    [Fact]
     public void CommitPreparedOpen_FromOtherThread_Throws()
     {
         using AssetContextController controller = CreateController();
@@ -1432,6 +1452,59 @@ public class AssetContextControllerTerrainPublicationTests : IDisposable
         Assert.Same(published, _workspace.ActiveDocument.Terrain);
     }
 
+    [Fact]
+    public void CommitPreparedOpen_WhilePublicationPending_Throws()
+    {
+        using AssetContextController controller = CreateController();
+        string firstDirectory = WriteAssetDirectory("assets-root-interleave-first");
+        AssetFixture.WriteTerrainSidecar(firstDirectory, AssetFixture.TerrainCatalogJson);
+        Assert.True(controller.TryOpen(firstDirectory));
+        AssetContext context = controller.Current;
+        TerrainCatalogPreparedSave prepared = PrepareSave(firstDirectory, context, ParseCatalog(), context.Terrain.Revision);
+        using TerrainOperationLease operation = controller.Gate.AcquireAsync().GetAwaiter().GetResult();
+        ITerrainCatalogSavePublication publication = controller.PrepareSave(operation, context, prepared);
+        string secondDirectory = WriteAssetDirectory("assets-root-interleave-second");
+        Assert.True(controller.TryPrepareOpen(secondDirectory, out PreparedAssetContext? root, out _));
+        int events = 0;
+        controller.CurrentChanged += (_, _) => events++;
+
+        Assert.Throws<InvalidOperationException>(() => controller.CommitPreparedOpen(operation, root));
+
+        Assert.Same(context, controller.Current);
+        Assert.Equal(0, events);
+        Assert.False(root!.Context.IsDisposed);
+        publication.Dispose();
+        root.Dispose();
+    }
+
+    [Fact]
+    public void CommitPreparedOpen_ThrowingOldContextDisposal_RecordsFailureWithoutThrowing()
+    {
+        using AssetContextController controller = new(
+            _workspace,
+            new AppSettingsStore(_settingsPath),
+            path => AssetContext.Create(path, new ThrowingDisposeSheetLoader()));
+        string firstDirectory = WriteAssetDirectory("assets-root-dispose-first");
+        Assert.True(controller.TryOpen(firstDirectory));
+        AssetContext first = controller.Current;
+        Assert.Equal(SpriteResolutionStatus.Ready, first.Resolve(new SpriteReference(1, 10)).Status);
+        string secondDirectory = WriteAssetDirectory("assets-root-dispose-second");
+        Assert.True(controller.TryPrepareOpen(secondDirectory, out PreparedAssetContext? prepared, out _));
+        using TerrainOperationLease operation = controller.Gate.AcquireAsync().GetAwaiter().GetResult();
+        _viewModel.PropertyChanged += (_, _) => throw new InvalidOperationException("property failure");
+        _viewModel.CanvasInvalidated += () => throw new InvalidOperationException("canvas failure");
+        _viewModel.PaletteInvalidated += () => throw new InvalidOperationException("palette failure");
+        controller.CurrentChanged += (_, _) => throw new InvalidOperationException("subscriber failure");
+
+        controller.CommitPreparedOpen(operation, prepared);
+
+        Assert.Same(prepared.Context, controller.Current);
+        Assert.True(first.IsDisposed);
+        Assert.NotNull(controller.LastPublicationNotificationErrors);
+        Assert.Equal(5, controller.LastPublicationNotificationErrors.Count);
+        Assert.Equal("image disposal failure", controller.LastPublicationNotificationErrors[4].Message);
+    }
+
     private sealed class RecordingReconciliation : IPreparedAssetReconciliation
     {
         public bool Applied;
@@ -1449,5 +1522,19 @@ public class AssetContextControllerTerrainPublicationTests : IDisposable
             Notified = true;
             Timeline?.Add("participant.notify");
         }
+    }
+
+    private sealed class ThrowingDisposeSheetLoader : ISpriteSheetLoader
+    {
+        public SpriteSheetLoadResult Load(string path) => SpriteSheetLoadResult.Success(new ThrowingDisposeImage());
+    }
+
+    private sealed class ThrowingDisposeImage : ISpriteSheetImage
+    {
+        public int PixelWidth => 64;
+
+        public int PixelHeight => 64;
+
+        public void Dispose() => throw new InvalidOperationException("image disposal failure");
     }
 }

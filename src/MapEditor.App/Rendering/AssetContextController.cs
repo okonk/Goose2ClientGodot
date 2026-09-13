@@ -197,6 +197,10 @@ internal sealed class AssetContextController : IDisposable, ITerrainCatalogPubli
         }
 
         _gate.VerifyCurrent(operation);
+        if (_publication is not null)
+        {
+            throw new InvalidOperationException("A terrain publication is in progress; the asset root cannot be swapped.");
+        }
 
         List<TerrainDocumentReconciliation> plans = new();
         foreach (MapDocumentViewModel document in _workspace.Documents)
@@ -205,7 +209,7 @@ internal sealed class AssetContextController : IDisposable, ITerrainCatalogPubli
         }
 
         Delegate[] currentChangedHandlers = CurrentChanged?.GetInvocationList() ?? EmptyHandlers;
-        var errors = new PublicationNotificationErrors(plans.Count * 3 + (participant is null ? 0 : 1) + currentChangedHandlers.Length);
+        var errors = new PublicationNotificationErrors(plans.Count * 3 + (participant is null ? 0 : 1) + currentChangedHandlers.Length + 1);
         InvokeGestureCancellations();
 
         AssetContext replaced = _current;
@@ -448,6 +452,7 @@ internal sealed class AssetContextController : IDisposable, ITerrainCatalogPubli
 
         public void Commit(TerrainCatalogSaveResult durableReplacement)
         {
+            _owner.VerifyCreatingThread();
             if (_finished)
             {
                 throw new ObjectDisposedException(nameof(SavePublication));
@@ -503,6 +508,7 @@ internal sealed class AssetContextController : IDisposable, ITerrainCatalogPubli
 
         public void Commit()
         {
+            _owner.VerifyCreatingThread();
             if (_finished)
             {
                 throw new ObjectDisposedException(nameof(LoadedPublication));
