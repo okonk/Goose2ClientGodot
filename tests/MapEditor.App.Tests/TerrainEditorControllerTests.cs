@@ -313,8 +313,9 @@ public class TerrainEditorControllerTests : IDisposable
         await controller.SaveAsync();
 
         Assert.Equal(_publisher.LastPreparedSave!.CanonicalBytes, _operations.ReadFileDirect(SourcePath));
-        Assert.Equal(new[] { "PrepareSave", "CommitSaveFailed" }, _publisher.Events);
+        Assert.Equal(new[] { "PrepareSave", "CommitSaveFailed", "DisposeSavePublication" }, _publisher.Events);
         Assert.Equal(0, _publisher.CommittedSaveCount);
+        Assert.Equal(1, _publisher.DisposedSavePublications);
         Assert.True(controller.Session.IsDirty);
         Assert.Equal(TerrainFileRevision.FromBytes(bytes), controller.Revision);
         Assert.Single(_dialogs.Errors);
@@ -413,6 +414,58 @@ public class TerrainEditorControllerTests : IDisposable
         Assert.False(controller.Session.IsDirty);
         Assert.True(controller.IsTerrainFeaturesEnabled);
         Assert.Equal(1, stateChanged);
+    }
+
+    [AvaloniaFact]
+    public async Task Save_Conflict_Reload_PublicationPrepareFailure_PreservesDraftAndReleasesReservation()
+    {
+        var firstBytes = Serialize(CreateCatalog((GrassId, "Grass", 1, 10)));
+        var controller = CreateController(firstBytes);
+        var externalBytes = Serialize(CreateCatalog((DirtId, "Dirt", 1, 20)));
+        _operations.WriteFile(SourcePath, externalBytes);
+        MakeDirty(controller.Session);
+        var originalSession = controller.Session;
+        var revision = controller.Revision;
+        _dialogs.ReplaceTerrainCatalogResult = TerrainExternalChangeChoice.Reload;
+        _publisher.PrepareLoadedFailure = new InvalidOperationException("reservation failed");
+
+        await controller.SaveAsync();
+
+        Assert.Equal(new[] { "PrepareSave", "DisposeSavePublication", "PrepareLoadedFailed" }, _publisher.Events);
+        Assert.Same(originalSession, controller.Session);
+        Assert.True(controller.Session.IsDirty);
+        Assert.Equal(revision, controller.Revision);
+        Assert.True(controller.IsTerrainFeaturesEnabled);
+        Assert.Equal(externalBytes, _operations.ReadFileDirect(SourcePath));
+        Assert.Single(_dialogs.Errors);
+        Assert.False(controller.Gate.IsBusy);
+    }
+
+    [AvaloniaFact]
+    public async Task Save_Conflict_Reload_PublicationCommitFailure_PreservesDraftAndReleasesReservation()
+    {
+        var firstBytes = Serialize(CreateCatalog((GrassId, "Grass", 1, 10)));
+        var controller = CreateController(firstBytes);
+        var externalBytes = Serialize(CreateCatalog((DirtId, "Dirt", 1, 20)));
+        _operations.WriteFile(SourcePath, externalBytes);
+        MakeDirty(controller.Session);
+        var originalSession = controller.Session;
+        var revision = controller.Revision;
+        _dialogs.ReplaceTerrainCatalogResult = TerrainExternalChangeChoice.Reload;
+        _publisher.CommitLoadedFailure = new IOException("commit failed");
+
+        await controller.SaveAsync();
+
+        Assert.Equal(new[] { "PrepareSave", "DisposeSavePublication", "PrepareLoaded", "CommitLoadedFailed", "DisposeLoadedPublication" }, _publisher.Events);
+        Assert.Equal(0, _publisher.CommittedLoadedCount);
+        Assert.Equal(1, _publisher.DisposedLoadedPublications);
+        Assert.Same(originalSession, controller.Session);
+        Assert.True(controller.Session.IsDirty);
+        Assert.Equal(revision, controller.Revision);
+        Assert.True(controller.IsTerrainFeaturesEnabled);
+        Assert.Equal(externalBytes, _operations.ReadFileDirect(SourcePath));
+        Assert.Single(_dialogs.Errors);
+        Assert.False(controller.Gate.IsBusy);
     }
 
     [AvaloniaFact]

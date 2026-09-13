@@ -150,7 +150,16 @@ internal sealed class TerrainEditorController : IDisposable
                 return;
             }
 
-            publication.Commit(result);
+            try
+            {
+                publication.Commit(result);
+            }
+            catch
+            {
+                publication.Dispose();
+                throw;
+            }
+
             _session.ApplyMarkSaved(preparedMarkSaved);
             _revision = result.Revision;
             NotifySaved(preparedMarkSaved);
@@ -184,7 +193,16 @@ internal sealed class TerrainEditorController : IDisposable
         {
             var replacement = CreateReplacement(loaded.Catalog ?? EmptyCatalog);
             var publication = _publisher.PrepareLoaded(operation, _context, loaded, TerrainLoadedPublicationKind.ValidReload);
-            publication.Commit();
+            try
+            {
+                publication.Commit();
+            }
+            catch
+            {
+                publication.Dispose();
+                throw;
+            }
+
             ApplyReplacement(replacement);
             _revision = loaded.Revision;
             _featuresEnabled = true;
@@ -199,7 +217,16 @@ internal sealed class TerrainEditorController : IDisposable
 
         var recovery = CreateReplacement(EmptyCatalog);
         var recoveryPublication = _publisher.PrepareLoaded(operation, _context, loaded, TerrainLoadedPublicationKind.ConfirmedMalformedReload);
-        recoveryPublication.Commit();
+        try
+        {
+            recoveryPublication.Commit();
+        }
+        catch
+        {
+            recoveryPublication.Dispose();
+            throw;
+        }
+
         ApplyReplacement(recovery);
         _revision = loaded.Revision;
         _featuresEnabled = false;
