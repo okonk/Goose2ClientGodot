@@ -202,8 +202,9 @@ public class TerrainEditorViewModelTests
         var (vm, session, _) = CreateViewModel();
         var added = vm.AddTerrain();
         Assert.NotNull(added);
-        Assert.True(session.CanUndo);
-        Assert.False(session.CanRedo);
+        Assert.True(session.RenameTerrain(GrassId, "Grass2"));
+        Assert.True(session.Undo());
+        Assert.True(session.CanRedo);
         var catalog = vm.CurrentCatalog;
 
         vm.SelectedTerrain = Item(vm, added!.Value);
@@ -212,7 +213,7 @@ public class TerrainEditorViewModelTests
         Assert.NotNull(vm.NameError);
         Assert.Same(catalog, vm.CurrentCatalog);
         Assert.True(session.CanUndo);
-        Assert.False(session.CanRedo);
+        Assert.True(session.CanRedo);
         Assert.Equal("Terrain", Item(vm, added.Value).Name);
 
         vm.Name = "Fresh";
@@ -227,6 +228,9 @@ public class TerrainEditorViewModelTests
     {
         var (vm, session, _) = CreateViewModel();
         vm.AddTerrain();
+        Assert.True(session.RenameTerrain(DirtId, "Dirt2"));
+        Assert.True(session.Undo());
+        Assert.True(session.CanRedo);
         var catalog = vm.CurrentCatalog;
 
         foreach (var text in new[] { "FF0000", "#12345", "#1234567", "#GGGGGG", "#12345 " })
@@ -236,7 +240,7 @@ public class TerrainEditorViewModelTests
             Assert.NotNull(vm.ColorError);
             Assert.Same(catalog, vm.CurrentCatalog);
             Assert.True(session.CanUndo);
-            Assert.False(session.CanRedo);
+            Assert.True(session.CanRedo);
         }
 
         vm.ColorOverrideText = "#abcdef";
@@ -244,6 +248,7 @@ public class TerrainEditorViewModelTests
         Assert.Equal(
             new TerrainColor(0xAB, 0xCD, 0xEF),
             session.CurrentCatalog.Terrains.Single(terrain => terrain.Id == vm.SelectedTerrain!.Id).ColorOverride);
+        Assert.False(session.CanRedo);
     }
 
     [Fact]
@@ -551,6 +556,22 @@ public class TerrainEditorViewModelTests
 
         Assert.True(TerrainEditorViewModel.TryParseColorOverride("#123456", out var color));
         Assert.Equal(new TerrainColor(0x12, 0x34, 0x56), color);
+    }
+
+    [Fact]
+    public void CommitPending_NullColorText_ResetsToDerived()
+    {
+        var (vm, session, _) = CreateViewModel();
+        vm.SelectedTerrain = Item(vm, GrassId);
+        vm.ColorOverrideText = "#FF0000";
+        Assert.True(vm.CommitPending());
+
+        vm.ColorOverrideText = null!;
+        Assert.True(vm.CommitPending());
+        var item = Item(vm, GrassId);
+        Assert.Equal(TerrainColor.Derive(GrassId), item.Swatch);
+        Assert.False(item.HasColorOverride);
+        Assert.Null(session.CurrentCatalog.Terrains.Single(terrain => terrain.Id == GrassId).ColorOverride);
     }
 
     [Fact]

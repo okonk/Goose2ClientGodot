@@ -321,7 +321,7 @@ internal sealed class TerrainEditorViewModel : ViewModelBase, IDisposable
     internal static bool TryParseColorOverride(string text, out TerrainColor? color)
     {
         color = null;
-        var trimmed = text.Trim();
+        var trimmed = text?.Trim() ?? string.Empty;
         if (trimmed.Length == 0)
         {
             return true;
