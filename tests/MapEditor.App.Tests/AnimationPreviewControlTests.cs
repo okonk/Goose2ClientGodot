@@ -30,6 +30,12 @@ public class AnimationPreviewControlTests : IDisposable
           { "ownerSheet": 1, "id": 1, "fps": 8, "frames": [[1, 10], [2, 20]] } ] }
         """;
 
+    private const string LargeFrameManifestJson = """
+        { "tileSize": 32, "sheets": {
+          "1": { "10": [0, 0, 16, 24], "11": [0, 0, 100, 100] },
+          "2": { "20": [0, 0, 24, 32] } } }
+        """;
+
     private readonly string _directory = Directory.CreateTempSubdirectory("map-editor-preview-").FullName;
 
     private sealed record Harness(AnimationPreviewControl Control, GraphicViewerViewModel ViewModel, AssetContext Context, CountingSpriteSheetLoader Loader);
@@ -76,6 +82,42 @@ public class AnimationPreviewControlTests : IDisposable
 
         harness.Control.Measure(new Size(Area, Area));
         Assert.Equal(new Size(Area, Area), harness.Control.DesiredSize);
+    }
+
+    [AvaloniaFact]
+    public void RenderPreview_ManifestMaxLargerThanAnimationFrames_ScalesByTheAnimationMaxFrameDims()
+    {
+        Harness harness = Create(manifestJson: LargeFrameManifestJson);
+        Arrange(harness);
+
+        var first = new RecordingMapDrawTarget();
+        harness.Control.RenderPreview(first);
+        Assert.Equal(new Rect(0, 0, 16, 24), first.Images[0].Source);
+        Assert.Equal(new Rect(62, 38, 16 * Scale, 24 * Scale), first.Images[0].Destination);
+
+        harness.ViewModel.StepNext();
+        var second = new RecordingMapDrawTarget();
+        harness.Control.RenderPreview(second);
+        Assert.Equal(new Rect(0, 0, 24, 32), second.Images[0].Source);
+        Assert.Equal(new Rect(38, 14, 24 * Scale, 32 * Scale), second.Images[0].Destination);
+    }
+
+    [AvaloniaFact]
+    public void RenderPreview_FrameWithoutMatchingAnimation_DrawsNothingAndClearsDiagnostic()
+    {
+        Harness harness = Create();
+        Arrange(harness);
+        Assert.True(harness.ViewModel.TrySelectSheet(1));
+        Assert.True(harness.ViewModel.TrySelectFrameAt(24, 8));
+        Assert.Equal(new SpriteReference(1, 11), harness.ViewModel.SelectedFrame!.Value.Reference);
+        Assert.Null(harness.ViewModel.SelectedAnimation);
+        RecordingMapDrawTarget target = new();
+
+        harness.Control.RenderPreview(target);
+
+        Assert.Empty(target.Images);
+        Assert.Empty(target.Texts);
+        Assert.Null(harness.Control.Diagnostic);
     }
 
     [AvaloniaFact]
@@ -187,11 +229,14 @@ public class AnimationPreviewControlTests : IDisposable
         harness.Control.Arrange(new Rect(0, 0, Area, Area));
     }
 
-    private Harness Create(Func<string, SpriteSheetLoadResult>? loaderBehavior = null, bool selectAnimation = true)
+    private Harness Create(
+        Func<string, SpriteSheetLoadResult>? loaderBehavior = null,
+        bool selectAnimation = true,
+        string manifestJson = ManifestJson)
     {
         string assetDirectory = Path.Combine(_directory, Guid.NewGuid().ToString("n"));
         Directory.CreateDirectory(assetDirectory);
-        File.WriteAllText(Path.Combine(assetDirectory, "manifest.json"), ManifestJson);
+        File.WriteAllText(Path.Combine(assetDirectory, "manifest.json"), manifestJson);
         File.WriteAllText(Path.Combine(assetDirectory, GraphicAnimationManifest.FileName), AnimationJson);
         CountingSpriteSheetLoader loader = new(loaderBehavior ?? (path =>
             SpriteSheetLoadResult.Success(new AvaloniaSpriteSheetImage(new Bitmap(new MemoryStream(AssetFixture.PngSheet.Create(64, 64)))))));

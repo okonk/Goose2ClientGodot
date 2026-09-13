@@ -60,9 +60,22 @@ internal sealed class AnimationPreviewControl : Control
         {
             SetDiagnostic(null);
             SpriteSourceRect source = resolution.SourceRect;
-            int scale = Math.Max(1, (int)Math.Floor(Math.Min(
-                area.Width / _assets.Cache.MaxFrameWidth,
-                area.Height / _assets.Cache.MaxFrameHeight)));
+            int maxW = source.Width;
+            int maxH = source.Height;
+            GraphicAnimation? animation = _viewModel.SelectedAnimation;
+            SpriteManifest? manifest = _assets.Cache.Manifest;
+            if (animation is not null && manifest is not null)
+            {
+                foreach (SpriteReference frame in animation.Frames)
+                {
+                    if (manifest.TryGetSourceRect(frame, out SpriteSourceRect rect))
+                    {
+                        maxW = Math.Max(maxW, rect.Width);
+                        maxH = Math.Max(maxH, rect.Height);
+                    }
+                }
+            }
+            int scale = Math.Max(1, (int)Math.Floor(Math.Min(area.Width / maxW, area.Height / maxH)));
             double destinationWidth = source.Width * scale;
             double destinationHeight = source.Height * scale;
             target.DrawImage(
