@@ -1091,5 +1091,47 @@ public class MapEditSessionTests
         Assert.Equal(version + 1, session.HistoryVersion);
     }
 
+    [Fact]
+    public void DiscardRedo_WithActiveStroke_ThrowsWithoutChangingHistory()
+    {
+        var session = CreateSession();
+        session.SelectedTileLayer = new MapTileLayer(1, 2);
+        session.BeginStroke(MapEditTool.Pencil, 0, 0);
+        Assert.True(session.CompleteStroke());
+        session.BeginStroke(MapEditTool.Pencil, 1, 1);
+        Assert.True(session.CompleteStroke());
+        Assert.True(session.Undo());
+        Assert.True(session.CanRedo);
+
+        long version = session.HistoryVersion;
+        session.BeginStroke(MapEditTool.Pencil, 2, 2);
+
+        Assert.Throws<InvalidOperationException>(() => session.DiscardRedo());
+        Assert.Equal(version, session.HistoryVersion);
+        Assert.True(session.History.RedoCount > 0);
+        Assert.True(session.HasActiveStroke);
+    }
+
+    [Fact]
+    public void ClearHistory_WithActiveStroke_ThrowsWithoutChangingHistory()
+    {
+        var session = CreateSession();
+        session.SelectedTileLayer = new MapTileLayer(1, 2);
+        session.BeginStroke(MapEditTool.Pencil, 0, 0);
+        Assert.True(session.CompleteStroke());
+        session.BeginStroke(MapEditTool.Pencil, 1, 1);
+        Assert.True(session.CompleteStroke());
+        Assert.True(session.Undo());
+        Assert.True(session.CanUndo);
+
+        long version = session.HistoryVersion;
+        session.BeginStroke(MapEditTool.Pencil, 2, 2);
+
+        Assert.Throws<InvalidOperationException>(() => session.ClearHistory());
+        Assert.Equal(version, session.HistoryVersion);
+        Assert.True(session.History.RedoCount > 0);
+        Assert.True(session.HasActiveStroke);
+    }
+
     private static MapEditSession CreateSession(int width = 4, int height = 4) => new(MapDocument.Create(width, height));
 }

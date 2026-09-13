@@ -46,6 +46,8 @@ internal sealed class TerrainMapEditStroke
 
     internal bool IsActive => _active;
 
+    internal bool HasChanges => _accumulator.HasChanges;
+
     internal MapCoordinate PreviousSample => _sample;
 
     internal int IntentCount => _centerOverrides.Count;
