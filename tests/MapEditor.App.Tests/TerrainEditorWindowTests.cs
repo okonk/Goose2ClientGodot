@@ -7,6 +7,7 @@ using System.Reflection;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
@@ -378,6 +379,32 @@ public class TerrainEditorWindowTests
 
         Assert.Null(ById(harness.Session, first.Id).ColorOverride);
         Assert.Equal(string.Empty, Find<TextBox>(harness, "ColorBox").Text);
+    }
+
+    [AvaloniaFact]
+    public void RegionPaintCommit_KeepsTheTerrainSelection()
+    {
+        using var harness = TerrainEditorWindowHarness.Create(DefaultCatalog());
+        var list = Find<ListBox>(harness, "TerrainList");
+        var control = harness.Window.SheetControl;
+        var dirt = harness.ViewModel.Terrains.Single(item => item.Id == DirtId);
+
+        harness.ViewModel.SelectedTerrain = dirt;
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal(DirtId, ((TerrainEditorItemViewModel)list.SelectedItem!).Id);
+
+        Point windowPoint = control.TranslatePoint(new Point(16, 16), harness.Window)!.Value;
+        harness.Window.MouseDown(windowPoint, MouseButton.Left, RawInputModifiers.None);
+        Assert.True(control.IsPainting);
+        harness.Window.MouseUp(windowPoint, MouseButton.Left, RawInputModifiers.None);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Equal(DirtId, harness.Session.CurrentCatalog.Graphics
+            .Single(graphic => graphic.Reference.Graphic == 10).Pattern.Center);
+        var selected = Assert.IsType<TerrainEditorItemViewModel>(list.SelectedItem);
+        Assert.Equal(DirtId, selected.Id);
+        Assert.Contains(selected, harness.ViewModel.Terrains);
+        Assert.Same(harness.ViewModel.SelectedTerrain, selected);
     }
 
     [AvaloniaFact]

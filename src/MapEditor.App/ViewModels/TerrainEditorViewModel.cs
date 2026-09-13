@@ -393,9 +393,14 @@ internal sealed class TerrainEditorViewModel : ViewModelBase, IDisposable
             _terrains.Add(new TerrainEditorItemViewModel(terrain));
         }
 
-        OnPropertyChanged(nameof(Terrains));
         var previous = _selected;
         _selected = selectedId is { } id ? _terrains.FirstOrDefault(item => item.Id == id) : null;
+        if (_selected is null && _terrains.Count > 0)
+        {
+            _selected = _terrains[0];
+        }
+
+        OnPropertyChanged(nameof(Terrains));
         if (!SameItem(previous, _selected))
         {
             OnPropertyChanged(nameof(SelectedTerrain));
