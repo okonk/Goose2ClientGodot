@@ -291,7 +291,7 @@ public class TerrainEditorSessionTests
         session.AddTerrain();
         Assert.True(session.RenameTerrain(GrassId, "Renamed"));
 
-        var prepared = session.PrepareMarkSaved(session.CurrentCatalog);
+        var prepared = session.PrepareMarkSaved(baseline);
         session.ApplyMarkSaved(prepared);
 
         Assert.False(session.IsDirty);
