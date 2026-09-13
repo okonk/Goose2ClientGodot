@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -10,6 +11,8 @@ namespace MapEditor.Rendering;
 public static class TerrainAssetCatalog
 {
     public const string FileName = "terrain-brushes.json";
+
+    private static readonly UTF8Encoding StrictUtf8 = new(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
 
     public static TerrainCatalogValidationResult Validate(TerrainCatalog catalog, SpriteManifest manifest)
     {
@@ -40,7 +43,7 @@ public static class TerrainAssetCatalog
             }
         }
 
-        var issues = core.Issues.Concat(manifestIssues).ToList();
+        var issues = new ReadOnlyCollection<TerrainValidationIssue>(core.Issues.Concat(manifestIssues).ToList());
         var hasErrors = issues.Any(issue => issue.Severity == TerrainValidationSeverity.Error);
         return new TerrainCatalogValidationResult(issues, hasErrors ? null : core.Index);
     }
@@ -97,7 +100,15 @@ public static class TerrainAssetCatalog
         TerrainCatalog catalog;
         try
         {
-            catalog = TerrainCatalogJson.Parse(Encoding.UTF8.GetString(bytes), sourcePath);
+            catalog = TerrainCatalogJson.Parse(StrictUtf8.GetString(bytes), sourcePath);
+        }
+        catch (Exception ex) when (ex is DecoderFallbackException or ArgumentException)
+        {
+            return TerrainCatalogLoadResult.Invalid(
+                sourcePath,
+                revision,
+                Array.Empty<TerrainValidationIssue>(),
+                $"Invalid UTF-8 in terrain file: {sourcePath}: {ex.Message}");
         }
         catch (TerrainCatalogFormatException ex)
         {

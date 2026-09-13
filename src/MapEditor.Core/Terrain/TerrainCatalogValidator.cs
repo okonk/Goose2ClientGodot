@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Linq;
 
 namespace MapEditor.Core;
@@ -346,13 +347,14 @@ public static class TerrainCatalogValidator
         => terrainsById.TryGetValue(id, out var terrain) ? terrain.Name : id.ToString();
 
     private static IReadOnlyList<TerrainValidationIssue> OrderIssues(List<TerrainValidationIssue> issues)
-        => issues
-            .OrderBy(issue => issue.Severity)
-            .ThenBy(issue => issue.Code)
-            .ThenBy(issue => issue.TerrainId, Comparer<Guid?>.Default)
-            .ThenBy(issue => issue.GraphicReference, ReferenceComparer)
-            .ThenBy(issue => issue.Peer, Comparer<TerrainPeer?>.Default)
-            .ToList();
+        => new ReadOnlyCollection<TerrainValidationIssue>(
+            issues
+                .OrderBy(issue => issue.Severity)
+                .ThenBy(issue => issue.Code)
+                .ThenBy(issue => issue.TerrainId, Comparer<Guid?>.Default)
+                .ThenBy(issue => issue.GraphicReference, ReferenceComparer)
+                .ThenBy(issue => issue.Peer, Comparer<TerrainPeer?>.Default)
+                .ToList());
 
     private static TerrainCatalogIndex BuildIndex(TerrainCatalog catalog)
     {

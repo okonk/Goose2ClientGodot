@@ -1,4 +1,5 @@
 using System;
+using System.Collections.ObjectModel;
 using System.Linq;
 using MapEditor.Core;
 
@@ -11,6 +12,6 @@ public sealed class TerrainCatalogValidationException : Exception
     public TerrainCatalogValidationException(IReadOnlyList<TerrainValidationIssue> issues)
         : base($"Terrain catalog validation failed ({issues.Count(issue => issue.Severity == TerrainValidationSeverity.Error)} error(s)).")
     {
-        Issues = issues;
+        Issues = new ReadOnlyCollection<TerrainValidationIssue>(issues.ToList());
     }
 }

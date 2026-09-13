@@ -115,6 +115,23 @@ public class TerrainCatalogIndexTests
     }
 
     [Fact]
+    public void Index_ExposesReadOnlyViews()
+    {
+        var index = TerrainCatalogValidator.Validate(TerrainCatalogFixture.Valid()).Index!;
+        var candidates = index.GetCandidates(TerrainCatalogFixture.Grass);
+        Assert.NotEmpty(candidates);
+        Assert.All(candidates, group =>
+        {
+            Assert.NotEmpty(group.Variants);
+            Assert.Throws<NotSupportedException>(() => ((IList<TerrainGraphicDefinition>)group.Variants).Add(null!));
+        });
+        Assert.Throws<NotSupportedException>(() => ((IList<TerrainPatternCandidateGroup>)candidates).Add(null!));
+        var representatives = index.GetRepresentatives(TerrainCatalogFixture.Grass);
+        Assert.NotEmpty(representatives);
+        Assert.Throws<NotSupportedException>(() => ((IList<TerrainGraphicDefinition>)representatives).Add(null!));
+    }
+
+    [Fact]
     public void Index_GetCandidatesForUnknownCenter_ReturnsEmpty()
     {
         var index = TerrainCatalogValidator.Validate(TerrainCatalogFixture.Valid()).Index!;

@@ -13,6 +13,8 @@ public sealed class TerrainCatalogFileStore
     private const string TempPrefix = ".terrain-";
     private const string TempSuffix = ".tmp";
 
+    private static readonly UTF8Encoding StrictUtf8 = new(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
+
     private readonly ITerrainCatalogFileOperations _operations;
 
     public TerrainCatalogFileStore()
@@ -77,7 +79,15 @@ public sealed class TerrainCatalogFileStore
         TerrainCatalog catalog;
         try
         {
-            catalog = TerrainCatalogJson.Parse(Encoding.UTF8.GetString(bytes), sourcePath);
+            catalog = TerrainCatalogJson.Parse(StrictUtf8.GetString(bytes), sourcePath);
+        }
+        catch (Exception ex) when (ex is DecoderFallbackException or ArgumentException)
+        {
+            return TerrainCatalogLoadResult.Invalid(
+                sourcePath,
+                revision,
+                Array.Empty<TerrainValidationIssue>(),
+                $"Invalid UTF-8 in terrain file: {sourcePath}: {ex.Message}");
         }
         catch (TerrainCatalogFormatException ex)
         {
@@ -145,9 +155,10 @@ public sealed class TerrainCatalogFileStore
 
         try
         {
+            var canonicalBytes = prepared.CanonicalBytes;
             using (var stream = _operations.CreateNew(temp))
             {
-                stream.Write(prepared.CanonicalBytes);
+                stream.Write(canonicalBytes);
                 _operations.FlushToDisk(stream);
             }
 
@@ -167,7 +178,7 @@ public sealed class TerrainCatalogFileStore
                 prepared.OperationId,
                 prepared.Catalog,
                 prepared.Index,
-                TerrainFileRevision.FromBytes(prepared.CanonicalBytes));
+                TerrainFileRevision.FromBytes(canonicalBytes));
         }
         catch
         {

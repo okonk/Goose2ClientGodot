@@ -300,6 +300,40 @@ public class TerrainAssetCatalogTests
     }
 
     [Fact]
+    public void Load_InvalidUtf8_ReturnsInvalidWithRawRevision()
+    {
+        var directory = CreateTempDirectory();
+        try
+        {
+            var catalog = CreateCatalog((GrassId, "Grass", 1, 10));
+            var bytes = Encoding.UTF8.GetBytes(TerrainCatalogJson.Serialize(catalog));
+            var name = Encoding.UTF8.GetBytes("Grass");
+            var index = bytes.AsSpan().IndexOf(name);
+            Assert.True(index >= 0);
+            bytes[index] = 0xFF;
+            var sourcePath = Path.Combine(directory, "terrain-brushes.json");
+            File.WriteAllBytes(sourcePath, bytes);
+
+            var result = TerrainAssetCatalog.Load(directory, CreateManifest("{ \"1\": { \"10\": [0, 0, 32, 32] } }"));
+
+            Assert.False(result.IsValid);
+            Assert.True(result.CanAuthor);
+            Assert.False(result.CanPaint);
+            Assert.Null(result.Catalog);
+            Assert.Null(result.Index);
+            Assert.Empty(result.Issues);
+            Assert.True(result.Revision.Exists);
+            Assert.Equal(Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant(), result.Revision.ContentHash);
+            Assert.NotNull(result.Diagnostic);
+            Assert.Contains(sourcePath, result.Diagnostic);
+        }
+        finally
+        {
+            Directory.Delete(directory, true);
+        }
+    }
+
+    [Fact]
     public void Load_EmptyFile_IsInvalidWithEmptyFileRevision()
     {
         var directory = CreateTempDirectory();

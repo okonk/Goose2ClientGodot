@@ -441,6 +441,28 @@ public class TerrainCatalogJsonTests
     }
 
     [Fact]
+    public void Load_InvalidUtf8_ThrowsTypedFailureWithPath()
+    {
+        var path = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N") + ".json");
+        var bytes = Encoding.UTF8.GetBytes(GoldenDocument + "\n");
+        var name = Encoding.UTF8.GetBytes("Grass");
+        var index = bytes.AsSpan().IndexOf(name);
+        Assert.True(index >= 0);
+        bytes[index] = 0xFF;
+        File.WriteAllBytes(path, bytes);
+        try
+        {
+            var ex = Assert.Throws<TerrainCatalogFormatException>(() => TerrainCatalogJson.Load(path));
+
+            Assert.Contains(path, ex.Message);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
     public void Load_MissingFile_PropagatesFileNotFound()
     {
         var path = Path.Combine(Path.GetTempPath(), "nonexistent-" + Guid.NewGuid().ToString("N") + ".json");

@@ -33,6 +33,18 @@ public class TerrainCatalogValidatorTests
     }
 
     [Fact]
+    public void Validate_Issues_ExposeReadOnlyView()
+    {
+        var result = TerrainCatalogValidator.Validate(TerrainCatalogFixture.Valid());
+
+        Assert.Throws<NotSupportedException>(
+            () => ((IList<TerrainValidationIssue>)result.Issues).Add(new TerrainValidationIssue(
+                TerrainValidationSeverity.Warning,
+                TerrainValidationCode.MissingCoveragePattern,
+                "injected")));
+    }
+
+    [Fact]
     public void Validate_EmptyTerrainId_ReturnsErrorAndNoIndex()
     {
         var catalog = new TerrainCatalog(

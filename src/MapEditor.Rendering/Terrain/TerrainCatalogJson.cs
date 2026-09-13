@@ -15,6 +15,7 @@ public static class TerrainCatalogJson
     private const string DefaultSourcePath = "<memory>";
 
     private static readonly string[] RootProperties = { "version", "terrains", "graphics" };
+    private static readonly UTF8Encoding StrictUtf8 = new(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
     private static readonly string[] TerrainProperties = { "id", "name", "color" };
     private static readonly string[] GraphicProperties =
     {
@@ -78,7 +79,17 @@ public static class TerrainCatalogJson
     public static TerrainCatalog Load(string path)
     {
         var bytes = File.ReadAllBytes(path);
-        return Parse(Encoding.UTF8.GetString(bytes), path);
+        string json;
+        try
+        {
+            json = StrictUtf8.GetString(bytes);
+        }
+        catch (Exception ex) when (ex is DecoderFallbackException or ArgumentException)
+        {
+            throw Fail(path, $"Invalid UTF-8: {ex.Message}");
+        }
+
+        return Parse(json, path);
     }
 
     public static string Serialize(TerrainCatalog catalog)

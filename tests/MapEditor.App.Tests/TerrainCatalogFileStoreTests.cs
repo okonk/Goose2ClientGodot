@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
 using MapEditor.App.Terrain;
@@ -144,6 +145,56 @@ public class TerrainCatalogFileStoreTests
         Assert.Equal(expectedRevision, prepared.ExpectedRevision);
         Assert.False(string.IsNullOrWhiteSpace(prepared.OperationId));
         Assert.Empty(operations.Events);
+    }
+
+    [Fact]
+    public void Save_CallerMutatesPreparedBytes_PersistsOriginalCanonicalBytes()
+    {
+        var catalog = CreateCatalog((GrassId, "Grass", 1, 10));
+        var manifest = CreateManifest("{ \"1\": { \"10\": [0, 0, 32, 32] } }");
+        var operations = new FakeFileOperations();
+        var store = new TerrainCatalogFileStore(operations);
+        var prepared = store.PrepareSave(AssetDirectory, catalog, manifest, TerrainFileRevision.Missing);
+        var original = prepared.CanonicalBytes;
+        Assert.Equal(Encoding.UTF8.GetBytes(TerrainCatalogJson.Serialize(catalog)), original);
+        Assert.NotSame(original, prepared.CanonicalBytes);
+
+        var mutated = prepared.CanonicalBytes;
+        mutated[0] ^= 0xFF;
+        if (MemoryMarshal.TryGetArray<Byte>(prepared.CanonicalBytes, out var segment) && segment.Array is { } array)
+        {
+            array[segment.Offset] ^= 0xFF;
+        }
+
+        var result = store.Save(prepared);
+
+        Assert.Equal(original, operations.ReadFileDirect(SourcePath));
+        Assert.Equal(Hash(original), result.Revision.ContentHash);
+    }
+
+    [Fact]
+    public void Open_InvalidUtf8_ReturnsInvalidWithRawRevision()
+    {
+        var catalog = CreateCatalog((GrassId, "Grass", 1, 10));
+        var bytes = Encoding.UTF8.GetBytes(TerrainCatalogJson.Serialize(catalog));
+        var name = Encoding.UTF8.GetBytes("Grass");
+        var index = bytes.AsSpan().IndexOf(name);
+        Assert.True(index >= 0);
+        bytes[index] = 0xFF;
+        var operations = CreateOpenOperations(bytes);
+
+        var result = new TerrainCatalogFileStore(operations).Open(AssetDirectory, CreateManifest("{ \"1\": { \"10\": [0, 0, 32, 32] } }"));
+
+        Assert.False(result.IsValid);
+        Assert.True(result.CanAuthor);
+        Assert.False(result.CanPaint);
+        Assert.Null(result.Catalog);
+        Assert.Null(result.Index);
+        Assert.Empty(result.Issues);
+        Assert.True(result.Revision.Exists);
+        Assert.Equal(Hash(bytes), result.Revision.ContentHash);
+        Assert.NotNull(result.Diagnostic);
+        Assert.Contains(SourcePath, result.Diagnostic);
     }
 
     [Fact]

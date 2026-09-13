@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Linq;
 
 namespace MapEditor.Core;
@@ -15,8 +16,8 @@ public sealed class TerrainCatalogIndex
 
     private readonly Dictionary<Guid, TerrainDefinition> _terrainsById;
     private readonly Dictionary<TerrainGraphicReference, TerrainGraphicDefinition> _graphicsByReference;
-    private readonly Dictionary<Guid, IReadOnlyList<TerrainPatternCandidateGroup>> _candidatesByCenter;
-    private readonly Dictionary<Guid, IReadOnlyList<TerrainGraphicDefinition>> _representativesByCenter;
+    private readonly Dictionary<Guid, ReadOnlyCollection<TerrainPatternCandidateGroup>> _candidatesByCenter;
+    private readonly Dictionary<Guid, ReadOnlyCollection<TerrainGraphicDefinition>> _representativesByCenter;
     private readonly Dictionary<Guid, TerrainColor> _displayColorsById;
 
     internal TerrainCatalogIndex(
@@ -28,8 +29,17 @@ public sealed class TerrainCatalogIndex
     {
         _terrainsById = terrainsById.ToDictionary(entry => entry.Key, entry => entry.Value);
         _graphicsByReference = graphicsByReference.ToDictionary(entry => entry.Key, entry => entry.Value);
-        _candidatesByCenter = candidatesByCenter.ToDictionary(entry => entry.Key, entry => entry.Value);
-        _representativesByCenter = representativesByCenter.ToDictionary(entry => entry.Key, entry => entry.Value);
+        _candidatesByCenter = candidatesByCenter.ToDictionary(
+            entry => entry.Key,
+            entry => new ReadOnlyCollection<TerrainPatternCandidateGroup>(
+                entry.Value
+                    .Select(group => new TerrainPatternCandidateGroup(
+                        group.Pattern,
+                        new ReadOnlyCollection<TerrainGraphicDefinition>(group.Variants.ToList())))
+                    .ToList()));
+        _representativesByCenter = representativesByCenter.ToDictionary(
+            entry => entry.Key,
+            entry => new ReadOnlyCollection<TerrainGraphicDefinition>(entry.Value.ToList()));
         _displayColorsById = displayColorsById.ToDictionary(entry => entry.Key, entry => entry.Value);
     }
 
