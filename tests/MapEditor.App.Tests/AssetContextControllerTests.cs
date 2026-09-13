@@ -10,6 +10,7 @@ using MapEditor.App.Dialogs;
 using MapEditor.App.Documents;
 using MapEditor.App.Rendering;
 using MapEditor.App.Settings;
+using MapEditor.App.Terrain;
 using MapEditor.App.Tests.Fakes;
 using MapEditor.App.Tests.Fixtures;
 using MapEditor.App.ViewModels;
@@ -522,11 +523,15 @@ public class AssetContextControllerTests : IDisposable
         controller.CurrentChanged += (_, _) => throw new InvalidOperationException("subscriber failure");
         string secondDirectory = WriteAssetDirectory("assets-second", TwoSheetJson);
 
-        Assert.Throws<InvalidOperationException>(() => controller.TryOpen(secondDirectory));
+        bool opened = controller.TryOpen(secondDirectory);
 
+        Assert.True(opened);
         Assert.NotSame(first, controller.Current);
         Assert.True(first.IsDisposed);
         Assert.False(controller.Current.IsDisposed);
+        Assert.NotNull(controller.LastPublicationNotificationErrors);
+        Assert.Equal(1, controller.LastPublicationNotificationErrors.Count);
+        Assert.IsType<InvalidOperationException>(controller.LastPublicationNotificationErrors[0]);
     }
 
     [Fact]
@@ -830,5 +835,619 @@ public class AssetContextControllerTests : IDisposable
         MapDocumentViewModel late = _workspace.ActiveDocument;
         Assert.Empty(late.SheetIds);
         Assert.Equal(0, late.SelectedSheet);
+    }
+}
+
+public class AssetContextControllerTerrainPublicationTests : IDisposable
+{
+    private const string TwoSheetJson = """
+        { "tileSize": 32, "sheets": {
+          "1": { "10": [0, 0, 32, 32], "11": [32, 0, 32, 32] },
+          "2": { "20": [0, 0, 32, 32] }
+        } }
+        """;
+
+    private readonly string _directory = Directory.CreateTempSubdirectory("map-editor-terrain-pub-").FullName;
+    private readonly FakeEditorDialogs _dialogs = new();
+    private readonly WorkspaceViewModel _workspace;
+    private readonly MapDocumentViewModel _viewModel;
+    private readonly string _settingsPath;
+
+    public AssetContextControllerTerrainPublicationTests()
+    {
+        _workspace = new WorkspaceViewModel(_dialogs, new MapFileStore());
+        _viewModel = _workspace.ActiveDocument;
+        _settingsPath = Path.Combine(_directory, "settings.json");
+    }
+
+    public void Dispose()
+        => Directory.Delete(_directory, recursive: true);
+
+    private AssetContextController CreateController()
+        => new(_workspace, new AppSettingsStore(_settingsPath));
+
+    private async Task AddDocumentAsync()
+    {
+        _dialogs.NewMapResult = new NewMapRequest(10, 10);
+        await _workspace.NewAsync();
+    }
+
+    private string WriteAssetDirectory(string name)
+    {
+        string assetDirectory = Path.Combine(_directory, name);
+        Directory.CreateDirectory(Path.Combine(assetDirectory, "sheets"));
+        File.WriteAllText(Path.Combine(assetDirectory, "manifest.json"), TwoSheetJson);
+        return assetDirectory;
+    }
+
+    private static TerrainCatalog ParseCatalog()
+        => TerrainCatalogJson.Parse(AssetFixture.TerrainCatalogJson);
+
+    private static TerrainCatalogPreparedSave PrepareSave(string assetDirectory, AssetContext context, TerrainCatalog catalog, TerrainFileRevision expectedRevision)
+        => new TerrainCatalogFileStore().PrepareSave(assetDirectory, catalog, context.Cache.Manifest!, expectedRevision);
+
+    private static TerrainCatalogSaveResult SaveResult(TerrainCatalogPreparedSave prepared, TerrainFileRevision revision)
+        => new(prepared.OperationId, prepared.Catalog, prepared.Index, revision);
+
+    [Fact]
+    public void PrepareSave_FromOtherThread_Throws()
+    {
+        using AssetContextController controller = CreateController();
+        string assetDirectory = WriteAssetDirectory("assets-thread");
+        AssetFixture.WriteTerrainSidecar(assetDirectory, AssetFixture.TerrainCatalogJson);
+        Assert.True(controller.TryOpen(assetDirectory));
+        TerrainCatalogPreparedSave prepared = PrepareSave(assetDirectory, controller.Current, ParseCatalog(), controller.Current.Terrain.Revision);
+
+        Assert.ThrowsAny<InvalidOperationException>(() => Task.Run(() =>
+        {
+            using TerrainOperationLease operation = controller.Gate.AcquireAsync().GetAwaiter().GetResult();
+            controller.PrepareSave(operation, controller.Current, prepared);
+        }).GetAwaiter().GetResult());
+    }
+
+    [Fact]
+    public void RegisterTerrainGestureCancellation_FromOtherThread_Throws()
+    {
+        using AssetContextController controller = CreateController();
+
+        Assert.ThrowsAny<InvalidOperationException>(() => Task.Run(() => controller.RegisterTerrainGestureCancellation(() => { })).GetAwaiter().GetResult());
+    }
+
+    [Fact]
+    public void TryPrepareOpen_FromOtherThread_Throws()
+    {
+        using AssetContextController controller = CreateController();
+        string assetDirectory = WriteAssetDirectory("assets-thread-root");
+
+        Assert.ThrowsAny<InvalidOperationException>(() => Task.Run(() => controller.TryPrepareOpen(assetDirectory, out _, out _)).GetAwaiter().GetResult());
+    }
+
+    [Fact]
+    public void CommitPreparedOpen_FromOtherThread_Throws()
+    {
+        using AssetContextController controller = CreateController();
+        string assetDirectory = WriteAssetDirectory("assets-thread-commit");
+        Assert.True(controller.TryPrepareOpen(assetDirectory, out PreparedAssetContext? prepared, out _));
+
+        Assert.ThrowsAny<InvalidOperationException>(() => Task.Run(() =>
+        {
+            using TerrainOperationLease operation = controller.Gate.AcquireAsync().GetAwaiter().GetResult();
+            controller.CommitPreparedOpen(operation, prepared!);
+        }).GetAwaiter().GetResult());
+    }
+
+    [Fact]
+    public void PrepareSave_WithStaleExpectedContext_Throws()
+    {
+        using AssetContextController controller = CreateController();
+        string firstDirectory = WriteAssetDirectory("assets-stale-first");
+        AssetFixture.WriteTerrainSidecar(firstDirectory, AssetFixture.TerrainCatalogJson);
+        Assert.True(controller.TryOpen(firstDirectory));
+        AssetContext stale = controller.Current;
+        string secondDirectory = WriteAssetDirectory("assets-stale-second");
+        AssetFixture.WriteTerrainSidecar(secondDirectory, AssetFixture.TerrainCatalogJson);
+        Assert.True(controller.TryOpen(secondDirectory));
+        TerrainCatalogPreparedSave prepared = PrepareSave(secondDirectory, controller.Current, ParseCatalog(), controller.Current.Terrain.Revision);
+        using TerrainOperationLease operation = controller.Gate.AcquireAsync().GetAwaiter().GetResult();
+
+        Assert.Throws<InvalidOperationException>(() => controller.PrepareSave(operation, stale, prepared));
+    }
+
+    [Fact]
+    public void PrepareSave_WithMismatchedGateLease_Throws()
+    {
+        using AssetContextController controller = CreateController();
+        string assetDirectory = WriteAssetDirectory("assets-lease");
+        AssetFixture.WriteTerrainSidecar(assetDirectory, AssetFixture.TerrainCatalogJson);
+        Assert.True(controller.TryOpen(assetDirectory));
+        TerrainCatalogPreparedSave prepared = PrepareSave(assetDirectory, controller.Current, ParseCatalog(), controller.Current.Terrain.Revision);
+        using TerrainOperationGate otherGate = new();
+        using TerrainOperationLease operation = otherGate.AcquireAsync().GetAwaiter().GetResult();
+
+        Assert.Throws<InvalidOperationException>(() => controller.PrepareSave(operation, controller.Current, prepared));
+    }
+
+    [Fact]
+    public void PrepareSave_WithInvalidPreparedCandidate_Throws()
+    {
+        using AssetContextController controller = CreateController();
+        string assetDirectory = WriteAssetDirectory("assets-invalid-prepared");
+        AssetFixture.WriteTerrainSidecar(assetDirectory, AssetFixture.TerrainCatalogJson);
+        Assert.True(controller.TryOpen(assetDirectory));
+        Guid grass = new("11111111-1111-1111-1111-111111111111");
+        var invalidCatalog = new TerrainCatalog(
+            new[] { new TerrainDefinition(grass, "Grass", null) },
+            new[] { new TerrainGraphicDefinition(new TerrainGraphicReference(9, 10), new TerrainPattern(Center: grass)) });
+        var prepared = new TerrainCatalogPreparedSave(
+            "op-invalid",
+            Array.Empty<byte>(),
+            invalidCatalog,
+            null,
+            Path.Combine(assetDirectory, TerrainAssetCatalog.FileName),
+            controller.Current.Terrain.Revision);
+        using TerrainOperationLease operation = controller.Gate.AcquireAsync().GetAwaiter().GetResult();
+
+        Assert.Throws<InvalidOperationException>(() => controller.PrepareSave(operation, controller.Current, prepared));
+    }
+
+    [Fact]
+    public void PrepareSave_WhilePublicationPending_Throws()
+    {
+        using AssetContextController controller = CreateController();
+        string assetDirectory = WriteAssetDirectory("assets-reentrant");
+        AssetFixture.WriteTerrainSidecar(assetDirectory, AssetFixture.TerrainCatalogJson);
+        Assert.True(controller.TryOpen(assetDirectory));
+        AssetContext context = controller.Current;
+        TerrainCatalogPreparedSave prepared = PrepareSave(assetDirectory, context, ParseCatalog(), context.Terrain.Revision);
+        using TerrainOperationLease operation = controller.Gate.AcquireAsync().GetAwaiter().GetResult();
+        ITerrainCatalogSavePublication first = controller.PrepareSave(operation, context, prepared);
+
+        try
+        {
+            Assert.Throws<InvalidOperationException>(() => controller.PrepareSave(operation, context, prepared));
+        }
+        finally
+        {
+            first.Dispose();
+        }
+    }
+
+    [Fact]
+    public void DisposeUncommittedPublication_PublishesNothingAndReleasesReservation()
+    {
+        using AssetContextController controller = CreateController();
+        string assetDirectory = WriteAssetDirectory("assets-uncommitted");
+        AssetFixture.WriteTerrainSidecar(assetDirectory, AssetFixture.TerrainCatalogJson);
+        Assert.True(controller.TryOpen(assetDirectory));
+        AssetContext context = controller.Current;
+        TerrainCatalogLoadResult before = context.Terrain;
+        TerrainCatalogPreparedSave prepared = PrepareSave(assetDirectory, context, ParseCatalog(), before.Revision);
+        using TerrainOperationLease operation = controller.Gate.AcquireAsync().GetAwaiter().GetResult();
+        ITerrainCatalogSavePublication publication = controller.PrepareSave(operation, context, prepared);
+        int events = 0;
+        controller.TerrainCatalogChanged += (_, _) => events++;
+
+        publication.Dispose();
+
+        Assert.Same(before, context.Terrain);
+        Assert.Same(before, _viewModel.Terrain);
+        Assert.Equal(0, events);
+        ITerrainCatalogSavePublication second = controller.PrepareSave(operation, context, prepared);
+        second.Commit(SaveResult(prepared, TerrainFileRevision.FromBytes(prepared.CanonicalBytes)));
+        Assert.NotSame(before, controller.Current.Terrain);
+        Assert.Equal(1, events);
+    }
+
+    [Fact]
+    public void CommitTerrain_PreservesContextCacheRendererAndTint()
+    {
+        using AssetContextController controller = CreateController();
+        string assetDirectory = WriteAssetDirectory("assets-identity");
+        AssetFixture.WriteTerrainSidecar(assetDirectory, AssetFixture.TerrainCatalogJson);
+        Assert.True(controller.TryOpen(assetDirectory));
+        AssetContext context = controller.Current;
+        SpriteAssetCache cache = context.Cache;
+        MapRenderer renderer = context.Renderer;
+        AvaloniaTintedSpriteCache tint = context.TintCache;
+        TerrainCatalogLoadResult before = context.Terrain;
+        TerrainCatalogPreparedSave prepared = PrepareSave(assetDirectory, context, ParseCatalog(), before.Revision);
+        TerrainFileRevision revision = TerrainFileRevision.FromBytes(prepared.CanonicalBytes);
+        using TerrainOperationLease operation = controller.Gate.AcquireAsync().GetAwaiter().GetResult();
+        ITerrainCatalogSavePublication publication = controller.PrepareSave(operation, context, prepared);
+
+        publication.Commit(SaveResult(prepared, revision));
+
+        Assert.Same(context, controller.Current);
+        Assert.Same(cache, context.Cache);
+        Assert.Same(renderer, context.Renderer);
+        Assert.Same(tint, context.TintCache);
+        TerrainCatalogLoadResult after = context.Terrain;
+        Assert.NotSame(before, after);
+        Assert.True(after.IsValid);
+        Assert.Equal(revision, after.Revision);
+        Assert.Same(prepared.Catalog, after.Catalog);
+        Assert.Same(prepared.Index, after.Index);
+        Assert.Same(after, _viewModel.Terrain);
+    }
+
+    [Fact]
+    public async Task CommitTerrain_ObserverSeesEveryDocumentReconciled()
+    {
+        await AddDocumentAsync();
+        MapDocumentViewModel second = _workspace.ActiveDocument;
+        using AssetContextController controller = CreateController();
+        string assetDirectory = WriteAssetDirectory("assets-observers");
+        AssetFixture.WriteTerrainSidecar(assetDirectory, AssetFixture.TerrainCatalogJson);
+        Assert.True(controller.TryOpen(assetDirectory));
+        AssetContext context = controller.Current;
+        TerrainCatalogPreparedSave prepared = PrepareSave(assetDirectory, context, ParseCatalog(), context.Terrain.Revision);
+        using TerrainOperationLease operation = await controller.Gate.AcquireAsync();
+        bool firstDocumentSawAllReconciled = false;
+        bool catalogChangedSawAllReconciled = false;
+        _viewModel.CanvasInvalidated += () =>
+        {
+            firstDocumentSawAllReconciled = _workspace.Documents.All(document => ReferenceEquals(document.Terrain, controller.Current.Terrain));
+        };
+        controller.TerrainCatalogChanged += (_, e) =>
+        {
+            catalogChangedSawAllReconciled =
+                ReferenceEquals(e.Terrain, controller.Current.Terrain) &&
+                _workspace.Documents.All(document => ReferenceEquals(document.Terrain, controller.Current.Terrain));
+        };
+        ITerrainCatalogSavePublication publication = controller.PrepareSave(operation, context, prepared);
+
+        publication.Commit(SaveResult(prepared, TerrainFileRevision.FromBytes(prepared.CanonicalBytes)));
+
+        Assert.True(firstDocumentSawAllReconciled);
+        Assert.True(catalogChangedSawAllReconciled);
+        Assert.Same(controller.Current.Terrain, second.Terrain);
+    }
+
+    [Fact]
+    public async Task CommitTerrain_ThrowingDocumentNotification_RecordsFailureAndNotifiesRemainingDocuments()
+    {
+        await AddDocumentAsync();
+        MapDocumentViewModel second = _workspace.ActiveDocument;
+        using AssetContextController controller = CreateController();
+        string assetDirectory = WriteAssetDirectory("assets-callback-failure");
+        AssetFixture.WriteTerrainSidecar(assetDirectory, AssetFixture.TerrainCatalogJson);
+        Assert.True(controller.TryOpen(assetDirectory));
+        AssetContext context = controller.Current;
+        TerrainCatalogPreparedSave prepared = PrepareSave(assetDirectory, context, ParseCatalog(), context.Terrain.Revision);
+        using TerrainOperationLease operation = await controller.Gate.AcquireAsync();
+        int firstPalette = 0;
+        _viewModel.CanvasInvalidated += () => throw new InvalidOperationException("canvas failure");
+        _viewModel.PaletteInvalidated += () => firstPalette++;
+        int secondCanvas = 0;
+        int secondPalette = 0;
+        second.CanvasInvalidated += () => secondCanvas++;
+        second.PaletteInvalidated += () => secondPalette++;
+        int catalogEvents = 0;
+        controller.TerrainCatalogChanged += (_, _) => catalogEvents++;
+        ITerrainCatalogSavePublication publication = controller.PrepareSave(operation, context, prepared);
+
+        publication.Commit(SaveResult(prepared, TerrainFileRevision.FromBytes(prepared.CanonicalBytes)));
+
+        Assert.Equal(1, firstPalette);
+        Assert.Equal(1, secondCanvas);
+        Assert.Equal(1, secondPalette);
+        Assert.Equal(1, catalogEvents);
+        Assert.NotNull(controller.LastPublicationNotificationErrors);
+        Assert.Equal(1, controller.LastPublicationNotificationErrors.Count);
+        Assert.IsType<InvalidOperationException>(controller.LastPublicationNotificationErrors[0]);
+        Assert.Same(controller.Current.Terrain, _viewModel.Terrain);
+        Assert.Same(controller.Current.Terrain, second.Terrain);
+    }
+
+    [Fact]
+    public void CommitTerrain_ThrowingCatalogChangedSubscriber_DoesNotPreventLaterSubscribers()
+    {
+        using AssetContextController controller = CreateController();
+        string assetDirectory = WriteAssetDirectory("assets-subscriber-failure");
+        AssetFixture.WriteTerrainSidecar(assetDirectory, AssetFixture.TerrainCatalogJson);
+        Assert.True(controller.TryOpen(assetDirectory));
+        AssetContext context = controller.Current;
+        TerrainCatalogPreparedSave prepared = PrepareSave(assetDirectory, context, ParseCatalog(), context.Terrain.Revision);
+        using TerrainOperationLease operation = controller.Gate.AcquireAsync().GetAwaiter().GetResult();
+        int laterSubscribers = 0;
+        controller.TerrainCatalogChanged += (_, _) => throw new InvalidOperationException("first subscriber failure");
+        controller.TerrainCatalogChanged += (_, _) => laterSubscribers++;
+        ITerrainCatalogSavePublication publication = controller.PrepareSave(operation, context, prepared);
+
+        publication.Commit(SaveResult(prepared, TerrainFileRevision.FromBytes(prepared.CanonicalBytes)));
+
+        Assert.Equal(1, laterSubscribers);
+        Assert.NotNull(controller.LastPublicationNotificationErrors);
+        Assert.Equal(1, controller.LastPublicationNotificationErrors.Count);
+        Assert.IsType<InvalidOperationException>(controller.LastPublicationNotificationErrors[0]);
+    }
+
+    [Fact]
+    public void CommitLoaded_ValidReload_PublishesLoadedResult()
+    {
+        using AssetContextController controller = CreateController();
+        string assetDirectory = WriteAssetDirectory("assets-loaded-valid");
+        Assert.True(controller.TryOpen(assetDirectory));
+        AssetContext context = controller.Current;
+        TerrainCatalog catalog = ParseCatalog();
+        var loaded = TerrainCatalogLoadResult.Valid(
+            Path.Combine(assetDirectory, TerrainAssetCatalog.FileName),
+            new TerrainFileRevision(true, "abc123"),
+            catalog,
+            TerrainAssetCatalog.Validate(catalog, context.Cache.Manifest!).Index!,
+            Array.Empty<TerrainValidationIssue>());
+        using TerrainOperationLease operation = controller.Gate.AcquireAsync().GetAwaiter().GetResult();
+        ITerrainCatalogLoadedPublication publication = controller.PrepareLoaded(operation, context, loaded, TerrainLoadedPublicationKind.ValidReload);
+
+        publication.Commit();
+
+        Assert.Same(context, controller.Current);
+        Assert.Same(loaded, context.Terrain);
+        Assert.Same(loaded, _viewModel.Terrain);
+        Assert.NotNull(controller.LastPublicationNotificationErrors);
+        Assert.Equal(0, controller.LastPublicationNotificationErrors.Count);
+    }
+
+    [Fact]
+    public void CommitLoaded_ConfirmedMalformedReload_PublishesInvalidTerrainWithoutAffectingAssets()
+    {
+        using AssetContextController controller = CreateController();
+        string assetDirectory = WriteAssetDirectory("assets-loaded-malformed");
+        File.WriteAllBytes(Path.Combine(assetDirectory, "sheets", "1.png"), AssetFixture.PngSheet.Create(64, 64));
+        AssetFixture.WriteTerrainSidecar(assetDirectory, AssetFixture.TerrainCatalogJson);
+        Assert.True(controller.TryOpen(assetDirectory));
+        AssetContext context = controller.Current;
+        SpriteAssetCache cache = context.Cache;
+        var loaded = TerrainCatalogLoadResult.Invalid(
+            Path.Combine(assetDirectory, TerrainAssetCatalog.FileName),
+            new TerrainFileRevision(true, "deadbeef"),
+            new[] { new TerrainValidationIssue(TerrainValidationSeverity.Error, TerrainValidationCode.MissingSpriteFrame, "boom") },
+            "Terrain validation failed");
+        using TerrainOperationLease operation = controller.Gate.AcquireAsync().GetAwaiter().GetResult();
+        ITerrainCatalogLoadedPublication publication = controller.PrepareLoaded(operation, context, loaded, TerrainLoadedPublicationKind.ConfirmedMalformedReload);
+
+        publication.Commit();
+
+        Assert.Same(loaded, context.Terrain);
+        Assert.False(context.Terrain.IsValid);
+        Assert.False(context.Terrain.CanPaint);
+        Assert.Same(cache, context.Cache);
+        Assert.True(context.IsAvailable);
+        Assert.Same(loaded, _viewModel.Terrain);
+    }
+
+    [Fact]
+    public void PrepareLoaded_WithMismatchedKind_Throws()
+    {
+        using AssetContextController controller = CreateController();
+        string assetDirectory = WriteAssetDirectory("assets-loaded-kind");
+        Assert.True(controller.TryOpen(assetDirectory));
+        AssetContext context = controller.Current;
+        var valid = TerrainCatalogLoadResult.ValidEmpty(Path.Combine(assetDirectory, TerrainAssetCatalog.FileName));
+        var invalidWithoutRevision = TerrainCatalogLoadResult.Invalid(
+            Path.Combine(assetDirectory, TerrainAssetCatalog.FileName),
+            TerrainFileRevision.Missing,
+            Array.Empty<TerrainValidationIssue>(),
+            "bad");
+        using TerrainOperationLease operation = controller.Gate.AcquireAsync().GetAwaiter().GetResult();
+
+        Assert.Throws<InvalidOperationException>(() => controller.PrepareLoaded(operation, context, invalidWithoutRevision, TerrainLoadedPublicationKind.ValidReload));
+        Assert.Throws<InvalidOperationException>(() => controller.PrepareLoaded(operation, context, valid, TerrainLoadedPublicationKind.ConfirmedMalformedReload));
+        Assert.Throws<InvalidOperationException>(() => controller.PrepareLoaded(operation, context, invalidWithoutRevision, TerrainLoadedPublicationKind.ConfirmedMalformedReload));
+    }
+
+    [Fact]
+    public void RegisterTerrainGestureCancellation_InvokesSnapshotAndAllowsSelfUnregistration()
+    {
+        using AssetContextController controller = CreateController();
+        string assetDirectory = WriteAssetDirectory("assets-gesture");
+        AssetFixture.WriteTerrainSidecar(assetDirectory, AssetFixture.TerrainCatalogJson);
+        Assert.True(controller.TryOpen(assetDirectory));
+        AssetContext context = controller.Current;
+        TerrainCatalogPreparedSave prepared = PrepareSave(assetDirectory, context, ParseCatalog(), context.Terrain.Revision);
+        using TerrainOperationLease operation = controller.Gate.AcquireAsync().GetAwaiter().GetResult();
+        int calls = 0;
+        IDisposable? registration = null;
+        registration = controller.RegisterTerrainGestureCancellation(() =>
+        {
+            calls++;
+            registration.Dispose();
+        });
+        ITerrainCatalogSavePublication first = controller.PrepareSave(operation, context, prepared);
+        first.Dispose();
+        ITerrainCatalogSavePublication second = controller.PrepareSave(operation, context, prepared);
+        second.Dispose();
+
+        Assert.Equal(1, calls);
+        registration.Dispose();
+    }
+
+    [Fact]
+    public void RegisterTerrainGestureCancellation_ThrowingCallback_FailsPrepareAndReleasesReservation()
+    {
+        using AssetContextController controller = CreateController();
+        string assetDirectory = WriteAssetDirectory("assets-gesture-throw");
+        AssetFixture.WriteTerrainSidecar(assetDirectory, AssetFixture.TerrainCatalogJson);
+        Assert.True(controller.TryOpen(assetDirectory));
+        AssetContext context = controller.Current;
+        TerrainCatalogLoadResult before = context.Terrain;
+        TerrainCatalogPreparedSave prepared = PrepareSave(assetDirectory, context, ParseCatalog(), before.Revision);
+        using TerrainOperationLease operation = controller.Gate.AcquireAsync().GetAwaiter().GetResult();
+        IDisposable registration = controller.RegisterTerrainGestureCancellation(() => throw new InvalidOperationException("gesture failure"));
+
+        Assert.Throws<InvalidOperationException>(() => controller.PrepareSave(operation, context, prepared));
+
+        Assert.Same(before, context.Terrain);
+        registration.Dispose();
+        ITerrainCatalogSavePublication second = controller.PrepareSave(operation, context, prepared);
+        second.Commit(SaveResult(prepared, TerrainFileRevision.FromBytes(prepared.CanonicalBytes)));
+        Assert.NotSame(before, context.Terrain);
+    }
+
+    [Fact]
+    public void TryPrepareOpen_PreservesCurrentUntilCommit()
+    {
+        using AssetContextController controller = CreateController();
+        string firstDirectory = WriteAssetDirectory("assets-root-first");
+        Assert.True(controller.TryOpen(firstDirectory));
+        AssetContext first = controller.Current;
+        int events = 0;
+        controller.CurrentChanged += (_, _) => events++;
+        string secondDirectory = WriteAssetDirectory("assets-root-second");
+
+        bool preparedOk = controller.TryPrepareOpen(secondDirectory, out PreparedAssetContext? prepared, out Exception? failure);
+
+        Assert.True(preparedOk);
+        Assert.Null(failure);
+        Assert.NotNull(prepared);
+        Assert.Same(first, controller.Current);
+        Assert.Equal(0, events);
+        Assert.False(prepared!.Context.IsDisposed);
+        using TerrainOperationLease operation = controller.Gate.AcquireAsync().GetAwaiter().GetResult();
+        controller.CommitPreparedOpen(operation, prepared);
+        Assert.Same(prepared.Context, controller.Current);
+        Assert.Equal(1, events);
+        Assert.True(first.IsDisposed);
+        prepared.Dispose();
+        Assert.False(prepared.Context.IsDisposed);
+    }
+
+    [Fact]
+    public void TryPrepareOpen_Failure_PreservesCurrentAndReportsFailure()
+    {
+        using AssetContextController controller = CreateController();
+        string firstDirectory = WriteAssetDirectory("assets-root-bad-first");
+        Assert.True(controller.TryOpen(firstDirectory));
+        AssetContext first = controller.Current;
+        string badDirectory = WriteAssetDirectory("assets-root-bad");
+        File.WriteAllText(Path.Combine(badDirectory, "manifest.json"), "this is not json");
+
+        bool preparedOk = controller.TryPrepareOpen(badDirectory, out PreparedAssetContext? prepared, out Exception? failure);
+
+        Assert.False(preparedOk);
+        Assert.Null(prepared);
+        Assert.IsType<SpriteManifestException>(failure);
+        Assert.Same(first, controller.Current);
+        Assert.False(first.IsDisposed);
+    }
+
+    [Fact]
+    public void DiscardPreparedOpen_DisposesCandidateAndPreservesCurrent()
+    {
+        using AssetContextController controller = CreateController();
+        string firstDirectory = WriteAssetDirectory("assets-root-discard-first");
+        Assert.True(controller.TryOpen(firstDirectory));
+        AssetContext first = controller.Current;
+        int events = 0;
+        controller.CurrentChanged += (_, _) => events++;
+        string secondDirectory = WriteAssetDirectory("assets-root-discard");
+        Assert.True(controller.TryPrepareOpen(secondDirectory, out PreparedAssetContext? prepared, out _));
+
+        prepared!.Dispose();
+
+        Assert.True(prepared.Context.IsDisposed);
+        Assert.Same(first, controller.Current);
+        Assert.Equal(0, events);
+        Assert.False(first.IsDisposed);
+    }
+
+    [Fact]
+    public void CommitPreparedOpen_ThrowingGestureCancellation_PreservesCurrentAndSkipsParticipant()
+    {
+        using AssetContextController controller = CreateController();
+        string firstDirectory = WriteAssetDirectory("assets-root-cancel-first");
+        Assert.True(controller.TryOpen(firstDirectory));
+        AssetContext first = controller.Current;
+        string secondDirectory = WriteAssetDirectory("assets-root-cancel");
+        Assert.True(controller.TryPrepareOpen(secondDirectory, out PreparedAssetContext? prepared, out _));
+        using TerrainOperationLease operation = controller.Gate.AcquireAsync().GetAwaiter().GetResult();
+        var participant = new RecordingReconciliation();
+        int events = 0;
+        controller.CurrentChanged += (_, _) => events++;
+        IDisposable registration = controller.RegisterTerrainGestureCancellation(() => throw new InvalidOperationException("gesture failure"));
+
+        Assert.Throws<InvalidOperationException>(() => controller.CommitPreparedOpen(operation, prepared, participant));
+
+        Assert.Same(first, controller.Current);
+        Assert.Equal(0, events);
+        Assert.False(participant.Applied);
+        Assert.False(participant.Notified);
+        Assert.False(prepared!.Context.IsDisposed);
+        registration.Dispose();
+        prepared.Dispose();
+        Assert.True(prepared.Context.IsDisposed);
+    }
+
+    [Fact]
+    public void CommitPreparedOpen_ParticipantAppliesBeforeFirstRootObserver()
+    {
+        using AssetContextController controller = CreateController();
+        string assetDirectory = WriteAssetDirectory("assets-root-participant");
+        Assert.True(controller.TryPrepareOpen(assetDirectory, out PreparedAssetContext? prepared, out _));
+        using TerrainOperationLease operation = controller.Gate.AcquireAsync().GetAwaiter().GetResult();
+        var timeline = new List<string>();
+        var participant = new RecordingReconciliation { Timeline = timeline };
+        _viewModel.CanvasInvalidated += () => timeline.Add("document.canvas");
+        controller.CurrentChanged += (_, _) => timeline.Add("current.changed");
+
+        controller.CommitPreparedOpen(operation, prepared, participant);
+
+        Assert.Equal(new[] { "participant.apply", "document.canvas", "participant.notify", "current.changed" }, timeline);
+    }
+
+    [Fact]
+    public void CommitPreparedOpen_RaisesCurrentChangedOnceAndNoTerrainCatalogChanged()
+    {
+        using AssetContextController controller = CreateController();
+        string assetDirectory = WriteAssetDirectory("assets-root-events");
+        Assert.True(controller.TryPrepareOpen(assetDirectory, out PreparedAssetContext? prepared, out _));
+        using TerrainOperationLease operation = controller.Gate.AcquireAsync().GetAwaiter().GetResult();
+        int currentEvents = 0;
+        int terrainEvents = 0;
+        controller.CurrentChanged += (_, _) => currentEvents++;
+        controller.TerrainCatalogChanged += (_, _) => terrainEvents++;
+
+        controller.CommitPreparedOpen(operation, prepared);
+
+        Assert.Equal(1, currentEvents);
+        Assert.Equal(0, terrainEvents);
+    }
+
+    [Fact]
+    public async Task DocumentAddedAfterTerrainCommit_UsesCurrentTerrain()
+    {
+        using AssetContextController controller = CreateController();
+        string assetDirectory = WriteAssetDirectory("assets-late-terrain");
+        AssetFixture.WriteTerrainSidecar(assetDirectory, AssetFixture.TerrainCatalogJson);
+        Assert.True(controller.TryOpen(assetDirectory));
+        AssetContext context = controller.Current;
+        TerrainCatalogPreparedSave prepared = PrepareSave(assetDirectory, context, ParseCatalog(), context.Terrain.Revision);
+        using TerrainOperationLease operation = await controller.Gate.AcquireAsync();
+        ITerrainCatalogSavePublication publication = controller.PrepareSave(operation, context, prepared);
+        publication.Commit(SaveResult(prepared, TerrainFileRevision.FromBytes(prepared.CanonicalBytes)));
+        TerrainCatalogLoadResult published = controller.Current.Terrain;
+
+        await AddDocumentAsync();
+
+        Assert.Same(published, _workspace.ActiveDocument.Terrain);
+    }
+
+    private sealed class RecordingReconciliation : IPreparedAssetReconciliation
+    {
+        public bool Applied;
+        public bool Notified;
+        public List<string>? Timeline;
+
+        public void Apply()
+        {
+            Applied = true;
+            Timeline?.Add("participant.apply");
+        }
+
+        public void Notify()
+        {
+            Notified = true;
+            Timeline?.Add("participant.notify");
+        }
     }
 }

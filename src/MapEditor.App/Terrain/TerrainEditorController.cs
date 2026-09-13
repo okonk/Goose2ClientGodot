@@ -258,10 +258,20 @@ internal sealed class TerrainEditorController : IDisposable
 
     private void NotifySaved(TerrainEditorPreparedMarkSaved prepared)
     {
+        NotifyGuarded(() => _session.NotifyMarkSaved(prepared));
+        NotifyActionSubscribers(StateChanged);
+    }
+
+    private void NotifyStateChanged()
+    {
+        NotifyActionSubscribers(StateChanged);
+    }
+
+    private void NotifyGuarded(Action stage)
+    {
         try
         {
-            _session.NotifyMarkSaved(prepared);
-            StateChanged?.Invoke();
+            stage();
         }
         catch (Exception ex)
         {
@@ -269,15 +279,16 @@ internal sealed class TerrainEditorController : IDisposable
         }
     }
 
-    private void NotifyStateChanged()
+    private void NotifyActionSubscribers(Action? subscribers)
     {
-        try
+        if (subscribers is null)
         {
-            StateChanged?.Invoke();
+            return;
         }
-        catch (Exception ex)
+
+        foreach (Delegate handler in subscribers.GetInvocationList())
         {
-            _notificationFailures.Add(ex);
+            NotifyGuarded(() => ((Action)handler)());
         }
     }
 }

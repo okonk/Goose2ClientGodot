@@ -1,13 +1,16 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using MapEditor.App.Dialogs;
 using MapEditor.App.Documents;
+using MapEditor.App.Rendering;
 using MapEditor.Core;
 using MapEditor.GameData.Editing;
 using MapEditor.GameData.Rows;
+using MapEditor.Rendering;
 
 namespace MapEditor.App.ViewModels;
 
@@ -21,7 +24,7 @@ internal enum EditorRefresh
     Palette = 1 << 3
 }
 
-internal sealed class MapDocumentViewModel : ViewModelBase, IDisposable
+internal sealed class MapDocumentViewModel : ViewModelBase, ITerrainDocumentReconciler, IDisposable
 {
     private const string UntitledName = "Untitled";
 
@@ -35,6 +38,7 @@ internal sealed class MapDocumentViewModel : ViewModelBase, IDisposable
     private MapEditTool _activeTool = MapEditTool.Pencil;
     private IReadOnlyList<int> _sheetIds = Array.Empty<int>();
     private int _selectedSheet;
+    private TerrainCatalogLoadResult? _terrain;
     private byte _layerVisibility = 0b11111;
     private bool _showGrid = true;
     private bool _showBlocked;
@@ -187,6 +191,48 @@ internal sealed class MapDocumentViewModel : ViewModelBase, IDisposable
     }
 
     public IReadOnlyList<int> SheetIds => _sheetIds;
+
+    internal TerrainCatalogLoadResult? Terrain => _terrain;
+
+    internal void SetTerrain(TerrainCatalogLoadResult? terrain) => _terrain = terrain;
+
+    public TerrainDocumentReconciliation PrepareRootPublication(AssetContext context)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        int selectedSheet = context.SheetIds.Count > 0 ? context.SheetIds[0] : 0;
+        int previousSelectedSheet = _selectedSheet;
+        var sheetArgs = new PropertyChangedEventArgs(nameof(SheetIds));
+        var selectedSheetArgs = new PropertyChangedEventArgs(nameof(SelectedSheet));
+        var terrainArgs = new PropertyChangedEventArgs(nameof(Terrain));
+        return new TerrainDocumentReconciliation(
+            () =>
+            {
+                _sheetIds = context.SheetIds;
+                _selectedSheet = selectedSheet;
+                _terrain = context.Terrain;
+            },
+            () =>
+            {
+                OnPropertyChanged(sheetArgs);
+                if (previousSelectedSheet != selectedSheet)
+                {
+                    OnPropertyChanged(selectedSheetArgs);
+                }
+            },
+            () => CanvasInvalidated?.Invoke(),
+            () => PaletteInvalidated?.Invoke());
+    }
+
+    public TerrainDocumentReconciliation PrepareTerrainPublication(TerrainPublication publication)
+    {
+        ArgumentNullException.ThrowIfNull(publication);
+        var terrainArgs = new PropertyChangedEventArgs(nameof(Terrain));
+        return new TerrainDocumentReconciliation(
+            () => _terrain = publication.Result,
+            () => OnPropertyChanged(terrainArgs),
+            () => CanvasInvalidated?.Invoke(),
+            () => PaletteInvalidated?.Invoke());
+    }
 
     internal void SetSheetIds(IReadOnlyList<int> sheetIds)
     {

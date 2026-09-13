@@ -339,6 +339,40 @@ public class TerrainEditorControllerTests : IDisposable
     }
 
     [AvaloniaFact]
+    public async Task Save_ThrowingSessionNotification_StillRaisesStateChanged()
+    {
+        var bytes = Serialize(CreateCatalog((GrassId, "Grass", 1, 10)));
+        var controller = CreateController(bytes);
+        MakeDirty(controller.Session);
+        controller.Session.Changed += _ => throw new InvalidOperationException("observer down");
+        int stateChanged = 0;
+        controller.StateChanged += () => stateChanged++;
+
+        await controller.SaveAsync();
+
+        Assert.Equal(1, stateChanged);
+        Assert.Single(controller.NotificationFailures);
+        Assert.False(controller.Session.IsDirty);
+    }
+
+    [AvaloniaFact]
+    public async Task Save_ThrowingStateChangedSubscriber_DoesNotPreventLaterSubscribers()
+    {
+        var bytes = Serialize(CreateCatalog((GrassId, "Grass", 1, 10)));
+        var controller = CreateController(bytes);
+        MakeDirty(controller.Session);
+        int laterSubscribers = 0;
+        controller.StateChanged += () => throw new InvalidOperationException("first subscriber down");
+        controller.StateChanged += () => laterSubscribers++;
+
+        await controller.SaveAsync();
+
+        Assert.Equal(1, laterSubscribers);
+        Assert.Single(controller.NotificationFailures);
+        Assert.False(controller.Session.IsDirty);
+    }
+
+    [AvaloniaFact]
     public async Task Overwrite_RereadsRevisionBeforeRetry()
     {
         var firstBytes = Serialize(CreateCatalog((GrassId, "Grass", 1, 10)));

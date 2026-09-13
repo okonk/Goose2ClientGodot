@@ -43,9 +43,12 @@ internal sealed class AssetContext : IDisposable
 
     public GraphicViewerAvailability GraphicViewerAvailability { get; }
 
-    public TerrainCatalogLoadResult Terrain { get; }
+    public TerrainCatalogLoadResult Terrain { get; private set; }
 
     public AvaloniaTintedSpriteCache TintCache { get; }
+
+    internal void ReplaceTerrain(TerrainCatalogLoadResult terrain)
+        => Terrain = terrain ?? throw new ArgumentNullException(nameof(terrain));
 
     public bool IsAvailable => Cache.IsAvailable;
 
