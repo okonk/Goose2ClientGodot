@@ -1,0 +1,91 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="MapEditor.App.TerrainEditorWindow"
+        Title="Terrain Editor"
+        Width="1000"
+        Height="700"
+        FontFamily="Inter, $Default">
+  <DockPanel>
+    <Border x:Name="RecoveryPanel" Classes="chrome" DockPanel.Dock="Top" Padding="10,8" BorderThickness="0,0,0,1" IsVisible="False">
+      <DockPanel>
+        <Button x:Name="ReplaceCatalogButton" DockPanel.Dock="Right" Content="Replace with Empty Catalog" Click="OnReplaceWithEmptyCatalog" />
+        <TextBlock x:Name="RecoveryText" Classes="muted" TextWrapping="Wrap" VerticalAlignment="Center" Margin="0,0,12,0" />
+      </DockPanel>
+    </Border>
+    <Border x:Name="Toolbar" Classes="chrome" DockPanel.Dock="Top" Padding="10,8" BorderThickness="0,0,0,1">
+      <StackPanel Orientation="Horizontal" Spacing="8">
+        <TextBlock Text="Sheet" Classes="muted" VerticalAlignment="Center" />
+        <ComboBox x:Name="SheetCombo" Width="110" />
+        <TextBlock Text="Zoom" Classes="muted" VerticalAlignment="Center" />
+        <ComboBox x:Name="ZoomCombo" Width="80" />
+        <Button x:Name="Percent100Button" Content="100%" Click="OnResetZoom" />
+        <Button x:Name="UndoButton" Content="Undo" Click="OnUndo" />
+        <Button x:Name="RedoButton" Content="Redo" Click="OnRedo" />
+        <Button x:Name="RevertButton" Content="Revert" Click="OnRevert" />
+        <Button x:Name="SaveButton" Content="Save" Classes="accent" Click="OnSave" />
+      </StackPanel>
+    </Border>
+    <Border x:Name="Diagnostics" Classes="chrome" DockPanel.Dock="Bottom" Padding="10,6" BorderThickness="0,1,0,0">
+      <DockPanel>
+        <TextBlock x:Name="SheetDiagnosticText" Classes="mono muted" VerticalAlignment="Center" IsVisible="False" TextTrimming="CharacterEllipsis" />
+        <ItemsControl x:Name="ValidationList" DockPanel.Dock="Right">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate>
+              <StackPanel Orientation="Horizontal" />
+            </ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate>
+              <TextBlock Classes="mono muted" Margin="0,0,18,0" TextTrimming="CharacterEllipsis">
+                <Run Text="{Binding Severity}" /><Run Text=": " /><Run Text="{Binding Message}" />
+              </TextBlock>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </DockPanel>
+    </Border>
+    <Grid>
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="*" />
+        <ColumnDefinition Width="320" />
+      </Grid.ColumnDefinitions>
+      <ScrollViewer x:Name="SheetScroll" Grid.Column="0"
+                    Background="{DynamicResource EditorArtboardBrush}"
+                    HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+        <Border x:Name="SheetHost" Background="{DynamicResource EditorArtboardBrush}" Padding="16"
+                HorizontalAlignment="Left" VerticalAlignment="Top" />
+      </ScrollViewer>
+      <Border Grid.Column="1" Classes="panel" Padding="12">
+        <DockPanel>
+          <StackPanel DockPanel.Dock="Bottom" Spacing="6">
+            <TextBlock Text="NAME" Classes="section" />
+            <TextBox x:Name="NameBox" />
+            <TextBlock x:Name="NameErrorText" Classes="error" IsVisible="False" TextWrapping="Wrap" />
+            <TextBlock Text="COLOR (#RRGGBB)" Classes="section" />
+            <DockPanel>
+              <Button x:Name="ResetColorButton" DockPanel.Dock="Right" Content="Reset" Click="OnResetColor" />
+              <TextBox x:Name="ColorBox" />
+            </DockPanel>
+            <TextBlock x:Name="ColorErrorText" Classes="error" IsVisible="False" TextWrapping="Wrap" />
+          </StackPanel>
+          <StackPanel Spacing="6">
+            <DockPanel>
+              <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="4">
+                <Button x:Name="AddButton" Content="Add" Click="OnAdd" />
+                <Button x:Name="DeleteButton" Content="Delete" Click="OnDelete" />
+              </StackPanel>
+              <TextBlock Text="TERRAIN" Classes="section" />
+            </DockPanel>
+            <ListBox x:Name="TerrainList">
+              <ListBox.ItemTemplate>
+                <DataTemplate>
+                  <TextBlock Text="{Binding Name}" />
+                </DataTemplate>
+              </ListBox.ItemTemplate>
+            </ListBox>
+          </StackPanel>
+        </DockPanel>
+      </Border>
+    </Grid>
+  </DockPanel>
+</Window>

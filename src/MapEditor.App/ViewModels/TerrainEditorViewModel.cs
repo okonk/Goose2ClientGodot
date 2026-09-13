@@ -214,7 +214,7 @@ internal sealed class TerrainEditorViewModel : ViewModelBase, IDisposable
             return;
         }
 
-        SetField(ref _pendingColorText, string.Empty);
+        SetField(ref _pendingColorText, string.Empty, nameof(ColorOverrideText));
         CommitPending();
     }
 
