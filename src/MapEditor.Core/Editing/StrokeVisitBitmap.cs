@@ -1,3 +1,5 @@
+using System;
+
 namespace MapEditor.Core;
 
 internal sealed class StrokeVisitBitmap
@@ -7,6 +9,11 @@ internal sealed class StrokeVisitBitmap
     internal StrokeVisitBitmap(int tileCount)
     {
         _words = new ulong[(tileCount + 63) / 64];
+    }
+
+    internal void Clear()
+    {
+        Array.Clear(_words, 0, _words.Length);
     }
 
     internal int WordCount => _words.Length;
