@@ -355,6 +355,9 @@ internal partial class TerrainEditorWindow : Window
 
     private async Task HandleClosingAsync(WindowClosingEventArgs e)
     {
+        // The dirty prompt awaits a user choice, so OnClosing returns before the task
+        // completes; without this the window closes while the dialog is still open.
+        e.Cancel = true;
         try
         {
             while (true)

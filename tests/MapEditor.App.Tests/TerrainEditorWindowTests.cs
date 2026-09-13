@@ -517,6 +517,89 @@ public class TerrainEditorWindowTests
     }
 
     [AvaloniaFact]
+    public async Task Close_Dirty_KeepsTheWindowOpenWhileTheChoiceIsPending()
+    {
+        using var harness = TerrainEditorWindowHarness.Create(DefaultCatalog());
+        harness.Session.RenameTerrain(GrassId, "Meadow");
+        Dispatcher.UIThread.RunJobs();
+
+        var gate = new TaskCompletionSource<DirtyChoice>(TaskCreationOptions.RunContinuationsAsynchronously);
+        harness.Dialogs.DirtyGate = gate;
+
+        harness.Window.Close();
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Equal(1, harness.Dialogs.DirtyShown);
+        Assert.True(harness.Window.IsVisible);
+        Assert.True(harness.ViewModel.IsDirty);
+
+        gate.SetResult(DirtyChoice.Save);
+        await WaitUntilAsync(() => !harness.Window.IsVisible);
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal(1, harness.Publisher.CommittedSaveCount);
+        Assert.False(harness.ViewModel.IsDirty);
+
+        using var discarded = TerrainEditorWindowHarness.Create(DefaultCatalog());
+        discarded.Session.RenameTerrain(GrassId, "Meadow");
+        Dispatcher.UIThread.RunJobs();
+        var discardGate = new TaskCompletionSource<DirtyChoice>(TaskCreationOptions.RunContinuationsAsynchronously);
+        discarded.Dialogs.DirtyGate = discardGate;
+
+        discarded.Window.Close();
+        Dispatcher.UIThread.RunJobs();
+        Assert.True(discarded.Window.IsVisible);
+
+        discardGate.SetResult(DirtyChoice.Discard);
+        await WaitUntilAsync(() => !discarded.Window.IsVisible);
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal(0, discarded.Publisher.CommittedSaveCount);
+        Assert.False(discarded.ViewModel.IsDirty);
+        Assert.Equal("Grass", ById(discarded.Session, GrassId).Name);
+
+        using var cancelled = TerrainEditorWindowHarness.Create(DefaultCatalog());
+        cancelled.Session.RenameTerrain(GrassId, "Meadow");
+        Dispatcher.UIThread.RunJobs();
+        var cancelGate = new TaskCompletionSource<DirtyChoice>(TaskCreationOptions.RunContinuationsAsynchronously);
+        cancelled.Dialogs.DirtyGate = cancelGate;
+
+        cancelled.Window.Close();
+        Dispatcher.UIThread.RunJobs();
+        Assert.True(cancelled.Window.IsVisible);
+
+        cancelGate.SetResult(DirtyChoice.Cancel);
+        Dispatcher.UIThread.RunJobs();
+        Assert.True(cancelled.Window.IsVisible);
+        Assert.True(cancelled.ViewModel.IsDirty);
+        Assert.Equal("Meadow", ById(cancelled.Session, GrassId).Name);
+    }
+
+    [AvaloniaFact]
+    public void Close_InvalidPendingMetadata_BlocksCloseUntilCorrected()
+    {
+        using var harness = TerrainEditorWindowHarness.Create(DefaultCatalog());
+
+        Find<TextBox>(harness, "ColorBox").Text = "red";
+        Dispatcher.UIThread.RunJobs();
+
+        harness.Window.Close();
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.True(harness.Window.IsVisible);
+        var colorError = Find<TextBlock>(harness, "ColorErrorText");
+        Assert.True(colorError.IsVisible);
+        Assert.Equal("Color must be empty or #RRGGBB.", colorError.Text);
+        Assert.Equal(0, harness.Dialogs.DirtyShown);
+
+        Find<TextBox>(harness, "ColorBox").Text = "";
+        Dispatcher.UIThread.RunJobs();
+
+        harness.Window.Close();
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.False(harness.Window.IsVisible);
+    }
+
+    [AvaloniaFact]
     public void Close_Clean_ClosesWithoutPrompting()
     {
         using var harness = TerrainEditorWindowHarness.Create(DefaultCatalog());
