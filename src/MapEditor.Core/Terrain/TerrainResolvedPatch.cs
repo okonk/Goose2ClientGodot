@@ -10,7 +10,7 @@ public sealed class TerrainResolvedPatch
 
     public int Count => Changes.Count;
 
-    internal TerrainResolvedPatch(int layer, IReadOnlyDictionary<int, MapTileLayer> changes)
+    internal TerrainResolvedPatch(int layer, SortedDictionary<int, MapTileLayer> changes)
     {
         Layer = layer;
         Changes = changes;

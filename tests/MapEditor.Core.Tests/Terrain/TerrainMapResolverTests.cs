@@ -189,8 +189,16 @@ public class TerrainMapResolverTests
 
         var patch = Resolve(resolver, document, 0, (2, 2, Grass));
 
-        Assert.Single(patch.Changes);
+        Assert.Equal(9, patch.Count);
         Assert.Equal(Tile(0, 10), patch.Changes[12]);
+        Assert.Equal(Tile(1, 2), patch.Changes[7]);
+        Assert.Equal(Tile(1, 3), patch.Changes[13]);
+        Assert.Equal(Tile(1, 4), patch.Changes[17]);
+        Assert.Equal(Tile(1, 5), patch.Changes[11]);
+        Assert.Equal(Tile(1, 6), patch.Changes[8]);
+        Assert.Equal(Tile(1, 7), patch.Changes[18]);
+        Assert.Equal(Tile(1, 8), patch.Changes[16]);
+        Assert.Equal(Tile(1, 9), patch.Changes[6]);
         Assert.True(index.TryGetGraphic(new TerrainGraphicReference(0, 10), out var graphic));
         Assert.Equal(Pattern(Grass,
             (TerrainPeer.North, Orientations[0].Id),
@@ -405,7 +413,7 @@ public class TerrainMapResolverTests
         var baseline = Resolve(new TerrainMapResolver(Index(graphics)), document, 0, (2, 2, Grass), (3, 2, Grass), (2, 3, Grass));
         var shuffled = Resolve(new TerrainMapResolver(Index(graphics.Reverse().ToArray())), document, 0, (2, 2, Grass), (3, 2, Grass), (2, 3, Grass));
 
-        Assert.Equal(3, baseline.Count);
+        Assert.Equal(6, baseline.Count);
         Assert.Equal(baseline.Changes, shuffled.Changes);
     }
 
@@ -416,12 +424,14 @@ public class TerrainMapResolverTests
         var water = new TerrainDefinition(Water, "Water", null);
         var correct = new TerrainGraphicDefinition(new TerrainGraphicReference(0, 1), Pattern(Grass, (TerrainPeer.North, Water)));
         var wrong = new TerrainGraphicDefinition(new TerrainGraphicReference(1, 1), Pattern(Water, (TerrainPeer.North, Water)));
+        var waterGraphic = new TerrainGraphicDefinition(new TerrainGraphicReference(2, 1), Pattern(Water));
         var index = new TerrainCatalogIndex(
             new Dictionary<Guid, TerrainDefinition> { [Grass] = grass, [Water] = water },
             new Dictionary<TerrainGraphicReference, TerrainGraphicDefinition>
             {
                 [correct.Reference] = correct,
-                [wrong.Reference] = wrong
+                [wrong.Reference] = wrong,
+                [waterGraphic.Reference] = waterGraphic
             },
             new Dictionary<Guid, IReadOnlyList<TerrainPatternCandidateGroup>>
             {
@@ -429,9 +439,10 @@ public class TerrainMapResolverTests
                 [
                     new(correct.Pattern, new[] { correct }),
                     new(wrong.Pattern, new[] { wrong })
-                ]
+                ],
+                [Water] = [ new(waterGraphic.Pattern, new[] { waterGraphic }) ]
             },
-            new Dictionary<Guid, IReadOnlyList<TerrainGraphicDefinition>> { [Grass] = new[] { correct } },
+            new Dictionary<Guid, IReadOnlyList<TerrainGraphicDefinition>> { [Grass] = new[] { correct }, [Water] = new[] { waterGraphic } },
             new Dictionary<Guid, TerrainColor> { [Grass] = grass.DisplayColor, [Water] = water.DisplayColor });
 
         var resolver = new TerrainMapResolver(index);
