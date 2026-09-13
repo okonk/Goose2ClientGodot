@@ -141,6 +141,55 @@ public class TerrainSheetControlTests
     }
 
     [AvaloniaFact]
+    public void SecondPointer_DoesNotExtendOrCommitStroke()
+    {
+        Harness harness = Create();
+        SelectGrass(harness);
+
+        harness.Window.MouseDown(new Point(16, 4), MouseButton.Left, RawInputModifiers.None);
+        Assert.True(harness.Control.IsPainting);
+        Assert.False(harness.ViewModel.IsDirty);
+        Assert.False(harness.ViewModel.CanUndo);
+
+        IPointer second = new Pointer(2, PointerType.Mouse, false);
+
+        harness.Control.RaiseEvent(new PointerEventArgs(
+            InputElement.PointerMovedEvent,
+            harness.Control,
+            second,
+            harness.Control,
+            new Point(48, 4),
+            0,
+            new PointerPointProperties(RawInputModifiers.None, PointerUpdateKind.Other),
+            KeyModifiers.None));
+        harness.Control.RaiseEvent(new PointerReleasedEventArgs(
+            harness.Control,
+            second,
+            harness.Control,
+            new Point(48, 4),
+            0,
+            new PointerPointProperties(RawInputModifiers.None, PointerUpdateKind.Other),
+            KeyModifiers.None,
+            MouseButton.Left));
+
+        Assert.True(harness.Control.IsPainting);
+        Assert.False(harness.ViewModel.IsDirty);
+        Assert.False(harness.ViewModel.CanUndo);
+
+        harness.Window.MouseUp(new Point(16, 4), MouseButton.Left, RawInputModifiers.None);
+
+        Assert.False(harness.Control.IsPainting);
+        Assert.True(harness.ViewModel.IsDirty);
+        Assert.True(harness.ViewModel.CanUndo);
+        Assert.Equal(GrassId, Graphic(harness, 1, 10).Pattern.North);
+        Assert.Null(Graphic(harness, 1, 11).Pattern.North);
+
+        Assert.True(harness.ViewModel.Undo());
+        Assert.Equal(DirtId, Graphic(harness, 1, 10).Pattern.North);
+        Assert.False(harness.ViewModel.IsDirty);
+    }
+
+    [AvaloniaFact]
     public void Drag_ShiftLeft_ClearsRegionAndCommits()
     {
         Harness harness = Create();

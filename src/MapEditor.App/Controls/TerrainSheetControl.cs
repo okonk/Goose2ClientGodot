@@ -202,7 +202,7 @@ internal sealed class TerrainSheetControl : Control, ICustomHitTest, IDisposable
     protected override void OnPointerMoved(PointerEventArgs e)
     {
         base.OnPointerMoved(e);
-        if (!_painting)
+        if (!_painting || e.Pointer != _paintPointer)
         {
             return;
         }
@@ -233,7 +233,7 @@ internal sealed class TerrainSheetControl : Control, ICustomHitTest, IDisposable
     protected override void OnPointerReleased(PointerReleasedEventArgs e)
     {
         base.OnPointerReleased(e);
-        if (!_painting)
+        if (!_painting || e.Pointer != _paintPointer)
         {
             return;
         }

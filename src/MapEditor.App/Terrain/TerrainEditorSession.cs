@@ -244,15 +244,16 @@ internal sealed class TerrainEditorSession
             throw new InvalidOperationException("No region stroke is active.");
         }
 
+        var before = _strokeBefore!;
         var existed = _graphics.TryGet(key.Graphic, out var pattern);
         if (pattern.Get(key.Peer) == _strokeValue)
         {
             return;
         }
 
-        if (!_strokeBefore.ContainsKey(key.Graphic))
+        if (!before.ContainsKey(key.Graphic))
         {
-            _strokeBefore[key.Graphic] = existed
+            before[key.Graphic] = existed
                 ? (pattern, _graphics.IndexOf(key.Graphic))
                 : (null, -1);
         }
