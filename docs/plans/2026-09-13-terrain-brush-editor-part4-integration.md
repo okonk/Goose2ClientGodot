@@ -47,6 +47,13 @@ Disposing an uncommitted lease releases the reservation and publishes nothing. P
 
 Capture `Environment.CurrentManagedThreadId` in the controller constructor and reject mutating publication/root-commit calls from another thread. This avoids relying on an unverified dispatcher API and pins the existing UI-thread ownership assumption.
 
+## Carried over from the Part 3 review
+
+Two Part 3 review notes that Part 4 work must honor:
+
+- **Gate coordinators await the active lease's release, not `Completion` after dispose** — `TerrainOperationGate.Completion` completes per busy period only when the active lease releases. A root/close coordinator that disposes the gate while a lease is live and then awaits `Completion` can hang. Task 5 Step 6 coordinators (root switch, main close) must wait for the active lease's release and retry, never dispose-then-await.
+- **Isolate notification stages in `TerrainEditorController`'s save tail** — `src/MapEditor.App/Terrain/TerrainEditorController.cs` (`NotifySaved`, ~lines 259-280): a throwing session `NotifyMarkSaved` callback prevents `StateChanged` from running, and a throwing `StateChanged` subscriber prevents later subscribers. Task 1 wires the real observers; invoke each stage and each subscriber individually under exception isolation (matching the locked publication contract's per-subscriber isolation) and record failures in `NotificationFailures`.
+
 ## Task 1: Implement live terrain publication and gesture cancellation
 
 **Files:**
