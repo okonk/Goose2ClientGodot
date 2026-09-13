@@ -21,7 +21,9 @@ public enum TerrainValidationCode
     DuplicateGraphicReference,
     InvalidGraphicNumber,
     InvalidSheetNumber,
-    MissingCoveragePattern
+    MissingCoveragePattern,
+    MissingSpriteFrame,
+    SpriteFrameSizeMismatch
 }
 
 public sealed record TerrainValidationIssue(
