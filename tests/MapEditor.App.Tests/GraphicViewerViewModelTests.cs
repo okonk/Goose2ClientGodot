@@ -36,6 +36,27 @@ public class GraphicViewerViewModelTests
         => (SpriteManifest.Parse(SpriteJson),
             GraphicAssetCatalog.Create(SpriteManifest.Parse(SpriteJson), GraphicAnimationManifest.Parse(AnimationJson)));
 
+    private const string ItemTilesAnimationJson = """
+        { "version": 1,
+          "sheets": {
+            "10": { "categories": [ { "name": "Body", "id": 1 }, { "name": "ItemTiles" } ] },
+            "20": { "categories": [ { "name": "ItemTiles" } ] },
+            "30": { "categories": [ { "name": "Spells" } ] }
+          },
+          "animations": [
+            { "ownerSheet": 10, "id": 1, "fps": 8, "frames": [[10, 1], [10, 2]] },
+            { "ownerSheet": 20, "id": 1, "fps": 8, "frames": [[20, 1], [20, 2]] }
+          ] }
+        """;
+
+    private static GraphicViewerViewModel CreateItemTilesViewer()
+    {
+        (SpriteManifest sprites, GraphicAssetCatalog catalog) =
+            (SpriteManifest.Parse(SpriteJson),
+             GraphicAssetCatalog.Create(SpriteManifest.Parse(SpriteJson), GraphicAnimationManifest.Parse(ItemTilesAnimationJson)));
+        return new GraphicViewerViewModel(sprites, catalog);
+    }
+
     private static GraphicViewerViewModel CreateViewer()
     {
         (SpriteManifest sprites, GraphicAssetCatalog catalog) = CreateAssets();
@@ -73,7 +94,8 @@ public class GraphicViewerViewModelTests
                 GraphicViewerCategoryFilter.Feet,
                 GraphicViewerCategoryFilter.Hand,
                 GraphicViewerCategoryFilter.Tiles,
-                GraphicViewerCategoryFilter.Spells
+                GraphicViewerCategoryFilter.Spells,
+                GraphicViewerCategoryFilter.ItemTiles
             },
             Enum.GetValues<GraphicViewerCategoryFilter>());
     }
@@ -94,6 +116,24 @@ public class GraphicViewerViewModelTests
         viewer.Category = GraphicViewerCategoryFilter.Eyes;
         Assert.Empty(viewer.Sheets);
         Assert.Null(viewer.SelectedSheetId);
+    }
+
+    [Fact]
+    public void CategoryChange_ItemTilesFilterReturnsOnlyItemTilesSheets()
+    {
+        GraphicViewerViewModel viewer = CreateItemTilesViewer();
+
+        viewer.Category = GraphicViewerCategoryFilter.ItemTiles;
+        Assert.Equal(new[] { 10, 20 }, viewer.Sheets);
+
+        viewer.Category = GraphicViewerCategoryFilter.Body;
+        Assert.Equal(new[] { 10 }, viewer.Sheets);
+
+        viewer.Category = GraphicViewerCategoryFilter.Spells;
+        Assert.Equal(new[] { 30 }, viewer.Sheets);
+
+        viewer.Category = GraphicViewerCategoryFilter.Hair;
+        Assert.Empty(viewer.Sheets);
     }
 
     [Fact]

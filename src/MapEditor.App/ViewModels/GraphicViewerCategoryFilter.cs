@@ -12,5 +12,6 @@ internal enum GraphicViewerCategoryFilter
     Feet,
     Hand,
     Tiles,
-    Spells
+    Spells,
+    ItemTiles
 }

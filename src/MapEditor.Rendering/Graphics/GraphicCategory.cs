@@ -11,7 +11,8 @@ public enum GraphicCategory
     Feet,
     Hand,
     Tiles,
-    Spells
+    Spells,
+    ItemTiles
 }
 
 public readonly record struct GraphicCategoryMapping(GraphicCategory Category, int? Id);

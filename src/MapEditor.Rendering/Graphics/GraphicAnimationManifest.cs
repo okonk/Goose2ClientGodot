@@ -325,7 +325,7 @@ public sealed class GraphicAnimationManifest
                 throw Fail(GraphicAnimationManifestError.InvalidCategoryName, sourcePath, $"Unknown category name '{name}' in sheet {sheetId}.");
             }
 
-            bool equipment = category is not (GraphicCategory.Tiles or GraphicCategory.Spells);
+            bool equipment = category is not (GraphicCategory.Tiles or GraphicCategory.Spells or GraphicCategory.ItemTiles);
             if (equipment && id is null)
             {
                 throw Fail(GraphicAnimationManifestError.InvalidCategoryMapping, sourcePath, $"Category '{name}' in sheet {sheetId} requires an integer 'id' property.");
@@ -460,7 +460,8 @@ public sealed class GraphicAnimationManifest
         ["Feet"] = GraphicCategory.Feet,
         ["Hand"] = GraphicCategory.Hand,
         ["Tiles"] = GraphicCategory.Tiles,
-        ["Spells"] = GraphicCategory.Spells
+        ["Spells"] = GraphicCategory.Spells,
+        ["ItemTiles"] = GraphicCategory.ItemTiles
     };
 
     private static bool TryParseCategory(string name, out GraphicCategory category)

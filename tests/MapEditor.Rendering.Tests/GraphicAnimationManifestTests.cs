@@ -55,6 +55,46 @@ public class GraphicAnimationManifestTests
     }
 
     [Fact]
+    public void Parse_ItemTilesCategoryParsesWithoutId()
+    {
+        string json = """
+            { "version": 1,
+              "sheets": { "115": { "categories": [ { "name": "ItemTiles" } ] } },
+              "animations": [] }
+            """;
+
+        GraphicAnimationManifest manifest = GraphicAnimationManifest.Parse(json);
+
+        Assert.Equal(new[] { new GraphicCategoryMapping(GraphicCategory.ItemTiles, null) }, manifest.GetCategories(115));
+    }
+
+    [Fact]
+    public void Parse_BodyAndItemTilesParseBothAndSortBodyFirst()
+    {
+        string bodyFirst = """
+            { "version": 1,
+              "sheets": { "115": { "categories": [ { "name": "Body", "id": 1 }, { "name": "ItemTiles" } ] } },
+              "animations": [] }
+            """;
+        string itemTilesFirst = """
+            { "version": 1,
+              "sheets": { "115": { "categories": [ { "name": "ItemTiles" }, { "name": "Body", "id": 1 } ] } },
+              "animations": [] }
+            """;
+
+        foreach (string json in new[] { bodyFirst, itemTilesFirst })
+        {
+            GraphicAnimationManifest manifest = GraphicAnimationManifest.Parse(json);
+
+            Assert.Equal(new[]
+            {
+                new GraphicCategoryMapping(GraphicCategory.Body, 1),
+                new GraphicCategoryMapping(GraphicCategory.ItemTiles, null)
+            }, manifest.GetCategories(115));
+        }
+    }
+
+    [Fact]
     public void Parse_SameAnimationIdOnDifferentOwnersResolvesCompositeKeys()
     {
         GraphicAnimationManifest manifest = GraphicAnimationManifest.Parse(ValidJson);
@@ -228,6 +268,7 @@ public class GraphicAnimationManifestTests
     [InlineData("""{ "version": 1, "sheets": { "1": { "categories": [ { "name": "Spells", "id": 2 } ] } }, "animations": [] }""")]
     [InlineData("""{ "version": 1, "sheets": { "1": { "categories": [ { "name": "Tiles", "id": null } ] } }, "animations": [] }""")]
     [InlineData("""{ "version": 1, "sheets": { "1": { "categories": [ { "name": "Spells", "id": "x" } ] } }, "animations": [] }""")]
+    [InlineData("""{ "version": 1, "sheets": { "1": { "categories": [ { "name": "ItemTiles", "id": 1 } ] } }, "animations": [] }""")]
     [InlineData("""{ "version": 1, "sheets": { "1": { "categories": [ { "name": "Body", "id": 1, "id": 1 } ] } }, "animations": [] }""")]
     [InlineData("""{ "version": 1, "sheets": { "1": { "categories": [ "Body" ] } }, "animations": [] }""")]
     public void Parse_CategoryIdPresenceRulesAreEnforced(string json)

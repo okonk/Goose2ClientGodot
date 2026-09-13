@@ -288,6 +288,18 @@ public class GraphicViewerWindowTests
     }
 
     [AvaloniaFact]
+    public void CategoryCombo_ExposesAllFiltersIncludingItemTiles()
+    {
+        using var harness = OpenAssetsA();
+
+        ComboBox combo = Find<ComboBox>(harness, "CategoryCombo");
+        var items = ((IEnumerable)combo.ItemsSource!).Cast<GraphicViewerCategoryFilter>().ToArray();
+
+        Assert.Equal(12, items.Length);
+        Assert.Contains(GraphicViewerCategoryFilter.ItemTiles, items);
+    }
+
+    [AvaloniaFact]
     public void Fit_UsesTheRenderedSheetSizeNotTheFrameExtents()
     {
         using var harness = OpenAssetsA(new SpySpriteSheetLoader(96, 48));
