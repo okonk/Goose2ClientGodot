@@ -16,6 +16,9 @@ internal sealed class FakeEditorDialogs : IEditorDialogs
     public DirtyChoice DirtyResult = DirtyChoice.Cancel;
     public ExternalChangeChoice ExternalChangeResult = ExternalChangeChoice.Cancel;
     public Queue<ExternalChangeChoice>? ExternalChangeChoices;
+    public TerrainExternalChangeChoice ReplaceTerrainCatalogResult = TerrainExternalChangeChoice.Cancel;
+    public Queue<TerrainExternalChangeChoice>? ReplaceTerrainCatalogChoices;
+    public bool ConfirmReplaceMalformedResult;
     public string? OpenPickResult;
     public string? SavePickResult;
     public string? AssetDirectoryPickResult { get; set; }
@@ -46,6 +49,8 @@ internal sealed class FakeEditorDialogs : IEditorDialogs
     public Exception? ShowMapConfirmationException;
     public Exception? ShowSheetDirtyException;
     public Exception? ShowPushConflictException;
+    public Exception? ConfirmReplaceTerrainCatalogException;
+    public Exception? ConfirmReplaceMalformedException;
     public Exception? ShowErrorException;
     public Task? ShowErrorGate;
     public TaskCompletionSource<DirtyChoice>? DirtyGate;
@@ -53,11 +58,17 @@ internal sealed class FakeEditorDialogs : IEditorDialogs
     public TaskCompletionSource<SheetDirtyChoice>? SheetDirtyGate;
     public TaskCompletionSource<string?>? AssetDirectoryPickGate;
     public TaskCompletionSource<string?>? SavePickGate;
+    public TaskCompletionSource<TerrainExternalChangeChoice>? ReplaceTerrainCatalogGate;
+    public TaskCompletionSource<bool>? ConfirmReplaceMalformedGate;
 
     public int NewMapShown;
     public int ResizeMapShown;
     public int DirtyShown;
     public int ExternalChangeShown;
+    public int ReplaceTerrainCatalogShown;
+    public string? LastReplaceTerrainCatalogPath;
+    public int ConfirmReplaceMalformedShown;
+    public string? LastConfirmReplaceMalformedPath;
     public int OpenPickShown;
     public int SavePickShown;
     public List<ErrorPresentation> Errors = new();
@@ -109,6 +120,43 @@ internal sealed class FakeEditorDialogs : IEditorDialogs
             ? queue.Dequeue()
             : ExternalChangeResult;
         return Task.FromResult(choice);
+    }
+
+    public Task<TerrainExternalChangeChoice> ConfirmReplaceTerrainCatalogAsync(string path)
+    {
+        ReplaceTerrainCatalogShown++;
+        LastReplaceTerrainCatalogPath = path;
+        if (ConfirmReplaceTerrainCatalogException is { } exception)
+        {
+            return Task.FromException<TerrainExternalChangeChoice>(exception);
+        }
+
+        if (ReplaceTerrainCatalogGate is { } gate)
+        {
+            return gate.Task;
+        }
+
+        TerrainExternalChangeChoice choice = ReplaceTerrainCatalogChoices is { Count: > 0 } queue
+            ? queue.Dequeue()
+            : ReplaceTerrainCatalogResult;
+        return Task.FromResult(choice);
+    }
+
+    public Task<bool> ConfirmReplaceMalformedExternalTerrainAsync(string path)
+    {
+        ConfirmReplaceMalformedShown++;
+        LastConfirmReplaceMalformedPath = path;
+        if (ConfirmReplaceMalformedException is { } exception)
+        {
+            return Task.FromException<bool>(exception);
+        }
+
+        if (ConfirmReplaceMalformedGate is { } gate)
+        {
+            return gate.Task;
+        }
+
+        return Task.FromResult(ConfirmReplaceMalformedResult);
     }
 
     public Task<string?> PickOpenMapAsync()

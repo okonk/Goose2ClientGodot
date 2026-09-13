@@ -52,6 +52,26 @@ internal sealed class AvaloniaEditorDialogs : IEditorDialogs
             ExternalChangeChoice.Cancel)
         .ShowDialog<ExternalChangeChoice>(_owner);
 
+    public Task<TerrainExternalChangeChoice> ConfirmReplaceTerrainCatalogAsync(string path) => new ChoiceDialog(
+            "Terrain changed",
+            $"'{path}' has been modified by another program. Reload the external catalog or overwrite it with your changes?",
+            "Reload",
+            TerrainExternalChangeChoice.Reload,
+            "Overwrite",
+            TerrainExternalChangeChoice.Overwrite,
+            "Cancel",
+            TerrainExternalChangeChoice.Cancel)
+        .ShowDialog<TerrainExternalChangeChoice>(_owner);
+
+    public Task<bool> ConfirmReplaceMalformedExternalTerrainAsync(string path) => new ChoiceDialog(
+            "Terrain invalid",
+            $"'{path}' is invalid and cannot be loaded. Discard the current draft and start from an empty catalog?",
+            "Replace",
+            true,
+            "Cancel",
+            false)
+        .ShowDialog<bool>(_owner);
+
     public async Task<string?> PickOpenMapAsync()
     {
         IReadOnlyList<IStorageItem?>? items = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions

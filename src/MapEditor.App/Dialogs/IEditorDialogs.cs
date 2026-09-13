@@ -21,6 +21,13 @@ internal enum ExternalChangeChoice
     Cancel
 }
 
+internal enum TerrainExternalChangeChoice
+{
+    Reload,
+    Overwrite,
+    Cancel
+}
+
 internal enum SheetDirtyChoice
 {
     Push,
@@ -39,6 +46,10 @@ internal interface IEditorDialogs
     Task<DirtyChoice> ShowDirtyAsync(string displayName);
 
     Task<ExternalChangeChoice> ShowExternalChangeAsync(string path);
+
+    Task<TerrainExternalChangeChoice> ConfirmReplaceTerrainCatalogAsync(string path);
+
+    Task<bool> ConfirmReplaceMalformedExternalTerrainAsync(string path);
 
     Task<string?> PickOpenMapAsync();
 

@@ -14,8 +14,8 @@ public partial class ChoiceDialog : Window
         object? primaryResult,
         string secondaryLabel,
         object? secondaryResult,
-        string tertiaryLabel,
-        object? tertiaryResult)
+        string? tertiaryLabel = null,
+        object? tertiaryResult = null)
     {
         InitializeComponent();
         Title = title;
@@ -23,10 +23,17 @@ public partial class ChoiceDialog : Window
         _tertiaryResult = tertiaryResult;
         PrimaryButton.Content = primaryLabel;
         SecondaryButton.Content = secondaryLabel;
-        TertiaryButton.Content = tertiaryLabel;
         PrimaryButton.Click += (sender, e) => Complete(primaryResult);
         SecondaryButton.Click += (sender, e) => Complete(secondaryResult);
-        TertiaryButton.Click += (sender, e) => Complete(tertiaryResult);
+        if (tertiaryLabel is not null)
+        {
+            TertiaryButton.Content = tertiaryLabel;
+            TertiaryButton.Click += (sender, e) => Complete(tertiaryResult);
+        }
+        else
+        {
+            TertiaryButton.IsVisible = false;
+        }
         // Closing via the window button instead of a choice maps to the tertiary (cancel) result;
         // ShowDialog<T> would otherwise return default(T), which is the primary (save) choice.
         Closing += (sender, e) =>

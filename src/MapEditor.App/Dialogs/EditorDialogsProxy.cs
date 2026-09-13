@@ -27,6 +27,10 @@ internal sealed class EditorDialogsProxy : IEditorDialogs
 
     public Task<ExternalChangeChoice> ShowExternalChangeAsync(string path) => Target.ShowExternalChangeAsync(path);
 
+    public Task<TerrainExternalChangeChoice> ConfirmReplaceTerrainCatalogAsync(string path) => Target.ConfirmReplaceTerrainCatalogAsync(path);
+
+    public Task<bool> ConfirmReplaceMalformedExternalTerrainAsync(string path) => Target.ConfirmReplaceMalformedExternalTerrainAsync(path);
+
     public Task<string?> PickOpenMapAsync() => Target.PickOpenMapAsync();
 
     public Task<string?> PickSaveMapAsync(string suggestedName) => Target.PickSaveMapAsync(suggestedName);
