@@ -384,11 +384,6 @@ internal sealed class TerrainEditorSession
         ArgumentNullException.ThrowIfNull(prepared);
         _pushedStateId = prepared.StateId;
         _baseline = prepared.Baseline;
-        if (!prepared.Baseline.Equals(_currentCatalog))
-        {
-            ResetDraft(prepared.Baseline);
-            Rebuild();
-        }
     }
 
     public void NotifyMarkSaved(TerrainEditorPreparedMarkSaved prepared)

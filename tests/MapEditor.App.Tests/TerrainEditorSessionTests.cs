@@ -254,6 +254,57 @@ public class TerrainEditorSessionTests
     }
 
     [Fact]
+    public void RegionStroke_NewEntry_UndoRedo_RestoresExactBaseline()
+    {
+        var session = CreateSession(out var baseline);
+        var before = Serialize(baseline);
+
+        session.BeginRegionStroke(GrassId);
+        session.VisitRegion(new TerrainRegionKey(PeerGraphic, TerrainPeer.Center));
+        session.VisitRegion(new TerrainRegionKey(PeerGraphic, TerrainPeer.North));
+        Assert.True(session.CompleteRegionStroke());
+
+        var created = session.CurrentCatalog.Graphics.Single(graphic => graphic.Reference == PeerGraphic);
+        Assert.Equal(GrassId, created.Pattern.Center);
+        Assert.Equal(GrassId, created.Pattern.North);
+        Assert.Equal(PeerGraphic, session.CurrentCatalog.Graphics[^1].Reference);
+
+        Assert.True(session.Undo());
+        Assert.Equal(before, Serialize(session.CurrentCatalog));
+        Assert.DoesNotContain(session.CurrentCatalog.Graphics, graphic => graphic.Reference == PeerGraphic);
+
+        Assert.True(session.Redo());
+        Assert.Equal(PeerGraphic, session.CurrentCatalog.Graphics[^1].Reference);
+
+        session.AddTerrain();
+        Assert.False(session.CanRedo);
+        Assert.True(session.Undo());
+        Assert.True(session.Undo());
+        Assert.Equal(before, Serialize(session.CurrentCatalog));
+    }
+
+    [Fact]
+    public void ApplyMarkSaved_DoesNotTouchDraftOrHistory()
+    {
+        var session = CreateSession(out var baseline);
+        var before = Serialize(baseline);
+        session.AddTerrain();
+        Assert.True(session.RenameTerrain(GrassId, "Renamed"));
+
+        var prepared = session.PrepareMarkSaved(session.CurrentCatalog);
+        session.ApplyMarkSaved(prepared);
+
+        Assert.False(session.IsDirty);
+        Assert.True(session.CanUndo);
+        Assert.False(session.CanRedo);
+        Assert.Equal("Renamed", NameOf(session, GrassId));
+
+        Assert.True(session.Undo());
+        Assert.True(session.Undo());
+        Assert.Equal(before, Serialize(session.CurrentCatalog));
+    }
+
+    [Fact]
     public void RegionStroke_ClearingFinalAuthoredRegion_RemovesEntry_AndUndoRestores()
     {
         var session = CreateSession(out var baseline);
