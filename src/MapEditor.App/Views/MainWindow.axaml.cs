@@ -518,6 +518,10 @@ internal partial class MainWindow : Window
                     OnRedo(this, new RoutedEventArgs());
                     e.Handled = true;
                     break;
+                case Key.B when modifiers == PrimaryModifier:
+                    Document.ShowBlocked = !Document.ShowBlocked;
+                    e.Handled = true;
+                    break;
                 case Key.C when modifiers == PrimaryModifier && e.Source is not TextBox:
                     Document.CopySelection();
                     e.Handled = true;
