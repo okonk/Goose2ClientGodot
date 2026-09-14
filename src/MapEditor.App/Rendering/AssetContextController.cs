@@ -287,7 +287,7 @@ internal sealed class AssetContextController : IDisposable, ITerrainCatalogPubli
 
             using (operation)
             {
-                CommitPreparedOpen(operation, prepared!);
+                CommitPreparedOpen(operation!, prepared!);
             }
         }
 
