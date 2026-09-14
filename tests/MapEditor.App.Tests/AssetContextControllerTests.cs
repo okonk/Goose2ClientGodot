@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
+using System.Threading;
 using System.Threading.Tasks;
 using Avalonia.Headless.XUnit;
 using Avalonia.Media.Imaging;
@@ -272,6 +273,42 @@ public class AssetContextControllerTests : IDisposable
         Assert.Equal(new TerrainFileRevision(true, expectedHash), terrain.Revision);
         Assert.Equal(Path.GetFullPath(Path.Combine(assetDirectory, TerrainAssetCatalog.FileName)), terrain.SourcePath);
         Assert.Null(terrain.Diagnostic);
+    }
+
+    [Fact]
+    public void TryOpen_WhileGateBusy_FailsFastInsteadOfDeadlocking()
+    {
+        string assetDirectory = WriteAssetDirectory("assets-busy", TwoSheetJson);
+        File.WriteAllBytes(Path.Combine(assetDirectory, "sheets", "1.png"), AssetFixture.PngSheet.Create(64, 64));
+        AssetFixture.WriteTerrainSidecar(assetDirectory, AssetFixture.TerrainCatalogJson);
+
+        AssetContextController controller = null!;
+        TerrainOperationLease? heldLease = null;
+        bool opened = true;
+        Exception? openFailure = null;
+        Exception? failure = null;
+        var thread = new Thread(() =>
+        {
+            try
+            {
+                controller = CreateController();
+                heldLease = controller.Gate.AcquireAsync().GetAwaiter().GetResult();
+                opened = controller.TryOpen(assetDirectory, out openFailure);
+            }
+            catch (Exception ex)
+            {
+                failure = ex;
+            }
+        }) { IsBackground = true };
+        thread.Start();
+        bool finished = thread.Join(TimeSpan.FromSeconds(10));
+        heldLease?.Dispose();
+        thread.Join();
+        Assert.True(finished);
+        Assert.Null(failure);
+        Assert.False(opened);
+        Assert.IsType<InvalidOperationException>(openFailure);
+        controller.Dispose();
     }
 
     [AvaloniaFact]

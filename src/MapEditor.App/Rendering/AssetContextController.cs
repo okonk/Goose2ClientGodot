@@ -268,7 +268,7 @@ internal sealed class AssetContextController : IDisposable, ITerrainCatalogPubli
         LastPublicationNotificationErrors = errors;
     }
 
-    public bool TryOpen(string path) => TryOpen(path, out _);
+    internal bool TryOpen(string path) => TryOpen(path, out _);
 
     internal bool TryOpen(string path, out Exception? failure)
     {
@@ -279,8 +279,16 @@ internal sealed class AssetContextController : IDisposable, ITerrainCatalogPubli
 
         using (prepared)
         {
-            using TerrainOperationLease operation = _gate.AcquireAsync().GetAwaiter().GetResult();
-            CommitPreparedOpen(operation, prepared!);
+            if (!_gate.TryAcquire(out TerrainOperationLease? operation))
+            {
+                failure = new InvalidOperationException("The terrain operation gate is busy.");
+                return false;
+            }
+
+            using (operation)
+            {
+                CommitPreparedOpen(operation, prepared!);
+            }
         }
 
         return true;

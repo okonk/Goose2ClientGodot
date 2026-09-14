@@ -86,6 +86,34 @@ internal sealed class TerrainOperationGate : IDisposable
         return lease;
     }
 
+    public bool TryAcquire(out TerrainOperationLease? lease)
+    {
+        if (!_semaphore.Wait(0))
+        {
+            lease = null;
+            return false;
+        }
+
+        lock (_sync)
+        {
+            if (_disposed)
+            {
+                _semaphore.Release();
+                lease = null;
+                return false;
+            }
+
+            lease = new TerrainOperationLease(this);
+            _current = lease;
+            if (++_active == 1)
+            {
+                _completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            }
+
+            return true;
+        }
+    }
+
     internal void VerifyCurrent(TerrainOperationLease lease)
     {
         lock (_sync)
