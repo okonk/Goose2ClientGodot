@@ -21,13 +21,14 @@ internal partial class TerrainEditorWindow : Window
 
     private readonly TerrainEditorController _controller;
     private readonly IEditorDialogs _dialogs;
-    private readonly AssetContext _context;
     private readonly ISpriteSheetLoader _loader;
     private TerrainEditorViewModel _viewModel = null!;
     private TerrainSheetControl _sheetControl = null!;
+    private string _sheetDirectory = string.Empty;
     private bool _syncingSelection;
     private bool _closeApproved;
     private bool _closeGuardRunning;
+    private bool _closed;
 
     public TerrainEditorWindow(TerrainEditorController controller, IEditorDialogs dialogs, AssetContext context)
         : this(controller, dialogs, context, new AvaloniaSpriteSheetLoader())
@@ -38,7 +39,7 @@ internal partial class TerrainEditorWindow : Window
     {
         _controller = controller ?? throw new ArgumentNullException(nameof(controller));
         _dialogs = dialogs ?? throw new ArgumentNullException(nameof(dialogs));
-        _context = context ?? throw new ArgumentNullException(nameof(context));
+        ArgumentNullException.ThrowIfNull(context);
         _loader = loader ?? throw new ArgumentNullException(nameof(loader));
         InitializeComponent();
 
@@ -51,6 +52,7 @@ internal partial class TerrainEditorWindow : Window
         _controller.StateChanged += OnControllerStateChanged;
         BindViewModel(_controller.ViewModel);
         SyncRecoveryPanel();
+        Closed += (sender, e) => _closed = true;
     }
 
     internal TerrainEditorViewModel ViewModel => _viewModel;
@@ -149,7 +151,8 @@ internal partial class TerrainEditorWindow : Window
             _sheetControl.Dispose();
         }
 
-        _sheetControl = new TerrainSheetControl(_viewModel, _context.Cache.AssetDirectory, _loader);
+        _sheetDirectory = _controller.Context.Cache.AssetDirectory;
+        _sheetControl = new TerrainSheetControl(_viewModel, _sheetDirectory, _loader);
         SheetHost.Child = _sheetControl;
         _sheetControl.Images.ImageChanged += OnSheetImageChanged;
         SyncSheetDiagnostic();
@@ -242,7 +245,7 @@ internal partial class TerrainEditorWindow : Window
         RecoveryPanel.IsVisible = malformed;
         if (malformed)
         {
-            RecoveryText.Text = _context.Terrain.Diagnostic ?? "The terrain source is invalid.";
+            RecoveryText.Text = _controller.Context.Terrain.Diagnostic ?? "The terrain source is invalid.";
         }
     }
 
@@ -307,6 +310,11 @@ internal partial class TerrainEditorWindow : Window
 
     private void OnControllerStateChanged()
     {
+        if (!string.Equals(_sheetDirectory, _controller.Context.Cache.AssetDirectory, StringComparison.Ordinal))
+        {
+            ReplaceSheetControl();
+        }
+
         BindViewModel(_controller.ViewModel);
         SyncRecoveryPanel();
     }
@@ -362,6 +370,11 @@ internal partial class TerrainEditorWindow : Window
         {
             while (true)
             {
+                if (_closed)
+                {
+                    return;
+                }
+
                 if (_controller.Gate.IsBusy)
                 {
                     e.Cancel = true;
@@ -373,10 +386,20 @@ internal partial class TerrainEditorWindow : Window
                 if (viewModel.IsDirty)
                 {
                     DirtyChoice choice = await _dialogs.ShowDirtyAsync("Terrain");
+                    if (_closed)
+                    {
+                        return;
+                    }
+
                     switch (choice)
                     {
                         case DirtyChoice.Save:
                             await _controller.SaveAsync();
+                            if (_closed)
+                            {
+                                return;
+                            }
+
                             if (_controller.ViewModel.IsDirty)
                             {
                                 e.Cancel = true;
@@ -403,6 +426,11 @@ internal partial class TerrainEditorWindow : Window
                 {
                     break;
                 }
+            }
+
+            if (_closed)
+            {
+                return;
             }
 
             e.Cancel = false;
@@ -434,5 +462,13 @@ internal partial class TerrainEditorWindow : Window
         SheetHost.Child = null;
         _sheetControl.Dispose();
         Close();
+    }
+
+    internal void ForceClose()
+    {
+        if (!_closed)
+        {
+            ApproveClose();
+        }
     }
 }

@@ -64,6 +64,7 @@ internal sealed class FakeEditorDialogs : IEditorDialogs
     public int NewMapShown;
     public int ResizeMapShown;
     public int DirtyShown;
+    public string? LastDirtyDisplayName;
     public int ExternalChangeShown;
     public int ReplaceTerrainCatalogShown;
     public string? LastReplaceTerrainCatalogPath;
@@ -95,6 +96,7 @@ internal sealed class FakeEditorDialogs : IEditorDialogs
     public Task<DirtyChoice> ShowDirtyAsync(string displayName)
     {
         DirtyShown++;
+        LastDirtyDisplayName = displayName;
         if (ShowDirtyException is { } exception)
         {
             return Task.FromException<DirtyChoice>(exception);

@@ -6,13 +6,17 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Headless.XUnit;
+using Avalonia.Interactivity;
 using Avalonia.Threading;
 using MapEditor.App.Connectivity;
 using MapEditor.App.Dialogs;
 using MapEditor.App.Settings;
+using MapEditor.App.Terrain;
 using MapEditor.App.Tests.Fakes;
+using MapEditor.App.Tests.Fixtures;
 using MapEditor.Core;
 using MapEditor.GameData.Google.Auth;
+using MapEditor.Rendering;
 using Xunit;
 
 namespace MapEditor.App.Tests;
@@ -35,6 +39,15 @@ public class AppStartupTests : IDisposable
         string directory = Path.Combine(_directory, "assets");
         Directory.CreateDirectory(Path.Combine(directory, "sheets"));
         File.WriteAllText(Path.Combine(directory, "manifest.json"), TwoSheetJson);
+        return directory;
+    }
+
+    private string WriteTerrainAssetDirectory()
+    {
+        string directory = WriteAssetDirectory();
+        File.WriteAllBytes(Path.Combine(directory, "sheets", "1.png"), AssetFixture.PngSheet.Create(64, 64));
+        File.WriteAllBytes(Path.Combine(directory, "sheets", "2.png"), AssetFixture.PngSheet.Create(64, 64));
+        File.WriteAllText(Path.Combine(directory, TerrainAssetCatalog.FileName), AssetFixture.TerrainCatalogJson);
         return directory;
     }
 
@@ -68,6 +81,37 @@ public class AppStartupTests : IDisposable
         Assert.Same(composed.Assets, composed.Window.Assets);
         Assert.False(composed.Window.Workspace.ActiveDocument.Session.IsDirty);
         Assert.False(composed.Window.Assets.Current.IsAvailable);
+    }
+
+    [AvaloniaFact]
+    public void ComposedGraph_TerrainEditorStartsFromTheDefaultCompositionSharingTheAssetGate()
+    {
+        var dialogs = new FakeEditorDialogs();
+        string assetDirectory = WriteTerrainAssetDirectory();
+        dialogs.AssetDirectoryPickResult = assetDirectory;
+        var composed = App.ComposeMainWindow(dialogs, new AppSettingsStore(Path.Combine(_directory, "settings.json")));
+
+        composed.Window.Show();
+        Dispatcher.UIThread.RunJobs();
+        composed.Window.FindControl<Button>("TerrainAddButton")!.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.True(composed.Assets.Current.IsAvailable);
+        TerrainEditorWindow editor = Assert.IsType<TerrainEditorWindow>(composed.Window.TerrainEditor);
+        Assert.True(editor.IsVisible);
+        TerrainEditorController controller = composed.Window.TerrainEditorController!;
+        Assert.Same(composed.Assets.Gate, controller.Gate);
+        Assert.Equal(2, controller.Session.CurrentCatalog.Terrains.Count);
+        Assert.Equal("Terrain", controller.Session.CurrentCatalog.Terrains.Last().Name);
+        Assert.True(controller.Session.IsDirty);
+        Assert.Empty(dialogs.Errors);
+
+        dialogs.DirtyResult = DirtyChoice.Discard;
+        composed.Window.Close();
+        Dispatcher.UIThread.RunJobs();
+        Assert.False(composed.Window.IsVisible);
+        Assert.False(editor.IsVisible);
+        Assert.True(composed.Assets.Current.IsDisposed);
     }
 
     [AvaloniaFact]

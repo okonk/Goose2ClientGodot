@@ -126,6 +126,17 @@ internal sealed class MapCanvas : Control, ICustomHitTest
         _viewModel.Refresh(EditorRefresh.Canvas | EditorRefresh.Commands | EditorRefresh.Title);
     }
 
+    public void FinishInteractionForRootSwap()
+    {
+        if (_terrainStroke)
+        {
+            CancelTerrainGesture();
+            return;
+        }
+
+        FinishInteraction(commit: true);
+    }
+
     internal void ZoomStep(bool zoomIn)
     {
         MapZoom next = zoomIn ? MapZoomLevels.ZoomIn(_viewport.Zoom) : MapZoomLevels.ZoomOut(_viewport.Zoom);

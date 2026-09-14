@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -54,7 +55,8 @@ internal sealed class MainWindowHarness : IDisposable
         Workspace = new WorkspaceViewModel(Dialogs, new MapFileStore(), connectivity);
         ViewModel = Workspace.ActiveDocument;
         Assets = new AssetContextController(Workspace, Settings);
-        Window = new MainWindow(Dialogs, Settings, Workspace, Assets);
+        var terrainStore = new TerrainCatalogFileStore();
+        Window = new MainWindow(Dialogs, Settings, Workspace, Assets, context => new TerrainEditorController(context, terrainStore, Assets, Dialogs, Assets.Gate));
     }
 
     public static MainWindowHarness Create(IGameDataConnectivity? connectivity = null)
@@ -1226,6 +1228,392 @@ public class MainWindowTests : IDisposable
         document.Session.BeginStroke(MapEditTool.Pencil, 0, 0);
         Assert.True(document.Session.CompleteStroke());
     }
+
+    private string WriteTerrainAssetDirectory(string name, string terrainJson)
+    {
+        string directory = WriteAssetDirectory(name, TwoSheetJson);
+        File.WriteAllBytes(Path.Combine(directory, "sheets", "1.png"), AssetFixture.PngSheet.Create(64, 64));
+        File.WriteAllBytes(Path.Combine(directory, "sheets", "2.png"), AssetFixture.PngSheet.Create(64, 64));
+        File.WriteAllText(Path.Combine(directory, TerrainAssetCatalog.FileName), terrainJson);
+        return directory;
+    }
+
+    private void ClickTerrainAdd()
+    {
+        Find<Button>("TerrainAddButton").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        Dispatcher.UIThread.RunJobs();
+    }
+
+    private void ClickTerrainEdit()
+    {
+        Find<Button>("TerrainEditButton").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        Dispatcher.UIThread.RunJobs();
+    }
+
+    private void ClickLoadAssets(string directory)
+    {
+        _harness.Dialogs.AssetDirectoryPickResult = directory;
+        Find<Button>("LoadAssetsButton").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        Dispatcher.UIThread.RunJobs();
+    }
+
+    private TerrainEditorController OpenEditorWithSelectedTerrain()
+    {
+        Guid terrainId = ViewModel.Terrains.Single().Id;
+        ViewModel.SelectTerrain(terrainId);
+        ClickTerrainEdit();
+        TerrainEditorController controller = Window.TerrainEditorController!;
+        Assert.False(controller.Session.IsDirty);
+        return controller;
+    }
+
+    private static void MakeEditorDraftDirty(TerrainEditorController controller)
+    {
+        controller.ViewModel.Name = "Grass 2";
+        controller.ViewModel.CommitPending();
+        Assert.True(controller.Session.IsDirty);
+    }
+
+    [AvaloniaFact]
+    public void TerrainEditor_Add_CreatesOneModelessEditorWithTheSharedGateAndAddsATerrain()
+    {
+        string directory = WriteTerrainAssetDirectory("assets-terrain", AssetFixture.TerrainCatalogJson);
+        Assert.True(_harness.Assets.TryOpen(directory));
+        Dispatcher.UIThread.RunJobs();
+
+        ClickTerrainAdd();
+
+        TerrainEditorWindow editor = Assert.IsType<TerrainEditorWindow>(Window.TerrainEditor);
+        Assert.True(editor.IsVisible);
+        Assert.Same(Window, editor.Owner);
+        Assert.True(Window.IsVisible);
+        TerrainEditorController controller = Assert.IsType<TerrainEditorController>(Window.TerrainEditorController);
+        Assert.Same(_harness.Assets.Gate, controller.Gate);
+        Assert.Equal(2, controller.Session.CurrentCatalog.Terrains.Count);
+        Assert.True(controller.Session.IsDirty);
+        Assert.Empty(_harness.Dialogs.Errors);
+
+        ClickTerrainAdd();
+        Assert.Same(editor, Window.TerrainEditor);
+        Assert.Same(controller, Window.TerrainEditorController);
+        Assert.Equal(3, controller.Session.CurrentCatalog.Terrains.Count);
+    }
+
+    [AvaloniaFact]
+    public void TerrainEditor_Edit_FocusesTheExistingEditorAndSelectsTheDocumentsTerrain()
+    {
+        string directory = WriteTerrainAssetDirectory("assets-terrain", AssetFixture.TerrainCatalogJson);
+        Assert.True(_harness.Assets.TryOpen(directory));
+        Dispatcher.UIThread.RunJobs();
+
+        Guid terrainId = ViewModel.Terrains.Single().Id;
+        ViewModel.SelectTerrain(terrainId);
+        ClickTerrainEdit();
+
+        TerrainEditorWindow editor = Assert.IsType<TerrainEditorWindow>(Window.TerrainEditor);
+        Assert.True(editor.IsVisible);
+        Assert.Single(editor.ViewModel.Terrains);
+        Assert.Equal(terrainId, editor.ViewModel.SelectedTerrain!.Id);
+        Assert.False(Window.TerrainEditorController!.Session.IsDirty);
+
+        ClickTerrainAdd();
+        Assert.Same(editor, Window.TerrainEditor);
+    }
+
+    [AvaloniaFact]
+    public void TerrainEditor_ClosedByUser_ClearsOwnershipSoTheNextCommandCreatesAFreshInstance()
+    {
+        string directory = WriteTerrainAssetDirectory("assets-terrain", AssetFixture.TerrainCatalogJson);
+        Assert.True(_harness.Assets.TryOpen(directory));
+        Dispatcher.UIThread.RunJobs();
+
+        ClickTerrainAdd();
+        TerrainEditorWindow editor = Assert.IsType<TerrainEditorWindow>(Window.TerrainEditor);
+        TerrainEditorController controller = Window.TerrainEditorController!;
+
+        _harness.Dialogs.DirtyResult = DirtyChoice.Discard;
+        editor.Close();
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.False(editor.IsVisible);
+        Assert.Null(Window.TerrainEditor);
+        Assert.Null(Window.TerrainEditorController);
+        Assert.False(controller.Session.IsDirty);
+
+        ClickTerrainAdd();
+        TerrainEditorWindow second = Assert.IsType<TerrainEditorWindow>(Window.TerrainEditor);
+        Assert.NotSame(editor, second);
+        Assert.NotSame(controller, Window.TerrainEditorController);
+        Assert.True(second.IsVisible);
+    }
+
+    [AvaloniaFact]
+    public void TerrainEditor_Add_WithoutAssets_ShowsErrorAndCreatesNoEditor()
+    {
+        ClickTerrainAdd();
+
+        ErrorPresentation error = Assert.Single(_harness.Dialogs.Errors);
+        Assert.Equal("Terrain editor", error.Title);
+        Assert.Null(Window.TerrainEditor);
+        Assert.Null(Window.TerrainEditorController);
+    }
+
+    [AvaloniaFact]
+    public void LoadAssets_InvalidCandidate_PreservesTerrainDraft()
+    {
+        string first = WriteTerrainAssetDirectory("assets-first", AssetFixture.TerrainCatalogJson);
+        Assert.True(_harness.Assets.TryOpen(first));
+        Dispatcher.UIThread.RunJobs();
+
+        ClickTerrainAdd();
+        TerrainEditorController controller = Window.TerrainEditorController!;
+        Assert.True(controller.Session.IsDirty);
+
+        string invalid = Path.Combine(_harness.TempDirectory, "assets-invalid");
+        Directory.CreateDirectory(invalid);
+        ClickLoadAssets(invalid);
+
+        ErrorPresentation error = Assert.Single(_harness.Dialogs.Errors);
+        Assert.Equal("Load assets", error.Title);
+        Assert.Equal(0, _harness.Dialogs.DirtyShown);
+        Assert.Equal(Path.GetFullPath(first), _harness.Assets.Current.Cache.AssetDirectory);
+        Assert.True(controller.Session.IsDirty);
+        Assert.NotNull(Window.TerrainEditor);
+    }
+
+    [AvaloniaFact]
+    public void LoadAssets_DirtyEditor_Save_SavesThenSwitchesRoot()
+    {
+        string first = WriteTerrainAssetDirectory("assets-first", AssetFixture.TerrainCatalogJson);
+        Assert.True(_harness.Assets.TryOpen(first));
+        Dispatcher.UIThread.RunJobs();
+
+        TerrainEditorController controller = OpenEditorWithSelectedTerrain();
+        MakeEditorDraftDirty(controller);
+        TerrainCatalog saved = controller.Session.CurrentCatalog;
+
+        string second = WriteAssetDirectory("assets-second", TwoSheetJson);
+        _harness.Dialogs.DirtyResult = DirtyChoice.Save;
+        ClickLoadAssets(second);
+
+        Assert.Equal(1, _harness.Dialogs.DirtyShown);
+        Assert.True(_harness.Assets.Current.IsAvailable);
+        Assert.Equal(Path.GetFullPath(second), _harness.Assets.Current.Cache.AssetDirectory);
+        Assert.False(controller.Session.IsDirty);
+        Assert.Same(saved, controller.Session.CurrentCatalog);
+        Assert.NotNull(Window.TerrainEditor);
+        Assert.Same(controller, Window.TerrainEditorController);
+        Assert.Contains("Grass 2", File.ReadAllText(Path.Combine(first, TerrainAssetCatalog.FileName)));
+        Assert.Empty(_harness.Dialogs.Errors);
+    }
+
+    [AvaloniaFact]
+    public void LoadAssets_DirtyEditor_Discard_SwitchesRootAndDiscardsTheDraft()
+    {
+        string first = WriteTerrainAssetDirectory("assets-first", AssetFixture.TerrainCatalogJson);
+        Assert.True(_harness.Assets.TryOpen(first));
+        Dispatcher.UIThread.RunJobs();
+
+        TerrainEditorController controller = OpenEditorWithSelectedTerrain();
+        TerrainCatalog loaded = controller.Session.CurrentCatalog;
+        MakeEditorDraftDirty(controller);
+
+        string second = WriteAssetDirectory("assets-second", TwoSheetJson);
+        _harness.Dialogs.DirtyResult = DirtyChoice.Discard;
+        ClickLoadAssets(second);
+
+        Assert.Equal(1, _harness.Dialogs.DirtyShown);
+        Assert.Equal(Path.GetFullPath(second), _harness.Assets.Current.Cache.AssetDirectory);
+        Assert.False(controller.Session.IsDirty);
+        Assert.Equal(loaded, controller.Session.CurrentCatalog);
+        Assert.NotNull(Window.TerrainEditor);
+        Assert.Empty(_harness.Dialogs.Errors);
+    }
+
+    [AvaloniaFact]
+    public void LoadAssets_DirtyEditor_Cancel_PreservesRootAndDraft()
+    {
+        string first = WriteTerrainAssetDirectory("assets-first", AssetFixture.TerrainCatalogJson);
+        Assert.True(_harness.Assets.TryOpen(first));
+        Dispatcher.UIThread.RunJobs();
+
+        TerrainEditorController controller = OpenEditorWithSelectedTerrain();
+        MakeEditorDraftDirty(controller);
+        TerrainCatalog draft = controller.Session.CurrentCatalog;
+
+        string second = WriteAssetDirectory("assets-second", TwoSheetJson);
+        _harness.Dialogs.DirtyResult = DirtyChoice.Cancel;
+        ClickLoadAssets(second);
+
+        Assert.Equal(1, _harness.Dialogs.DirtyShown);
+        Assert.Equal(Path.GetFullPath(first), _harness.Assets.Current.Cache.AssetDirectory);
+        Assert.True(controller.Session.IsDirty);
+        Assert.Same(draft, controller.Session.CurrentCatalog);
+        Assert.NotNull(Window.TerrainEditor);
+        Assert.Empty(_harness.Dialogs.Errors);
+    }
+
+    [AvaloniaFact]
+    public void LoadAssets_DirtyEditor_SaveFails_PreservesRootAndDraft()
+    {
+        string first = WriteTerrainAssetDirectory("assets-first", AssetFixture.TerrainCatalogJson);
+        Assert.True(_harness.Assets.TryOpen(first));
+        Dispatcher.UIThread.RunJobs();
+
+        TerrainEditorController controller = OpenEditorWithSelectedTerrain();
+        MakeEditorDraftDirty(controller);
+        TerrainCatalog draft = controller.Session.CurrentCatalog;
+
+        string second = WriteAssetDirectory("assets-second", TwoSheetJson);
+        _harness.Dialogs.DirtyResult = DirtyChoice.Save;
+        _harness.Dialogs.ReplaceTerrainCatalogResult = TerrainExternalChangeChoice.Cancel;
+        File.WriteAllText(Path.Combine(first, TerrainAssetCatalog.FileName), "{ externally changed }");
+        ClickLoadAssets(second);
+
+        Assert.Equal(1, _harness.Dialogs.DirtyShown);
+        Assert.Equal(1, _harness.Dialogs.ReplaceTerrainCatalogShown);
+        Assert.Equal(Path.GetFullPath(first), _harness.Assets.Current.Cache.AssetDirectory);
+        Assert.True(controller.Session.IsDirty);
+        Assert.Same(draft, controller.Session.CurrentCatalog);
+        Assert.NotNull(Window.TerrainEditor);
+        Assert.Empty(_harness.Dialogs.Errors);
+    }
+
+    [AvaloniaFact]
+    public void LoadAssets_RefreshedCandidateFails_PreservesRootAndDeferredDiscard()
+    {
+        string first = WriteTerrainAssetDirectory("assets-first", AssetFixture.TerrainCatalogJson);
+        Assert.True(_harness.Assets.TryOpen(first));
+        Dispatcher.UIThread.RunJobs();
+
+        TerrainEditorController controller = OpenEditorWithSelectedTerrain();
+        MakeEditorDraftDirty(controller);
+
+        string second = WriteAssetDirectory("assets-second", TwoSheetJson);
+        var gate = new TaskCompletionSource<DirtyChoice>(TaskCreationOptions.RunContinuationsAsynchronously);
+        _harness.Dialogs.DirtyGate = gate;
+        _harness.Dialogs.AssetDirectoryPickResult = second;
+        Find<Button>("LoadAssetsButton").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Equal(1, _harness.Dialogs.DirtyShown);
+        Directory.Delete(second, recursive: true);
+        gate.SetResult(DirtyChoice.Discard);
+        Dispatcher.UIThread.RunJobs();
+
+        ErrorPresentation error = Assert.Single(_harness.Dialogs.Errors);
+        Assert.Equal("Load assets", error.Title);
+        Assert.Equal(Path.GetFullPath(first), _harness.Assets.Current.Cache.AssetDirectory);
+        Assert.True(controller.Session.IsDirty);
+        Assert.Equal("Grass 2", controller.Session.CurrentCatalog.Terrains.Single().Name);
+        Assert.NotNull(Window.TerrainEditor);
+    }
+
+    [AvaloniaFact]
+    public void LoadAssets_SameRootAfterSave_LoadsTheSavedRevision()
+    {
+        string directory = WriteTerrainAssetDirectory("assets-same", AssetFixture.TerrainCatalogJson);
+        Assert.True(_harness.Assets.TryOpen(directory));
+        Dispatcher.UIThread.RunJobs();
+
+        TerrainEditorController controller = OpenEditorWithSelectedTerrain();
+        TerrainFileRevision original = controller.Revision;
+        MakeEditorDraftDirty(controller);
+        TerrainCatalog saved = controller.Session.CurrentCatalog;
+
+        _harness.Dialogs.DirtyResult = DirtyChoice.Save;
+        ClickLoadAssets(directory);
+
+        Assert.Equal(1, _harness.Dialogs.DirtyShown);
+        Assert.True(_harness.Assets.Current.IsAvailable);
+        Assert.NotEqual(original, controller.Revision);
+        Assert.Equal(saved, _harness.Assets.Current.Terrain.Catalog);
+        Assert.False(controller.Session.IsDirty);
+        Assert.NotNull(Window.TerrainEditor);
+        Assert.Empty(_harness.Dialogs.Errors);
+    }
+
+    [AvaloniaFact]
+    public async Task LoadAssets_WhileTerrainSaveInFlight_WaitsForTheSaveThenSwitches()
+    {
+        string first = WriteTerrainAssetDirectory("assets-first", AssetFixture.TerrainCatalogJson);
+        Assert.True(_harness.Assets.TryOpen(first));
+        Dispatcher.UIThread.RunJobs();
+
+        TerrainEditorController controller = OpenEditorWithSelectedTerrain();
+        MakeEditorDraftDirty(controller);
+
+        File.WriteAllText(Path.Combine(first, TerrainAssetCatalog.FileName), "{ externally changed }");
+        var conflictGate = new TaskCompletionSource<TerrainExternalChangeChoice>(TaskCreationOptions.RunContinuationsAsynchronously);
+        _harness.Dialogs.ReplaceTerrainCatalogGate = conflictGate;
+        Task saveTask = controller.SaveAsync();
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal(1, _harness.Dialogs.ReplaceTerrainCatalogShown);
+        Assert.True(controller.Gate.IsBusy);
+
+        string second = WriteAssetDirectory("assets-second", TwoSheetJson);
+        _harness.Dialogs.AssetDirectoryPickResult = second;
+        Find<Button>("LoadAssetsButton").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Equal(Path.GetFullPath(first), _harness.Assets.Current.Cache.AssetDirectory);
+        Assert.Equal(0, _harness.Dialogs.DirtyShown);
+
+        conflictGate.SetResult(TerrainExternalChangeChoice.Overwrite);
+        Dispatcher.UIThread.RunJobs();
+        await saveTask;
+
+        Assert.Equal(Path.GetFullPath(second), _harness.Assets.Current.Cache.AssetDirectory);
+        Assert.Equal(0, _harness.Dialogs.DirtyShown);
+        Assert.False(controller.Session.IsDirty);
+        Assert.NotNull(Window.TerrainEditor);
+        Assert.Empty(_harness.Dialogs.Errors);
+    }
+
+    [AvaloniaFact]
+    public void LoadAssets_MidTerrainStroke_CancelsTheTerrainStroke()
+    {
+        string first = WriteTerrainAssetDirectory("assets-first", AssetFixture.TerrainCatalogJson);
+        Assert.True(_harness.Assets.TryOpen(first));
+        Dispatcher.UIThread.RunJobs();
+
+        Guid terrainId = ViewModel.Terrains.Single().Id;
+        ViewModel.SelectTerrain(terrainId);
+        Point tileCenter = Window.Canvas.TranslatePoint(new Point(16, 16), Window).Value;
+        Window.MouseDown(tileCenter, MouseButton.Left, RawInputModifiers.None);
+        Assert.True(ViewModel.Session.HasActiveStroke);
+        Assert.Equal(new MapTileLayer(1, 10), ViewModel.Session.Document[0, 0].GetLayer(0));
+
+        string second = WriteAssetDirectory("assets-second", TwoSheetJson);
+        ClickLoadAssets(second);
+
+        Assert.Equal(Path.GetFullPath(second), _harness.Assets.Current.Cache.AssetDirectory);
+        Assert.False(ViewModel.Session.HasActiveStroke);
+        Assert.Equal(new MapTileLayer(0, 0), ViewModel.Session.Document[0, 0].GetLayer(0));
+    }
+
+    [AvaloniaFact]
+    public void LoadAssets_MidManualStroke_CommitsTheStrokeBeforeTheSwap()
+    {
+        string first = WriteTerrainAssetDirectory("assets-first", AssetFixture.TerrainCatalogJson);
+        Assert.True(_harness.Assets.TryOpen(first));
+        Dispatcher.UIThread.RunJobs();
+
+        ViewModel.ActiveTool = MapEditTool.Pencil;
+        ViewModel.Brush = new MapTileLayer(2, 20);
+        Point tileCenter = Window.Canvas.TranslatePoint(new Point(16, 16), Window).Value;
+        Window.MouseDown(tileCenter, MouseButton.Left, RawInputModifiers.None);
+        Assert.True(ViewModel.Session.HasActiveStroke);
+
+        string second = WriteAssetDirectory("assets-second", TwoSheetJson);
+        ClickLoadAssets(second);
+
+        Assert.Equal(Path.GetFullPath(second), _harness.Assets.Current.Cache.AssetDirectory);
+        Assert.False(ViewModel.Session.HasActiveStroke);
+        Assert.True(ViewModel.Session.CanUndo);
+        Assert.Equal(new MapTileLayer(2, 20), ViewModel.Session.Document[0, 0].GetLayer(0));
+    }
+
 }
 
 public class MainWindowGraphicViewerTests : IDisposable

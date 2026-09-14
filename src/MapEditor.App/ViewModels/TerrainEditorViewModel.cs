@@ -385,21 +385,22 @@ internal sealed class TerrainEditorViewModel : ViewModelBase, IDisposable
     private void RebuildItems()
     {
         var selectedId = _selected?.Id;
-        _terrains.Clear();
+        var items = new List<TerrainEditorItemViewModel>(_session.CurrentCatalog.Terrains.Count);
         foreach (var terrain in _session.CurrentCatalog.Terrains
             .OrderBy(terrain => terrain.Name, StringComparer.OrdinalIgnoreCase)
             .ThenBy(terrain => terrain.Id))
         {
-            _terrains.Add(new TerrainEditorItemViewModel(terrain));
+            items.Add(new TerrainEditorItemViewModel(terrain));
         }
 
         var previous = _selected;
-        _selected = selectedId is { } id ? _terrains.FirstOrDefault(item => item.Id == id) : null;
-        if (_selected is null && _terrains.Count > 0)
+        _selected = selectedId is { } id ? items.FirstOrDefault(item => item.Id == id) : null;
+        if (_selected is null && items.Count > 0)
         {
-            _selected = _terrains[0];
+            _selected = items[0];
         }
 
+        _terrains = items;
         OnPropertyChanged(nameof(Terrains));
         if (!SameItem(previous, _selected))
         {

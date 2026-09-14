@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.ComponentModel;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Avalonia;
@@ -17,6 +18,7 @@ using MapEditor.App.Controls;
 using MapEditor.App.Dialogs;
 using MapEditor.App.Rendering;
 using MapEditor.App.Settings;
+using MapEditor.App.Terrain;
 using MapEditor.App.ViewModels;
 using MapEditor.Core;
 using MapEditor.GameData.Rows;
@@ -39,7 +41,11 @@ internal partial class MainWindow : Window
     private readonly AppSettingsStore _settings;
     private readonly WorkspaceViewModel _workspace;
     private readonly AssetContextController _assets;
+    private readonly Func<AssetContext, TerrainEditorController> _terrainEditorFactory;
     private GraphicViewerWindow? _graphicViewer;
+    private TerrainEditorWindow? _terrainEditor;
+    private TerrainEditorController? _terrainEditorController;
+    private bool _terrainDiscardDeferred;
     private readonly INotifyCollectionChanged _documents;
     // The workspace owns the view models' lifetime; the window must never dispose them.
     private readonly Dictionary<MapDocumentViewModel, DocumentView> _views = new();
@@ -64,12 +70,18 @@ internal partial class MainWindow : Window
 
     private sealed record DocumentView(MapCanvas Canvas, SpritePaletteControl Palette);
 
-    public MainWindow(IEditorDialogs dialogs, AppSettingsStore settings, WorkspaceViewModel workspace, AssetContextController assets)
+    public MainWindow(
+        IEditorDialogs dialogs,
+        AppSettingsStore settings,
+        WorkspaceViewModel workspace,
+        AssetContextController assets,
+        Func<AssetContext, TerrainEditorController> terrainEditorFactory)
     {
         _dialogs = dialogs ?? throw new ArgumentNullException(nameof(dialogs));
         _settings = settings ?? throw new ArgumentNullException(nameof(settings));
         _workspace = workspace ?? throw new ArgumentNullException(nameof(workspace));
         _assets = assets ?? throw new ArgumentNullException(nameof(assets));
+        _terrainEditorFactory = terrainEditorFactory ?? throw new ArgumentNullException(nameof(terrainEditorFactory));
         InitializeComponent();
         Body.ColumnDefinitions[0].Width = new GridLength(
             DefaultPaletteColumns * SpritePaletteControl.CellSize + PaletteChromeWidth, GridUnitType.Pixel);
@@ -114,10 +126,22 @@ internal partial class MainWindow : Window
         }
 
         ActivateDocument(_workspace.ActiveDocument);
+        // The default behavior closes owned windows first, letting the terrain editor's own close
+        // guard prompt before this window's close flow; the Closed handler closes both windows.
+        ClosingBehavior = WindowClosingBehavior.OwnerWindowOnly;
         Closing += OnClosing;
         Closed += (sender, e) =>
         {
             _closed = true;
+            if (_terrainEditor is { } terrainEditor)
+            {
+                _terrainEditor = null;
+                terrainEditor.Closed -= OnTerrainEditorClosed;
+                terrainEditor.ForceClose();
+                _terrainEditorController?.Dispose();
+                _terrainEditorController = null;
+            }
+
             if (_graphicViewer is { } viewer)
             {
                 _graphicViewer = null;
@@ -151,6 +175,10 @@ internal partial class MainWindow : Window
     internal AssetContextController Assets => _assets;
 
     internal GraphicViewerWindow? GraphicViewer => _graphicViewer;
+
+    internal TerrainEditorWindow? TerrainEditor => _terrainEditor;
+
+    internal TerrainEditorController? TerrainEditorController => _terrainEditorController;
 
     internal bool HasViewFor(MapDocumentViewModel document) => _views.ContainsKey(document);
 
@@ -741,13 +769,63 @@ internal partial class MainWindow : Window
     }
 
     private void OnTerrainAdd(object? sender, RoutedEventArgs e)
-    {
-        // Placeholder entry point; the terrain editor wiring lands later.
-    }
+        => _ = RunCommandAsync(async () =>
+        {
+            if (await EnsureTerrainEditorAsync() is { } editor)
+            {
+                editor.ViewModel.AddTerrain();
+            }
+        });
 
     private void OnTerrainEdit(object? sender, RoutedEventArgs e)
+        => _ = RunCommandAsync(async () =>
+        {
+            if (Document.SelectedTerrainId is not { } terrainId || await EnsureTerrainEditorAsync() is not { } editor)
+            {
+                return;
+            }
+
+            editor.ViewModel.SelectedTerrain = editor.ViewModel.Terrains.FirstOrDefault(item => item.Id == terrainId);
+        });
+
+    private async Task<TerrainEditorWindow?> EnsureTerrainEditorAsync()
     {
-        // Placeholder entry point; the terrain editor wiring lands later.
+        if (_terrainEditor is { } editor)
+        {
+            editor.Activate();
+            return editor;
+        }
+
+        if (!_assets.Current.IsAvailable)
+        {
+            await _dialogs.ShowErrorAsync(new ErrorPresentation("Terrain editor", "Load an asset directory before editing terrains."));
+            return null;
+        }
+
+        AssetContext context = _assets.Current;
+        var controller = _terrainEditorFactory(context);
+        var window = new TerrainEditorWindow(controller, _dialogs, context);
+        window.Closed += OnTerrainEditorClosed;
+        _terrainEditorController = controller;
+        _terrainEditor = window;
+        window.Show(this);
+        return window;
+    }
+
+    private void OnTerrainEditorClosed(object? sender, EventArgs e)
+    {
+        if (sender is TerrainEditorWindow editor)
+        {
+            editor.Closed -= OnTerrainEditorClosed;
+        }
+
+        if (ReferenceEquals(_terrainEditor, sender))
+        {
+            _terrainEditor = null;
+            _terrainEditorController?.Dispose();
+            _terrainEditorController = null;
+            _terrainDiscardDeferred = false;
+        }
     }
 
     private void OnToolUnchecked(object? sender, RoutedEventArgs e)
@@ -1015,7 +1093,7 @@ internal partial class MainWindow : Window
             {
                 await TryOpenAssetsAsync(directory);
             }
-        });
+        }, preserveInteraction: true);
 
     private void OnGraphicViewer(object? sender, RoutedEventArgs e) => _ = RunCommandAsync(OpenGraphicViewerAsync);
 
@@ -1135,14 +1213,137 @@ internal partial class MainWindow : Window
             return false;
         }
 
-        if (_assets.TryOpen(path, out Exception? failure))
+        if (!_assets.TryPrepareOpen(path, out PreparedAssetContext? candidate, out Exception? failure) ||
+            candidate is null)
         {
+            await ShowAssetLoadErrorAsync(path, failure);
+            return false;
+        }
+
+        try
+        {
+            using TerrainOperationLease operation = await _assets.Gate.AcquireAsync();
+            if (!await ResolveTerrainEditorForRootSwapAsync(operation))
+            {
+                return false;
+            }
+
+            candidate.Dispose();
+            if (!_assets.TryPrepareOpen(path, out PreparedAssetContext? refreshed, out Exception? refreshFailure) ||
+                refreshed is null)
+            {
+                await ShowAssetLoadErrorAsync(path, refreshFailure);
+                return false;
+            }
+
+            try
+            {
+                TerrainEditorRebind? rebind = _terrainEditorController is { } controller
+                    ? new TerrainEditorRebind(controller, refreshed)
+                    : null;
+                Canvas.FinishInteractionForRootSwap();
+                _assets.CommitPreparedOpen(operation, refreshed, rebind);
+            }
+            finally
+            {
+                refreshed.Dispose();
+            }
+
+            ApplyDeferredTerrainDiscard();
             SyncAssetDirectory();
             return true;
         }
+        finally
+        {
+            candidate.Dispose();
+        }
+    }
 
-        await _dialogs.ShowErrorAsync(new ErrorPresentation("Load assets", failure is { } ex ? $"{path}: {ex.Message}" : path));
-        return false;
+    private async Task ShowAssetLoadErrorAsync(string path, Exception? failure)
+        => await _dialogs.ShowErrorAsync(new ErrorPresentation("Load assets", failure is { } ex ? $"{path}: {ex.Message}" : path));
+
+    private async Task<bool> ResolveTerrainEditorForRootSwapAsync(TerrainOperationLease operation)
+    {
+        TerrainEditorController? controller = _terrainEditorController;
+        if (controller is null || !controller.ViewModel.IsDirty)
+        {
+            return true;
+        }
+
+        DirtyChoice choice = await _dialogs.ShowDirtyAsync("Terrain");
+        if (!ReferenceEquals(_terrainEditorController, controller))
+        {
+            return true;
+        }
+
+        switch (choice)
+        {
+            case DirtyChoice.Save:
+                await controller.SaveWithLeaseAsync(operation);
+                return !controller.ViewModel.IsDirty;
+            case DirtyChoice.Discard:
+                _terrainDiscardDeferred = true;
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    private async Task<bool> ResolveTerrainEditorCloseAsync()
+    {
+        TerrainEditorController? controller = _terrainEditorController;
+        if (controller is null)
+        {
+            return true;
+        }
+
+        while (true)
+        {
+            if (!ReferenceEquals(_terrainEditorController, controller))
+            {
+                return true;
+            }
+
+            if (controller.Gate.IsBusy)
+            {
+                await controller.Gate.Completion;
+                continue;
+            }
+
+            if (!controller.ViewModel.IsDirty)
+            {
+                return true;
+            }
+
+            DirtyChoice choice = await _dialogs.ShowDirtyAsync("Terrain");
+            if (!ReferenceEquals(_terrainEditorController, controller))
+            {
+                return true;
+            }
+
+            switch (choice)
+            {
+                case DirtyChoice.Save:
+                    await controller.SaveAsync();
+                    return !controller.ViewModel.IsDirty;
+                case DirtyChoice.Discard:
+                    _terrainDiscardDeferred = true;
+                    return true;
+                default:
+                    return false;
+            }
+        }
+    }
+
+    private void ApplyDeferredTerrainDiscard()
+    {
+        if (!_terrainDiscardDeferred)
+        {
+            return;
+        }
+
+        _terrainDiscardDeferred = false;
+        _terrainEditorController?.ViewModel.Revert();
     }
 
     private async void OnClosing(object? sender, WindowClosingEventArgs e)
@@ -1170,7 +1371,16 @@ internal partial class MainWindow : Window
         bool approved;
         try
         {
-            approved = await _workspace.CloseAllAsync();
+            approved = await ResolveTerrainEditorCloseAsync();
+            if (approved)
+            {
+                approved = await _workspace.CloseAllAsync();
+            }
+
+            if (approved)
+            {
+                ApplyDeferredTerrainDiscard();
+            }
         }
         catch (OutOfMemoryException)
         {
@@ -1193,7 +1403,7 @@ internal partial class MainWindow : Window
         }
     }
 
-    private async Task RunCommandAsync(Func<Task> command)
+    private async Task RunCommandAsync(Func<Task> command, bool preserveInteraction = false)
     {
         if (_commandRunning)
         {
@@ -1203,7 +1413,11 @@ internal partial class MainWindow : Window
         _commandRunning = true;
         try
         {
-            Canvas.FinishInteraction(commit: true);
+            if (!preserveInteraction)
+            {
+                Canvas.FinishInteraction(commit: true);
+            }
+
             await command();
         }
         catch (OutOfMemoryException)
@@ -1487,5 +1701,34 @@ internal partial class MainWindow : Window
     {
         AssetDirectoryText.Text = _assets.Current.IsAvailable ? _assets.Current.Cache.AssetDirectory : "—";
         SyncPreviewStatus();
+    }
+
+    private sealed class TerrainEditorRebind : IPreparedAssetReconciliation
+    {
+        private readonly TerrainEditorController _controller;
+        private readonly AssetContext _context;
+        private readonly SpriteManifest _manifest;
+        private readonly string _assetDirectory;
+        private readonly string _sourcePath;
+        private readonly TerrainFileRevision _revision;
+        private readonly bool _featuresEnabled;
+
+        internal TerrainEditorRebind(TerrainEditorController controller, PreparedAssetContext prepared)
+        {
+            _controller = controller;
+            AssetContext context = prepared.Context;
+            _context = context;
+            _manifest = context.Cache.Manifest!;
+            TerrainCatalogLoadResult load = context.Terrain;
+            _assetDirectory = Path.GetDirectoryName(load.SourcePath) ?? string.Empty;
+            _sourcePath = Path.Combine(_assetDirectory, TerrainAssetCatalog.FileName);
+            _revision = load.Revision;
+            _featuresEnabled = load.IsValid;
+        }
+
+        public void Apply()
+            => _controller.Rebind(_context, _manifest, _assetDirectory, _sourcePath, _revision, _featuresEnabled);
+
+        public void Notify() => _controller.NotifyStateChanged();
     }
 }

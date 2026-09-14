@@ -15,6 +15,8 @@ using Avalonia.VisualTree;
 using MapEditor.App.Connectivity;
 using MapEditor.App.Dialogs;
 using MapEditor.App.Rendering;
+using MapEditor.App.Settings;
+using MapEditor.App.Terrain;
 using MapEditor.App.Tests.Fakes;
 using MapEditor.App.Tests.Fixtures;
 using MapEditor.App.ViewModels;
@@ -747,6 +749,220 @@ public class MainWindowCloseTests
             Calls.Add(new Call("ReplaceOwnedRowsAsync"));
             return Task.CompletedTask;
         }
+    }
+
+    private static string WriteTerrainAssetDirectory(string root)
+    {
+        string directory = Path.Combine(root, "assets-terrain");
+        Directory.CreateDirectory(Path.Combine(directory, "sheets"));
+        File.WriteAllText(Path.Combine(directory, "manifest.json"),
+            """{ "tileSize": 32, "sheets": { "1": { "10": [0, 0, 32, 32], "11": [32, 0, 32, 32] } } }""");
+        File.WriteAllBytes(Path.Combine(directory, "sheets", "1.png"), AssetFixture.PngSheet.Create(64, 32));
+        File.WriteAllText(Path.Combine(directory, TerrainAssetCatalog.FileName), AssetFixture.TerrainCatalogJson);
+        return directory;
+    }
+
+    private static TerrainEditorController OpenDirtyTerrainEditor(MainWindowHarness harness)
+    {
+        string directory = WriteTerrainAssetDirectory(harness.TempDirectory);
+        Assert.True(harness.Assets.TryOpen(directory));
+        Dispatcher.UIThread.RunJobs();
+
+        Guid terrainId = harness.ViewModel.Terrains.Single().Id;
+        harness.ViewModel.SelectTerrain(terrainId);
+        harness.Window.FindControl<Button>("TerrainEditButton")!.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        Dispatcher.UIThread.RunJobs();
+
+        TerrainEditorController controller = harness.Window.TerrainEditorController!;
+        controller.ViewModel.Name = "Grass 2";
+        controller.ViewModel.CommitPending();
+        Assert.True(controller.Session.IsDirty);
+        return controller;
+    }
+
+    [AvaloniaFact]
+    public void Close_DirtyEditor_Save_SavesThenCloses()
+    {
+        using MainWindowHarness harness = MainWindowHarness.Create();
+        TerrainEditorController controller = OpenDirtyTerrainEditor(harness);
+        string sourcePath = Path.Combine(harness.TempDirectory, "assets-terrain", TerrainAssetCatalog.FileName);
+        harness.Dialogs.DirtyResult = DirtyChoice.Save;
+
+        harness.Window.Close();
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.False(harness.Window.IsVisible);
+        Assert.Equal(1, harness.Dialogs.DirtyShown);
+        Assert.False(controller.Session.IsDirty);
+        Assert.Contains("Grass 2", File.ReadAllText(sourcePath));
+        Assert.True(harness.Assets.Current.IsDisposed);
+    }
+
+    [AvaloniaFact]
+    public void Close_DirtyEditor_Cancel_StaysOpenAndKeepsTheDraft()
+    {
+        using MainWindowHarness harness = MainWindowHarness.Create();
+        TerrainEditorController controller = OpenDirtyTerrainEditor(harness);
+        harness.Dialogs.DirtyResult = DirtyChoice.Cancel;
+
+        harness.Window.Close();
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.True(harness.Window.IsVisible);
+        Assert.Equal(1, harness.Dialogs.DirtyShown);
+        Assert.True(controller.Session.IsDirty);
+        Assert.NotNull(harness.Window.TerrainEditor);
+        Assert.False(harness.Assets.Current.IsDisposed);
+    }
+
+    [AvaloniaFact]
+    public void Close_TerrainDiscardThenMapCancel_KeepsDraft()
+    {
+        using MainWindowHarness harness = MainWindowHarness.Create();
+        TerrainEditorController controller = OpenDirtyTerrainEditor(harness);
+
+        harness.ViewModel.Brush = new MapTileLayer(1, 2);
+        harness.ViewModel.Session.BeginStroke(MapEditTool.Pencil, 0, 0);
+        Assert.True(harness.ViewModel.Session.CompleteStroke());
+
+        var terrainGate = new TaskCompletionSource<DirtyChoice>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var mapGate = new TaskCompletionSource<DirtyChoice>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var gates = new Queue<TaskCompletionSource<DirtyChoice>>();
+        gates.Enqueue(terrainGate);
+        gates.Enqueue(mapGate);
+        harness.Dialogs.DirtyGates = gates;
+
+        harness.Window.Close();
+        Dispatcher.UIThread.RunJobs();
+        Assert.True(harness.Window.IsVisible);
+        Assert.Equal(1, harness.Dialogs.DirtyShown);
+
+        terrainGate.SetResult(DirtyChoice.Discard);
+        Dispatcher.UIThread.RunJobs();
+        Assert.True(harness.Window.IsVisible);
+        Assert.Equal(2, harness.Dialogs.DirtyShown);
+
+        mapGate.SetResult(DirtyChoice.Cancel);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.True(harness.Window.IsVisible);
+        Assert.True(controller.Session.IsDirty);
+        Assert.True(harness.ViewModel.Session.IsDirty);
+        Assert.NotNull(harness.Window.TerrainEditor);
+        Assert.False(harness.Assets.Current.IsDisposed);
+    }
+
+    [AvaloniaFact]
+    public async Task Close_WhileTerrainSaveConflictPending_WaitsForTheSaveThenCloses()
+    {
+        using MainWindowHarness harness = MainWindowHarness.Create();
+        TerrainEditorController controller = OpenDirtyTerrainEditor(harness);
+        string sourcePath = Path.Combine(harness.TempDirectory, "assets-terrain", TerrainAssetCatalog.FileName);
+
+        File.WriteAllText(sourcePath, "{ externally changed }");
+        var conflictGate = new TaskCompletionSource<TerrainExternalChangeChoice>(TaskCreationOptions.RunContinuationsAsynchronously);
+        harness.Dialogs.ReplaceTerrainCatalogGate = conflictGate;
+        Task saveTask = controller.SaveAsync();
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal(1, harness.Dialogs.ReplaceTerrainCatalogShown);
+        Assert.True(controller.Gate.IsBusy);
+
+        harness.Dialogs.DirtyResult = DirtyChoice.Discard;
+        harness.Window.Close();
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.True(harness.Window.IsVisible);
+        Assert.Equal(0, harness.Dialogs.DirtyShown);
+
+        conflictGate.SetResult(TerrainExternalChangeChoice.Overwrite);
+        Dispatcher.UIThread.RunJobs();
+        await saveTask;
+
+        Assert.False(harness.Window.IsVisible);
+        Assert.Equal(0, harness.Dialogs.DirtyShown);
+        Assert.False(controller.Session.IsDirty);
+        Assert.Contains("Grass 2", File.ReadAllText(sourcePath));
+        Assert.Null(harness.Window.TerrainEditor);
+        Assert.True(harness.Assets.Current.IsDisposed);
+        Assert.Empty(harness.Dialogs.Errors);
+    }
+
+    [AvaloniaFact]
+    public void Close_WithViewerAndEditor_WindowsReleaseResourcesBeforeAssets()
+    {
+        using MainWindowHarness harness = MainWindowHarness.Create();
+        harness.Dialogs.DirtyResult = DirtyChoice.Discard;
+
+        string viewerDirectory = WriteViewerAssetDirectory(harness.TempDirectory);
+        Assert.True(harness.Assets.TryOpen(viewerDirectory));
+        Dispatcher.UIThread.RunJobs();
+        harness.Window.FindControl<MenuItem>("GraphicViewerCommand")!.RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+        Dispatcher.UIThread.RunJobs();
+        GraphicViewerWindow viewer = Assert.IsType<GraphicViewerWindow>(harness.Window.GraphicViewer);
+
+        string terrainDirectory = WriteTerrainAssetDirectory(harness.TempDirectory);
+        Assert.True(harness.Assets.TryOpen(terrainDirectory));
+        Dispatcher.UIThread.RunJobs();
+        Guid terrainId = harness.ViewModel.Terrains.Single().Id;
+        harness.ViewModel.SelectTerrain(terrainId);
+        harness.Window.FindControl<Button>("TerrainEditButton")!.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        Dispatcher.UIThread.RunJobs();
+        TerrainEditorWindow editor = Assert.IsType<TerrainEditorWindow>(harness.Window.TerrainEditor);
+
+        bool assetsDisposedAtEditorClose = true;
+        bool assetsDisposedAtViewerClose = true;
+        editor.Closed += (sender, e) => assetsDisposedAtEditorClose = harness.Assets.Current.IsDisposed;
+        viewer.Closed += (sender, e) => assetsDisposedAtViewerClose = harness.Assets.Current.IsDisposed;
+
+        harness.Window.Close();
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.False(harness.Window.IsVisible);
+        Assert.False(editor.IsVisible);
+        Assert.False(viewer.IsVisible);
+        Assert.False(assetsDisposedAtEditorClose);
+        Assert.False(assetsDisposedAtViewerClose);
+        Assert.True(harness.Assets.Current.IsDisposed);
+    }
+
+    [AvaloniaFact]
+    public void Close_WithEditorPromptPending_NoCallbacksAfterClose()
+    {
+        using MainWindowHarness harness = MainWindowHarness.Create();
+        TerrainEditorController controller = OpenDirtyTerrainEditor(harness);
+        TerrainEditorWindow editor = Assert.IsType<TerrainEditorWindow>(harness.Window.TerrainEditor);
+
+        var editorGate = new TaskCompletionSource<DirtyChoice>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var mainGate = new TaskCompletionSource<DirtyChoice>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var gates = new Queue<TaskCompletionSource<DirtyChoice>>();
+        gates.Enqueue(editorGate);
+        gates.Enqueue(mainGate);
+        harness.Dialogs.DirtyGates = gates;
+
+        editor.Close();
+        Dispatcher.UIThread.RunJobs();
+        Assert.True(editor.IsVisible);
+        Assert.Equal(1, harness.Dialogs.DirtyShown);
+
+        harness.Window.Close();
+        Dispatcher.UIThread.RunJobs();
+        Assert.True(harness.Window.IsVisible);
+        Assert.Equal(2, harness.Dialogs.DirtyShown);
+
+        mainGate.SetResult(DirtyChoice.Discard);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.False(harness.Window.IsVisible);
+        Assert.False(editor.IsVisible);
+        Assert.False(controller.Session.IsDirty);
+        Assert.True(harness.Assets.Current.IsDisposed);
+
+        int errors = harness.Dialogs.Errors.Count;
+        int dirty = harness.Dialogs.DirtyShown;
+        editorGate.SetResult(DirtyChoice.Save);
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal(errors, harness.Dialogs.Errors.Count);
+        Assert.Equal(dirty, harness.Dialogs.DirtyShown);
     }
 
     private sealed class ScriptedConnectivity : IGameDataConnectivity

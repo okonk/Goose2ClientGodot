@@ -11,6 +11,7 @@ using MapEditor.App.Dialogs;
 using MapEditor.App.Documents;
 using MapEditor.App.Rendering;
 using MapEditor.App.Settings;
+using MapEditor.App.Terrain;
 using MapEditor.App.Tests.Fakes;
 using MapEditor.App.ViewModels;
 using MapEditor.Core;
@@ -135,7 +136,8 @@ public class MainWindowThemeTests : IDisposable
     {
         var workspace = new WorkspaceViewModel(_dialogs, new MapFileStore());
         _assets = new AssetContextController(workspace, _settings);
-        _window = new MainWindow(_dialogs, _settings, workspace, _assets);
+        var terrainStore = new TerrainCatalogFileStore();
+        _window = new MainWindow(_dialogs, _settings, workspace, _assets, context => new TerrainEditorController(context, terrainStore, _assets, _dialogs, _assets.Gate));
         _window.Show();
         Dispatcher.UIThread.RunJobs();
         return _window;

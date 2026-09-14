@@ -16,10 +16,10 @@ internal sealed class TerrainEditorController : IDisposable
         Array.Empty<TerrainDefinition>(),
         Array.Empty<TerrainGraphicDefinition>());
 
-    private readonly AssetContext _context;
-    private readonly SpriteManifest _manifest;
-    private readonly string _assetDirectory;
-    private readonly string _sourcePath;
+    private AssetContext _context;
+    private SpriteManifest _manifest;
+    private string _assetDirectory;
+    private string _sourcePath;
     private readonly TerrainCatalogFileStore _store;
     private readonly ITerrainCatalogPublisher _publisher;
     private readonly IEditorDialogs _dialogs;
@@ -29,6 +29,7 @@ internal sealed class TerrainEditorController : IDisposable
     private TerrainEditorViewModel _viewModel = null!;
     private TerrainFileRevision _revision;
     private bool _featuresEnabled;
+    private readonly bool _ownsGate;
 
     public TerrainOperationGate Gate { get; }
 
@@ -48,13 +49,15 @@ internal sealed class TerrainEditorController : IDisposable
         AssetContext context,
         TerrainCatalogFileStore store,
         ITerrainCatalogPublisher publisher,
-        IEditorDialogs dialogs)
+        IEditorDialogs dialogs,
+        TerrainOperationGate? gate = null)
     {
         _context = context ?? throw new ArgumentNullException(nameof(context));
         _store = store ?? throw new ArgumentNullException(nameof(store));
         _publisher = publisher ?? throw new ArgumentNullException(nameof(publisher));
         _dialogs = dialogs ?? throw new ArgumentNullException(nameof(dialogs));
-        Gate = new TerrainOperationGate();
+        Gate = gate ?? new TerrainOperationGate();
+        _ownsGate = gate is null;
 
         var load = context.Terrain;
         _manifest = context.Cache.Manifest ?? throw new InvalidOperationException("Sprite assets are unavailable.");
@@ -183,7 +186,28 @@ internal sealed class TerrainEditorController : IDisposable
     public void Dispose()
     {
         _viewModel.Dispose();
-        Gate.Dispose();
+        if (_ownsGate)
+        {
+            Gate.Dispose();
+        }
+    }
+
+    internal AssetContext Context => _context;
+
+    internal void Rebind(
+        AssetContext context,
+        SpriteManifest manifest,
+        string assetDirectory,
+        string sourcePath,
+        TerrainFileRevision revision,
+        bool featuresEnabled)
+    {
+        _context = context;
+        _manifest = manifest;
+        _assetDirectory = assetDirectory;
+        _sourcePath = sourcePath;
+        _revision = revision;
+        _featuresEnabled = featuresEnabled;
     }
 
     private async Task ReloadExternalAsync(TerrainOperationLease operation)
@@ -262,7 +286,7 @@ internal sealed class TerrainEditorController : IDisposable
         NotifyActionSubscribers(StateChanged);
     }
 
-    private void NotifyStateChanged()
+    internal void NotifyStateChanged()
     {
         NotifyActionSubscribers(StateChanged);
     }
