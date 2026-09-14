@@ -257,7 +257,7 @@ public class TerrainEditorEndToEndTests
             }
         }
 
-        harness.Dialogs.DirtyResult = DirtyChoice.Discard;
+        harness.Dispose();
     }
 
     private static void AssertTileState(MapDocument map, bool afterBlock)
@@ -310,6 +310,8 @@ public class TerrainEditorEndToEndTests
         Assert.Equal(new[] { "Meadow", "Water" }, document.Terrains.Select(choice => choice.Name).ToArray());
         Assert.Equal(AssetFixture.GrassId, document.SelectedTerrainId);
         Assert.Equal(MapEditTool.Terrain, document.ActiveTool);
+
+        harness.Dispose();
     }
 
     [AvaloniaFact]
@@ -385,9 +387,10 @@ public class TerrainEditorEndToEndTests
         TerrainCatalogLoadResult availability = document.TerrainAvailability!;
         Assert.False(availability.IsValid);
         Assert.True(availability.CanAuthor);
+        string diagnosticMessage = Assert.NotNull(availability.Diagnostic);
         TextBlock diagnostic = Find<TextBlock>(harness.Window, "TerrainDiagnosticText");
         Assert.True(diagnostic.IsVisible);
-        Assert.Equal(availability.Diagnostic, diagnostic.Text);
+        Assert.Equal(diagnosticMessage, diagnostic.Text);
         Assert.False(Find<ComboBox>(harness.Window, "TerrainCombo").IsEnabled);
         Assert.True(Find<Button>(harness.Window, "TerrainAddButton").IsEnabled);
 
@@ -399,7 +402,7 @@ public class TerrainEditorEndToEndTests
         TerrainEditorController controller = harness.Window.TerrainEditorController!;
         Assert.False(controller.IsTerrainFeaturesEnabled);
         Assert.True(Find<Border>(editor, "RecoveryPanel").IsVisible);
-        Assert.Contains(availability.Diagnostic, Find<TextBlock>(editor, "RecoveryText").Text);
+        Assert.Contains(diagnosticMessage, Find<TextBlock>(editor, "RecoveryText").Text);
 
         harness.Dialogs.ConfirmReplaceMalformedResult = true;
         Find<Button>(editor, "ReplaceCatalogButton").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
@@ -415,6 +418,8 @@ public class TerrainEditorEndToEndTests
         document.Brush = new MapTileLayer(2, 20);
         ClickTile(harness, 0, 1);
         Assert.Equal(new MapTileLayer(2, 20), Tile(document.Session.Document, 0, 1));
+
+        harness.Dispose();
     }
 
     [AvaloniaFact]
@@ -436,6 +441,8 @@ public class TerrainEditorEndToEndTests
         Assert.Equal(new MapTileLayer(1, 10), Tile(document.Session.Document, 0, 0));
         Assert.True(document.Undo());
         Assert.Equal(Empty, Tile(document.Session.Document, 0, 0));
+
+        harness.Dispose();
     }
 
     [AvaloniaFact]
@@ -551,6 +558,8 @@ public class TerrainEditorEndToEndTests
         Assert.Empty(harness.Dialogs.Errors);
         MapDocument decoded = new MapFileStore().Open(mapPath).Document;
         Assert.Equal(Empty, Tile(decoded, 1, 1));
+
+        harness.Dispose();
     }
 
     [AvaloniaFact]
@@ -569,5 +578,7 @@ public class TerrainEditorEndToEndTests
         document.Brush = new MapTileLayer(2, 20);
         ClickTile(harness, 0, 0);
         Assert.Equal(new MapTileLayer(2, 20), Tile(document.Session.Document, 0, 0));
+
+        harness.Dispose();
     }
 }
