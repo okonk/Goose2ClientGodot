@@ -60,6 +60,8 @@ internal partial class MainWindow : Window
     private int? _warpPrefillSelection;
     private long _warpPrefillVersion = -1;
     private GameDataSyncSession? _prefillSession;
+    private IReadOnlyDictionary<int, NpcAppearance>? _spawnNpcSource;
+    private IReadOnlyList<MapReference>? _warpDestinationSource;
     private AppTheme _theme = AppTheme.Dark;
     private bool _commandRunning;
     private bool _closeGuardRunning;
@@ -435,6 +437,8 @@ internal partial class MainWindow : Window
         _warpPrefillSelection = null;
         _warpPrefillVersion = -1;
         _prefillSession = document.GameData?.Session;
+        _spawnNpcSource = null;
+        _warpDestinationSource = null;
         SyncGameDataChrome();
         SyncRightPanel();
         Title = document.Title;
@@ -1513,6 +1517,8 @@ internal partial class MainWindow : Window
             _prefillSession = session;
             _warpPrefillSelection = null;
             _warpPrefillVersion = -1;
+            _spawnNpcSource = null;
+            _warpDestinationSource = null;
             SpawnNpcPicker.SelectedItem = default;
             WarpDestinationPicker.SelectedItem = default;
         }
@@ -1554,8 +1560,23 @@ internal partial class MainWindow : Window
         RightPanel.IsVisible = !showSpawn && !showWarp;
         SpawnProperties.IsVisible = showSpawn;
         WarpProperties.IsVisible = showWarp;
-        SpawnNpcPicker.Items = state.Session?.Npcs.Values.OrderBy(npc => npc.NpcId).ToList() ?? new List<NpcAppearance>();
-        WarpDestinationPicker.Items = state.Session?.Maps ?? Array.Empty<MapReference>();
+        // Reassigning Items rebuilds the picker list (Clear + re-add), which re-enters the
+        // ListBox selection model if it happens while a selection operation is still
+        // committing (e.g. from the click that just changed the selection). The sources
+        // only change identity when a pull replaces them, so only rebuild then.
+        IReadOnlyDictionary<int, NpcAppearance>? npcSource = state.Session?.Npcs;
+        if (!ReferenceEquals(_spawnNpcSource, npcSource))
+        {
+            _spawnNpcSource = npcSource;
+            SpawnNpcPicker.Items = npcSource?.Values.OrderBy(npc => npc.NpcId).ToList() ?? new List<NpcAppearance>();
+        }
+
+        IReadOnlyList<MapReference>? mapSource = state.Session?.Maps;
+        if (!ReferenceEquals(_warpDestinationSource, mapSource))
+        {
+            _warpDestinationSource = mapSource;
+            WarpDestinationPicker.Items = mapSource ?? Array.Empty<MapReference>();
+        }
         if (showSpawn)
         {
             SyncSpawnProperties(state);

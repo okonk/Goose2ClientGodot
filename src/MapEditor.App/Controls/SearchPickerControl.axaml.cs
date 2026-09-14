@@ -13,6 +13,7 @@ public class SearchPickerControl<T> : UserControl
 {
     private readonly TextBox _searchBox;
     private readonly ListBox _results;
+    private bool _syncingListSelection;
 
     // AVP1002 suppressed: the value types are generic in T, so a non-generic owner type is
     // impossible; none of these properties are set from XAML.
@@ -41,6 +42,18 @@ public class SearchPickerControl<T> : UserControl
             if (_searchBox.Text != SearchText)
             {
                 SearchText = _searchBox.Text ?? string.Empty;
+            }
+        };
+        _results.SelectionChanged += (_, _) =>
+        {
+            if (_syncingListSelection || _results.SelectedItem is not ListBoxItem { Tag: T item })
+            {
+                return;
+            }
+
+            if (!EqualityComparer<T>.Default.Equals(SelectedItem, item))
+            {
+                SelectedItem = item;
             }
         };
         PropertyChanged += (_, e) =>
@@ -136,33 +149,45 @@ public class SearchPickerControl<T> : UserControl
 
     private void Rebuild()
     {
-        string search = SearchText ?? string.Empty;
-        Func<T, string> project = ItemText ?? (item => item?.ToString() ?? string.Empty);
-        _results.Items.Clear();
-        foreach (T item in Items ?? Array.Empty<T>())
+        // Suppress the selection handler for the whole rebuild: clearing the list raises
+        // SelectionChanged mid-clear, and acting on it re-enters the selection model.
+        _syncingListSelection = true;
+        try
         {
-            string text = project(item);
-            if (text.Contains(search, StringComparison.OrdinalIgnoreCase))
+            string search = SearchText ?? string.Empty;
+            Func<T, string> project = ItemText ?? (item => item?.ToString() ?? string.Empty);
+            _results.Items.Clear();
+            foreach (T item in Items ?? Array.Empty<T>())
             {
-                // A TextBlock (rather than a raw string) so long names ellipsize instead of
-                // clipping against the narrow properties panel.
-                _results.Items.Add(new ListBoxItem
+                string text = project(item);
+                if (text.Contains(search, StringComparison.OrdinalIgnoreCase))
                 {
-                    Content = new TextBlock { Text = text, TextTrimming = TextTrimming.CharacterEllipsis },
-                    Tag = item,
-                    [ToolTip.TipProperty] = text
-                });
+                    // A TextBlock (rather than a raw string) so long names ellipsize instead of
+                    // clipping against the narrow properties panel.
+                    _results.Items.Add(new ListBoxItem
+                    {
+                        Content = new TextBlock { Text = text, TextTrimming = TextTrimming.CharacterEllipsis },
+                        Tag = item,
+                        [ToolTip.TipProperty] = text
+                    });
+                }
             }
-        }
 
-        SyncListSelection();
+            SyncListSelection();
+        }
+        finally
+        {
+            _syncingListSelection = false;
+        }
     }
 
     private void SyncListSelection()
     {
         if (_results.Items.Count == 0)
         {
+            _syncingListSelection = true;
             _results.SelectedIndex = -1;
+            _syncingListSelection = false;
             return;
         }
 
@@ -181,6 +206,8 @@ public class SearchPickerControl<T> : UserControl
             }
         }
 
+        _syncingListSelection = true;
         _results.SelectedIndex = index < 0 ? 0 : index;
+        _syncingListSelection = false;
     }
 }
