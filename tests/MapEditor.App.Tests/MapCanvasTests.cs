@@ -258,6 +258,24 @@ public class MapCanvasTests
     }
 
     [AvaloniaFact]
+    public async Task Dispose_DuringActiveStroke_CancelsTheStroke()
+    {
+        Harness harness = CreateSmallMapAsync();
+        MapEditSession session = harness.ViewModel.Session;
+        MapDocument document = session.Document;
+        harness.ViewModel.Brush = new MapTileLayer(7, 42);
+
+        harness.Window.MouseDown(new Point(Cell / 2, Cell / 2), MouseButton.Left, RawInputModifiers.None);
+        Assert.True(session.HasActiveStroke);
+
+        harness.Canvas.Dispose();
+
+        Assert.False(session.HasActiveStroke);
+        Assert.Equal(new MapTileLayer(0, 0), document[0, 0].GetLayer(0));
+        Assert.False(session.CanUndo);
+    }
+
+    [AvaloniaFact]
     public async Task BlockedDragShiftReleasedMidDrag_StillClears()
     {
         Harness harness = CreateSmallMapAsync();

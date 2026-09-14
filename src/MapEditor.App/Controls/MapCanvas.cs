@@ -55,6 +55,7 @@ internal sealed class MapCanvas : Control, ICustomHitTest
         }
 
         _disposed = true;
+        FinishInteraction(commit: false);
         _terrainCancellation?.Dispose();
         _viewModel.CanvasInvalidated -= OnCanvasInvalidated;
         if (_viewModel.GameData is { } gameData)
