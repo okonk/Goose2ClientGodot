@@ -147,7 +147,7 @@
                       <Border Width="16" Height="16" CornerRadius="3" Background="{Binding Color, Converter={StaticResource TerrainSwatchBrush}}" />
                       <TextBlock Text="{Binding Name}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
                       <controls:TerrainThumbnailControl Choice="{Binding}"
-                                                         Assets="{Binding Assets, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                         Assets="{Binding Assets, RelativeSource={RelativeSource AncestorType=Window, Tree=Logical}}"
                                                          VerticalAlignment="Center" />
                     </StackPanel>
                   </DataTemplate>

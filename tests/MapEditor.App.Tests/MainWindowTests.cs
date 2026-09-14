@@ -11,6 +11,7 @@ using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.LogicalTree;
 using Avalonia.Media;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
@@ -2085,5 +2086,27 @@ public class MainWindowGraphicViewerTests : IDisposable
 
         int thumbnailsAfter = Window.GetVisualDescendants().OfType<TerrainThumbnailControl>().Count();
         Assert.Equal(thumbnailsBefore, thumbnailsAfter);
+    }
+
+    // On real platforms the dropdown content lives in a separate visual tree, so the
+    // thumbnail's Assets binding (Tree=Logical in MainWindow.axaml) depends on the
+    // logical chain reaching the window.
+    [AvaloniaFact]
+    public void TerrainSelector_DropdownThumbnail_LogicalTreeReachesTheWindow()
+    {
+        string directory = WriteTerrainAssetDirectory("assets-terrain", AssetFixture.TerrainCatalogJson);
+        Assert.True(_harness.Assets.TryOpen(directory));
+        Dispatcher.UIThread.RunJobs();
+
+        Find<TabControl>("LeftTabs").SelectedIndex = 1;
+        Dispatcher.UIThread.RunJobs();
+        ComboBox combo = Find<ComboBox>("TerrainCombo");
+        combo.IsDropDownOpen = true;
+        Dispatcher.UIThread.RunJobs();
+        Dispatcher.UIThread.RunJobs();
+
+        Popup popup = combo.GetVisualDescendants().OfType<Popup>().Single();
+        TerrainThumbnailControl thumbnail = popup.Child!.GetVisualDescendants().OfType<TerrainThumbnailControl>().Single();
+        Assert.NotNull(((ILogical)thumbnail).FindLogicalAncestorOfType<MainWindow>());
     }
 }
