@@ -127,6 +127,12 @@ public class TerrainEditorEndToEndTests
         Assert.True(index >= 0, $"terrain {name} not in selector");
         combo.SelectedIndex = index;
         Dispatcher.UIThread.RunJobs();
+        ToggleButton tool = Find<ToggleButton>(harness.Window, "TerrainTool");
+        if (tool.IsChecked != true)
+        {
+            tool.IsChecked = true;
+            Dispatcher.UIThread.RunJobs();
+        }
     }
 
     private static string TerrainPath(string assetDirectory)

@@ -620,7 +620,7 @@ public class ShortcutTests
     {
         using MainWindowHarness harness = MainWindowHarness.Create();
         MainWindow window = harness.Window;
-        string directory = WriteTerrainAssetDirectory(harness);
+        string directory = WritePlainAssetDirectory(harness);
         Assert.True(harness.Assets.TryOpen(directory));
         Dispatcher.UIThread.RunJobs();
         harness.ViewModel.ActiveTool = MapEditTool.Eraser;
@@ -656,12 +656,18 @@ public class ShortcutTests
 
     private static string WriteTerrainAssetDirectory(MainWindowHarness harness)
     {
+        string directory = WritePlainAssetDirectory(harness);
+        File.WriteAllText(Path.Combine(directory, TerrainAssetCatalog.FileName), AssetFixture.TerrainCatalogJson);
+        return directory;
+    }
+
+    private static string WritePlainAssetDirectory(MainWindowHarness harness)
+    {
         string directory = Path.Combine(harness.TempDirectory, "terrain-assets");
         Directory.CreateDirectory(Path.Combine(directory, "sheets"));
         File.WriteAllText(Path.Combine(directory, "manifest.json"), AssetFixture.ManifestJson);
         File.WriteAllBytes(Path.Combine(directory, "sheets", "1.png"), AssetFixture.PngSheet.Create(64, 64));
         File.WriteAllBytes(Path.Combine(directory, "sheets", "2.png"), AssetFixture.PngSheet.Create(64, 64));
-        File.WriteAllText(Path.Combine(directory, TerrainAssetCatalog.FileName), AssetFixture.TerrainCatalogJson);
         return directory;
     }
 

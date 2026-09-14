@@ -216,6 +216,10 @@ internal sealed class MapDocumentViewModel : ViewModelBase, ITerrainDocumentReco
     {
         _terrain = terrain;
         _terrainChoices = BuildTerrainChoices(terrain?.Catalog, terrain?.Index);
+        if (_selectedTerrainId is null)
+        {
+            _selectedTerrainId = ReconcileSelectedTerrainId(terrain?.Catalog, terrain?.Index);
+        }
     }
 
     public void SelectTerrain(Guid terrainId)
@@ -301,7 +305,7 @@ internal sealed class MapDocumentViewModel : ViewModelBase, ITerrainDocumentReco
     {
         bool sameResult = result is not null && ReferenceEquals(_terrain, result);
         IReadOnlyList<TerrainChoice> choices = sameResult ? _terrainChoices : BuildTerrainChoices(catalog, index);
-        Guid? selection = ReconcileSelectedTerrainId(index);
+        Guid? selection = ReconcileSelectedTerrainId(catalog, index);
         MapEditTool tool = selection is null && _activeTool == MapEditTool.Terrain ? MapEditTool.Pencil : _activeTool;
         if (!sameResult)
         {
@@ -375,14 +379,16 @@ internal sealed class MapDocumentViewModel : ViewModelBase, ITerrainDocumentReco
         return choices;
     }
 
-    private Guid? ReconcileSelectedTerrainId(TerrainCatalogIndex? index)
+    private Guid? ReconcileSelectedTerrainId(TerrainCatalog? catalog, TerrainCatalogIndex? index)
     {
-        if (_selectedTerrainId is not { } id)
+        if (_selectedTerrainId is { } id)
         {
-            return null;
+            return index is not null && index.TryGetTerrain(id, out _) ? id : null;
         }
 
-        return index is not null && index.TryGetTerrain(id, out _) ? id : null;
+        // Same default as the terrain editor window: open on the first terrain
+        // instead of an empty selector.
+        return catalog is { Terrains.Count: > 0 } ? catalog.Terrains[0].Id : null;
     }
 
     private static void InvokeSafely(Delegate[] handlers, PublicationNotificationErrors errors)

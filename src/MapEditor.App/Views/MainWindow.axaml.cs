@@ -13,6 +13,7 @@ using Avalonia.Interactivity;
 using Avalonia.Markup.Xaml;
 using Avalonia.Media;
 using Avalonia.Styling;
+using Avalonia.Threading;
 using Avalonia.VisualTree;
 using MapEditor.App.Controls;
 using MapEditor.App.Dialogs;
@@ -1662,6 +1663,13 @@ internal partial class MainWindow : Window
         if (!ReferenceEquals(TerrainCombo.SelectedItem, selected))
         {
             TerrainCombo.SelectedItem = selected;
+        }
+
+        // The ItemsSource binding can apply the list after this sync runs (initial
+        // asset load), and a selection made before the items exist is discarded.
+        if (!ReferenceEquals(TerrainCombo.SelectedItem, selected) && TerrainCombo.Items.Count == 0)
+        {
+            Dispatcher.UIThread.Post(SyncTerrainSelector);
         }
     }
 

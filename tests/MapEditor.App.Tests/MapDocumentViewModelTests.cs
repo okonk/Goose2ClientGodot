@@ -971,9 +971,9 @@ public class MapDocumentViewModelTests : IDisposable
     {
         _viewModel.SetTerrain(ValidTerrainCatalog(GrassId, WaterId));
 
-        var raised = RaisedProperties(() => _viewModel.SelectTerrain(GrassId));
+        var raised = RaisedProperties(() => _viewModel.SelectTerrain(WaterId));
 
-        Assert.Equal(GrassId, _viewModel.SelectedTerrainId);
+        Assert.Equal(WaterId, _viewModel.SelectedTerrainId);
         Assert.Equal(MapEditTool.Terrain, _viewModel.ActiveTool);
         Assert.Equal(
             new[] { nameof(MapDocumentViewModel.SelectedTerrainId), nameof(MapDocumentViewModel.ActiveTool) },
@@ -1001,7 +1001,7 @@ public class MapDocumentViewModelTests : IDisposable
 
         Assert.Throws<ArgumentException>(() => _viewModel.SelectTerrain(WaterId));
 
-        Assert.Null(_viewModel.SelectedTerrainId);
+        Assert.Equal(GrassId, _viewModel.SelectedTerrainId);
         Assert.Equal(MapEditTool.Pencil, _viewModel.ActiveTool);
         Assert.Empty(raised);
     }
@@ -1034,7 +1034,7 @@ public class MapDocumentViewModelTests : IDisposable
     [Fact]
     public void ActiveTool_Terrain_WithoutSelection_ThrowsBeforeChangingAnyField()
     {
-        _viewModel.SetTerrain(ValidTerrainCatalog(GrassId));
+        _viewModel.SetTerrain(ValidTerrainCatalog());
         var raised = new List<string>();
         _viewModel.PropertyChanged += (sender, e) => raised.Add(e.PropertyName ?? string.Empty);
 
@@ -1059,14 +1059,14 @@ public class MapDocumentViewModelTests : IDisposable
     }
 
     [Fact]
-    public void ApplyTerrainReconciliation_WithChoices_LeavesSelectionNull()
+    public void ApplyTerrainReconciliation_WithChoices_DefaultsToTheFirstTerrain()
     {
         _viewModel.SetTerrain(ValidTerrainCatalog(GrassId, WaterId));
 
         TerrainDocumentReconciliation plan = _viewModel.PrepareTerrainReconciliation(ValidTerrainCatalog(GrassId, WaterId));
         _viewModel.ApplyTerrainReconciliation(plan);
 
-        Assert.Null(_viewModel.SelectedTerrainId);
+        Assert.Equal(GrassId, _viewModel.SelectedTerrainId);
         Assert.Equal(MapEditTool.Pencil, _viewModel.ActiveTool);
         Assert.Equal(2, _viewModel.Terrains.Count);
         Assert.True(_viewModel.TerrainAvailability!.IsValid);
@@ -1151,7 +1151,12 @@ public class MapDocumentViewModelTests : IDisposable
         _viewModel.NotifyTerrainReconciliation(plan, new PublicationNotificationErrors(8));
 
         Assert.Equal(
-            new[] { nameof(MapDocumentViewModel.TerrainAvailability), nameof(MapDocumentViewModel.Terrains) },
+            new[]
+            {
+                nameof(MapDocumentViewModel.TerrainAvailability),
+                nameof(MapDocumentViewModel.Terrains),
+                nameof(MapDocumentViewModel.SelectedTerrainId)
+            },
             raised);
         Assert.Equal(1, canvas);
         Assert.Equal(1, palette);
@@ -1185,6 +1190,7 @@ public class MapDocumentViewModelTests : IDisposable
     {
         TerrainCatalogLoadResult terrain = ValidTerrainCatalog(GrassId);
         _viewModel.SetTerrain(terrain);
+        _viewModel.SelectTerrain(GrassId);
         var raised = new List<string>();
         _viewModel.PropertyChanged += (sender, e) => raised.Add(e.PropertyName ?? string.Empty);
         int canvas = 0;
@@ -1202,6 +1208,7 @@ public class MapDocumentViewModelTests : IDisposable
     public void NotifyTerrainReconciliation_ThrowingPropertyHandler_RecordsFailureAndNotifiesRemainingHandlers()
     {
         _viewModel.SetTerrain(ValidTerrainCatalog(GrassId));
+        _viewModel.SelectTerrain(GrassId);
         int remaining = 0;
         _viewModel.PropertyChanged += (_, _) => throw new InvalidOperationException("first handler failure");
         _viewModel.PropertyChanged += (_, _) => remaining++;
