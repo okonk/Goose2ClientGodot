@@ -1,7 +1,6 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:controls="using:MapEditor.App.Controls"
-        xmlns:rendering="using:MapEditor.App.Rendering"
         xmlns:rows="using:MapEditor.GameData.Rows"
         x:Class="MapEditor.App.MainWindow"
         Title="Goose2 Map Editor — Untitled"

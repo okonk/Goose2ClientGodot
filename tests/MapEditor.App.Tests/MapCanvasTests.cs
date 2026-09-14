@@ -47,12 +47,27 @@ public class MapCanvasTests
         } }
         """;
 
-    private sealed record Harness(MapCanvas Canvas, SpritePaletteControl Palette, MapDocumentViewModel ViewModel, FakeEditorDialogs Dialogs, Window Window, AssetContextController Assets);
+    private sealed record Harness(MapCanvas Canvas, SpritePaletteControl Palette, MapDocumentViewModel ViewModel, FakeEditorDialogs Dialogs, Window Window, AssetContextController Assets, string TempDirectory) : IDisposable
+    {
+        public void Dispose()
+        {
+            Canvas.Dispose();
+            Palette.Dispose();
+            if (Window.IsVisible)
+            {
+                Window.Close();
+                Dispatcher.UIThread.RunJobs();
+            }
+
+            Assets.Dispose();
+            Directory.Delete(TempDirectory, recursive: true);
+        }
+    }
 
     [AvaloniaFact]
     public async Task LeftPressRelease_PaintsOneCellAsSingleUndoEntry()
     {
-        Harness harness = CreateSmallMapAsync();
+        using Harness harness = CreateSmallMapAsync();
         MapEditSession session = harness.ViewModel.Session;
         MapDocument document = session.Document;
         harness.ViewModel.Brush = new MapTileLayer(7, 42);
@@ -72,7 +87,7 @@ public class MapCanvasTests
     [AvaloniaFact]
     public async Task SparseDrag_InterpolatesThroughPartTwoAsOneCommand()
     {
-        Harness harness = CreateSmallMapAsync();
+        using Harness harness = CreateSmallMapAsync();
         MapEditSession session = harness.ViewModel.Session;
         MapDocument document = session.Document;
         harness.ViewModel.Brush = new MapTileLayer(3, 9);
@@ -98,7 +113,7 @@ public class MapCanvasTests
     [AvaloniaFact]
     public async Task ReleaseOutsideCanvas_CompletesStrokeOnce()
     {
-        Harness harness = CreateSmallMapAsync();
+        using Harness harness = CreateSmallMapAsync();
         MapEditSession session = harness.ViewModel.Session;
         MapDocument document = session.Document;
         harness.ViewModel.Brush = new MapTileLayer(1, 2);
@@ -124,7 +139,7 @@ public class MapCanvasTests
     [AvaloniaFact]
     public async Task DragOutsideThenReentry_InterpolatesFromLastValidCellAndNeverLeavesBounds()
     {
-        Harness harness = CreateSmallMapAsync();
+        using Harness harness = CreateSmallMapAsync();
         MapEditSession session = harness.ViewModel.Session;
         MapDocument document = session.Document;
         harness.ViewModel.Brush = new MapTileLayer(4, 6);
@@ -152,7 +167,7 @@ public class MapCanvasTests
     [AvaloniaFact]
     public async Task BlockedDrag_BlocksTheRectangleAsOneUndoEntry()
     {
-        Harness harness = CreateSmallMapAsync();
+        using Harness harness = CreateSmallMapAsync();
         harness.ViewModel.ActiveTool = MapEditTool.Blocked;
         MapDocument document = harness.ViewModel.Session.Document;
 
@@ -174,7 +189,7 @@ public class MapCanvasTests
     [AvaloniaFact]
     public async Task BlockedShiftDrag_ClearsInsteadOfSetting()
     {
-        Harness harness = CreateSmallMapAsync();
+        using Harness harness = CreateSmallMapAsync();
         harness.ViewModel.ActiveTool = MapEditTool.Blocked;
         MapDocument document = harness.ViewModel.Session.Document;
         for (int y = 0; y < MapSize; y++)
@@ -199,7 +214,7 @@ public class MapCanvasTests
     [AvaloniaFact]
     public async Task BlockedDragEscape_AppliesNothing()
     {
-        Harness harness = CreateSmallMapAsync();
+        using Harness harness = CreateSmallMapAsync();
         harness.ViewModel.ActiveTool = MapEditTool.Blocked;
         MapDocument document = harness.ViewModel.Session.Document;
 
@@ -218,7 +233,7 @@ public class MapCanvasTests
     [AvaloniaFact]
     public async Task BlockedDragCaptureLost_AppliesNothing()
     {
-        Harness harness = CreateSmallMapAsync();
+        using Harness harness = CreateSmallMapAsync();
         harness.ViewModel.ActiveTool = MapEditTool.Blocked;
         MapDocument document = harness.ViewModel.Session.Document;
 
@@ -238,7 +253,7 @@ public class MapCanvasTests
     [AvaloniaFact]
     public async Task FinishInteractionCommit_AppliesTheBlockRectangle()
     {
-        Harness harness = CreateSmallMapAsync();
+        using Harness harness = CreateSmallMapAsync();
         harness.ViewModel.ActiveTool = MapEditTool.Blocked;
         MapDocument document = harness.ViewModel.Session.Document;
 
@@ -260,7 +275,7 @@ public class MapCanvasTests
     [AvaloniaFact]
     public async Task Dispose_DuringActiveStroke_CancelsTheStroke()
     {
-        Harness harness = CreateSmallMapAsync();
+        using Harness harness = CreateSmallMapAsync();
         MapEditSession session = harness.ViewModel.Session;
         MapDocument document = session.Document;
         harness.ViewModel.Brush = new MapTileLayer(7, 42);
@@ -278,7 +293,7 @@ public class MapCanvasTests
     [AvaloniaFact]
     public async Task BlockedDragShiftReleasedMidDrag_StillClears()
     {
-        Harness harness = CreateSmallMapAsync();
+        using Harness harness = CreateSmallMapAsync();
         harness.ViewModel.ActiveTool = MapEditTool.Blocked;
         MapDocument document = harness.ViewModel.Session.Document;
         for (int y = 0; y < MapSize; y++)
@@ -300,7 +315,7 @@ public class MapCanvasTests
     [AvaloniaFact]
     public async Task BlockPreview_VanishesAfterCommitAndAfterCancel()
     {
-        Harness harness = CreateSmallMapAsync();
+        using Harness harness = CreateSmallMapAsync();
         harness.ViewModel.ActiveTool = MapEditTool.Blocked;
         MapDocument document = harness.ViewModel.Session.Document;
 
@@ -335,7 +350,7 @@ public class MapCanvasTests
     [AvaloniaFact]
     public async Task EyedropperPress_SelectsTileLayerWithoutEditing()
     {
-        Harness harness = CreateSmallMapAsync();
+        using Harness harness = CreateSmallMapAsync();
         MapEditSession session = harness.ViewModel.Session;
         MapDocument document = session.Document;
         document.SetLayer(1, 1, 2, new MapTileLayer(9, 9));
@@ -355,7 +370,7 @@ public class MapCanvasTests
     [AvaloniaFact]
     public async Task EyedropperPick_SelectsThePickedSheetInThePaletteAndRefreshesIt()
     {
-        Harness harness = CreateSmallMapAsync();
+        using Harness harness = CreateSmallMapAsync();
         using AssetFixture fixture = new();
         fixture.WriteManifest(TwoSheetJson);
         fixture.WriteSheet(1, 64, 32);
@@ -385,7 +400,7 @@ public class MapCanvasTests
     [AvaloniaFact]
     public async Task EyedropperEscape_RestoresThePaletteSelection()
     {
-        Harness harness = CreateSmallMapAsync();
+        using Harness harness = CreateSmallMapAsync();
         using AssetFixture fixture = new();
         fixture.WriteManifest(TwoSheetJson);
         fixture.WriteSheet(1, 64, 32);
@@ -413,7 +428,7 @@ public class MapCanvasTests
     [AvaloniaFact]
     public async Task EyedropperPick_KeepsTheDisplayedSheetWhenThePickedSheetHasNoAssets()
     {
-        Harness harness = CreateSmallMapAsync();
+        using Harness harness = CreateSmallMapAsync();
         using AssetFixture fixture = new();
         fixture.WriteManifest(TwoSheetJson);
         Assert.True(harness.Assets.TryOpen(fixture.AssetDirectory));
@@ -432,7 +447,7 @@ public class MapCanvasTests
     [AvaloniaFact]
     public async Task EscapeDuringStroke_CancelsAndRestores()
     {
-        Harness harness = CreateSmallMapAsync();
+        using Harness harness = CreateSmallMapAsync();
         MapEditSession session = harness.ViewModel.Session;
         MapDocument document = session.Document;
         harness.ViewModel.Brush = new MapTileLayer(5, 5);
@@ -450,7 +465,7 @@ public class MapCanvasTests
     [AvaloniaFact]
     public async Task UnexpectedCaptureLoss_CompletesEffectiveStrokeOnce()
     {
-        Harness harness = CreateSmallMapAsync();
+        using Harness harness = CreateSmallMapAsync();
         MapEditSession session = harness.ViewModel.Session;
         MapDocument document = session.Document;
         harness.ViewModel.Brush = new MapTileLayer(8, 8);
@@ -467,7 +482,7 @@ public class MapCanvasTests
     [AvaloniaFact]
     public async Task MiddleDrag_PansWithoutEditing()
     {
-        Harness harness = CreateSmallMapAsync();
+        using Harness harness = CreateSmallMapAsync();
         MapEditSession session = harness.ViewModel.Session;
         byte[] before = MapCodec.Encode(session.Document);
         bool dirtyBefore = session.IsDirty;
@@ -486,7 +501,7 @@ public class MapCanvasTests
     [AvaloniaFact]
     public async Task SpacePlusLeftDrag_PansWithoutStartingStroke()
     {
-        Harness harness = CreateSmallMapAsync();
+        using Harness harness = CreateSmallMapAsync();
         MapEditSession session = harness.ViewModel.Session;
         MapDocument document = session.Document;
         harness.ViewModel.Brush = new MapTileLayer(2, 2);
@@ -507,7 +522,7 @@ public class MapCanvasTests
     [AvaloniaFact]
     public async Task WheelZoomsAtCursorAndClampsAtLimits()
     {
-        Harness harness = CreateSmallMapAsync();
+        using Harness harness = CreateSmallMapAsync();
         MapCanvas canvas = harness.Canvas;
 
         RenderPoint anchorWorld = canvas.Viewport.ScreenToWorld(new RenderPoint(100, 100));
@@ -540,7 +555,7 @@ public class MapCanvasTests
     [AvaloniaFact]
     public async Task MidStrokeLayerAndBrushChange_AffectsOnlySubsequentStrokes()
     {
-        Harness harness = CreateSmallMapAsync();
+        using Harness harness = CreateSmallMapAsync();
         MapEditSession session = harness.ViewModel.Session;
         MapDocument document = session.Document;
         harness.ViewModel.Brush = new MapTileLayer(7, 42);
@@ -573,7 +588,7 @@ public class MapCanvasTests
     [AvaloniaFact]
     public async Task RenderMapSinkFailure_PropagatesAndLeavesStateIntact()
     {
-        Harness harness = CreateSmallMapAsync();
+        using Harness harness = CreateSmallMapAsync();
         MapEditSession session = harness.ViewModel.Session;
         byte[] before = MapCodec.Encode(session.Document);
         bool dirtyBefore = session.IsDirty;
@@ -606,7 +621,7 @@ public class MapCanvasTests
     [AvaloniaFact]
     public async Task PanAndZoom_NeverChangeDocumentHistoryOrDirty()
     {
-        Harness harness = CreateSmallMapAsync();
+        using Harness harness = CreateSmallMapAsync();
         MapEditSession session = harness.ViewModel.Session;
         byte[] before = MapCodec.Encode(session.Document);
         bool dirtyBefore = session.IsDirty;
@@ -638,7 +653,7 @@ public class MapCanvasTests
     [AvaloniaFact]
     public async Task MoveUpdatesHoverAndPressUpdatesSelection()
     {
-        Harness harness = CreateSmallMapAsync();
+        using Harness harness = CreateSmallMapAsync();
         MapEditSession session = harness.ViewModel.Session;
 
         harness.Window.MouseMove(new Point(2 * Cell - Cell / 2, 2 * Cell - Cell / 2), RawInputModifiers.None);
@@ -659,7 +674,7 @@ public class MapCanvasTests
     [AvaloniaFact]
     public async Task FinishInteraction_CommitCompletesAndCancelRestores()
     {
-        Harness harness = CreateSmallMapAsync();
+        using Harness harness = CreateSmallMapAsync();
         MapEditSession session = harness.ViewModel.Session;
         MapDocument document = session.Document;
         harness.ViewModel.Brush = new MapTileLayer(6, 6);
@@ -680,7 +695,7 @@ public class MapCanvasTests
     [AvaloniaFact]
     public async Task HoverMoves_InvalidateOnlyWhenHoveredTileChanges()
     {
-        Harness harness = CreateSmallMapAsync();
+        using Harness harness = CreateSmallMapAsync();
         MapCanvas canvas = harness.Canvas;
 
         int before = canvas.InvalidationCount;
@@ -702,7 +717,7 @@ public class MapCanvasTests
     [AvaloniaFact]
     public async Task StrokeActive_ReportsGestureActiveUntilRelease()
     {
-        Harness harness = CreateSmallMapAsync();
+        using Harness harness = CreateSmallMapAsync();
         MapCanvas canvas = harness.Canvas;
         Assert.False(canvas.IsGestureActive);
 
@@ -716,7 +731,7 @@ public class MapCanvasTests
     [AvaloniaFact]
     public async Task SelectTool_Click_SetsSelectionWithoutStrokeOrHistory()
     {
-        Harness harness = CreateSmallMapAsync();
+        using Harness harness = CreateSmallMapAsync();
         harness.ViewModel.ActiveTool = MapEditTool.Select;
         Point p = new(Cell / 2, Cell / 2);
         harness.Window.MouseDown(p, MouseButton.Left, RawInputModifiers.None);
@@ -731,7 +746,7 @@ public class MapCanvasTests
     [AvaloniaFact]
     public async Task TerrainPressRelease_PaintsOneCellAsSingleUndoEntry()
     {
-        Harness harness = CreateSmallMapAsync();
+        using Harness harness = CreateSmallMapAsync();
         SelectGrass(harness);
         MapEditSession session = harness.ViewModel.Session;
         MapDocument document = session.Document;
@@ -754,7 +769,7 @@ public class MapCanvasTests
     [AvaloniaFact]
     public async Task TerrainDrag_Release_OneUndoRestoresWholeGesture()
     {
-        Harness harness = CreateSmallMapAsync();
+        using Harness harness = CreateSmallMapAsync();
         SelectGrass(harness);
         MapEditSession session = harness.ViewModel.Session;
         MapDocument document = session.Document;
@@ -791,7 +806,7 @@ public class MapCanvasTests
     [AvaloniaFact]
     public async Task TerrainPaint_RepairsEightNeighborsLive()
     {
-        Harness harness = CreateSmallMapAsync();
+        using Harness harness = CreateSmallMapAsync();
         MapEditSession session = harness.ViewModel.Session;
         MapDocument document = session.Document;
         harness.ViewModel.SetTerrain(TerrainCatalog(
@@ -818,7 +833,7 @@ public class MapCanvasTests
     [AvaloniaFact]
     public async Task TerrainShiftPress_ErasesAnyRecognizedTile()
     {
-        Harness harness = CreateSmallMapAsync();
+        using Harness harness = CreateSmallMapAsync();
         SelectGrass(harness);
         MapEditSession session = harness.ViewModel.Session;
         MapDocument document = session.Document;
@@ -837,7 +852,7 @@ public class MapCanvasTests
     [AvaloniaFact]
     public async Task TerrainPaint_OverwritesManualTile_LeavesManualNeighborsUntouched()
     {
-        Harness harness = CreateSmallMapAsync();
+        using Harness harness = CreateSmallMapAsync();
         SelectGrass(harness);
         MapDocument document = harness.ViewModel.Session.Document;
         document.SetLayer(0, 0, 0, new MapTileLayer(7, 42));
@@ -856,7 +871,7 @@ public class MapCanvasTests
     [AvaloniaFact]
     public async Task TerrainPaint_NonContiguousLayerMask_PaintsTopmostSelectedLayer()
     {
-        Harness harness = CreateSmallMapAsync();
+        using Harness harness = CreateSmallMapAsync();
         SelectGrass(harness);
         MapDocument document = harness.ViewModel.Session.Document;
         harness.ViewModel.SelectedLayers = (byte)0b1001;
@@ -873,7 +888,7 @@ public class MapCanvasTests
     [AvaloniaFact]
     public async Task TerrainZeroDeltaErase_StaysCaptured_ThenDragErases_AndUnchangedReleasePushesNoCommand()
     {
-        Harness harness = CreateSmallMapAsync();
+        using Harness harness = CreateSmallMapAsync();
         SelectGrass(harness);
         MapEditSession session = harness.ViewModel.Session;
         MapDocument document = session.Document;
@@ -903,7 +918,7 @@ public class MapCanvasTests
     [AvaloniaFact]
     public async Task TerrainShiftReleasedMidDrag_StillErases()
     {
-        Harness harness = CreateSmallMapAsync();
+        using Harness harness = CreateSmallMapAsync();
         SelectGrass(harness);
         MapDocument document = harness.ViewModel.Session.Document;
         document.SetLayer(0, 0, 0, new MapTileLayer(1, 10));
@@ -920,7 +935,7 @@ public class MapCanvasTests
     [AvaloniaFact]
     public async Task TerrainEscape_CancelsAndRestores()
     {
-        Harness harness = CreateSmallMapAsync();
+        using Harness harness = CreateSmallMapAsync();
         SelectGrass(harness);
         MapEditSession session = harness.ViewModel.Session;
         MapDocument document = session.Document;
@@ -937,7 +952,7 @@ public class MapCanvasTests
     [AvaloniaFact]
     public async Task TerrainCaptureLost_CancelsAndRestores()
     {
-        Harness harness = CreateSmallMapAsync();
+        using Harness harness = CreateSmallMapAsync();
         SelectGrass(harness);
         MapEditSession session = harness.ViewModel.Session;
         MapDocument document = session.Document;
@@ -954,7 +969,7 @@ public class MapCanvasTests
     [AvaloniaFact]
     public async Task PencilCaptureLost_CommitsTheStroke()
     {
-        Harness harness = CreateSmallMapAsync();
+        using Harness harness = CreateSmallMapAsync();
         MapEditSession session = harness.ViewModel.Session;
         MapDocument document = session.Document;
         harness.ViewModel.Brush = new MapTileLayer(8, 8);
@@ -970,7 +985,7 @@ public class MapCanvasTests
     [AvaloniaFact]
     public async Task TerrainPublication_CancelsActiveGestureAndRestores()
     {
-        Harness harness = CreateSmallMapAsync();
+        using Harness harness = CreateSmallMapAsync();
         SelectGrass(harness);
         MapEditSession session = harness.ViewModel.Session;
         MapDocument document = session.Document;
@@ -996,7 +1011,7 @@ public class MapCanvasTests
     [AvaloniaFact]
     public async Task RootSwap_CancelsActiveGestureAndRestores()
     {
-        Harness harness = CreateSmallMapAsync();
+        using Harness harness = CreateSmallMapAsync();
         SelectGrass(harness);
         MapEditSession session = harness.ViewModel.Session;
         MapDocument document = session.Document;
@@ -1017,7 +1032,7 @@ public class MapCanvasTests
     [AvaloniaFact]
     public async Task TerrainBeginFailure_SurfacesOneErrorAndCapturesNothing()
     {
-        Harness harness = CreateSmallMapAsync();
+        using Harness harness = CreateSmallMapAsync();
         SelectGrass(harness);
         MapEditSession session = harness.ViewModel.Session;
         MapDocument document = session.Document;
@@ -1042,7 +1057,7 @@ public class MapCanvasTests
     [AvaloniaFact]
     public async Task MapCanvasDispose_IsIdempotent()
     {
-        Harness harness = CreateSmallMapAsync();
+        using Harness harness = CreateSmallMapAsync();
         harness.Canvas.Dispose();
         harness.Canvas.Dispose();
         harness.Palette.Dispose();
@@ -1052,7 +1067,7 @@ public class MapCanvasTests
     [AvaloniaFact]
     public async Task FloodFillTool_Click_FillsRegionAsOneUndoableCommand()
     {
-        Harness harness = CreateSmallMapAsync();
+        using Harness harness = CreateSmallMapAsync();
         MapDocument document = harness.ViewModel.Session.Document;
         // the harness map is 4x4 (MapSize = 4); ring = all perimeter cells with (1,1),
         // interior = the 4 cells (1,1),(1,2),(2,1),(2,2)
@@ -1078,7 +1093,7 @@ public class MapCanvasTests
     [AvaloniaFact]
     public async Task MultiSelectTool_Drag_SetsSelectionRectangle()
     {
-        Harness harness = CreateSmallMapAsync();
+        using Harness harness = CreateSmallMapAsync();
         harness.ViewModel.ActiveTool = MapEditTool.MultiSelect;
         Point start = new(Cell / 2, Cell / 2);
         Point end = new(3 * Cell + Cell / 2, 2 * Cell + Cell / 2);
@@ -1094,7 +1109,7 @@ public class MapCanvasTests
     [AvaloniaFact]
     public async Task MultiSelectTool_DragOutsideMap_ClampsToMapBounds()
     {
-        Harness harness = CreateSmallMapAsync();
+        using Harness harness = CreateSmallMapAsync();
         harness.ViewModel.ActiveTool = MapEditTool.MultiSelect;
         Point start = new(Cell / 2, Cell / 2);
         Point outside = new(3 * Cell + Cell / 2 + 400, 3 * Cell + Cell / 2 + 400);
@@ -1109,7 +1124,7 @@ public class MapCanvasTests
     [AvaloniaFact]
     public async Task MultiSelectTool_ClickWithoutMove_SetsSingleTileRectangle()
     {
-        Harness harness = CreateSmallMapAsync();
+        using Harness harness = CreateSmallMapAsync();
         harness.ViewModel.ActiveTool = MapEditTool.MultiSelect;
         Point p = new(Cell + Cell / 2, Cell + Cell / 2);
         harness.Window.MouseDown(p, MouseButton.Left, RawInputModifiers.None);
@@ -1123,7 +1138,7 @@ public class MapCanvasTests
     [AvaloniaFact]
     public async Task PasteMode_IsOneShot_SecondClickRunsActiveTool()
     {
-        Harness harness = CreateSmallMapAsync();
+        using Harness harness = CreateSmallMapAsync();
         MapDocument document = harness.ViewModel.Session.Document;
         document.SetLayer(0, 0, 0, new MapTileLayer(7, 7));
         document.SetLayer(1, 0, 0, new MapTileLayer(7, 7));
@@ -1156,7 +1171,7 @@ public class MapCanvasTests
     [AvaloniaFact]
     public async Task PasteMode_EscapeCancelsWithoutPasting()
     {
-        Harness harness = CreateSmallMapAsync();
+        using Harness harness = CreateSmallMapAsync();
         MapDocument document = harness.ViewModel.Session.Document;
         document.SetLayer(0, 0, 0, new MapTileLayer(7, 7));
         harness.ViewModel.SelectionRectangle = new MapTileRectangle(0, 0, 1, 1);
@@ -1171,7 +1186,7 @@ public class MapCanvasTests
     [AvaloniaFact]
     public async Task PasteMode_EscapeWithBrushFieldFocused_Cancels()
     {
-        Harness harness = CreateSmallMapAsync();
+        using Harness harness = CreateSmallMapAsync();
         MapDocument document = harness.ViewModel.Session.Document;
         document.SetLayer(0, 0, 0, new MapTileLayer(7, 7));
         harness.ViewModel.SelectionRectangle = new MapTileRectangle(0, 0, 1, 1);
@@ -1188,7 +1203,7 @@ public class MapCanvasTests
     [AvaloniaFact]
     public async Task PasteMode_ClickOutsideMapCancelsWithoutPasting()
     {
-        Harness harness = CreateSmallMapAsync();
+        using Harness harness = CreateSmallMapAsync();
         MapDocument document = harness.ViewModel.Session.Document;
         document.SetLayer(0, 0, 0, new MapTileLayer(7, 7));
         harness.ViewModel.SelectionRectangle = new MapTileRectangle(0, 0, 1, 1);
@@ -1205,7 +1220,7 @@ public class MapCanvasTests
     [AvaloniaFact]
     public async Task PasteMode_UndoMenuCancelsBeforeNextClick()
     {
-        Harness harness = CreateSmallMapAsync();
+        using Harness harness = CreateSmallMapAsync();
         MapDocument document = harness.ViewModel.Session.Document;
 
         // paint a cell before entering paste mode so the Undo menu item is enabled
@@ -1237,7 +1252,7 @@ public class MapCanvasTests
     [AvaloniaFact]
     public async Task PasteMode_ClickOnNonCanvasControl_CancelsWithoutPasting()
     {
-        Harness harness = CreateSmallMapAsync();
+        using Harness harness = CreateSmallMapAsync();
         MapDocument document = harness.ViewModel.Session.Document;
         document.SetLayer(0, 0, 0, new MapTileLayer(7, 7));
         harness.ViewModel.SelectionRectangle = new MapTileRectangle(0, 0, 1, 1);
@@ -1256,7 +1271,7 @@ public class MapCanvasTests
     [AvaloniaFact]
     public async Task PasteMode_ClickOnToolToggle_CancelsWithoutPasting()
     {
-        Harness harness = CreateSmallMapAsync();
+        using Harness harness = CreateSmallMapAsync();
         MapDocument document = harness.ViewModel.Session.Document;
         document.SetLayer(0, 0, 0, new MapTileLayer(7, 7));
         harness.ViewModel.SelectionRectangle = new MapTileRectangle(0, 0, 1, 1);
@@ -1276,7 +1291,7 @@ public class MapCanvasTests
     [AvaloniaFact]
     public async Task CompletedGesture_CreatesTimelineEntry_RatherThanBypassingCoordination()
     {
-        Harness harness = CreateSmallMapAsync();
+        using Harness harness = CreateSmallMapAsync();
         MapDocument document = harness.ViewModel.Session.Document;
         DocumentEditTimeline timeline = harness.ViewModel.Timeline;
         harness.ViewModel.Brush = new MapTileLayer(7, 42);
@@ -1303,7 +1318,7 @@ public class MapCanvasTests
     [AvaloniaFact]
     public async Task CanceledGesture_CreatesNoTimelineEntry_AndRestoresThroughCoordination()
     {
-        Harness harness = CreateSmallMapAsync();
+        using Harness harness = CreateSmallMapAsync();
         MapEditSession session = harness.ViewModel.Session;
         MapDocument document = session.Document;
         DocumentEditTimeline timeline = harness.ViewModel.Timeline;
@@ -1323,7 +1338,7 @@ public class MapCanvasTests
     [AvaloniaFact]
     public async Task BlockedDragCommitAndEscape_CoordinateThroughTheTimeline()
     {
-        Harness harness = CreateSmallMapAsync();
+        using Harness harness = CreateSmallMapAsync();
         harness.ViewModel.ActiveTool = MapEditTool.Blocked;
         MapDocument document = harness.ViewModel.Session.Document;
         DocumentEditTimeline timeline = harness.ViewModel.Timeline;
@@ -1419,7 +1434,9 @@ public class MapCanvasTests
         // FakeEditorDialogs answers synchronously, so this completes before the next line
         workspace.NewAsync().GetAwaiter().GetResult();
         MapDocumentViewModel viewModel = workspace.ActiveDocument;
-        string settingsPath = Path.Combine(Path.GetTempPath(), "map-editor-canvas-tests", "settings.json");
+        string tempDirectory = Path.Combine(Path.GetTempPath(), $"map-editor-canvas-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(tempDirectory);
+        string settingsPath = Path.Combine(tempDirectory, "settings.json");
         AssetContextController assets = new(workspace, new AppSettingsStore(settingsPath));
         MapCanvas canvas = new(viewModel, assets)
         {
@@ -1499,13 +1516,13 @@ public class MapCanvasTests
         }, RoutingStrategies.Tunnel);
         window.Show();
         Dispatcher.UIThread.RunJobs();
-        return new Harness(canvas, palette, viewModel, dialogs, window, assets);
+        return new Harness(canvas, palette, viewModel, dialogs, window, assets, tempDirectory);
     }
 
     [AvaloniaFact]
     public async Task RenderMap_HonorsLayerVisibilityMask()
     {
-        Harness harness = CreateSmallMapAsync();
+        using Harness harness = CreateSmallMapAsync();
         using AssetFixture fixture = new();
         const string json = """
             { "tileSize": 32, "sheets": { "1": { "10": [0, 0, 32, 32], "11": [32, 0, 32, 32] } } }

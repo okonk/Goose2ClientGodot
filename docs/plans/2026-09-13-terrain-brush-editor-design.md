@@ -268,4 +268,11 @@ A smoke pass will:
 - Oversized or multi-cell terrain graphics.
 - User-authored variant weights or per-stroke randomization.
 - Pixel screenshot tests.
-- Long-stroke resolution performance: Part 2's stateless `TryResolvePatch` re-validates and re-sorts the full cumulative center-override set on every segment (O(K log K), K = cumulative visited cells; O(N² log N) per stroke, plus per-segment clone allocations). Realistic strokes stay sub-millisecond per event, but a single gesture visiting tens of thousands of cells on a large map degrades progressively (CPU + GC pressure). A fix needs a stateful/incremental resolution fast path (validated cumulative state + only newly staged entries) or stroke-side persistent overrides with rollback — both require relaxing Part 2's locked resolver contract. Surfaced by the Part 2 final review.
+- ~~Long-stroke resolution performance: Part 2's stateless `TryResolvePatch` re-validates and re-sorts the full cumulative center-override set on every segment (O(K log K), K = cumulative visited cells; O(N² log N) per stroke, plus per-segment clone allocations). Realistic strokes stay sub-millisecond per event, but a single gesture visiting tens of thousands of cells on a large map degrades progressively (CPU + GC pressure). A fix needs a stateful/incremental resolution fast path (validated cumulative state + only newly staged entries) or stroke-side persistent overrides with rollback — both require relaxing Part 2's locked resolver contract. Surfaced by the Part 2 final review.~~ **Resolved (2026-09-14):** added an incremental `TryResolveStaged` fast path in `TerrainMapResolver` that validates and resolves only newly staged cells, with in-place stroke overrides; the stateless `TryResolvePatch` is retained as the reference path. Guarded by `LongStroke_PaintsFullMapInOneGesture`.
+
+### Accepted behaviors (not defects)
+
+- `PublicationNotificationErrors` fixed-capacity `TryAdd` silently drops overflow (spec-consistent).
+- No disposed-check in publication `Commit` (contract requires it at prepare time only).
+- First document's `Terrain` is null until first root open (mirrors pre-existing `SheetIds` behavior).
+- Terrain editor keeps its pre-switch draft catalog after a root swap (plan-specified rebind behavior).

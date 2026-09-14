@@ -642,6 +642,7 @@ public class ShortcutTests
         Dispatcher.UIThread.RunJobs();
         Guid terrainId = harness.ViewModel.Terrains.Single().Id;
         harness.ViewModel.SelectTerrain(terrainId);
+        harness.ViewModel.ActiveTool = MapEditTool.Eraser;
         TextBox graphic = window.FindControl<TextBox>("BrushGraphic")!;
         graphic.Focus();
 
@@ -649,7 +650,7 @@ public class ShortcutTests
         window.KeyTextInput("t");
         Dispatcher.UIThread.RunJobs();
 
-        Assert.Equal(MapEditTool.Terrain, harness.ViewModel.ActiveTool);
+        Assert.Equal(MapEditTool.Eraser, harness.ViewModel.ActiveTool);
         Assert.Contains("t", graphic.Text);
     }
 

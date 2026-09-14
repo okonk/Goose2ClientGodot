@@ -1,7 +1,9 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Text.Json;
 using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
@@ -91,23 +93,19 @@ public class TerrainEditorEndToEndTests
         Dispatcher.UIThread.RunJobs();
     }
 
-    private static int FrameX(int graphic)
-        => graphic switch
+    private static readonly Lazy<Dictionary<int, int>> _frameX = new(() =>
+    {
+        var map = new Dictionary<int, int>();
+        using JsonDocument doc = JsonDocument.Parse(AssetFixture.TerrainManifestJson);
+        JsonElement sheet = doc.RootElement.GetProperty("sheets").GetProperty("1");
+        foreach (JsonProperty property in sheet.EnumerateObject())
         {
-            10 => 0,
-            11 => 32,
-            12 => 64,
-            13 => 96,
-            14 => 128,
-            15 => 160,
-            16 => 192,
-            17 => 224,
-            18 => 256,
-            20 => 288,
-            21 => 320,
-            22 => 352,
-            _ => throw new ArgumentOutOfRangeException(nameof(graphic))
-        };
+            map[int.Parse(property.Name)] = property.Value[0].GetInt32();
+        }
+        return map;
+    });
+
+    private static int FrameX(int graphic) => _frameX.Value[graphic];
 
     private static void ClickTile(MainWindowHarness harness, int x, int y, RawInputModifiers modifiers = RawInputModifiers.None)
     {
