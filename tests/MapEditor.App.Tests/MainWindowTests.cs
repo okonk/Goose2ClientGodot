@@ -1516,6 +1516,26 @@ public class MainWindowGraphicViewerTests : IDisposable
     }
 
     [AvaloniaFact]
+    public void TerrainSelector_ValidEmptyCatalog_DisablesSelectorAndEditButKeepsAdd()
+    {
+        _harness.Dialogs.AssetDirectoryPickResult = WriteAssetDirectory("assets-empty", ManifestA, AnimationA, 1);
+        Find<Button>("LoadAssetsButton").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        Dispatcher.UIThread.RunJobs();
+
+        TerrainCatalogLoadResult availability = _harness.ViewModel.TerrainAvailability!;
+        Assert.True(availability.IsValid);
+        Assert.Null(availability.Catalog);
+
+        Find<TabControl>("LeftTabs").SelectedIndex = 1;
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.True(Find<Button>("TerrainAddButton").IsEnabled);
+        Assert.False(Find<ComboBox>("TerrainCombo").IsEnabled);
+        Assert.Empty(Find<ComboBox>("TerrainCombo").Items);
+        Assert.False(Find<Button>("TerrainEditButton").IsEnabled);
+    }
+
+    [AvaloniaFact]
     public void TerrainSelector_ValidCatalog_PopulatesEntriesAndSelectingActivatesTheTerrainTool()
     {
         string directory = WriteTerrainAssetDirectory("assets-terrain", AssetFixture.TerrainCatalogJson);

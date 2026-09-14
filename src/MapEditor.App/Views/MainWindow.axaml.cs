@@ -1424,7 +1424,7 @@ internal partial class MainWindow : Window
         }
 
         TerrainCatalogLoadResult? terrain = Document.TerrainAvailability;
-        TerrainCombo.IsEnabled = terrain?.IsValid == true;
+        TerrainCombo.IsEnabled = terrain is { IsValid: true, Catalog: not null };
         TerrainDiagnosticText.Text = terrain?.Diagnostic ?? string.Empty;
         TerrainDiagnosticText.IsVisible = terrain?.Diagnostic is not null;
         TerrainAddButton.IsEnabled = terrain is null || terrain.CanAuthor;
