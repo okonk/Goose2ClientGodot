@@ -691,4 +691,26 @@ public class TerrainMapResolverTests
         Assert.False(statelessOk);
         Assert.Equal(unknown, statelessFailure!.TerrainId);
     }
+
+    [Fact]
+    public void TryResolveStaged_DuplicateStagedIndex_MatchesStatelessEffectiveCenter()
+    {
+        var resolver = new TerrainMapResolver(Index((0, 1, Pattern(Grass))));
+        var document = MapDocument.Create(3, 3);
+        var unknown = Guid.NewGuid();
+        var staged = new (int Index, Guid? Center)[] { (4, unknown), (4, Grass) };
+        var overrides = new Dictionary<int, Guid?>();
+        foreach (var (index, center) in staged)
+        {
+            overrides[index] = center;
+        }
+
+        Assert.True(
+            resolver.TryResolveStaged(document, 0, overrides, staged, out var stagedPatch, out var stagedFailure),
+            stagedFailure?.Message);
+        Assert.True(
+            resolver.TryResolvePatch(document, 0, overrides, staged.Select(pair => pair.Index).ToList(), out var statelessPatch, out var statelessFailure),
+            statelessFailure?.Message);
+        Assert.Equal(statelessPatch.Changes, stagedPatch.Changes);
+    }
 }

@@ -119,17 +119,18 @@ public sealed class TerrainMapResolver : ITerrainPatchResolver
         }
 
         var direct = staged
-            .GroupBy(pair => pair.Index)
-            .Select(group => (Index: group.Key, Center: group.First().Center))
-            .OrderBy(pair => pair.Index)
+            .Select(pair => pair.Index)
+            .Distinct()
+            .OrderBy(static value => value)
             .ToList();
-        foreach (var (index, center) in direct)
+        foreach (var index in direct)
         {
             if (index < 0 || index >= document.TileCount)
             {
                 throw new ArgumentOutOfRangeException(nameof(staged));
             }
 
+            var center = centerOverrides[index];
             if (center is not null && !_catalog.TryGetTerrain(center.Value, out _))
             {
                 (patch, failure) = Fail(layer, center.Value, index % document.Width, index / document.Width, $"Unknown terrain {center}.");
@@ -137,7 +138,7 @@ public sealed class TerrainMapResolver : ITerrainPatchResolver
             }
         }
 
-        return ResolveAffected(document, layer, centerOverrides, direct.Select(pair => pair.Index).ToList(), out patch, out failure);
+        return ResolveAffected(document, layer, centerOverrides, direct, out patch, out failure);
     }
 
     private bool ResolveAffected(
