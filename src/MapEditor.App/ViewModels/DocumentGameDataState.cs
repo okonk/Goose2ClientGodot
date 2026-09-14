@@ -25,7 +25,7 @@ internal sealed class DocumentGameDataState : IDisposable, INotifyPropertyChange
     private bool _showSpawnOverlay = true;
     private bool _showWarpOverlay = true;
     private bool _showNames = true;
-    private bool _previewMode;
+    private bool _previewMode = true;
     private int? _selectedSpawn;
     private int? _selectedWarp;
     private int? _selectedNpcId;

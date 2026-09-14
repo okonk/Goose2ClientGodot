@@ -126,8 +126,8 @@ public class MainWindowGameDataTests
         Assert.True(Item(harness, "SpawnOverlayMenuItem").IsChecked == true);
         Assert.True(Item(harness, "WarpOverlayMenuItem").IsChecked == true);
         Assert.True(Item(harness, "ShowNamesMenuItem").IsChecked == true);
-        Assert.False(Item(harness, "PreviewMenuItem").IsChecked == true);
-        Assert.False(Control<TextBlock>(harness, "PreviewStatusText").IsVisible);
+        Assert.True(Item(harness, "PreviewMenuItem").IsChecked == true);
+        Assert.True(Control<TextBlock>(harness, "PreviewStatusText").IsVisible);
     }
 
     [AvaloniaFact]
@@ -216,7 +216,6 @@ public class MainWindowGameDataTests
         MenuItem spawnOverlay = Item(harness, "SpawnOverlayMenuItem");
         TextBlock status = Control<TextBlock>(harness, "PreviewStatusText");
 
-        preview.IsChecked = true;
         Assert.True(first.GameData!.PreviewMode);
         Assert.True(preview.IsChecked == true);
         Assert.True(status.IsVisible);
@@ -227,9 +226,13 @@ public class MainWindowGameDataTests
         harness.Dialogs.NewMapResult = new NewMapRequest(100, 100);
         await harness.Workspace.NewAsync();
         MapDocumentViewModel second = harness.Workspace.ActiveDocument;
-        Assert.False(second.GameData!.PreviewMode);
+        Assert.True(second.GameData!.PreviewMode);
+        Assert.True(status.IsVisible);
+        Assert.True(preview.IsChecked == true);
+
+        preview.IsChecked = false;
+        Assert.False(second.GameData.PreviewMode);
         Assert.False(status.IsVisible);
-        Assert.False(preview.IsChecked == true);
 
         harness.Workspace.Activate(first);
         Dispatcher.UIThread.RunJobs();

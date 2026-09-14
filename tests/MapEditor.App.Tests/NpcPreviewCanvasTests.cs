@@ -199,13 +199,14 @@ public class NpcPreviewCanvasTests
     }
 
     [AvaloniaFact]
-    public void Names_RenderOnMarkerBoxesByDefault_AndHideWhenToggledOff()
+    public void Names_RenderOnMarkerBoxesWhenPreviewOff_AndHideWhenToggledOff()
     {
         Harness harness = CreateHarness();
         MapDocumentViewModel viewModel = harness.ViewModel;
         viewModel.GameData!.AttachSession(Session(
             spawns: new[] { new NpcSpawnRow(1, 10, 1, 1), new NpcSpawnRow(999, 10, 3, 1) },
             warps: new[] { new WarpRow(10, 2, 2, 10, 5, 6) }));
+        viewModel.GameData.PreviewMode = false;
 
         RecordingMapDrawTarget target = new();
         harness.Canvas.RenderMap(target);
