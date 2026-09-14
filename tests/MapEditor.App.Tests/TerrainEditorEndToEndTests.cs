@@ -387,7 +387,8 @@ public class TerrainEditorEndToEndTests
         TerrainCatalogLoadResult availability = document.TerrainAvailability!;
         Assert.False(availability.IsValid);
         Assert.True(availability.CanAuthor);
-        string diagnosticMessage = Assert.NotNull(availability.Diagnostic);
+        Assert.NotNull(availability.Diagnostic);
+        string diagnosticMessage = availability.Diagnostic!;
         TextBlock diagnostic = Find<TextBlock>(harness.Window, "TerrainDiagnosticText");
         Assert.True(diagnostic.IsVisible);
         Assert.Equal(diagnosticMessage, diagnostic.Text);
