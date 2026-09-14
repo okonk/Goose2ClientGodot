@@ -239,6 +239,52 @@ public class TerrainPatternScorerTests
     }
 
     [Fact]
+    public void Select_ScoreTiePrefersTheSpecificPatternOverTheAllCenterDefault()
+    {
+        var center = Ids[0];
+        var desired = AllPeers(1, 1, 2, 1, 1, 1, 1, 1) with { Center = center };
+        var allCenter = AllPeers(1, 1, 1, 1, 1, 1, 1, 1) with { Center = center };
+        var southEdge = AllPeers(1, 1, 2, 1, 1, 2, 2, 1) with { Center = center };
+        var candidates = new List<TerrainPatternCandidateGroup>
+        {
+            Group(allCenter, (0, 1)),
+            Group(southEdge, (0, 2))
+        };
+
+        Assert.Equal(8, TerrainPatternScorer.Score(desired, allCenter));
+        Assert.Equal(8, TerrainPatternScorer.Score(desired, southEdge));
+
+        for (var x = 0; x < 8; x++)
+        {
+            for (var y = 0; y < 8; y++)
+            {
+                var selection = TerrainPatternScorer.Select(desired, x, y, candidates);
+                Assert.Equal(southEdge, selection.Pattern);
+                Assert.Equal(2, selection.TiedPatternCount);
+            }
+        }
+    }
+
+    [Fact]
+    public void Select_AllCenterDefaultStillWinsWhenItIsTheUniqueBest()
+    {
+        var center = Ids[0];
+        var desired = AllPeers(1, 1, 1, 1, 1, 1, 1, 1) with { Center = center };
+        var allCenter = AllPeers(1, 1, 1, 1, 1, 1, 1, 1) with { Center = center };
+        var southEdge = AllPeers(1, 1, 2, 1, 1, 2, 2, 1) with { Center = center };
+        var candidates = new List<TerrainPatternCandidateGroup>
+        {
+            Group(allCenter, (0, 1)),
+            Group(southEdge, (0, 2))
+        };
+
+        var selection = TerrainPatternScorer.Select(desired, 3, 7, candidates);
+        Assert.Equal(allCenter, selection.Pattern);
+        Assert.Equal(12, selection.Score);
+        Assert.Equal(1, selection.TiedPatternCount);
+    }
+
+    [Fact]
     public void Select_RejectsEmptyCandidates()
     {
         var desired = AllPeers(1, 2, 3, 4, 1, 2, 3, 4) with { Center = Ids[0] };

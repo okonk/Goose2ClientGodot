@@ -109,8 +109,12 @@ public static class TerrainPatternScorer
         }
 
         tied.Sort(static (a, b) => ComparePatterns(a.Pattern, b.Pattern));
+        // On an exact score tie, prefer the most specific pattern so a default all-center
+        // pattern never wins against a specific edge/corner pattern and drops the border.
+        var maxSpecificity = tied.Max(entry => Specificity(entry.Pattern, centerId));
+        var specific = tied.Where(entry => Specificity(entry.Pattern, centerId) == maxSpecificity).ToList();
         var patternHash = TerrainStableHash.HashPattern(centerId, x, y, desired);
-        var selected = tied[(int)(patternHash % (ulong)tied.Count)];
+        var selected = specific[(int)(patternHash % (ulong)specific.Count)];
 
         var variants = selected.Variants.Distinct().ToList();
         if (variants.Count == 0)
@@ -157,5 +161,20 @@ public static class TerrainPatternScorer
         return string.CompareOrdinal(
             a.Value.ToString("N", CultureInfo.InvariantCulture),
             b.Value.ToString("N", CultureInfo.InvariantCulture));
+    }
+
+    private static int Specificity(TerrainPattern pattern, Guid center)
+    {
+        var count = 0;
+        foreach (var (peer, _) in PeerWeights)
+        {
+            var value = pattern.Get(peer);
+            if (value is not null && value.Value != center)
+            {
+                count++;
+            }
+        }
+
+        return count;
     }
 }
