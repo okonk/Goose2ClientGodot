@@ -13,6 +13,8 @@ using Avalonia.Threading;
 using Avalonia.VisualTree;
 using MapEditor.App.Controls;
 using MapEditor.App.Dialogs;
+using MapEditor.App.Tests.Fakes;
+using MapEditor.App.Tests.Fixtures;
 using MapEditor.App.ViewModels;
 using MapEditor.Core;
 using MapEditor.GameData.Connectivity;
@@ -592,6 +594,74 @@ public class ShortcutTests
         Assert.Null(harness.Workspace.Clipboard.Current);
         Assert.Empty(vm.GameData.Session.Edits.Warps);
         Assert.True(destinationX.IsFocused);
+    }
+
+    [AvaloniaFact]
+    public void UnmodifiedT_SelectsTheSelectedTerrainAndActivatesTheTerrainTool()
+    {
+        using MainWindowHarness harness = MainWindowHarness.Create();
+        MainWindow window = harness.Window;
+        string directory = WriteTerrainAssetDirectory(harness);
+        Assert.True(harness.Assets.TryOpen(directory));
+        Dispatcher.UIThread.RunJobs();
+        Guid terrainId = harness.ViewModel.Terrains.Single().Id;
+        harness.ViewModel.SelectTerrain(terrainId);
+
+        window.KeyPressQwerty(PhysicalKey.T, RawInputModifiers.None);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Equal(MapEditTool.Terrain, harness.ViewModel.ActiveTool);
+        Assert.Equal(terrainId, harness.ViewModel.SelectedTerrainId);
+        Assert.True(window.FindControl<Avalonia.Controls.Primitives.ToggleButton>("TerrainTool")!.IsChecked);
+    }
+
+    [AvaloniaFact]
+    public void UnmodifiedT_WithoutASelectedTerrain_LeavesTheToolUnchanged()
+    {
+        using MainWindowHarness harness = MainWindowHarness.Create();
+        MainWindow window = harness.Window;
+        string directory = WriteTerrainAssetDirectory(harness);
+        Assert.True(harness.Assets.TryOpen(directory));
+        Dispatcher.UIThread.RunJobs();
+        harness.ViewModel.ActiveTool = MapEditTool.Eraser;
+
+        window.KeyPressQwerty(PhysicalKey.T, RawInputModifiers.None);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Equal(MapEditTool.Eraser, harness.ViewModel.ActiveTool);
+        Assert.Null(harness.ViewModel.SelectedTerrainId);
+    }
+
+    [AvaloniaFact]
+    public void UnmodifiedT_WithFocusInBrushField_TypesInsteadOfSelectingTerrain()
+    {
+        using MainWindowHarness harness = MainWindowHarness.Create();
+        MainWindow window = harness.Window;
+        string directory = WriteTerrainAssetDirectory(harness);
+        Assert.True(harness.Assets.TryOpen(directory));
+        Dispatcher.UIThread.RunJobs();
+        Guid terrainId = harness.ViewModel.Terrains.Single().Id;
+        harness.ViewModel.SelectTerrain(terrainId);
+        TextBox graphic = window.FindControl<TextBox>("BrushGraphic")!;
+        graphic.Focus();
+
+        window.KeyPressQwerty(PhysicalKey.T, RawInputModifiers.None);
+        window.KeyTextInput("t");
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Equal(MapEditTool.Terrain, harness.ViewModel.ActiveTool);
+        Assert.Contains("t", graphic.Text);
+    }
+
+    private static string WriteTerrainAssetDirectory(MainWindowHarness harness)
+    {
+        string directory = Path.Combine(harness.TempDirectory, "terrain-assets");
+        Directory.CreateDirectory(Path.Combine(directory, "sheets"));
+        File.WriteAllText(Path.Combine(directory, "manifest.json"), AssetFixture.ManifestJson);
+        File.WriteAllBytes(Path.Combine(directory, "sheets", "1.png"), AssetFixture.PngSheet.Create(64, 64));
+        File.WriteAllBytes(Path.Combine(directory, "sheets", "2.png"), AssetFixture.PngSheet.Create(64, 64));
+        File.WriteAllText(Path.Combine(directory, TerrainAssetCatalog.FileName), AssetFixture.TerrainCatalogJson);
+        return directory;
     }
 
     private static void PressClipboardAndDeleteKeys(MainWindow window)

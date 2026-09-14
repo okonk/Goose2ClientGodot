@@ -1,12 +1,16 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:controls="using:MapEditor.App.Controls"
+        xmlns:rendering="using:MapEditor.App.Rendering"
         xmlns:rows="using:MapEditor.GameData.Rows"
         x:Class="MapEditor.App.MainWindow"
         Title="Goose2 Map Editor — Untitled"
         Width="1200"
         Height="800"
         FontFamily="Inter, $Default">
+  <Window.Resources>
+    <controls:TerrainColorSwatchConverter x:Key="TerrainSwatchBrush" />
+  </Window.Resources>
   <DockPanel x:Name="Root">
     <Menu x:Name="Menu" DockPanel.Dock="Top">
       <MenuItem x:Name="FileMenu" Header="_File">
@@ -88,22 +92,71 @@
         <StackPanel DockPanel.Dock="Top" Spacing="8" Margin="12,12,12,10">
           <Button x:Name="LoadAssetsButton" Content="Load assets…" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Click="OnLoadAssets" />
           <TextBlock x:Name="AssetDirectoryText" Classes="muted" FontSize="11" Text="—" TextWrapping="Wrap" TextTrimming="CharacterEllipsis" />
-          <ComboBox x:Name="SheetCombo" ItemsSource="{Binding SheetIds}" SelectedItem="{Binding SelectedSheet, Mode=TwoWay}" />
-          <StackPanel Orientation="Horizontal" Spacing="6">
-            <TextBlock Text="Sheet" Classes="muted" VerticalAlignment="Center" />
-            <TextBox x:Name="BrushSheet" Width="58" />
-            <TextBlock Text="Graphic" Classes="muted" VerticalAlignment="Center" />
-            <TextBox x:Name="BrushGraphic" Width="58" />
-          </StackPanel>
-          <TextBlock x:Name="BrushValidationError" Text="Must be a signed integer."
-                     Foreground="{DynamicResource EditorDangerBrush}" FontSize="11" IsVisible="False" />
         </StackPanel>
-        <!-- The scrollbar overlays the palette so the tile grid keeps the full panel width. -->
-        <Grid x:Name="PaletteHost" Margin="12,0,12,12">
-          <Border x:Name="PaletteBorder" Classes="sunken" ClipToBounds="True" />
-          <ScrollBar x:Name="PaletteBar" Classes="overlay" Orientation="Vertical"
-                     HorizontalAlignment="Right" Margin="0,3,3,3" IsVisible="False" />
-        </Grid>
+        <TabControl x:Name="LeftTabs">
+          <!-- A bare template: the themed content host insets the palette and costs a tile column. -->
+          <TabControl.Template>
+            <ControlTemplate>
+              <DockPanel>
+                <ItemsPresenter DockPanel.Dock="Top" Name="PART_ItemsPresenter">
+                  <ItemsPresenter.ItemsPanel>
+                    <ItemsPanelTemplate>
+                      <WrapPanel />
+                    </ItemsPanelTemplate>
+                  </ItemsPresenter.ItemsPanel>
+                </ItemsPresenter>
+                <ContentPresenter Name="PART_SelectedContentHost"
+                                  Content="{TemplateBinding SelectedContent}"
+                                  ContentTemplate="{TemplateBinding SelectedContentTemplate}" />
+              </DockPanel>
+            </ControlTemplate>
+          </TabControl.Template>
+          <TabItem Header="Tiles">
+            <DockPanel>
+              <StackPanel DockPanel.Dock="Top" Spacing="8" Margin="12,12,12,10">
+                <ComboBox x:Name="SheetCombo" ItemsSource="{Binding SheetIds}" SelectedItem="{Binding SelectedSheet, Mode=TwoWay}" />
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                  <TextBlock Text="Sheet" Classes="muted" VerticalAlignment="Center" />
+                  <TextBox x:Name="BrushSheet" Width="58" />
+                  <TextBlock Text="Graphic" Classes="muted" VerticalAlignment="Center" />
+                  <TextBox x:Name="BrushGraphic" Width="58" />
+                </StackPanel>
+                <TextBlock x:Name="BrushValidationError" Text="Must be a signed integer."
+                           Foreground="{DynamicResource EditorDangerBrush}" FontSize="11" IsVisible="False" />
+              </StackPanel>
+              <!-- The scrollbar overlays the palette so the tile grid keeps the full panel width. -->
+              <Grid x:Name="PaletteHost" Margin="12,0,12,12">
+                <Border x:Name="PaletteBorder" Classes="sunken" ClipToBounds="True" />
+                <ScrollBar x:Name="PaletteBar" Classes="overlay" Orientation="Vertical"
+                           HorizontalAlignment="Right" Margin="0,3,3,3" IsVisible="False" />
+              </Grid>
+            </DockPanel>
+          </TabItem>
+          <TabItem Header="Terrains">
+            <DockPanel Margin="12">
+              <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Spacing="6" Margin="0,8,0,0">
+                <Button x:Name="TerrainAddButton" Content="Add" MinWidth="64" Click="OnTerrainAdd" />
+                <Button x:Name="TerrainEditButton" Content="Edit" MinWidth="64" IsEnabled="False" Click="OnTerrainEdit" />
+              </StackPanel>
+              <TextBlock x:Name="TerrainDiagnosticText" DockPanel.Dock="Bottom" Classes="muted" FontSize="11"
+                         TextWrapping="Wrap" TextTrimming="CharacterEllipsis" Margin="0,8,0,0" IsVisible="False" />
+              <ComboBox x:Name="TerrainCombo" IsEnabled="False" ItemsSource="{Binding Terrains}"
+                        SelectionChanged="OnTerrainSelectionChanged">
+                <ComboBox.ItemTemplate>
+                  <DataTemplate>
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                      <Border Width="16" Height="16" CornerRadius="3" Background="{Binding Color, Converter={StaticResource TerrainSwatchBrush}}" />
+                      <TextBlock Text="{Binding Name}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                      <controls:TerrainThumbnailControl Choice="{Binding}"
+                                                         Assets="{Binding Assets, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                         VerticalAlignment="Center" />
+                    </StackPanel>
+                  </DataTemplate>
+                </ComboBox.ItemTemplate>
+              </ComboBox>
+            </DockPanel>
+          </TabItem>
+        </TabControl>
       </DockPanel>
       <DockPanel Grid.Column="2">
         <!-- A floating tool strip: the toolbar no longer spans the window, so a card reads better than a band.
@@ -118,6 +171,7 @@
             <ToggleButton x:Name="PencilTool" Classes="tool" Tag="Pencil" IsChecked="True" Content="{StaticResource IconPencil}" ToolTip.Tip="Pencil (P)" Checked="OnToolChecked" Unchecked="OnToolUnchecked" />
             <ToggleButton x:Name="EraserTool" Classes="tool" Tag="Eraser" Content="{StaticResource IconEraser}" ToolTip.Tip="Eraser (E)" Checked="OnToolChecked" Unchecked="OnToolUnchecked" />
             <ToggleButton x:Name="FloodFillTool" Classes="tool" Tag="FloodFill" Content="{StaticResource IconFloodFill}" ToolTip.Tip="Flood fill (B)" Checked="OnToolChecked" Unchecked="OnToolUnchecked" />
+            <ToggleButton x:Name="TerrainTool" Classes="tool" Tag="Terrain" Content="{StaticResource IconTerrain}" ToolTip.Tip="Terrain (T)" Checked="OnToolChecked" Unchecked="OnToolUnchecked" />
             <Rectangle Classes="toolSeparator" />
             <ToggleButton x:Name="BlockedTool" Classes="tool" Tag="Blocked" Content="{StaticResource IconBlocked}" ToolTip.Tip="Blocked (X)" Checked="OnToolChecked" Unchecked="OnToolUnchecked" />
             <Rectangle Classes="toolSeparator" />

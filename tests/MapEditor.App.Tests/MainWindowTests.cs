@@ -19,6 +19,7 @@ using MapEditor.App.Dialogs;
 using MapEditor.App.Documents;
 using MapEditor.App.Rendering;
 using MapEditor.App.Settings;
+using MapEditor.App.Terrain;
 using MapEditor.App.Tests.Fakes;
 using MapEditor.App.Tests.Fixtures;
 using MapEditor.App.ViewModels;
@@ -203,10 +204,11 @@ public class MainWindowTests : IDisposable
         Assert.False(Find<ToggleButton>("SelectTool").IsChecked);
         Assert.False(Find<ToggleButton>("MultiSelectTool").IsChecked);
         Assert.False(Find<ToggleButton>("FloodFillTool").IsChecked);
+        Assert.False(Find<ToggleButton>("TerrainTool").IsChecked);
         Assert.Equal(MapEditTool.Pencil, ViewModel.ActiveTool);
 
         Assert.Equal(
-            new[] { "SelectTool", "MultiSelectTool", "EyedropperTool", "PencilTool", "EraserTool", "FloodFillTool", "BlockedTool", "SpawnTool", "WarpTool" },
+            new[] { "SelectTool", "MultiSelectTool", "EyedropperTool", "PencilTool", "EraserTool", "FloodFillTool", "TerrainTool", "BlockedTool", "SpawnTool", "WarpTool" },
             Find<Border>("Toolbar").GetVisualDescendants().OfType<ToggleButton>().Select(toggle => toggle.Name).ToArray());
 
         Find<ToggleButton>("EraserTool").IsChecked = true;
@@ -1260,6 +1262,9 @@ public class MainWindowGraphicViewerTests : IDisposable
 
     private MainWindow Window => _harness.Window;
 
+    private T Find<T>(string name) where T : Control
+        => Window.FindControl<T>(name) ?? throw new InvalidOperationException($"missing control {name}");
+
     private string WriteAssetDirectory(string name, string manifestJson, string? animationJson, int sheetId)
     {
         string directory = Path.Combine(_harness.TempDirectory, name);
@@ -1449,5 +1454,228 @@ public class MainWindowGraphicViewerTests : IDisposable
         Assert.False(document.CanUndo);
         Assert.False(document.CanRedo);
         Assert.Equal(100, document.ZoomPercent);
+    }
+
+    private string WriteTerrainAssetDirectory(string name, string terrainJson)
+    {
+        string directory = Path.Combine(_harness.TempDirectory, name);
+        Directory.CreateDirectory(Path.Combine(directory, "sheets"));
+        File.WriteAllText(Path.Combine(directory, "manifest.json"), AssetFixture.ManifestJson);
+        File.WriteAllBytes(Path.Combine(directory, "sheets", "1.png"), AssetFixture.PngSheet.Create(64, 64));
+        File.WriteAllBytes(Path.Combine(directory, "sheets", "2.png"), AssetFixture.PngSheet.Create(64, 64));
+        File.WriteAllText(Path.Combine(directory, TerrainAssetCatalog.FileName), terrainJson);
+        AssetFixture.WriteAnimationSidecar(directory, AssetFixture.AnimationSidecarJson);
+        return directory;
+    }
+
+    [AvaloniaFact]
+    public void TerrainTabs_LeftPanelHasTilesAndTerrainsWithTilesActive()
+    {
+        TabControl tabs = Find<TabControl>("LeftTabs");
+        Assert.Equal(2, tabs.Items.Count);
+        Assert.Equal(0, tabs.SelectedIndex);
+
+        TabItem tilesTab = Assert.IsType<TabItem>(tabs.Items[0]);
+        TabItem terrainsTab = Assert.IsType<TabItem>(tabs.Items[1]);
+        Assert.Equal("Tiles", tilesTab.Header);
+        Assert.Equal("Terrains", terrainsTab.Header);
+        Assert.NotNull(Find<ComboBox>("SheetCombo"));
+        Assert.NotNull(Find<Grid>("PaletteHost"));
+        Assert.NotNull(Find<ComboBox>("TerrainCombo"));
+        Assert.NotNull(Find<Button>("TerrainAddButton"));
+        Assert.NotNull(Find<Button>("TerrainEditButton"));
+    }
+
+    [AvaloniaFact]
+    public void TerrainTabs_TilesPreservesSheetBrushAndPalette()
+    {
+        _harness.Dialogs.AssetDirectoryPickResult = WriteAssetDirectory("assets-tiles", ManifestA, AnimationA, 1);
+        Find<Button>("LoadAssetsButton").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.True(_harness.Assets.Current.IsAvailable);
+        Assert.Equal(1, Find<ComboBox>("SheetCombo").Items.Count);
+        Assert.NotNull(Find<TextBox>("BrushSheet"));
+        Assert.NotNull(Find<TextBox>("BrushGraphic"));
+        Assert.Same(Window.Palette, Find<Border>("PaletteBorder").Child);
+        Assert.True(Window.Palette.Bounds.Height > 0);
+    }
+
+    [AvaloniaFact]
+    public void TerrainSelector_WithoutACatalog_DisablesSelectorAndEditButKeepsAdd()
+    {
+        ComboBox combo = Find<ComboBox>("TerrainCombo");
+        Button add = Find<Button>("TerrainAddButton");
+        Button edit = Find<Button>("TerrainEditButton");
+
+        Assert.False(combo.IsEnabled);
+        Assert.Empty(combo.Items);
+        Assert.True(add.IsEnabled);
+        Assert.False(edit.IsEnabled);
+        Assert.False(Find<TextBlock>("TerrainDiagnosticText").IsVisible);
+    }
+
+    [AvaloniaFact]
+    public void TerrainSelector_ValidCatalog_PopulatesEntriesAndSelectingActivatesTheTerrainTool()
+    {
+        string directory = WriteTerrainAssetDirectory("assets-terrain", AssetFixture.TerrainCatalogJson);
+        Assert.True(_harness.Assets.TryOpen(directory));
+        Dispatcher.UIThread.RunJobs();
+
+        ComboBox combo = Find<ComboBox>("TerrainCombo");
+        Button add = Find<Button>("TerrainAddButton");
+        Button edit = Find<Button>("TerrainEditButton");
+        Assert.True(combo.IsEnabled);
+        Assert.Single(combo.Items);
+        Assert.True(add.IsEnabled);
+        Assert.False(edit.IsEnabled);
+
+        combo.SelectedIndex = 0;
+        Dispatcher.UIThread.RunJobs();
+
+        Guid terrainId = _harness.ViewModel.Terrains.Single().Id;
+        Assert.Equal(terrainId, _harness.ViewModel.SelectedTerrainId);
+        Assert.Equal(MapEditTool.Terrain, _harness.ViewModel.ActiveTool);
+        Assert.True(Find<ToggleButton>("TerrainTool").IsChecked);
+        Assert.True(edit.IsEnabled);
+    }
+
+    [AvaloniaFact]
+    public async Task TerrainSelector_MultiDocument_EachDocumentKeepsItsOwnSelection()
+    {
+        string directory = WriteTerrainAssetDirectory("assets-terrain", AssetFixture.TerrainCatalogJson);
+        Assert.True(_harness.Assets.TryOpen(directory));
+        Dispatcher.UIThread.RunJobs();
+
+        MapDocumentViewModel first = _harness.ViewModel;
+        _harness.Dialogs.NewMapResult = new NewMapRequest(100, 100);
+        await _harness.Workspace.NewAsync();
+        MapDocumentViewModel second = _harness.Workspace.ActiveDocument;
+        Dispatcher.UIThread.RunJobs();
+
+        ComboBox combo = Find<ComboBox>("TerrainCombo");
+        combo.SelectedIndex = 0;
+        Dispatcher.UIThread.RunJobs();
+        Guid terrainId = second.Terrains.Single().Id;
+        Assert.Equal(terrainId, second.SelectedTerrainId);
+        Assert.Equal(MapEditTool.Terrain, second.ActiveTool);
+
+        _harness.Workspace.Activate(first);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Null(first.SelectedTerrainId);
+        Assert.Equal(MapEditTool.Pencil, first.ActiveTool);
+        Assert.Null(combo.SelectedItem);
+        Assert.False(Find<ToggleButton>("TerrainTool").IsChecked);
+
+        _harness.Workspace.Activate(second);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Equal(terrainId, second.SelectedTerrainId);
+        Assert.Equal(MapEditTool.Terrain, second.ActiveTool);
+        Assert.Equal(terrainId, ((TerrainChoice)combo.SelectedItem!).Id);
+        Assert.True(Find<ToggleButton>("TerrainTool").IsChecked);
+    }
+
+    [AvaloniaFact]
+    public void TerrainTool_WithoutASelectedTerrain_StaysUncheckedAndLeavesTheTool()
+    {
+        string directory = WriteTerrainAssetDirectory("assets-terrain", AssetFixture.TerrainCatalogJson);
+        Assert.True(_harness.Assets.TryOpen(directory));
+        Dispatcher.UIThread.RunJobs();
+        _harness.ViewModel.ActiveTool = MapEditTool.Eraser;
+
+        ToggleButton terrainTool = Find<ToggleButton>("TerrainTool");
+        terrainTool.IsChecked = true;
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.False(terrainTool.IsChecked);
+        Assert.Equal(MapEditTool.Eraser, _harness.ViewModel.ActiveTool);
+        Assert.Null(_harness.ViewModel.SelectedTerrainId);
+    }
+
+    [AvaloniaFact]
+    public void TerrainTool_WithASelectedTerrain_ActivatesTheTerrainTool()
+    {
+        string directory = WriteTerrainAssetDirectory("assets-terrain", AssetFixture.TerrainCatalogJson);
+        Assert.True(_harness.Assets.TryOpen(directory));
+        Dispatcher.UIThread.RunJobs();
+        _harness.ViewModel.ActiveTool = MapEditTool.Eraser;
+        Guid terrainId = _harness.ViewModel.Terrains.Single().Id;
+        _harness.ViewModel.SelectTerrain(terrainId);
+        _harness.ViewModel.ActiveTool = MapEditTool.Eraser;
+
+        ToggleButton terrainTool = Find<ToggleButton>("TerrainTool");
+        terrainTool.IsChecked = true;
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.True(terrainTool.IsChecked);
+        Assert.Equal(MapEditTool.Terrain, _harness.ViewModel.ActiveTool);
+        Assert.Equal(terrainId, _harness.ViewModel.SelectedTerrainId);
+    }
+
+    [AvaloniaFact]
+    public void TerrainSelector_MalformedCatalog_ShowsTheDiagnosticAndKeepsTilesUsable()
+    {
+        string directory = WriteTerrainAssetDirectory("assets-malformed", "{ this is not json");
+        Assert.True(_harness.Assets.TryOpen(directory));
+        Dispatcher.UIThread.RunJobs();
+
+        TerrainCatalogLoadResult availability = _harness.ViewModel.TerrainAvailability!;
+        Assert.False(availability.IsValid);
+        TextBlock diagnostic = Find<TextBlock>("TerrainDiagnosticText");
+        Assert.True(diagnostic.IsVisible);
+        Assert.Equal(availability.Diagnostic, diagnostic.Text);
+        Assert.False(Find<ComboBox>("TerrainCombo").IsEnabled);
+        Assert.True(Find<Button>("TerrainAddButton").IsEnabled);
+        Assert.False(Find<Button>("TerrainEditButton").IsEnabled);
+
+        Assert.True(Find<ComboBox>("SheetCombo").IsEnabled);
+        Assert.Same(Window.Palette, Find<Border>("PaletteBorder").Child);
+        Assert.True(Window.Palette.Bounds.Height > 0);
+    }
+
+    [AvaloniaFact]
+    public void TerrainPublication_OnlyRedrawsThumbnailsAndKeepsTheGraphicViewer()
+    {
+        string directory = WriteTerrainAssetDirectory("assets-terrain", AssetFixture.TerrainCatalogJson);
+        Assert.True(_harness.Assets.TryOpen(directory));
+        Dispatcher.UIThread.RunJobs();
+        ClickGraphicViewer();
+        GraphicViewerWindow viewer = Assert.IsType<GraphicViewerWindow>(Window.GraphicViewer);
+
+        using TerrainOperationLease operation = _harness.Assets.Gate.AcquireAsync().GetAwaiter().GetResult();
+        TerrainCatalogLoadResult reload = TerrainAssetCatalog.Load(directory, _harness.Assets.Current.Cache.Manifest!);
+        ITerrainCatalogLoadedPublication publication = _harness.Assets.PrepareLoaded(operation, _harness.Assets.Current, reload, TerrainLoadedPublicationKind.ValidReload);
+        publication.Commit();
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Same(viewer, Window.GraphicViewer);
+        Assert.True(viewer.IsVisible);
+        Assert.True(Find<ComboBox>("TerrainCombo").IsEnabled);
+        Assert.Single(Find<ComboBox>("TerrainCombo").Items);
+    }
+
+    [AvaloniaFact]
+    public async Task TerrainSelector_ClosedDocumentDisposesItsThumbnails()
+    {
+        string directory = WriteTerrainAssetDirectory("assets-terrain", AssetFixture.TerrainCatalogJson);
+        Assert.True(_harness.Assets.TryOpen(directory));
+        Dispatcher.UIThread.RunJobs();
+
+        _harness.Dialogs.NewMapResult = new NewMapRequest(100, 100);
+        await _harness.Workspace.NewAsync();
+        MapDocumentViewModel second = _harness.Workspace.ActiveDocument;
+        Dispatcher.UIThread.RunJobs();
+        Find<TabControl>("LeftTabs").SelectedIndex = 1;
+        Dispatcher.UIThread.RunJobs();
+        int thumbnailsBefore = Window.GetVisualDescendants().OfType<TerrainThumbnailControl>().Count();
+        Assert.True(thumbnailsBefore > 0);
+
+        Assert.True(await _harness.Workspace.CloseAsync(second));
+        Dispatcher.UIThread.RunJobs();
+
+        int thumbnailsAfter = Window.GetVisualDescendants().OfType<TerrainThumbnailControl>().Count();
+        Assert.Equal(thumbnailsBefore, thumbnailsAfter);
     }
 }

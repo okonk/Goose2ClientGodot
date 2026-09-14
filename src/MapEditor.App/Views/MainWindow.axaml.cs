@@ -389,6 +389,7 @@ internal partial class MainWindow : Window
         SyncToolButtons();
         SyncLayerRows();
         SyncBrushFields();
+        SyncTerrainSelector();
         SyncReadouts();
         SyncAssetDirectory();
         _warpPrefillSelection = null;
@@ -538,6 +539,13 @@ internal partial class MainWindow : Window
             case Key.B:
                 Document.ActiveTool = MapEditTool.FloodFill;
                 e.Handled = true;
+                break;
+            case Key.T:
+                if (Document.SelectedTerrainId is { } terrainId)
+                {
+                    Document.SelectTerrain(terrainId);
+                    e.Handled = true;
+                }
                 break;
             case Key.Delete:
                 if (Document.GameData!.SelectedSpawn is not null || Document.GameData!.SelectedWarp is not null)
@@ -694,8 +702,41 @@ internal partial class MainWindow : Window
     {
         if (sender is ToggleButton { Tag: string name } && Enum.TryParse(name, out MapEditTool tool))
         {
+            if (tool == MapEditTool.Terrain)
+            {
+                // The Terrain tool cannot activate without a selection; snap the button back instead of throwing.
+                if (Document.SelectedTerrainId is not { } terrainId)
+                {
+                    ((ToggleButton)sender).IsChecked = false;
+                    return;
+                }
+
+                Document.SelectTerrain(terrainId);
+                return;
+            }
+
             Document.ActiveTool = tool;
         }
+    }
+
+    private void OnTerrainSelectionChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        if (TerrainCombo.SelectedItem is not TerrainChoice choice || choice.Id == Document.SelectedTerrainId)
+        {
+            return;
+        }
+
+        Document.SelectTerrain(choice.Id);
+    }
+
+    private void OnTerrainAdd(object? sender, RoutedEventArgs e)
+    {
+        // Placeholder entry point; the terrain editor wiring lands later.
+    }
+
+    private void OnTerrainEdit(object? sender, RoutedEventArgs e)
+    {
+        // Placeholder entry point; the terrain editor wiring lands later.
     }
 
     private void OnToolUnchecked(object? sender, RoutedEventArgs e)
@@ -1205,6 +1246,10 @@ internal partial class MainWindow : Window
             case nameof(MapDocumentViewModel.Brush):
                 SyncBrushFields();
                 break;
+            case nameof(MapDocumentViewModel.TerrainAvailability):
+            case nameof(MapDocumentViewModel.SelectedTerrainId):
+                SyncTerrainSelector();
+                break;
             case nameof(MapDocumentViewModel.HoverX):
             case nameof(MapDocumentViewModel.HoverY):
             case nameof(MapDocumentViewModel.SelectedX):
@@ -1227,6 +1272,7 @@ internal partial class MainWindow : Window
         SelectTool.IsChecked = gameTool == GameDataTool.None && Document.ActiveTool == MapEditTool.Select;
         MultiSelectTool.IsChecked = gameTool == GameDataTool.None && Document.ActiveTool == MapEditTool.MultiSelect;
         FloodFillTool.IsChecked = gameTool == GameDataTool.None && Document.ActiveTool == MapEditTool.FloodFill;
+        TerrainTool.IsChecked = gameTool == GameDataTool.None && Document.ActiveTool == MapEditTool.Terrain;
         SpawnTool.IsChecked = gameTool == GameDataTool.Spawn;
         WarpTool.IsChecked = gameTool == GameDataTool.Warp;
     }
@@ -1368,6 +1414,28 @@ internal partial class MainWindow : Window
         BrushValidationError.IsVisible = false;
         BrushSheet.BorderBrush = null;
         BrushGraphic.BorderBrush = null;
+    }
+
+    private void SyncTerrainSelector()
+    {
+        if (!ReferenceEquals(TerrainCombo.DataContext, Document))
+        {
+            return;
+        }
+
+        TerrainCatalogLoadResult? terrain = Document.TerrainAvailability;
+        TerrainCombo.IsEnabled = terrain?.IsValid == true;
+        TerrainDiagnosticText.Text = terrain?.Diagnostic ?? string.Empty;
+        TerrainDiagnosticText.IsVisible = terrain?.Diagnostic is not null;
+        TerrainAddButton.IsEnabled = terrain is null || terrain.CanAuthor;
+        TerrainEditButton.IsEnabled = Document.SelectedTerrainId is not null;
+        TerrainChoice? selected = Document.SelectedTerrainId is { } selectedId
+            ? Document.Terrains.FirstOrDefault(terrainChoice => terrainChoice.Id == selectedId)
+            : null;
+        if (!ReferenceEquals(TerrainCombo.SelectedItem, selected))
+        {
+            TerrainCombo.SelectedItem = selected;
+        }
     }
 
     private void SyncReadouts()
