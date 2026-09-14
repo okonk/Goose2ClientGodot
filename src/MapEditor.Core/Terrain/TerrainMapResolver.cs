@@ -15,6 +15,14 @@ internal interface ITerrainPatchResolver
         IReadOnlyCollection<int> directlyChangedIndices,
         out TerrainResolvedPatch patch,
         out TerrainResolutionFailure? failure);
+
+    bool TryResolveStaged(
+        MapDocument document,
+        int layer,
+        IReadOnlyDictionary<int, Guid?> centerOverrides,
+        IReadOnlyCollection<(int Index, Guid? Center)> staged,
+        out TerrainResolvedPatch patch,
+        out TerrainResolutionFailure? failure);
 }
 
 public sealed class TerrainMapResolver : ITerrainPatchResolver
@@ -91,6 +99,55 @@ public sealed class TerrainMapResolver : ITerrainPatchResolver
             }
         }
 
+        return ResolveAffected(document, layer, centerOverrides, direct, out patch, out failure);
+    }
+
+    internal bool TryResolveStaged(
+        MapDocument document,
+        int layer,
+        IReadOnlyDictionary<int, Guid?> centerOverrides,
+        IReadOnlyCollection<(int Index, Guid? Center)> staged,
+        out TerrainResolvedPatch patch,
+        out TerrainResolutionFailure? failure)
+    {
+        ArgumentNullException.ThrowIfNull(document);
+        ArgumentNullException.ThrowIfNull(centerOverrides);
+        ArgumentNullException.ThrowIfNull(staged);
+        if (layer < 0 || layer >= MapDocument.LayerCount)
+        {
+            throw new ArgumentOutOfRangeException(nameof(layer));
+        }
+
+        var direct = staged
+            .GroupBy(pair => pair.Index)
+            .Select(group => (Index: group.Key, Center: group.First().Center))
+            .OrderBy(pair => pair.Index)
+            .ToList();
+        foreach (var (index, center) in direct)
+        {
+            if (index < 0 || index >= document.TileCount)
+            {
+                throw new ArgumentOutOfRangeException(nameof(staged));
+            }
+
+            if (center is not null && !_catalog.TryGetTerrain(center.Value, out _))
+            {
+                (patch, failure) = Fail(layer, center.Value, index % document.Width, index / document.Width, $"Unknown terrain {center}.");
+                return false;
+            }
+        }
+
+        return ResolveAffected(document, layer, centerOverrides, direct.Select(pair => pair.Index).ToList(), out patch, out failure);
+    }
+
+    private bool ResolveAffected(
+        MapDocument document,
+        int layer,
+        IReadOnlyDictionary<int, Guid?> centerOverrides,
+        List<int> direct,
+        out TerrainResolvedPatch patch,
+        out TerrainResolutionFailure? failure)
+    {
         Guid? FinalCenter(int index)
             => centerOverrides.TryGetValue(index, out var center)
                 ? center
@@ -220,4 +277,13 @@ public sealed class TerrainMapResolver : ITerrainPatchResolver
         out TerrainResolvedPatch patch,
         out TerrainResolutionFailure? failure)
         => TryResolvePatch(document, layer, centerOverrides, directlyChangedIndices, out patch, out failure);
+
+    bool ITerrainPatchResolver.TryResolveStaged(
+        MapDocument document,
+        int layer,
+        IReadOnlyDictionary<int, Guid?> centerOverrides,
+        IReadOnlyCollection<(int Index, Guid? Center)> staged,
+        out TerrainResolvedPatch patch,
+        out TerrainResolutionFailure? failure)
+        => TryResolveStaged(document, layer, centerOverrides, staged, out patch, out failure);
 }

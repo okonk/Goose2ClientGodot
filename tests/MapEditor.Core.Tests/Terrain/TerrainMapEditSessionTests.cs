@@ -38,6 +38,15 @@ public class TerrainMapEditSessionTests
             IReadOnlyCollection<int> directlyChangedIndices,
             out TerrainResolvedPatch patch,
             out TerrainResolutionFailure? failure)
+            => _inner.TryResolvePatch(document, layer, centerOverrides, directlyChangedIndices, out patch, out failure);
+
+        public bool TryResolveStaged(
+            MapDocument document,
+            int layer,
+            IReadOnlyDictionary<int, Guid?> centerOverrides,
+            IReadOnlyCollection<(int Index, Guid? Center)> staged,
+            out TerrainResolvedPatch patch,
+            out TerrainResolutionFailure? failure)
         {
             _calls++;
             if (_calls > _failAfterCalls)
@@ -47,7 +56,7 @@ public class TerrainMapEditSessionTests
                 return false;
             }
 
-            return _inner.TryResolvePatch(document, layer, centerOverrides, directlyChangedIndices, out patch, out failure);
+            return _inner.TryResolveStaged(document, layer, centerOverrides, staged, out patch, out failure);
         }
     }
 

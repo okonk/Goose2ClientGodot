@@ -552,4 +552,143 @@ public class TerrainMapResolverTests
         Assert.Equal(1, failure.Y);
         Assert.Empty(patch.Changes);
     }
+
+    [Fact]
+    public void TryResolveStaged_MatchesStatelessAcrossSegments()
+    {
+        var resolver = new TerrainMapResolver(Index(
+            (0, 1, Pattern(Grass)),
+            (0, 2, Pattern(Grass, (TerrainPeer.West, Grass))),
+            (0, 3, Pattern(Grass, (TerrainPeer.East, Grass))),
+            (0, 4, Pattern(Grass, (TerrainPeer.North, Grass))),
+            (0, 5, Pattern(Grass, (TerrainPeer.South, Grass)))));
+        var document = MapDocument.Create(5, 5);
+        var overrides = new Dictionary<int, Guid?>();
+        var segments = new (int, int, Guid?)[][]
+        {
+            new[] { (1, 1, (Guid?)Grass), (2, 1, (Guid?)Grass), (3, 1, (Guid?)Grass) },
+            new[] { (4, 1, (Guid?)Grass), (1, 2, (Guid?)Grass) },
+            new[] { (2, 1, (Guid?)null) }
+        };
+
+        foreach (var segment in segments)
+        {
+            var staged = new List<(int Index, Guid? Center)>();
+            var indices = new List<int>();
+            foreach (var (x, y, center) in segment)
+            {
+                var index = y * document.Width + x;
+                staged.Add((index, center));
+                indices.Add(index);
+            }
+
+            foreach (var (index, center) in staged)
+            {
+                overrides[index] = center;
+            }
+
+            Assert.True(
+                resolver.TryResolveStaged(document, 0, overrides, staged, out var stagedPatch, out var stagedFailure),
+                stagedFailure?.Message);
+            Assert.True(
+                resolver.TryResolvePatch(document, 0, overrides, indices, out var statelessPatch, out var statelessFailure),
+                statelessFailure?.Message);
+            Assert.Equal(statelessPatch.Changes, stagedPatch.Changes);
+
+            foreach (var (index, tile) in stagedPatch.Changes)
+            {
+                document.SetLayer(index % document.Width, index / document.Width, 0, tile);
+            }
+        }
+    }
+
+    [Fact]
+    public void TryResolveStaged_UnknownTerrainInStaged_FailsLikeStateless()
+    {
+        var resolver = new TerrainMapResolver(Index((0, 1, Pattern(Grass))));
+        var document = MapDocument.Create(3, 3);
+        var unknown = Guid.NewGuid();
+
+        var ok = resolver.TryResolveStaged(
+            document,
+            0,
+            new Dictionary<int, Guid?> { [4] = unknown },
+            new[] { (4, (Guid?)unknown) },
+            out var patch,
+            out var failure);
+
+        Assert.False(ok);
+        Assert.Equal(unknown, failure!.TerrainId);
+        Assert.Equal(1, failure.X);
+        Assert.Equal(1, failure.Y);
+        Assert.Equal($"Unknown terrain {unknown}.", failure.Message);
+        Assert.Empty(patch.Changes);
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => resolver.TryResolveStaged(
+            document,
+            0,
+            new Dictionary<int, Guid?> { [9] = Grass },
+            new[] { (9, (Guid?)Grass) },
+            out _,
+            out _));
+    }
+
+    [Fact]
+    public void TryResolveStaged_MultiCellSegment_ReportsLowestIndexCell()
+    {
+        var resolver = new TerrainMapResolver(Index((0, 1, Pattern(Grass))));
+        var document = MapDocument.Create(3, 3);
+        var unknown = Guid.NewGuid();
+        var staged = new (int, Guid?)[] { (5, Grass), (3, unknown), (4, Grass) };
+        var overrides = new Dictionary<int, Guid?>();
+        foreach (var (index, center) in staged)
+        {
+            overrides[index] = center;
+        }
+
+        var ok = resolver.TryResolveStaged(document, 0, overrides, staged, out var patch, out var failure);
+
+        Assert.False(ok);
+        Assert.Equal(0, failure!.X);
+        Assert.Equal(1, failure.Y);
+        Assert.Equal($"Unknown terrain {unknown}.", failure.Message);
+
+        var statelessOk = resolver.TryResolvePatch(document, 0, overrides, staged.Select(pair => pair.Item1).ToList(), out var statelessPatch, out var statelessFailure);
+
+        Assert.False(statelessOk);
+        Assert.Equal(failure!.X, statelessFailure!.X);
+        Assert.Equal(failure.Y, statelessFailure.Y);
+        Assert.Equal(failure.Message, statelessFailure.Message);
+    }
+
+    [Fact]
+    public void TryResolveStaged_DoesNotRevalidateCumulativeEntries()
+    {
+        var resolver = new TerrainMapResolver(Index((0, 1, Pattern(Grass))));
+        var document = MapDocument.Create(5, 5);
+        var unknown = Guid.NewGuid();
+        var overrides = new Dictionary<int, Guid?> { [0] = unknown, [12] = Grass };
+
+        var ok = resolver.TryResolveStaged(
+            document,
+            0,
+            overrides,
+            new[] { (12, (Guid?)Grass) },
+            out var patch,
+            out var failure);
+
+        Assert.True(ok, failure?.Message);
+        Assert.Single(patch.Changes);
+
+        var statelessOk = resolver.TryResolvePatch(
+            document,
+            0,
+            overrides,
+            new[] { 12 },
+            out var statelessPatch,
+            out var statelessFailure);
+
+        Assert.False(statelessOk);
+        Assert.Equal(unknown, statelessFailure!.TerrainId);
+    }
 }

@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 
 namespace MapEditor.Core;
 
@@ -140,13 +139,12 @@ internal sealed class TerrainMapEditStroke
             return result;
         }
 
-        var overrides = new Dictionary<int, Guid?>(_centerOverrides);
         foreach (var (index, center) in staged)
         {
-            overrides[index] = center;
+            _centerOverrides[index] = center;
         }
 
-        if (!_resolver.TryResolvePatch(_document, _layerIndex, overrides, staged.Select(pair => pair.Index).ToList(), out var patch, out var failure))
+        if (!_resolver.TryResolveStaged(_document, _layerIndex, _centerOverrides, staged, out var patch, out var failure))
         {
             _accumulator.Restore();
             _centerOverrides.Clear();
@@ -169,7 +167,6 @@ internal sealed class TerrainMapEditStroke
             changed = true;
         }
 
-        _centerOverrides = overrides;
         _sample = to;
         return new TerrainEditResult(true, changed, null);
     }

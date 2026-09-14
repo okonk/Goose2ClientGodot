@@ -122,6 +122,15 @@ public class TerrainMapEditStrokeTests
             IReadOnlyCollection<int> directlyChangedIndices,
             out TerrainResolvedPatch patch,
             out TerrainResolutionFailure? failure)
+            => _inner.TryResolvePatch(document, layer, centerOverrides, directlyChangedIndices, out patch, out failure);
+
+        public bool TryResolveStaged(
+            MapDocument document,
+            int layer,
+            IReadOnlyDictionary<int, Guid?> centerOverrides,
+            IReadOnlyCollection<(int Index, Guid? Center)> staged,
+            out TerrainResolvedPatch patch,
+            out TerrainResolutionFailure? failure)
         {
             _calls++;
             if (_calls > _failAfterCalls)
@@ -131,7 +140,7 @@ public class TerrainMapEditStrokeTests
                 return false;
             }
 
-            return _inner.TryResolvePatch(document, layer, centerOverrides, directlyChangedIndices, out patch, out failure);
+            return _inner.TryResolveStaged(document, layer, centerOverrides, staged, out patch, out failure);
         }
     }
 
@@ -497,5 +506,37 @@ public class TerrainMapEditStrokeTests
         Assert.Equal(new TerrainEditResult(true, true, null), continued);
         Assert.Equal(default, document[0, 1].GetLayer(0));
         Assert.Equal(1, stroke.IntentCount);
+    }
+
+    [Fact]
+    public void LongStroke_PaintsFullMapInOneGesture()
+    {
+        var catalog = new TerrainCatalog(
+            new[] { TerrainCatalogFixture.Terrain(Grass, "Grass") },
+            new[] { TerrainCatalogFixture.Graphic(0, 1, TerrainCatalogFixture.Solid(Grass)) });
+        var index = TerrainCatalogValidator.Validate(catalog).Index!;
+        var resolver = new TerrainMapResolver(index);
+        var document = MapDocument.Create(100, 100);
+        var stroke = new TerrainMapEditStroke(document, resolver, 0, Grass, TerrainEditMode.Paint);
+
+        Assert.True(stroke.Begin(0, 0).IsActive);
+        for (var y = 0; y < 100; y++)
+        {
+            for (var step = y == 0 ? 1 : 0; step < 100; step++)
+            {
+                var x = y % 2 == 0 ? step : 99 - step;
+                Assert.True(stroke.Continue(x, y).IsActive);
+            }
+
+            Assert.True(stroke.IsActive);
+        }
+
+        var changes = stroke.Complete();
+
+        Assert.False(stroke.IsActive);
+        Assert.Equal(10_000, changes.Count);
+        Assert.All(
+            Enumerable.Range(0, 10_000),
+            tileIndex => Assert.Equal(Tile(0, 1), document.GetTile(tileIndex).GetLayer(0)));
     }
 }
