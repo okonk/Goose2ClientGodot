@@ -946,68 +946,235 @@ public class AssetContextControllerTerrainPublicationTests : IDisposable
     [Fact]
     public void PrepareSave_FromOtherThread_Throws()
     {
-        using AssetContextController controller = CreateController();
         string assetDirectory = WriteAssetDirectory("assets-thread");
         AssetFixture.WriteTerrainSidecar(assetDirectory, AssetFixture.TerrainCatalogJson);
-        Assert.True(controller.TryOpen(assetDirectory));
-        TerrainCatalogPreparedSave prepared = PrepareSave(assetDirectory, controller.Current, ParseCatalog(), controller.Current.Terrain.Revision);
 
-        Assert.ThrowsAny<InvalidOperationException>(() => Task.Run(() =>
+        AssetContextController controller = null!;
+        TerrainCatalogPreparedSave prepared = null!;
+        Exception? setupFailure = null;
+        var creating = new Thread(() =>
         {
-            using TerrainOperationLease operation = controller.Gate.AcquireAsync().GetAwaiter().GetResult();
-            controller.PrepareSave(operation, controller.Current, prepared);
-        }).GetAwaiter().GetResult());
+            try
+            {
+                controller = CreateController();
+                if (!controller.TryOpen(assetDirectory))
+                {
+                    throw new InvalidOperationException("TryOpen failed.");
+                }
+
+                prepared = PrepareSave(assetDirectory, controller.Current, ParseCatalog(), controller.Current.Terrain.Revision);
+            }
+            catch (Exception ex)
+            {
+                setupFailure = ex;
+            }
+        }) { IsBackground = true };
+        creating.Start();
+        creating.Join();
+        Assert.Null(setupFailure);
+
+        Exception? failure = null;
+        var other = new Thread(() =>
+        {
+            try
+            {
+                using TerrainOperationLease operation = controller.Gate.AcquireAsync().GetAwaiter().GetResult();
+                controller.PrepareSave(operation, controller.Current, prepared);
+            }
+            catch (Exception ex)
+            {
+                failure = ex;
+            }
+        }) { IsBackground = true };
+        other.Start();
+        other.Join();
+        Assert.IsType<InvalidOperationException>(failure);
+        controller.Dispose();
     }
 
     [Fact]
     public void RegisterTerrainGestureCancellation_FromOtherThread_Throws()
     {
-        using AssetContextController controller = CreateController();
+        AssetContextController controller = null!;
+        Exception? setupFailure = null;
+        var creating = new Thread(() =>
+        {
+            try
+            {
+                controller = CreateController();
+            }
+            catch (Exception ex)
+            {
+                setupFailure = ex;
+            }
+        }) { IsBackground = true };
+        creating.Start();
+        creating.Join();
+        Assert.Null(setupFailure);
 
-        Assert.ThrowsAny<InvalidOperationException>(() => Task.Run(() => controller.RegisterTerrainGestureCancellation(() => { })).GetAwaiter().GetResult());
+        Exception? failure = null;
+        var other = new Thread(() =>
+        {
+            try
+            {
+                controller.RegisterTerrainGestureCancellation(() => { });
+            }
+            catch (Exception ex)
+            {
+                failure = ex;
+            }
+        }) { IsBackground = true };
+        other.Start();
+        other.Join();
+        Assert.IsType<InvalidOperationException>(failure);
+        controller.Dispose();
     }
 
     [Fact]
     public void TryPrepareOpen_FromOtherThread_Throws()
     {
-        using AssetContextController controller = CreateController();
         string assetDirectory = WriteAssetDirectory("assets-thread-root");
 
-        Assert.ThrowsAny<InvalidOperationException>(() => Task.Run(() => controller.TryPrepareOpen(assetDirectory, out _, out _)).GetAwaiter().GetResult());
+        AssetContextController controller = null!;
+        Exception? setupFailure = null;
+        var creating = new Thread(() =>
+        {
+            try
+            {
+                controller = CreateController();
+            }
+            catch (Exception ex)
+            {
+                setupFailure = ex;
+            }
+        }) { IsBackground = true };
+        creating.Start();
+        creating.Join();
+        Assert.Null(setupFailure);
+
+        Exception? failure = null;
+        var other = new Thread(() =>
+        {
+            try
+            {
+                controller.TryPrepareOpen(assetDirectory, out _, out _);
+            }
+            catch (Exception ex)
+            {
+                failure = ex;
+            }
+        }) { IsBackground = true };
+        other.Start();
+        other.Join();
+        Assert.IsType<InvalidOperationException>(failure);
+        controller.Dispose();
     }
 
     [Fact]
     public void CommitSave_FromOtherThread_Throws()
     {
-        using AssetContextController controller = CreateController();
         string assetDirectory = WriteAssetDirectory("assets-thread-commit-terrain");
         AssetFixture.WriteTerrainSidecar(assetDirectory, AssetFixture.TerrainCatalogJson);
-        Assert.True(controller.TryOpen(assetDirectory));
-        AssetContext context = controller.Current;
-        TerrainCatalogLoadResult before = context.Terrain;
-        TerrainCatalogPreparedSave prepared = PrepareSave(assetDirectory, context, ParseCatalog(), before.Revision);
-        using TerrainOperationLease operation = controller.Gate.AcquireAsync().GetAwaiter().GetResult();
-        ITerrainCatalogSavePublication publication = controller.PrepareSave(operation, context, prepared);
-        TerrainCatalogSaveResult result = SaveResult(prepared, TerrainFileRevision.FromBytes(prepared.CanonicalBytes));
 
-        Assert.ThrowsAny<InvalidOperationException>(() => Task.Run(() => publication.Commit(result)).GetAwaiter().GetResult());
+        AssetContextController controller = null!;
+        AssetContext context = null!;
+        TerrainCatalogLoadResult before = null!;
+        TerrainOperationLease operation = null!;
+        ITerrainCatalogSavePublication publication = null!;
+        TerrainCatalogSaveResult result = null!;
+        Exception? setupFailure = null;
+        var creating = new Thread(() =>
+        {
+            try
+            {
+                controller = CreateController();
+                if (!controller.TryOpen(assetDirectory))
+                {
+                    throw new InvalidOperationException("TryOpen failed.");
+                }
+
+                context = controller.Current;
+                before = context.Terrain;
+                TerrainCatalogPreparedSave prepared = PrepareSave(assetDirectory, context, ParseCatalog(), before.Revision);
+                operation = controller.Gate.AcquireAsync().GetAwaiter().GetResult();
+                publication = controller.PrepareSave(operation, context, prepared);
+                result = SaveResult(prepared, TerrainFileRevision.FromBytes(prepared.CanonicalBytes));
+            }
+            catch (Exception ex)
+            {
+                setupFailure = ex;
+            }
+        }) { IsBackground = true };
+        creating.Start();
+        creating.Join();
+        Assert.Null(setupFailure);
+
+        Exception? failure = null;
+        var other = new Thread(() =>
+        {
+            try
+            {
+                publication.Commit(result);
+            }
+            catch (Exception ex)
+            {
+                failure = ex;
+            }
+        }) { IsBackground = true };
+        other.Start();
+        other.Join();
+        Assert.IsType<InvalidOperationException>(failure);
 
         Assert.Same(before, context.Terrain);
         publication.Dispose();
+        operation.Dispose();
+        controller.Dispose();
     }
 
     [Fact]
     public void CommitPreparedOpen_FromOtherThread_Throws()
     {
-        using AssetContextController controller = CreateController();
         string assetDirectory = WriteAssetDirectory("assets-thread-commit");
-        Assert.True(controller.TryPrepareOpen(assetDirectory, out PreparedAssetContext? prepared, out _));
 
-        Assert.ThrowsAny<InvalidOperationException>(() => Task.Run(() =>
+        AssetContextController controller = null!;
+        PreparedAssetContext? prepared = null;
+        Exception? setupFailure = null;
+        var creating = new Thread(() =>
         {
-            using TerrainOperationLease operation = controller.Gate.AcquireAsync().GetAwaiter().GetResult();
-            controller.CommitPreparedOpen(operation, prepared!);
-        }).GetAwaiter().GetResult());
+            try
+            {
+                controller = CreateController();
+                if (!controller.TryPrepareOpen(assetDirectory, out prepared, out _))
+                {
+                    throw new InvalidOperationException("TryPrepareOpen failed.");
+                }
+            }
+            catch (Exception ex)
+            {
+                setupFailure = ex;
+            }
+        }) { IsBackground = true };
+        creating.Start();
+        creating.Join();
+        Assert.Null(setupFailure);
+
+        Exception? failure = null;
+        var other = new Thread(() =>
+        {
+            try
+            {
+                using TerrainOperationLease operation = controller.Gate.AcquireAsync().GetAwaiter().GetResult();
+                controller.CommitPreparedOpen(operation, prepared!);
+            }
+            catch (Exception ex)
+            {
+                failure = ex;
+            }
+        }) { IsBackground = true };
+        other.Start();
+        other.Join();
+        Assert.IsType<InvalidOperationException>(failure);
+        controller.Dispose();
     }
 
     [Fact]
