@@ -36,8 +36,9 @@ public class TerrainEditorViewModelTests
     private static (TerrainEditorViewModel ViewModel, TerrainEditorSession Session, TerrainCatalog Baseline) CreateViewModel()
     {
         var baseline = CreateBaseline();
-        var session = new TerrainEditorSession(baseline, CreateManifest());
-        return (new TerrainEditorViewModel(session, CreateManifest()), session, baseline);
+        var manifest = CreateManifest();
+        var session = new TerrainEditorSession(baseline, manifest);
+        return (new TerrainEditorViewModel(session, manifest, manifest.SheetIds), session, baseline);
     }
 
     private static TerrainEditorItemViewModel Item(TerrainEditorViewModel vm, Guid id)
@@ -64,7 +65,7 @@ public class TerrainEditorViewModelTests
             });
         var manifest = SpriteManifest.Parse(
             "{ \"tileSize\": 32, \"sheets\": { \"1\": { \"1\": [0, 0, 32, 32], \"2\": [32, 0, 32, 32], \"3\": [64, 0, 32, 32] } } }");
-        var vm = new TerrainEditorViewModel(new TerrainEditorSession(catalog, manifest), manifest);
+        var vm = new TerrainEditorViewModel(new TerrainEditorSession(catalog, manifest), manifest, manifest.SheetIds);
 
         Assert.Equal(new[] { "A", "B", "b" }, vm.Terrains.Select(item => item.Name));
         Assert.Equal(idA, vm.Terrains[0].Id);
@@ -96,7 +97,7 @@ public class TerrainEditorViewModelTests
             "\"2\": { \"40\": [0, 0, 16, 16] }, " +
             "\"3\": { \"50\": [0, 0, 32, 32] } } }");
         var baseline = CreateBaseline();
-        var vm = new TerrainEditorViewModel(new TerrainEditorSession(baseline, manifest), manifest);
+        var vm = new TerrainEditorViewModel(new TerrainEditorSession(baseline, manifest), manifest, manifest.SheetIds);
 
         Assert.Equal(new[] { 1, 3 }, vm.EligibleSheets);
         Assert.Equal(1, vm.SelectedSheet);
@@ -104,6 +105,21 @@ public class TerrainEditorViewModelTests
 
         vm.SelectedSheet = 3;
         Assert.Equal(new[] { 50 }, vm.EligibleFrames.Select(frame => frame.Reference.Graphic));
+
+        vm.SelectedSheet = null;
+        Assert.Empty(vm.EligibleFrames);
+    }
+
+    [Fact]
+    public void EligibleSheets_AreLimitedToTilesetSheets()
+    {
+        var manifest = SpriteManifest.Parse(
+            "{ \"tileSize\": 32, \"sheets\": { \"1\": { \"10\": [0, 0, 32, 32] }, \"2\": { \"40\": [0, 0, 16, 16] }, \"3\": { \"50\": [0, 0, 32, 32] } } }");
+        var baseline = CreateBaseline();
+        var vm = new TerrainEditorViewModel(new TerrainEditorSession(baseline, manifest), manifest, new[] { 2, 3 });
+
+        Assert.Equal(new[] { 3 }, vm.EligibleSheets);
+        Assert.Equal(3, vm.SelectedSheet);
 
         vm.SelectedSheet = null;
         Assert.Empty(vm.EligibleFrames);
@@ -287,7 +303,7 @@ public class TerrainEditorViewModelTests
             {
                 new(new TerrainGraphicReference(9, 99), new TerrainPattern(Center: GrassId))
             });
-        var vm = new TerrainEditorViewModel(new TerrainEditorSession(catalog, manifest), manifest);
+        var vm = new TerrainEditorViewModel(new TerrainEditorSession(catalog, manifest), manifest, manifest.SheetIds);
 
         Assert.False(vm.CanSave);
         Assert.Contains(vm.Errors, error => error.Code == TerrainValidationCode.MissingSpriteFrame);

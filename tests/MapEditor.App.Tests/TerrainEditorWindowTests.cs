@@ -68,12 +68,17 @@ internal sealed class TerrainEditorWindowHarness : IDisposable
 
     public string SourcePath => Path.Combine(TempDirectory, TerrainAssetCatalog.FileName);
 
-    private TerrainEditorWindowHarness(byte[]? terrainBytes, ISpriteSheetLoader windowLoader, bool show, TerrainSheetPng firstSheet)
+    private TerrainEditorWindowHarness(byte[]? terrainBytes, ISpriteSheetLoader windowLoader, bool show, TerrainSheetPng firstSheet, int[]? tileSheets)
     {
         TempDirectory = Directory.CreateTempSubdirectory("map-editor-terrain-window-").FullName;
         Operations = new();
         Store = new(Operations);
         File.WriteAllText(Path.Combine(TempDirectory, "manifest.json"), ManifestJson);
+        if (tileSheets is not null)
+        {
+            File.WriteAllText(Path.Combine(TempDirectory, "tile-sheets.json"), $"[{string.Join(",", tileSheets)}]");
+        }
+
         Directory.CreateDirectory(Path.Combine(TempDirectory, "sheets"));
         switch (firstSheet)
         {
@@ -112,8 +117,9 @@ internal sealed class TerrainEditorWindowHarness : IDisposable
         byte[]? terrainBytes,
         ISpriteSheetLoader? windowLoader = null,
         bool show = true,
-        TerrainSheetPng firstSheet = TerrainSheetPng.Valid)
-        => new(terrainBytes, windowLoader ?? new PngSpriteSheetLoader(), show, firstSheet);
+        TerrainSheetPng firstSheet = TerrainSheetPng.Valid,
+        int[]? tileSheets = null)
+        => new(terrainBytes, windowLoader ?? new PngSpriteSheetLoader(), show, firstSheet, tileSheets);
 
     public void Dispose()
     {
@@ -139,6 +145,21 @@ internal sealed class PngSpriteSheetLoader : ISpriteSheetLoader
         LoadedPaths.Add(path);
         return SpriteSheetLoadResult.Success(new AvaloniaSpriteSheetImage(new Bitmap(new MemoryStream(AssetFixture.PngSheet.Create(64, 32)))));
     }
+}
+
+internal sealed class SizedPngSheetLoader : ISpriteSheetLoader
+{
+    private readonly int _width;
+    private readonly int _height;
+
+    public SizedPngSheetLoader(int width, int height)
+    {
+        _width = width;
+        _height = height;
+    }
+
+    public SpriteSheetLoadResult Load(string path)
+        => SpriteSheetLoadResult.Success(new AvaloniaSpriteSheetImage(new Bitmap(new MemoryStream(AssetFixture.PngSheet.Create(_width, _height)))));
 }
 
 internal sealed class TerrainWindowFileOperations : ITerrainCatalogFileOperations
@@ -299,7 +320,7 @@ public class TerrainEditorWindowTests
         var sheets = ((IEnumerable)Find<ComboBox>(harness, "SheetCombo").ItemsSource!).Cast<int>().ToArray();
         Assert.Equal(new[] { 1, 2 }, sheets);
         Assert.Equal(1, Find<ComboBox>(harness, "SheetCombo").SelectedItem);
-        Assert.Equal(1.0, Find<ComboBox>(harness, "ZoomCombo").SelectedItem);
+        Assert.Equal(TerrainEditorViewModel.MaxZoom, harness.ViewModel.Zoom);
 
         Assert.True(Find<Button>(harness, "SaveButton").IsEnabled);
         Assert.False(Find<Button>(harness, "RevertButton").IsEnabled);
@@ -393,7 +414,7 @@ public class TerrainEditorWindowTests
         Dispatcher.UIThread.RunJobs();
         Assert.Equal(DirtId, ((TerrainEditorItemViewModel)list.SelectedItem!).Id);
 
-        Point windowPoint = control.TranslatePoint(new Point(16, 16), harness.Window)!.Value;
+        Point windowPoint = control.TranslatePoint(new Point(16 * harness.ViewModel.Zoom, 16 * harness.ViewModel.Zoom), harness.Window)!.Value;
         harness.Window.MouseDown(windowPoint, MouseButton.Left, RawInputModifiers.None);
         Assert.True(control.IsPainting);
         harness.Window.MouseUp(windowPoint, MouseButton.Left, RawInputModifiers.None);
@@ -422,6 +443,48 @@ public class TerrainEditorWindowTests
     }
 
     [AvaloniaFact]
+    public void SheetCombo_IsLimitedToTilesetSheets()
+    {
+        using var harness = TerrainEditorWindowHarness.Create(DefaultCatalog(), tileSheets: new[] { 2 });
+        var combo = Find<ComboBox>(harness, "SheetCombo");
+
+        var sheets = ((IEnumerable)combo.ItemsSource!).Cast<int>().ToArray();
+        Assert.Equal(new[] { 2 }, sheets);
+        Assert.Equal(2, combo.SelectedItem);
+        Assert.Equal(2, harness.ViewModel.SelectedSheet);
+    }
+
+    [AvaloniaFact]
+    public void SheetImage_FitsTheViewportByDefault()
+    {
+        using var harness = TerrainEditorWindowHarness.Create(DefaultCatalog(), windowLoader: new SizedPngSheetLoader(512, 256));
+        var scroll = harness.Window.SheetScroll;
+        var host = Find<Border>(harness, "SheetHost");
+        double expected = Math.Min(
+            (scroll.Bounds.Width - host.Padding.Left - host.Padding.Right) / 512,
+            (scroll.Bounds.Height - host.Padding.Top - host.Padding.Bottom) / 256);
+
+        Assert.Equal(expected, harness.ViewModel.Zoom, precision: 4);
+        Assert.True(scroll.Extent.Width <= scroll.Bounds.Width);
+        Assert.True(scroll.Extent.Height <= scroll.Bounds.Height);
+    }
+
+    [AvaloniaFact]
+    public void SheetSwitch_RefitsToTheViewport()
+    {
+        using var harness = TerrainEditorWindowHarness.Create(DefaultCatalog());
+
+        harness.ViewModel.Zoom = 2.0;
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal(2.0, harness.ViewModel.Zoom);
+
+        Find<ComboBox>(harness, "SheetCombo").SelectedItem = 2;
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Equal(TerrainEditorViewModel.MaxZoom, harness.ViewModel.Zoom);
+    }
+
+    [AvaloniaFact]
     public void ZoomSelectorAndReset_PropagateToTheViewModel()
     {
         using var harness = TerrainEditorWindowHarness.Create(DefaultCatalog());
@@ -440,6 +503,8 @@ public class TerrainEditorWindowTests
     public void ZoomChange_RescalesTheScrollExtent()
     {
         using var harness = TerrainEditorWindowHarness.Create(DefaultCatalog());
+        harness.ViewModel.Zoom = 1.0;
+        Dispatcher.UIThread.RunJobs();
         double extentAtOne = harness.Window.SheetScroll.Extent.Width;
         Assert.True(extentAtOne > 0);
 

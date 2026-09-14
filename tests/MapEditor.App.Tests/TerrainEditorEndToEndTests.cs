@@ -87,7 +87,7 @@ public class TerrainEditorEndToEndTests
             _ => throw new ArgumentOutOfRangeException(nameof(peer))
         };
         Point windowPoint = editor.SheetControl.TranslatePoint(
-            new Point(FrameX(graphic) + local.X, local.Y), editor)!.Value;
+            new Point((FrameX(graphic) + local.X) * editor.ViewModel.Zoom, local.Y * editor.ViewModel.Zoom), editor)!.Value;
         editor.MouseDown(windowPoint, MouseButton.Left, RawInputModifiers.None);
         editor.MouseUp(windowPoint, MouseButton.Left, RawInputModifiers.None);
         Dispatcher.UIThread.RunJobs();

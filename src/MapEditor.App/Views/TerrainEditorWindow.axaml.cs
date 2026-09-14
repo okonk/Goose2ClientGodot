@@ -2,6 +2,7 @@ using System;
 using System.ComponentModel;
 using System.Linq;
 using System.Threading.Tasks;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
@@ -65,6 +66,7 @@ internal partial class TerrainEditorWindow : Window
         // ComboBox selection set before the template is applied does not stick.
         SheetCombo.SelectedItem = _viewModel.SelectedSheet is int sheet ? sheet : null;
         ZoomCombo.SelectedItem = _viewModel.Zoom;
+        FitSheetToViewport();
     }
 
     protected override void OnKeyDown(KeyEventArgs e)
@@ -156,6 +158,31 @@ internal partial class TerrainEditorWindow : Window
         SheetHost.Child = _sheetControl;
         _sheetControl.Images.ImageChanged += OnSheetImageChanged;
         SyncSheetDiagnostic();
+        FitSheetToViewport();
+    }
+
+    private void FitSheetToViewport()
+    {
+        if (_sheetControl.Images.Image is not { } image)
+        {
+            return;
+        }
+
+        Size viewport = SheetScroll.Bounds.Size;
+        if (viewport.Width <= 0 || viewport.Height <= 0)
+        {
+            return;
+        }
+
+        Thickness padding = SheetHost.Padding;
+        double availableWidth = viewport.Width - padding.Left - padding.Right;
+        double availableHeight = viewport.Height - padding.Top - padding.Bottom;
+        if (availableWidth <= 0 || availableHeight <= 0 || image.PixelWidth <= 0 || image.PixelHeight <= 0)
+        {
+            return;
+        }
+
+        _viewModel.Zoom = Math.Min(availableWidth / image.PixelWidth, availableHeight / image.PixelHeight);
     }
 
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -303,7 +330,10 @@ internal partial class TerrainEditorWindow : Window
         => _viewModel.ResetColorOverride();
 
     private void OnSheetImageChanged(object? sender, EventArgs e)
-        => SyncSheetDiagnostic();
+    {
+        SyncSheetDiagnostic();
+        FitSheetToViewport();
+    }
 
     private void OnSheetInvalidated()
         => SyncSheetDiagnostic();

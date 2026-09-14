@@ -39,12 +39,13 @@ internal sealed class TerrainEditorViewModel : ViewModelBase, IDisposable
 
     public event Action? SheetInvalidated;
 
-    public TerrainEditorViewModel(TerrainEditorSession session, SpriteManifest manifest)
+    public TerrainEditorViewModel(TerrainEditorSession session, SpriteManifest manifest, IReadOnlyList<int> tilesetSheets)
     {
         _session = session ?? throw new ArgumentNullException(nameof(session));
         _manifest = manifest ?? throw new ArgumentNullException(nameof(manifest));
+        ArgumentNullException.ThrowIfNull(tilesetSheets);
         _eligibleSheets = manifest.SheetIds
-            .Where(sheet => manifest.GetFrames(sheet).Any(IsEligibleFrame))
+            .Where(sheet => tilesetSheets.Contains(sheet) && manifest.GetFrames(sheet).Any(IsEligibleFrame))
             .ToList();
         _session.Changed += OnSessionChanged;
         _selectedSheet = _eligibleSheets.Count > 0 ? _eligibleSheets[0] : null;

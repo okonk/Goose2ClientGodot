@@ -267,7 +267,7 @@ internal sealed class TerrainEditorController : IDisposable
     private (TerrainEditorSession Session, TerrainEditorViewModel ViewModel) CreateReplacement(TerrainCatalog baseline)
     {
         var session = new TerrainEditorSession(baseline, _manifest);
-        return (session, new TerrainEditorViewModel(session, _manifest));
+        return (session, new TerrainEditorViewModel(session, _manifest, _context.SheetIds));
     }
 
     private void ApplyReplacement((TerrainEditorSession Session, TerrainEditorViewModel ViewModel) replacement)

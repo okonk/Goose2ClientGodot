@@ -61,7 +61,7 @@ public class TerrainSheetControlTests
     {
         SpriteManifest manifest = SpriteManifest.Parse(manifestJson);
         TerrainCatalog catalog = new(CreateTerrains(), graphics ?? CreateGraphics());
-        TerrainEditorViewModel viewModel = new(new TerrainEditorSession(catalog, manifest), manifest);
+        TerrainEditorViewModel viewModel = new(new TerrainEditorSession(catalog, manifest), manifest, manifest.SheetIds);
         List<AvaloniaSpriteSheetImage> images = new();
         CountingSpriteSheetLoader loader = new(path =>
         {
