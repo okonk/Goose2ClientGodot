@@ -710,6 +710,39 @@ public class MapCanvasTests
     }
 
     [AvaloniaFact]
+    public async Task TerrainTool_Click_WithSelection_IsNoOp()
+    {
+        Harness harness = CreateSmallMapAsync();
+        MapEditSession session = harness.ViewModel.Session;
+        MapDocument document = session.Document;
+        document.SetLayer(0, 0, 0, new MapTileLayer(1, 1));
+        document.SetLayer(2, 3, 2, new MapTileLayer(2, 2));
+        List<MapTileLayer> before = new();
+        for (int x = 0; x < document.Width; x++)
+            for (int y = 0; y < document.Height; y++)
+                for (int layer = 0; layer < MapDocument.LayerCount; layer++)
+                    before.Add(document[x, y].GetLayer(layer));
+
+        harness.ViewModel.SetTerrain(TerrainCatalogFor(GrassId));
+        harness.ViewModel.SelectTerrain(GrassId);
+        harness.ViewModel.SelectedX = 0;
+        harness.ViewModel.SelectedY = 0;
+        harness.ViewModel.ActiveTool = MapEditTool.Terrain;
+
+        Point p = new(Cell / 2, Cell / 2);
+        harness.Window.MouseDown(p, MouseButton.Left, RawInputModifiers.None);
+        harness.Window.MouseUp(p, MouseButton.Left, RawInputModifiers.None);
+
+        Assert.False(session.HasActiveStroke);
+        Assert.False(session.CanUndo);
+        int index = 0;
+        for (int x = 0; x < document.Width; x++)
+            for (int y = 0; y < document.Height; y++)
+                for (int layer = 0; layer < MapDocument.LayerCount; layer++)
+                    Assert.Equal(before[index++], document[x, y].GetLayer(layer));
+    }
+
+    [AvaloniaFact]
     public async Task FloodFillTool_Click_FillsRegionAsOneUndoableCommand()
     {
         Harness harness = CreateSmallMapAsync();
@@ -1025,6 +1058,22 @@ public class MapCanvasTests
         public void DrawText(string text, Point center, double fontSize, Brush fill, Brush? stroke) => throw new InvalidOperationException("sink failure");
 
         public IDisposable PushClip(Rect rect) => throw new InvalidOperationException("sink failure");
+    }
+
+    private static readonly Guid GrassId = new("00000000-0000-0000-0000-000000000001");
+
+    private static TerrainCatalogLoadResult TerrainCatalogFor(Guid terrainId)
+    {
+        var definitions = new List<TerrainDefinition> { new(terrainId, "Grass", null) };
+        var graphics = new List<TerrainGraphicDefinition> { new(new TerrainGraphicReference(1, 10), new TerrainPattern(Center: terrainId)) };
+        var catalog = new TerrainCatalog(definitions, graphics);
+        TerrainCatalogValidationResult validation = TerrainCatalogValidator.Validate(catalog);
+        return TerrainCatalogLoadResult.Valid(
+            "terrain-brushes.json",
+            new TerrainFileRevision(true, "unit-test"),
+            catalog,
+            validation.Index,
+            validation.Issues);
     }
 
     private static Harness CreateSmallMapAsync()

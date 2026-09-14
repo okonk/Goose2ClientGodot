@@ -444,6 +444,8 @@ internal sealed class MapCanvas : Control, ICustomHitTest
                 }
 
                 break;
+            case MapEditTool.Terrain:
+                break;
             default:
                 BeginStroke(position);
                 break;
