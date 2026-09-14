@@ -104,6 +104,52 @@ and `animation-manifest.json`.
 7. **Teardown.** Close the viewer and then the editor while playback is active: the viewer
    tears down first and the editor close completes without errors.
 
+## Terrain editor checklist
+
+Requires a display-equipped host and an asset root whose sprite sheets contain the frames you
+plan to author. Run after the automated gates pass.
+
+1. **Availability and tool.** Load the asset root. The Terrains tab shows Add (enabled) and
+   Edit (disabled while the catalog is empty or invalid), and the terrain selector stays
+   disabled. Select a terrain from the selector: the Terrain tool toggles on (also via the
+   `T` shortcut) and Edit becomes enabled. With no terrain selected, canvas clicks are
+   no-ops.
+2. **Authoring with the fixed 80% overlay.** Click Add: the modeless terrain editor opens
+   with a draft terrain selected. The sheet renders the sprite artwork, and every authored
+   region (center, each side, each corner) is drawn over it at a fixed 80% opacity
+   (alpha `0xCC`) in the terrain's display color — the artwork stays visible below the
+   overlay at all zoom levels. Click the center, side, and corner regions of frames to
+   assign them, then Add a second terrain and repeat. Each region click is one gesture.
+3. **Local undo/redo.** Undo and redo step through region gestures one at a time; Revert
+   restores the loaded catalog. Save writes the catalog file, closes the dirty state, and
+   the main-window selector enables with the authored terrains.
+4. **Map painting, transitions on both sides, diagonal repair.** Select a terrain and paint
+   a small block of cells. Each cell takes the best-matching frame, and the eight-neighbor
+   halo is re-resolved with every gesture, so boundary transitions appear on both sides of
+   the painted region and diagonal (corner) cells are repaired by strokes along the
+   diagonal. One press/release is exactly one undo step; a fast drag is still one step.
+5. **Shift erase.** Hold Shift and drag over painted terrain: any recognized terrain is
+   erased and the halo re-resolves again. Shift is frozen for the whole gesture. One
+   gesture is one undo step; undo/redo restore the painted state exactly.
+6. **Map save and reopen.** Save the map, close it, and reopen it: the terrain frames
+   round-trip unchanged and the map file format is unaffected by terrain painting.
+7. **Malformed recovery.** Point the editor at a root whose terrain file is corrupt: the
+   Terrains tab shows the diagnostic, the editor opens with a recovery panel, and ordinary
+   tile painting (pencil/eraser) keeps working. Confirm "Terrain invalid" → Replace to
+   reset to a valid empty catalog and author again.
+8. **External change conflict (best effort).** Modify the terrain file in another program,
+   then Save from the editor: the "Terrain changed" prompt offers Reload (adopt the
+   external catalog), Overwrite (write your draft), or Cancel (keep the draft, write
+   nothing). Detection is best effort: it catches saves that observe a changed file, not
+   concurrent writers in general.
+9. **Dirty root prompts.** Make the terrain editor dirty, then load a different asset root:
+   the "Unsaved changes" prompt names Terrain. Save writes the catalog and then switches
+   roots; Discard switches without writing; Cancel keeps the current root and the draft.
+   The same prompt guards application close, resolved before the map documents.
+10. **Removed terrain leaves the map unchanged.** Delete a terrain and save: cells painted
+    with its frames keep their frames, the selector drops the terrain, and the tool falls
+    back to the pencil. The painted cells can still be erased with the eraser.
+
 ## Archive inspection vs target-host launch
 
 ### Archive inspection (dev host)

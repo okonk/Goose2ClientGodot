@@ -26,7 +26,7 @@ public sealed class AssetFixture : IDisposable
         => File.WriteAllBytes(Path.Combine(AssetDirectory, "sheets", $"{sheetId}.png"), PngSheet.Create(width, height));
 
     public void WriteCorruptSheet(int sheetId)
-        => File.WriteAllText(Path.Combine(AssetDirectory, "sheets", $"{sheetId}.png"), "this is not a png, just text bytes");
+        => WriteCorruptSheet(AssetDirectory, sheetId);
 
     public const string ManifestJson = """
         { "tileSize": 32, "sheets": {
@@ -53,6 +53,100 @@ public sealed class AssetFixture : IDisposable
 
     public static void WriteAnimationSidecar(string assetDirectory, string json)
         => File.WriteAllText(Path.Combine(assetDirectory, GraphicAnimationManifest.FileName), json);
+
+    public static readonly Guid GrassId = new("aaaaaaaa-0000-0000-0000-000000000001");
+    public static readonly Guid WaterId = new("aaaaaaaa-0000-0000-0000-000000000002");
+
+    public const string TerrainManifestJson = """
+        { "tileSize": 32, "sheets": {
+          "1": { "10": [0, 0, 32, 32], "11": [32, 0, 32, 32], "12": [64, 0, 32, 32], "13": [96, 0, 32, 32],
+                 "14": [128, 0, 32, 32], "15": [160, 0, 32, 32], "16": [192, 0, 32, 32], "17": [224, 0, 32, 32],
+                 "18": [256, 0, 32, 32], "20": [288, 0, 32, 32], "21": [320, 0, 32, 32], "22": [352, 0, 32, 32],
+                 "23": [384, 0, 32, 32] },
+          "2": { "20": [0, 0, 32, 32] }
+        } }
+        """;
+
+    public const string GrassWaterCatalogJson = """
+        { "version": 1,
+          "terrains": [
+            { "id": "aaaaaaaa-0000-0000-0000-000000000001", "name": "Grass", "color": null },
+            { "id": "aaaaaaaa-0000-0000-0000-000000000002", "name": "Water", "color": null } ],
+          "graphics": [
+            { "sheet": 1, "graphic": 10, "center": "aaaaaaaa-0000-0000-0000-000000000001",
+              "north": null, "east": null, "south": null, "west": null,
+              "northEast": null, "southEast": null, "southWest": null, "northWest": null },
+            { "sheet": 1, "graphic": 11, "center": "aaaaaaaa-0000-0000-0000-000000000001",
+              "north": null, "east": "aaaaaaaa-0000-0000-0000-000000000001", "south": null, "west": null,
+              "northEast": null, "southEast": null, "southWest": null, "northWest": null },
+            { "sheet": 1, "graphic": 12, "center": "aaaaaaaa-0000-0000-0000-000000000001",
+              "north": "aaaaaaaa-0000-0000-0000-000000000001", "east": null, "south": null, "west": null,
+              "northEast": null, "southEast": null, "southWest": null, "northWest": null },
+            { "sheet": 1, "graphic": 13, "center": "aaaaaaaa-0000-0000-0000-000000000001",
+              "north": null, "east": null, "south": "aaaaaaaa-0000-0000-0000-000000000001", "west": null,
+              "northEast": null, "southEast": null, "southWest": null, "northWest": null },
+            { "sheet": 1, "graphic": 14, "center": "aaaaaaaa-0000-0000-0000-000000000001",
+              "north": null, "east": null, "south": null, "west": "aaaaaaaa-0000-0000-0000-000000000001",
+              "northEast": null, "southEast": null, "southWest": null, "northWest": null },
+            { "sheet": 1, "graphic": 15, "center": "aaaaaaaa-0000-0000-0000-000000000001",
+              "north": null, "east": null, "south": null, "west": null,
+              "northEast": "aaaaaaaa-0000-0000-0000-000000000001", "southEast": null, "southWest": null, "northWest": null },
+            { "sheet": 1, "graphic": 16, "center": "aaaaaaaa-0000-0000-0000-000000000001",
+              "north": null, "east": null, "south": null, "west": null,
+              "northEast": null, "southEast": "aaaaaaaa-0000-0000-0000-000000000001", "southWest": null, "northWest": null },
+            { "sheet": 1, "graphic": 17, "center": "aaaaaaaa-0000-0000-0000-000000000001",
+              "north": null, "east": null, "south": null, "west": null,
+              "northEast": null, "southEast": null, "southWest": "aaaaaaaa-0000-0000-0000-000000000001", "northWest": null },
+            { "sheet": 1, "graphic": 18, "center": "aaaaaaaa-0000-0000-0000-000000000001",
+              "north": null, "east": null, "south": null, "west": null,
+              "northEast": null, "southEast": null, "southWest": null, "northWest": "aaaaaaaa-0000-0000-0000-000000000001" },
+            { "sheet": 1, "graphic": 20, "center": "aaaaaaaa-0000-0000-0000-000000000002",
+              "north": null, "east": null, "south": null, "west": null,
+              "northEast": null, "southEast": null, "southWest": null, "northWest": null },
+            { "sheet": 1, "graphic": 21, "center": "aaaaaaaa-0000-0000-0000-000000000002",
+              "north": null, "east": "aaaaaaaa-0000-0000-0000-000000000002", "south": null, "west": null,
+              "northEast": null, "southEast": null, "southWest": null, "northWest": null },
+            { "sheet": 1, "graphic": 22, "center": "aaaaaaaa-0000-0000-0000-000000000002",
+              "north": "aaaaaaaa-0000-0000-0000-000000000002", "east": null, "south": null, "west": null,
+              "northEast": null, "southEast": null, "southWest": null, "northWest": null },
+            { "sheet": 1, "graphic": 23, "center": "aaaaaaaa-0000-0000-0000-000000000002",
+              "north": null, "east": null, "south": null, "west": null,
+              "northEast": "aaaaaaaa-0000-0000-0000-000000000002", "southEast": null, "southWest": null, "northWest": null } ] }
+        """;
+
+    public const string MalformedTerrainJson = """
+        { "version": 1, "terrains": [ { "id": "aaaaaaaa-0000-0000-0000-000000000001", "name": "Grass",
+        """;
+
+    public const string OverlappingFramesCatalogJson = """
+        { "version": 1,
+          "terrains": [ { "id": "aaaaaaaa-0000-0000-0000-000000000001", "name": "Grass", "color": null } ],
+          "graphics": [
+            { "sheet": 1, "graphic": 10, "center": "aaaaaaaa-0000-0000-0000-000000000001",
+              "north": null, "east": null, "south": null, "west": null,
+              "northEast": null, "southEast": null, "southWest": null, "northWest": null },
+            { "sheet": 1, "graphic": 10, "center": "aaaaaaaa-0000-0000-0000-000000000001",
+              "north": null, "east": "aaaaaaaa-0000-0000-0000-000000000001", "south": null, "west": null,
+              "northEast": null, "southEast": null, "southWest": null, "northWest": null } ] }
+        """;
+
+    public static string WriteTerrainAssetDirectory(string root, string name, string? terrainJson)
+    {
+        string assetDirectory = Path.Combine(root, name);
+        Directory.CreateDirectory(Path.Combine(assetDirectory, "sheets"));
+        File.WriteAllText(Path.Combine(assetDirectory, "manifest.json"), TerrainManifestJson);
+        File.WriteAllBytes(Path.Combine(assetDirectory, "sheets", "1.png"), PngSheet.Create(416, 32));
+        File.WriteAllBytes(Path.Combine(assetDirectory, "sheets", "2.png"), PngSheet.Create(64, 64));
+        if (terrainJson is not null)
+        {
+            File.WriteAllText(Path.Combine(assetDirectory, TerrainAssetCatalog.FileName), terrainJson);
+        }
+
+        return assetDirectory;
+    }
+
+    public static void WriteCorruptSheet(string assetDirectory, int sheetId)
+        => File.WriteAllText(Path.Combine(assetDirectory, "sheets", $"{sheetId}.png"), "this is not a png, just text bytes");
 
     public const string TerrainCatalogJson = """
         { "version": 1,
