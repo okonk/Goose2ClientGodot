@@ -19,6 +19,7 @@ using MapEditor.App.Dialogs;
 using MapEditor.App.Documents;
 using MapEditor.App.Rendering;
 using MapEditor.App.Settings;
+using MapEditor.App.Terrain;
 using MapEditor.App.Tests.Fakes;
 using MapEditor.App.Tests.Fixtures;
 using MapEditor.App.ViewModels;
@@ -46,7 +47,7 @@ public class MapCanvasTests
         } }
         """;
 
-    private sealed record Harness(MapCanvas Canvas, MapDocumentViewModel ViewModel, FakeEditorDialogs Dialogs, Window Window, AssetContextController Assets);
+    private sealed record Harness(MapCanvas Canvas, SpritePaletteControl Palette, MapDocumentViewModel ViewModel, FakeEditorDialogs Dialogs, Window Window, AssetContextController Assets);
 
     [AvaloniaFact]
     public async Task LeftPressRelease_PaintsOneCellAsSingleUndoEntry()
@@ -710,36 +711,324 @@ public class MapCanvasTests
     }
 
     [AvaloniaFact]
-    public async Task TerrainTool_Click_WithSelection_IsNoOp()
+    public async Task TerrainPressRelease_PaintsOneCellAsSingleUndoEntry()
+    {
+        Harness harness = CreateSmallMapAsync();
+        SelectGrass(harness);
+        MapEditSession session = harness.ViewModel.Session;
+        MapDocument document = session.Document;
+
+        harness.Window.MouseDown(new Point(Cell / 2, Cell / 2), MouseButton.Left, RawInputModifiers.None);
+        Assert.True(session.HasActiveStroke);
+        Assert.Equal(new MapTileLayer(1, 10), document[0, 0].GetLayer(0));
+        harness.Window.MouseUp(new Point(Cell / 2, Cell / 2), MouseButton.Left, RawInputModifiers.None);
+
+        Assert.False(session.HasActiveStroke);
+        Assert.Equal(new MapTileLayer(1, 10), document[0, 0].GetLayer(0));
+        Assert.True(session.CanUndo);
+        Assert.False(session.CanRedo);
+        Assert.True(harness.ViewModel.Undo());
+        Assert.Equal(new MapTileLayer(0, 0), document[0, 0].GetLayer(0));
+        Assert.True(harness.ViewModel.Redo());
+        Assert.Equal(new MapTileLayer(1, 10), document[0, 0].GetLayer(0));
+    }
+
+    [AvaloniaFact]
+    public async Task TerrainDrag_Release_OneUndoRestoresWholeGesture()
+    {
+        Harness harness = CreateSmallMapAsync();
+        SelectGrass(harness);
+        MapEditSession session = harness.ViewModel.Session;
+        MapDocument document = session.Document;
+
+        harness.Window.MouseDown(new Point(Cell / 2, Cell / 2), MouseButton.Left, RawInputModifiers.None);
+        harness.Window.MouseMove(new Point(3 * Cell + Cell / 2, Cell / 2), RawInputModifiers.None);
+        for (int x = 0; x < 4; x++)
+        {
+            Assert.Equal(new MapTileLayer(1, 10), document[x, 0].GetLayer(0));
+        }
+
+        harness.Window.MouseUp(new Point(3 * Cell + Cell / 2, Cell / 2), MouseButton.Left, RawInputModifiers.None);
+
+        Assert.False(session.HasActiveStroke);
+        for (int x = 0; x < 4; x++)
+        {
+            Assert.Equal(new MapTileLayer(1, 10), document[x, 0].GetLayer(0));
+        }
+
+        Assert.True(session.CanUndo);
+        Assert.True(harness.ViewModel.Undo());
+        for (int x = 0; x < 4; x++)
+        {
+            Assert.Equal(new MapTileLayer(0, 0), document[x, 0].GetLayer(0));
+        }
+
+        Assert.True(harness.ViewModel.Redo());
+        for (int x = 0; x < 4; x++)
+        {
+            Assert.Equal(new MapTileLayer(1, 10), document[x, 0].GetLayer(0));
+        }
+    }
+
+    [AvaloniaFact]
+    public async Task TerrainPaint_RepairsEightNeighborsLive()
     {
         Harness harness = CreateSmallMapAsync();
         MapEditSession session = harness.ViewModel.Session;
         MapDocument document = session.Document;
-        document.SetLayer(0, 0, 0, new MapTileLayer(1, 1));
-        document.SetLayer(2, 3, 2, new MapTileLayer(2, 2));
-        List<MapTileLayer> before = new();
-        for (int x = 0; x < document.Width; x++)
-            for (int y = 0; y < document.Height; y++)
-                for (int layer = 0; layer < MapDocument.LayerCount; layer++)
-                    before.Add(document[x, y].GetLayer(layer));
-
-        harness.ViewModel.SetTerrain(TerrainCatalogFor(GrassId));
+        harness.ViewModel.SetTerrain(TerrainCatalog(
+            (1, 10, new TerrainPattern(Center: GrassId)),
+            (1, 11, new TerrainPattern(Center: GrassId, East: GrassId))));
         harness.ViewModel.SelectTerrain(GrassId);
-        harness.ViewModel.SelectedX = 0;
-        harness.ViewModel.SelectedY = 0;
-        harness.ViewModel.ActiveTool = MapEditTool.Terrain;
 
-        Point p = new(Cell / 2, Cell / 2);
-        harness.Window.MouseDown(p, MouseButton.Left, RawInputModifiers.None);
-        harness.Window.MouseUp(p, MouseButton.Left, RawInputModifiers.None);
+        harness.Window.MouseDown(new Point(Cell / 2, Cell / 2), MouseButton.Left, RawInputModifiers.None);
+        harness.Window.MouseUp(new Point(Cell / 2, Cell / 2), MouseButton.Left, RawInputModifiers.None);
+        Assert.Equal(new MapTileLayer(1, 10), document[0, 0].GetLayer(0));
+
+        harness.Window.MouseDown(new Point(Cell + Cell / 2, Cell / 2), MouseButton.Left, RawInputModifiers.None);
+        Assert.Equal(new MapTileLayer(1, 11), document[0, 0].GetLayer(0));
+        Assert.Equal(new MapTileLayer(1, 10), document[1, 0].GetLayer(0));
+        harness.Window.MouseUp(new Point(Cell + Cell / 2, Cell / 2), MouseButton.Left, RawInputModifiers.None);
+
+        Assert.Equal(new MapTileLayer(1, 11), document[0, 0].GetLayer(0));
+        Assert.Equal(new MapTileLayer(1, 10), document[1, 0].GetLayer(0));
+        Assert.True(harness.ViewModel.Undo());
+        Assert.Equal(new MapTileLayer(1, 10), document[0, 0].GetLayer(0));
+        Assert.Equal(new MapTileLayer(0, 0), document[1, 0].GetLayer(0));
+    }
+
+    [AvaloniaFact]
+    public async Task TerrainShiftPress_ErasesAnyRecognizedTile()
+    {
+        Harness harness = CreateSmallMapAsync();
+        SelectGrass(harness);
+        MapEditSession session = harness.ViewModel.Session;
+        MapDocument document = session.Document;
+        document.SetLayer(0, 0, 0, new MapTileLayer(1, 10));
+
+        harness.Window.MouseDown(new Point(Cell / 2, Cell / 2), MouseButton.Left, RawInputModifiers.Shift);
+        Assert.Equal(new MapTileLayer(0, 0), document[0, 0].GetLayer(0));
+        harness.Window.MouseUp(new Point(Cell / 2, Cell / 2), MouseButton.Left, RawInputModifiers.Shift);
 
         Assert.False(session.HasActiveStroke);
+        Assert.Equal(new MapTileLayer(0, 0), document[0, 0].GetLayer(0));
+        Assert.True(harness.ViewModel.Undo());
+        Assert.Equal(new MapTileLayer(1, 10), document[0, 0].GetLayer(0));
+    }
+
+    [AvaloniaFact]
+    public async Task TerrainPaint_OverwritesManualTile_LeavesManualNeighborsUntouched()
+    {
+        Harness harness = CreateSmallMapAsync();
+        SelectGrass(harness);
+        MapDocument document = harness.ViewModel.Session.Document;
+        document.SetLayer(0, 0, 0, new MapTileLayer(7, 42));
+        document.SetLayer(1, 0, 0, new MapTileLayer(7, 42));
+        document.SetLayer(0, 1, 0, new MapTileLayer(7, 42));
+
+        harness.Window.MouseDown(new Point(Cell / 2, Cell / 2), MouseButton.Left, RawInputModifiers.None);
+        Assert.Equal(new MapTileLayer(1, 10), document[0, 0].GetLayer(0));
+        harness.Window.MouseUp(new Point(Cell / 2, Cell / 2), MouseButton.Left, RawInputModifiers.None);
+
+        Assert.Equal(new MapTileLayer(1, 10), document[0, 0].GetLayer(0));
+        Assert.Equal(new MapTileLayer(7, 42), document[1, 0].GetLayer(0));
+        Assert.Equal(new MapTileLayer(7, 42), document[0, 1].GetLayer(0));
+    }
+
+    [AvaloniaFact]
+    public async Task TerrainPaint_NonContiguousLayerMask_PaintsTopmostSelectedLayer()
+    {
+        Harness harness = CreateSmallMapAsync();
+        SelectGrass(harness);
+        MapDocument document = harness.ViewModel.Session.Document;
+        harness.ViewModel.SelectedLayers = (byte)0b1001;
+
+        harness.Window.MouseDown(new Point(Cell / 2, Cell / 2), MouseButton.Left, RawInputModifiers.None);
+        harness.Window.MouseUp(new Point(Cell / 2, Cell / 2), MouseButton.Left, RawInputModifiers.None);
+
+        Assert.Equal(new MapTileLayer(1, 10), document[0, 0].GetLayer(3));
+        Assert.Equal(new MapTileLayer(0, 0), document[0, 0].GetLayer(0));
+        Assert.True(harness.ViewModel.Undo());
+        Assert.Equal(new MapTileLayer(0, 0), document[0, 0].GetLayer(3));
+    }
+
+    [AvaloniaFact]
+    public async Task TerrainZeroDeltaErase_StaysCaptured_ThenDragErases_AndUnchangedReleasePushesNoCommand()
+    {
+        Harness harness = CreateSmallMapAsync();
+        SelectGrass(harness);
+        MapEditSession session = harness.ViewModel.Session;
+        MapDocument document = session.Document;
+        document.SetLayer(1, 0, 0, new MapTileLayer(1, 10));
+
+        harness.Window.MouseDown(new Point(Cell / 2, Cell / 2), MouseButton.Left, RawInputModifiers.Shift);
+        Assert.True(session.HasActiveStroke);
+        Assert.True(harness.Canvas.IsGestureActive);
+        Assert.Equal(new MapTileLayer(1, 10), document[1, 0].GetLayer(0));
+        harness.Window.MouseMove(new Point(Cell + Cell / 2, Cell / 2), RawInputModifiers.Shift);
+        Assert.Equal(new MapTileLayer(0, 0), document[1, 0].GetLayer(0));
+        harness.Window.MouseUp(new Point(Cell + Cell / 2, Cell / 2), MouseButton.Left, RawInputModifiers.Shift);
+
+        Assert.False(session.HasActiveStroke);
+        Assert.True(harness.ViewModel.Undo());
+        Assert.Equal(new MapTileLayer(1, 10), document[1, 0].GetLayer(0));
+
+        harness.Window.MouseDown(new Point(Cell / 2, Cell / 2), MouseButton.Left, RawInputModifiers.Shift);
+        Assert.True(session.HasActiveStroke);
+        harness.Window.MouseUp(new Point(Cell / 2, Cell / 2), MouseButton.Left, RawInputModifiers.Shift);
+
+        Assert.False(session.HasActiveStroke);
+        Assert.Equal(new MapTileLayer(0, 0), document[0, 0].GetLayer(0));
         Assert.False(session.CanUndo);
-        int index = 0;
-        for (int x = 0; x < document.Width; x++)
-            for (int y = 0; y < document.Height; y++)
-                for (int layer = 0; layer < MapDocument.LayerCount; layer++)
-                    Assert.Equal(before[index++], document[x, y].GetLayer(layer));
+    }
+
+    [AvaloniaFact]
+    public async Task TerrainShiftReleasedMidDrag_StillErases()
+    {
+        Harness harness = CreateSmallMapAsync();
+        SelectGrass(harness);
+        MapDocument document = harness.ViewModel.Session.Document;
+        document.SetLayer(0, 0, 0, new MapTileLayer(1, 10));
+        document.SetLayer(1, 0, 0, new MapTileLayer(1, 10));
+
+        harness.Window.MouseDown(new Point(Cell / 2, Cell / 2), MouseButton.Left, RawInputModifiers.Shift);
+        harness.Window.MouseMove(new Point(Cell + Cell / 2, Cell / 2), RawInputModifiers.None);
+        harness.Window.MouseUp(new Point(Cell + Cell / 2, Cell / 2), MouseButton.Left, RawInputModifiers.None);
+
+        Assert.Equal(new MapTileLayer(0, 0), document[0, 0].GetLayer(0));
+        Assert.Equal(new MapTileLayer(0, 0), document[1, 0].GetLayer(0));
+    }
+
+    [AvaloniaFact]
+    public async Task TerrainEscape_CancelsAndRestores()
+    {
+        Harness harness = CreateSmallMapAsync();
+        SelectGrass(harness);
+        MapEditSession session = harness.ViewModel.Session;
+        MapDocument document = session.Document;
+
+        harness.Window.MouseDown(new Point(Cell / 2, Cell / 2), MouseButton.Left, RawInputModifiers.None);
+        Assert.Equal(new MapTileLayer(1, 10), document[0, 0].GetLayer(0));
+        harness.Window.KeyPressQwerty(PhysicalKey.Escape, RawInputModifiers.None);
+
+        Assert.False(session.HasActiveStroke);
+        Assert.Equal(new MapTileLayer(0, 0), document[0, 0].GetLayer(0));
+        Assert.False(session.CanUndo);
+    }
+
+    [AvaloniaFact]
+    public async Task TerrainCaptureLost_CancelsAndRestores()
+    {
+        Harness harness = CreateSmallMapAsync();
+        SelectGrass(harness);
+        MapEditSession session = harness.ViewModel.Session;
+        MapDocument document = session.Document;
+
+        harness.Window.MouseDown(new Point(Cell / 2, Cell / 2), MouseButton.Left, RawInputModifiers.None);
+        Assert.Equal(new MapTileLayer(1, 10), document[0, 0].GetLayer(0));
+        harness.Window.Content = new Border();
+
+        Assert.False(session.HasActiveStroke);
+        Assert.Equal(new MapTileLayer(0, 0), document[0, 0].GetLayer(0));
+        Assert.False(session.CanUndo);
+    }
+
+    [AvaloniaFact]
+    public async Task PencilCaptureLost_CommitsTheStroke()
+    {
+        Harness harness = CreateSmallMapAsync();
+        MapEditSession session = harness.ViewModel.Session;
+        MapDocument document = session.Document;
+        harness.ViewModel.Brush = new MapTileLayer(8, 8);
+
+        harness.Window.MouseDown(new Point(Cell / 2, Cell / 2), MouseButton.Left, RawInputModifiers.None);
+        harness.Window.Content = new Border();
+
+        Assert.False(session.HasActiveStroke);
+        Assert.Equal(new MapTileLayer(8, 8), document[0, 0].GetLayer(0));
+        Assert.True(session.CanUndo);
+    }
+
+    [AvaloniaFact]
+    public async Task TerrainPublication_CancelsActiveGestureAndRestores()
+    {
+        Harness harness = CreateSmallMapAsync();
+        SelectGrass(harness);
+        MapEditSession session = harness.ViewModel.Session;
+        MapDocument document = session.Document;
+
+        harness.Window.MouseDown(new Point(Cell / 2, Cell / 2), MouseButton.Left, RawInputModifiers.None);
+        Assert.Equal(new MapTileLayer(1, 10), document[0, 0].GetLayer(0));
+
+        using TerrainOperationLease operation = harness.Assets.Gate.AcquireAsync().GetAwaiter().GetResult();
+        ITerrainCatalogLoadedPublication publication = harness.Assets.PrepareLoaded(
+            operation,
+            harness.Assets.Current,
+            harness.ViewModel.Terrain!,
+            TerrainLoadedPublicationKind.ValidReload);
+
+        Assert.False(session.HasActiveStroke);
+        Assert.False(harness.Canvas.IsGestureActive);
+        Assert.Equal(new MapTileLayer(0, 0), document[0, 0].GetLayer(0));
+        Assert.False(session.CanUndo);
+
+        publication.Dispose();
+    }
+
+    [AvaloniaFact]
+    public async Task RootSwap_CancelsActiveGestureAndRestores()
+    {
+        Harness harness = CreateSmallMapAsync();
+        SelectGrass(harness);
+        MapEditSession session = harness.ViewModel.Session;
+        MapDocument document = session.Document;
+
+        harness.Window.MouseDown(new Point(Cell / 2, Cell / 2), MouseButton.Left, RawInputModifiers.None);
+        Assert.Equal(new MapTileLayer(1, 10), document[0, 0].GetLayer(0));
+
+        string root = Directory.CreateTempSubdirectory("map-editor-canvas-root-swap-").FullName;
+        string second = AssetFixture.WriteAssetDirectory(root, "assets-second");
+        Assert.True(harness.Assets.TryOpen(second));
+
+        Assert.False(session.HasActiveStroke);
+        Assert.False(harness.Canvas.IsGestureActive);
+        Assert.Equal(new MapTileLayer(0, 0), document[0, 0].GetLayer(0));
+        Assert.False(session.CanUndo);
+    }
+
+    [AvaloniaFact]
+    public async Task TerrainBeginFailure_SurfacesOneErrorAndCapturesNothing()
+    {
+        Harness harness = CreateSmallMapAsync();
+        SelectGrass(harness);
+        MapEditSession session = harness.ViewModel.Session;
+        MapDocument document = session.Document;
+
+        harness.ViewModel.SetTerrain(TerrainCatalog((1, 20, new TerrainPattern(Center: DirtId))));
+        harness.ViewModel.TerrainError += error => harness.Dialogs.Errors.Add(error);
+
+        harness.Window.MouseDown(new Point(Cell / 2, Cell / 2), MouseButton.Left, RawInputModifiers.None);
+
+        Assert.False(session.HasActiveStroke);
+        Assert.False(harness.Canvas.IsGestureActive);
+        Assert.Equal(new MapTileLayer(0, 0), document[0, 0].GetLayer(0));
+        Assert.False(session.CanUndo);
+        var error = Assert.Single(harness.Dialogs.Errors);
+        Assert.Contains("Unknown terrain", error.Message);
+
+        harness.Window.MouseUp(new Point(Cell / 2, Cell / 2), MouseButton.Left, RawInputModifiers.None);
+        Assert.Single(harness.Dialogs.Errors);
+        Assert.False(session.CanUndo);
+    }
+
+    [AvaloniaFact]
+    public async Task MapCanvasDispose_IsIdempotent()
+    {
+        Harness harness = CreateSmallMapAsync();
+        harness.Canvas.Dispose();
+        harness.Canvas.Dispose();
+        harness.Palette.Dispose();
+        harness.Palette.Dispose();
     }
 
     [AvaloniaFact]
@@ -1061,6 +1350,34 @@ public class MapCanvasTests
     }
 
     private static readonly Guid GrassId = new("00000000-0000-0000-0000-000000000001");
+    private static readonly Guid DirtId = new("00000000-0000-0000-0000-000000000002");
+
+    private static void SelectGrass(Harness harness)
+    {
+        harness.ViewModel.SetTerrain(TerrainCatalogFor(GrassId));
+        harness.ViewModel.SelectTerrain(GrassId);
+    }
+
+    private static TerrainCatalogLoadResult TerrainCatalog(params (int Sheet, int Graphic, TerrainPattern Pattern)[] graphics)
+    {
+        var definitions = new List<TerrainDefinition>();
+        foreach (var (_, _, pattern) in graphics)
+        {
+            if (pattern.Center is { } center && definitions.All(terrain => terrain.Id != center))
+            {
+                definitions.Add(new TerrainDefinition(center, "Terrain", null));
+            }
+        }
+
+        var catalog = new TerrainCatalog(definitions, graphics.Select(graphic => new TerrainGraphicDefinition(new TerrainGraphicReference(graphic.Sheet, graphic.Graphic), graphic.Pattern)));
+        TerrainCatalogValidationResult validation = TerrainCatalogValidator.Validate(catalog);
+        return TerrainCatalogLoadResult.Valid(
+            "terrain-brushes.json",
+            new TerrainFileRevision(true, "unit-test"),
+            catalog,
+            validation.Index!,
+            validation.Issues);
+    }
 
     private static TerrainCatalogLoadResult TerrainCatalogFor(Guid terrainId)
     {
@@ -1087,6 +1404,13 @@ public class MapCanvasTests
         string settingsPath = Path.Combine(Path.GetTempPath(), "map-editor-canvas-tests", "settings.json");
         AssetContextController assets = new(workspace, new AppSettingsStore(settingsPath));
         MapCanvas canvas = new(viewModel, assets)
+        {
+            Width = CanvasWidth,
+            Height = CanvasHeight,
+            HorizontalAlignment = HorizontalAlignment.Left,
+            VerticalAlignment = VerticalAlignment.Top,
+        };
+        var palette = new SpritePaletteControl(viewModel, assets)
         {
             Width = CanvasWidth,
             Height = CanvasHeight,
@@ -1157,7 +1481,7 @@ public class MapCanvasTests
         }, RoutingStrategies.Tunnel);
         window.Show();
         Dispatcher.UIThread.RunJobs();
-        return new Harness(canvas, viewModel, dialogs, window, assets);
+        return new Harness(canvas, palette, viewModel, dialogs, window, assets);
     }
 
     [AvaloniaFact]

@@ -31,6 +31,7 @@ internal sealed class SpritePaletteControl : Control, ICustomHitTest
     private readonly Func<AssetContext, SpriteReference, SpriteResolution> _resolve;
     private ScrollBar? _bar;
     private double _offset;
+    private bool _disposed;
 
     public SpritePaletteControl(MapDocumentViewModel viewModel, AssetContextController assets)
         : this(viewModel, assets, (context, reference) => context.Resolve(reference))
@@ -49,6 +50,18 @@ internal sealed class SpritePaletteControl : Control, ICustomHitTest
         _viewModel.PaletteInvalidated += OnPaletteInvalidated;
         _viewModel.PropertyChanged += OnViewModelPropertyChanged;
         SizeChanged += OnSizeChanged;
+    }
+
+    public void Dispose()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
+        _viewModel.PaletteInvalidated -= OnPaletteInvalidated;
+        _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
     }
 
     public double Offset

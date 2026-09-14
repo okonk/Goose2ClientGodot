@@ -110,6 +110,7 @@ internal partial class MainWindow : Window
             _views[document] = CreateView(document);
             document.PropertyChanged += OnAnyDocumentPropertyChanged;
             document.GameDataError += OnDocumentGameDataError;
+            document.TerrainError += OnDocumentTerrainError;
         }
 
         ActivateDocument(_workspace.ActiveDocument);
@@ -122,6 +123,12 @@ internal partial class MainWindow : Window
                 _graphicViewer = null;
                 viewer.Closed -= OnGraphicViewerClosed;
                 viewer.Close();
+            }
+
+            foreach (DocumentView view in _views.Values)
+            {
+                view.Canvas.Dispose();
+                view.Palette.Dispose();
             }
 
             _assets.Dispose();
@@ -160,6 +167,7 @@ internal partial class MainWindow : Window
                 _views[document] = CreateView(document);
                 document.PropertyChanged += OnAnyDocumentPropertyChanged;
                 document.GameDataError += OnDocumentGameDataError;
+                document.TerrainError += OnDocumentTerrainError;
             }
         }
 
@@ -186,6 +194,9 @@ internal partial class MainWindow : Window
                 view.Palette.UnbindScrollBar();
                 document.PropertyChanged -= OnAnyDocumentPropertyChanged;
                 document.GameDataError -= OnDocumentGameDataError;
+                document.TerrainError -= OnDocumentTerrainError;
+                view.Canvas.Dispose();
+                view.Palette.Dispose();
                 _views.Remove(document);
             }
         }
@@ -846,6 +857,8 @@ internal partial class MainWindow : Window
     }
 
     private void OnDocumentGameDataError(ErrorPresentation error) => _ = _dialogs.ShowErrorAsync(error);
+
+    private void OnDocumentTerrainError(ErrorPresentation error) => _ = _dialogs.ShowErrorAsync(error);
 
     private void OnSpawnNpcPickerChanged(object? sender, AvaloniaPropertyChangedEventArgs e)
     {

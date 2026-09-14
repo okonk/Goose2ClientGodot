@@ -105,6 +105,8 @@ internal sealed class MapDocumentViewModel : ViewModelBase, ITerrainDocumentReco
 
     public event Action<ErrorPresentation>? GameDataError;
 
+    public event Action<ErrorPresentation>? TerrainError;
+
     public MapEditSession Session => _controller.Document.Session;
 
     internal SheetEditSession SheetSession => _sheetSession;
@@ -1197,6 +1199,9 @@ internal sealed class MapDocumentViewModel : ViewModelBase, ITerrainDocumentReco
         session.Edits.AddWarp(new WarpRow(session.MapId, x, y, payload.WarpDestinationMapId!.Value, payload.WarpDestinationX!.Value, payload.WarpDestinationY!.Value));
         state.SelectedWarp = index;
     }
+
+    internal void RaiseTerrainError(TerrainResolutionFailure failure)
+        => TerrainError?.Invoke(new ErrorPresentation("Terrain", failure.Message));
 
     private void RaiseGameDataError(ErrorPresentation error) => GameDataError?.Invoke(error);
 

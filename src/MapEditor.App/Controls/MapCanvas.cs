@@ -22,6 +22,7 @@ internal sealed class MapCanvas : Control, ICustomHitTest
     private ViewportTransform _viewport = new(new RenderSize(1, 1), new RenderPoint(0, 0), MapZoom.Percent100);
     private bool _stroking;
     private bool _eyedropperStroke;
+    private bool _terrainStroke;
     private bool _panning;
     private bool _spaceDown;
     private RectDrag? _rectDrag;
@@ -29,6 +30,8 @@ internal sealed class MapCanvas : Control, ICustomHitTest
     private IPointer? _capturedPointer;
     private Point _lastPanPosition;
     private Window? _hoverWindow;
+    private IDisposable? _terrainCancellation;
+    private bool _disposed;
 
     private readonly record struct MarkerDrag(GameDataMarkerKind Kind, int Index, MapTileCoordinate Current);
 
@@ -38,9 +41,32 @@ internal sealed class MapCanvas : Control, ICustomHitTest
         _assets = assets ?? throw new ArgumentNullException(nameof(assets));
         Focusable = true;
         RenderOptions.SetBitmapInterpolationMode(this, BitmapInterpolationMode.None);
+        _terrainCancellation = _assets.RegisterTerrainGestureCancellation(CancelTerrainGesture);
         _viewModel.CanvasInvalidated += OnCanvasInvalidated;
         _viewModel.GameData?.Changed += OnGameDataChanged;
         SizeChanged += OnSizeChanged;
+    }
+
+    public void Dispose()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
+        _terrainCancellation?.Dispose();
+        _viewModel.CanvasInvalidated -= OnCanvasInvalidated;
+        if (_viewModel.GameData is { } gameData)
+        {
+            gameData.Changed -= OnGameDataChanged;
+        }
+
+        if (_hoverWindow is { } window)
+        {
+            window.PointerMoved -= OnWindowPointerMoved;
+            _hoverWindow = null;
+        }
     }
 
     internal ViewportTransform Viewport => _viewport;
@@ -67,6 +93,7 @@ internal sealed class MapCanvas : Control, ICustomHitTest
 
         _stroking = false;
         _eyedropperStroke = false;
+        _terrainStroke = false;
         _panning = false;
         _spaceDown = false;
         if (_rectDrag is not null)
@@ -138,7 +165,7 @@ internal sealed class MapCanvas : Control, ICustomHitTest
         InvalidateVisual();
     }
 
-    internal bool IsGestureActive => _stroking || _panning || _rectDrag is not null || _markerDrag is not null;
+    internal bool IsGestureActive => _stroking || _terrainStroke || _panning || _rectDrag is not null || _markerDrag is not null;
 
     protected override void OnPointerPressed(PointerPressedEventArgs e)
     {
@@ -257,16 +284,35 @@ internal sealed class MapCanvas : Control, ICustomHitTest
             return;
         }
 
-        if (_stroking)
+        if (_stroking || _terrainStroke)
         {
             MapTileCoordinate? tile = TileAt(position);
             if (tile is { } target)
             {
-                MapEditSession session = _viewModel.Session;
-                session.ContinueStroke(target.X, target.Y);
-                if (_eyedropperStroke)
+                if (_stroking)
                 {
-                    _viewModel.SyncPaletteToBrush();
+                    MapEditSession session = _viewModel.Session;
+                    session.ContinueStroke(target.X, target.Y);
+                    if (_eyedropperStroke)
+                    {
+                        _viewModel.SyncPaletteToBrush();
+                    }
+                }
+                else
+                {
+                    TerrainEditResult result = _viewModel.Session.ContinueTerrainStroke(target.X, target.Y);
+                    if (result.Failure is not null)
+                    {
+                        // Core already cancelled the stroke; clear the gesture state before releasing
+                        // capture so the capture-loss handler cannot re-enter CompleteStroke.
+                        _terrainStroke = false;
+                        IPointer? pointer = _capturedPointer;
+                        _capturedPointer = null;
+                        pointer?.Capture(null);
+                        _viewModel.Refresh(EditorRefresh.Canvas | EditorRefresh.Commands | EditorRefresh.Title);
+                        _viewModel.RaiseTerrainError(result.Failure);
+                        return;
+                    }
                 }
 
                 _viewModel.Refresh(EditorRefresh.Canvas | EditorRefresh.Commands | EditorRefresh.Title);
@@ -307,11 +353,12 @@ internal sealed class MapCanvas : Control, ICustomHitTest
             return;
         }
 
-        if (_stroking)
+        if (_stroking || _terrainStroke)
         {
             _viewModel.CompleteStroke();
             _stroking = false;
             _eyedropperStroke = false;
+            _terrainStroke = false;
         }
 
         CommitMarkerDrag();
@@ -335,11 +382,16 @@ internal sealed class MapCanvas : Control, ICustomHitTest
         {
             _viewModel.CompleteStroke();
         }
+        else if (_terrainStroke)
+        {
+            _viewModel.CancelStroke();
+        }
 
         CancelMarkerDrag();
         CancelRectDrag();
         _stroking = false;
         _eyedropperStroke = false;
+        _terrainStroke = false;
         _panning = false;
         _capturedPointer = null;
         _viewModel.Refresh(EditorRefresh.Canvas | EditorRefresh.Commands | EditorRefresh.Title);
@@ -445,6 +497,7 @@ internal sealed class MapCanvas : Control, ICustomHitTest
 
                 break;
             case MapEditTool.Terrain:
+                BeginTerrainPress(position, modifiers);
                 break;
             default:
                 BeginStroke(position);
@@ -551,6 +604,51 @@ internal sealed class MapCanvas : Control, ICustomHitTest
 
         _markerDrag = null;
         Invalidate();
+    }
+
+    private void BeginTerrainPress(Point position, KeyModifiers modifiers)
+    {
+        MapTileCoordinate? tile = TileAt(position);
+        if (tile is not { } cell ||
+            _viewModel.SelectedTerrainId is not { } terrainId ||
+            _viewModel.Terrain?.Index is not { } index)
+        {
+            return;
+        }
+
+        var resolver = new TerrainMapResolver(index);
+        TerrainEditMode mode = modifiers.HasFlag(KeyModifiers.Shift) ? TerrainEditMode.Erase : TerrainEditMode.Paint;
+        TerrainEditResult result = _viewModel.Session.BeginTerrainStroke(resolver, terrainId, mode, cell.X, cell.Y);
+        if (!result.IsActive)
+        {
+            if (result.Failure is not null)
+            {
+                _viewModel.RaiseTerrainError(result.Failure);
+            }
+
+            _viewModel.Refresh(EditorRefresh.Commands | EditorRefresh.Title);
+            return;
+        }
+
+        _terrainStroke = true;
+        _viewModel.SelectedX = cell.X;
+        _viewModel.SelectedY = cell.Y;
+        _viewModel.Refresh(EditorRefresh.Canvas | EditorRefresh.Commands | EditorRefresh.Title);
+    }
+
+    private void CancelTerrainGesture()
+    {
+        if (!_terrainStroke)
+        {
+            return;
+        }
+
+        _terrainStroke = false;
+        _viewModel.CancelStroke();
+        IPointer? pointer = _capturedPointer;
+        _capturedPointer = null;
+        pointer?.Capture(null);
+        _viewModel.Refresh(EditorRefresh.Canvas | EditorRefresh.Commands | EditorRefresh.Title);
     }
 
     private void BeginStroke(Point position)
