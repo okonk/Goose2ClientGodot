@@ -47,6 +47,7 @@ internal sealed class TerrainEditorSession
     private TerrainCatalog _baseline;
     private TerrainCatalog _currentCatalog = null!;
     private IReadOnlyList<TerrainValidationIssue> _diagnostics = null!;
+    private TerrainCatalogIndex? _index;
     private bool _hasErrors;
 
     private bool _strokeActive;
@@ -62,6 +63,8 @@ internal sealed class TerrainEditorSession
     public bool CanSave => !_hasErrors;
 
     public TerrainCatalog CurrentCatalog => _currentCatalog;
+
+    public TerrainCatalogIndex? Index => _index;
 
     public IReadOnlyList<TerrainValidationIssue> Diagnostics => _diagnostics;
 
@@ -461,6 +464,7 @@ internal sealed class TerrainEditorSession
         _currentCatalog = new TerrainCatalog(_terrains, graphics);
         var validation = TerrainAssetCatalog.Validate(_currentCatalog, _manifest);
         _diagnostics = validation.Issues;
+        _index = validation.Index;
         _hasErrors = !validation.IsValid;
     }
 

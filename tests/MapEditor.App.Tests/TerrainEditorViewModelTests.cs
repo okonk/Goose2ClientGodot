@@ -125,6 +125,55 @@ public class TerrainEditorViewModelTests
         Assert.Empty(vm.EligibleFrames);
     }
 
+    private static (SpriteManifest Manifest, TerrainCatalog Baseline) CreateSplitSheetBaseline()
+    {
+        var manifest = SpriteManifest.Parse(
+            "{ \"tileSize\": 32, \"sheets\": { \"1\": { \"10\": [0, 0, 32, 32] }, \"2\": { \"20\": [0, 0, 32, 32] } } }");
+        var baseline = new TerrainCatalog(
+            new List<TerrainDefinition>
+            {
+                new(GrassId, "Grass", null),
+                new(DirtId, "Dirt", null)
+            },
+            new List<TerrainGraphicDefinition>
+            {
+                new(new TerrainGraphicReference(1, 10), new TerrainPattern(Center: GrassId, North: DirtId)),
+                new(new TerrainGraphicReference(2, 20), new TerrainPattern(Center: DirtId, South: GrassId))
+            });
+        return (manifest, baseline);
+    }
+
+    [Fact]
+    public void SelectedSheet_DefaultsToTheRepresentativeSheetOfTheDefaultTerrain()
+    {
+        var (manifest, baseline) = CreateSplitSheetBaseline();
+        var vm = new TerrainEditorViewModel(new TerrainEditorSession(baseline, manifest), manifest, manifest.SheetIds);
+
+        Assert.Equal(DirtId, vm.SelectedTerrain!.Id);
+        Assert.Equal(2, vm.SelectedSheet);
+    }
+
+    [Fact]
+    public void SelectedSheet_FollowsTerrainSelection_UntilTheUserPicksASheet()
+    {
+        var (manifest, baseline) = CreateSplitSheetBaseline();
+        var vm = new TerrainEditorViewModel(new TerrainEditorSession(baseline, manifest), manifest, manifest.SheetIds);
+
+        Assert.Equal(2, vm.SelectedSheet);
+
+        vm.SelectedTerrain = Item(vm, GrassId);
+        Assert.Equal(1, vm.SelectedSheet);
+
+        vm.SelectedTerrain = Item(vm, DirtId);
+        Assert.Equal(2, vm.SelectedSheet);
+
+        vm.SelectedSheet = 1;
+
+        vm.SelectedTerrain = Item(vm, GrassId);
+        vm.SelectedTerrain = Item(vm, DirtId);
+        Assert.Equal(1, vm.SelectedSheet);
+    }
+
     [Fact]
     public void Zoom_ClampsToViewerRange()
     {

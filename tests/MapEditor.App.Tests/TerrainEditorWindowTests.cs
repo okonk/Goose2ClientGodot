@@ -328,6 +328,43 @@ public class TerrainEditorWindowTests
         Assert.False(Find<Button>(harness, "RedoButton").IsEnabled);
     }
 
+    private static byte[] SplitSheetCatalog()
+        => Serialize(new TerrainCatalog(
+            new List<TerrainDefinition>
+            {
+                new(GrassId, "Grass", null),
+                new(DirtId, "Dirt", null)
+            },
+            new List<TerrainGraphicDefinition>
+            {
+                new(new TerrainGraphicReference(1, 10), new TerrainPattern(Center: GrassId)),
+                new(new TerrainGraphicReference(2, 20), new TerrainPattern(Center: DirtId))
+            }));
+
+    [AvaloniaFact]
+    public void InitialSheet_IsTheRepresentativeSheetOfTheSelectedTerrain()
+    {
+        using var harness = TerrainEditorWindowHarness.Create(SplitSheetCatalog());
+        var combo = Find<ComboBox>(harness, "SheetCombo");
+
+        Assert.Equal(DirtId, harness.ViewModel.SelectedTerrain!.Id);
+        Assert.Equal(2, combo.SelectedItem);
+        Assert.Equal(2, harness.ViewModel.SelectedSheet);
+    }
+
+    [AvaloniaFact]
+    public void Sheet_FollowsASelectionAppliedAfterOpen()
+    {
+        using var harness = TerrainEditorWindowHarness.Create(SplitSheetCatalog());
+        var combo = Find<ComboBox>(harness, "SheetCombo");
+
+        harness.ViewModel.SelectedTerrain = harness.ViewModel.Terrains.Single(item => item.Id == GrassId);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Equal(1, combo.SelectedItem);
+        Assert.Equal(1, harness.ViewModel.SelectedSheet);
+    }
+
     [AvaloniaFact]
     public void AddButton_CreatesAndSelectsANewTerrain()
     {

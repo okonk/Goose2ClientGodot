@@ -22,6 +22,7 @@ internal sealed class TerrainEditorViewModel : ViewModelBase, IDisposable
     private List<TerrainEditorItemViewModel> _terrains = new();
     private TerrainEditorItemViewModel? _selected;
     private int? _selectedSheet;
+    private bool _sheetTouchedByUser;
     private IReadOnlyList<SpriteFrame> _eligibleFrames = NoFrames;
     private double _zoom = 1.0;
     private string _pendingName = string.Empty;
@@ -48,14 +49,15 @@ internal sealed class TerrainEditorViewModel : ViewModelBase, IDisposable
             .Where(sheet => tilesetSheets.Contains(sheet) && manifest.GetFrames(sheet).Any(IsEligibleFrame))
             .ToList();
         _session.Changed += OnSessionChanged;
-        _selectedSheet = _eligibleSheets.Count > 0 ? _eligibleSheets[0] : null;
-        RefreshEligibleFrames();
         RebuildItems();
         if (_selected is null && _terrains.Count > 0)
         {
             _selected = _terrains[0];
             OnPropertyChanged(nameof(SelectedTerrain));
         }
+
+        _selectedSheet = DefaultSheetFor(_selected) ?? (_eligibleSheets.Count > 0 ? _eligibleSheets[0] : null);
+        RefreshEligibleFrames();
 
         SyncPendingText();
         RefreshDiagnostics();
@@ -87,6 +89,11 @@ internal sealed class TerrainEditorViewModel : ViewModelBase, IDisposable
 
             _selected = target;
             OnPropertyChanged(nameof(SelectedTerrain));
+            if (!_sheetTouchedByUser)
+            {
+                SetSheet(DefaultSheetFor(target) ?? _selectedSheet);
+            }
+
             SyncPendingText();
         }
     }
@@ -98,15 +105,32 @@ internal sealed class TerrainEditorViewModel : ViewModelBase, IDisposable
         get => _selectedSheet;
         set
         {
-            if (_selectedSheet == value)
-            {
-                return;
-            }
-
-            _selectedSheet = value;
-            OnPropertyChanged(nameof(SelectedSheet));
-            RefreshEligibleFrames();
+            _sheetTouchedByUser = true;
+            SetSheet(value);
         }
+    }
+
+    private void SetSheet(int? sheet)
+    {
+        if (_selectedSheet == sheet)
+        {
+            return;
+        }
+
+        _selectedSheet = sheet;
+        OnPropertyChanged(nameof(SelectedSheet));
+        RefreshEligibleFrames();
+    }
+
+    private int? DefaultSheetFor(TerrainEditorItemViewModel? terrain)
+    {
+        if (terrain is null || _session.Index?.GetRepresentatives(terrain.Id) is not { Count: > 0 } representatives)
+        {
+            return null;
+        }
+
+        int sheet = representatives[0].Reference.Sheet;
+        return _eligibleSheets.Contains(sheet) ? sheet : null;
     }
 
     public IReadOnlyList<SpriteFrame> EligibleFrames => _eligibleFrames;
