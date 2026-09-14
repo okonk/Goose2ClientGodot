@@ -64,6 +64,10 @@ internal sealed class TerrainEditorSession
 
     public TerrainCatalog CurrentCatalog => _currentCatalog;
 
+    // The render reads this so a drag shows its selection immediately; CurrentCatalog
+    // stays committed until the stroke is released.
+    public IReadOnlyList<TerrainGraphicDefinition> DraftGraphics => BuildGraphics();
+
     public TerrainCatalogIndex? Index => _index;
 
     public IReadOnlyList<TerrainValidationIssue> Diagnostics => _diagnostics;
@@ -454,6 +458,15 @@ internal sealed class TerrainEditorSession
 
     private void Rebuild()
     {
+        _currentCatalog = new TerrainCatalog(_terrains, BuildGraphics());
+        var validation = TerrainAssetCatalog.Validate(_currentCatalog, _manifest);
+        _diagnostics = validation.Issues;
+        _index = validation.Index;
+        _hasErrors = !validation.IsValid;
+    }
+
+    private IReadOnlyList<TerrainGraphicDefinition> BuildGraphics()
+    {
         var graphics = new List<TerrainGraphicDefinition>(_graphics.Count);
         foreach (var reference in _graphics.Order)
         {
@@ -461,11 +474,7 @@ internal sealed class TerrainEditorSession
             graphics.Add(new TerrainGraphicDefinition(reference, pattern));
         }
 
-        _currentCatalog = new TerrainCatalog(_terrains, graphics);
-        var validation = TerrainAssetCatalog.Validate(_currentCatalog, _manifest);
-        _diagnostics = validation.Issues;
-        _index = validation.Index;
-        _hasErrors = !validation.IsValid;
+        return graphics;
     }
 
     private void Raise(TerrainEditorChangeKind kind)

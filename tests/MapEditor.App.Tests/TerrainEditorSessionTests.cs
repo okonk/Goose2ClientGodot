@@ -542,4 +542,19 @@ public class TerrainEditorSessionTests
         Assert.Equal(baseline, session.CurrentCatalog);
         session.CancelRegionStroke();
     }
+
+    [Fact]
+    public void DraftGraphics_ReflectsTheInProgressStroke()
+    {
+        var session = CreateSession(out var baseline);
+
+        session.BeginRegionStroke(DirtId);
+        session.VisitRegion(new TerrainRegionKey(GrassGraphic, TerrainPeer.East));
+
+        Assert.Equal(DirtId, session.DraftGraphics.Single(graphic => graphic.Reference == GrassGraphic).Pattern.East);
+        Assert.Equal(baseline, session.CurrentCatalog);
+
+        session.CompleteRegionStroke();
+        Assert.Equal(DirtId, session.CurrentCatalog.Graphics.Single(graphic => graphic.Reference == GrassGraphic).Pattern.East);
+    }
 }

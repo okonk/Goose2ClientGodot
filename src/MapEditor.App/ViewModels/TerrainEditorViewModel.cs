@@ -69,6 +69,8 @@ internal sealed class TerrainEditorViewModel : ViewModelBase, IDisposable
 
     public TerrainCatalog CurrentCatalog => _session.CurrentCatalog;
 
+    public IReadOnlyList<TerrainGraphicDefinition> DraftGraphics => _session.DraftGraphics;
+
     public IReadOnlyList<TerrainEditorItemViewModel> Terrains => _terrains;
 
     public TerrainEditorItemViewModel? SelectedTerrain

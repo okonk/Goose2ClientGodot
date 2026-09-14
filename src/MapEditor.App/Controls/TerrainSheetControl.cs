@@ -107,7 +107,7 @@ internal sealed class TerrainSheetControl : Control, ICustomHitTest, IDisposable
             frames[new TerrainGraphicReference(frame.Reference.Sheet, frame.Reference.Graphic)] = frame;
         }
 
-        foreach (TerrainGraphicDefinition graphic in _viewModel.CurrentCatalog.Graphics)
+        foreach (TerrainGraphicDefinition graphic in _viewModel.DraftGraphics)
         {
             if (!frames.TryGetValue(graphic.Reference, out SpriteFrame frame))
             {

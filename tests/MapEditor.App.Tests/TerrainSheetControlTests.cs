@@ -445,6 +445,35 @@ public class TerrainSheetControlTests
     }
 
     [AvaloniaFact]
+    public void Render_DuringDrag_ShowsTheInProgressSelection()
+    {
+        Harness harness = Create();
+        SelectGrass(harness);
+
+        var northGeometry = TerrainRegionGeometry.ToScreenPolygon(TerrainPeer.North, new Point(0, 0), 1.0);
+
+        RecordingMapDrawTarget baseline = new();
+        harness.Control.RenderSheet(baseline);
+        Assert.Equal(
+            TerrainColor.Derive(DirtId),
+            ColorOf(baseline.Polygons.Single(polygon => polygon.Points.SequenceEqual(northGeometry))));
+
+        harness.Window.MouseDown(new Point(16, 4), MouseButton.Left, RawInputModifiers.None);
+        Assert.True(harness.Control.IsPainting);
+
+        RecordingMapDrawTarget during = new();
+        harness.Control.RenderSheet(during);
+        Assert.Equal(
+            GrassOverride,
+            ColorOf(during.Polygons.Single(polygon => polygon.Points.SequenceEqual(northGeometry))));
+
+        Assert.Equal(DirtId, Graphic(harness, 1, 10).Pattern.North);
+
+        harness.Window.MouseUp(new Point(16, 4), MouseButton.Left, RawInputModifiers.None);
+        Assert.Equal(GrassId, Graphic(harness, 1, 10).Pattern.North);
+    }
+
+    [AvaloniaFact]
     public void Render_Non32Frame_HasNoOverlayOrHitTarget()
     {
         const string manifestJson = """
