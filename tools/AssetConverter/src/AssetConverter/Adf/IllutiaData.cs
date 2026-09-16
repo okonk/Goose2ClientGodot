@@ -67,7 +67,7 @@ public class CompiledEnc
         this.CompiledAnimations = new List<CompiledAnimation>();
         this.SheetToAnimation = new Dictionary<int, CompiledAnimation>();
 
-        using (BinaryReader reader = new BinaryReader(File.Open(file, FileMode.Open)))
+        using (BinaryReader reader = new BinaryReader(File.OpenRead(file)))
         {
             while (reader.BaseStream.Position < reader.BaseStream.Length)
             {
@@ -177,7 +177,7 @@ public class AdfFile
 
     public AdfFile(string file)
     {
-        using (var reader = new BinaryReader(File.Open(file, FileMode.Open)))
+        using (var reader = new BinaryReader(File.OpenRead(file)))
         {
             this.Type = (AdfType)Convert.ToInt32(reader.ReadByte());
             this.Version = reader.ReadByte();
