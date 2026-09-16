@@ -114,4 +114,52 @@ public static class AnimationMetadataWriter
         File.WriteAllText(firstFramePath, BuildFirstFrameText(frames));
         File.WriteAllText(heightsPath, BuildHeightsText(heights));
     }
+
+    /// <summary>Parses <c>name,height</c> lines. Missing/malformed lines are skipped.</summary>
+    public static Dictionary<string, int> LoadHeights(string path)
+    {
+        var result = new Dictionary<string, int>();
+        if (!File.Exists(path))
+            return result;
+
+        foreach (var line in File.ReadAllLines(path))
+        {
+            if (string.IsNullOrWhiteSpace(line))
+                continue;
+            var parts = line.Split(',');
+            if (parts.Length < 2)
+                continue;
+            if (int.TryParse(parts[1], out int height))
+                result[parts[0]] = height;
+        }
+        return result;
+    }
+
+    /// <summary>
+    /// Parses <c>name,fileId,graphicId,width,height</c> lines.
+    /// Missing/malformed lines are skipped.
+    /// </summary>
+    public static Dictionary<string, AnimationFrameInfo> LoadFirstFrames(string path)
+    {
+        var result = new Dictionary<string, AnimationFrameInfo>();
+        if (!File.Exists(path))
+            return result;
+
+        foreach (var line in File.ReadAllLines(path))
+        {
+            if (string.IsNullOrWhiteSpace(line))
+                continue;
+            var parts = line.Split(',');
+            if (parts.Length < 5)
+                continue;
+            if (int.TryParse(parts[1], out int fileId)
+                && int.TryParse(parts[2], out int graphicId)
+                && int.TryParse(parts[3], out int width)
+                && int.TryParse(parts[4], out int height))
+            {
+                result[parts[0]] = new AnimationFrameInfo(fileId, graphicId, width, height);
+            }
+        }
+        return result;
+    }
 }

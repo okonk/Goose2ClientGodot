@@ -1,9 +1,43 @@
 using Goose2.AssetConverter;
+using Goose2.AssetConverter.Adf;
 using Goose2.AssetConverter.Aspereta;
 using Goose2.AssetConverter.Manifest;
 using Goose2.AssetConverter.Maps;
 using Goose2.AssetConverter.Tiles;
 using Goose2.AssetConverter.SpriteFrames;
+
+static int PublishIfChanged(string path, string content)
+{
+    if (File.Exists(path) && File.ReadAllText(path) == content)
+    {
+        Console.WriteLine($"  unchanged {path}");
+        return 0;
+    }
+
+    Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+    File.WriteAllText(path, content);
+    Console.WriteLine($"  wrote     {path}");
+    return 1;
+}
+
+static Dictionary<int, AdfFile> LoadIllutiaAdfs(string dataDir, out int failed)
+{
+    var adfs = new Dictionary<int, AdfFile>();
+    failed = 0;
+    foreach (var file in Directory.EnumerateFiles(dataDir, "*.adf"))
+    {
+        try
+        {
+            var adf = new AdfFile(file);
+            adfs[adf.FileNumber] = adf;
+        }
+        catch
+        {
+            failed++;
+        }
+    }
+    return adfs;
+}
 
 static string ResolveAsperetaMappingPath(string? repoRoot = null)
 {
@@ -208,6 +242,85 @@ if (args.Length >= 1 && args[0] == "all")
     return;
 }
 
+if (args.Length >= 2 && args[0] == "aspereta-body")
+{
+    int bodyId = int.Parse(args[1]);
+    string repoRoot = args.Length >= 3
+        ? Path.GetFullPath(args[2])
+        : Path.GetFullPath(Path.Combine("..", ".."));
+
+    var monsters = AsperetaMonsterConverter.BuildResources(
+        AsperetaCompiledEnc.Load(Paths.AsperetaCompiledEnc),
+        AsperetaSheets.Load(Paths.AsperetaData), out var monsterErrors);
+
+    int outputBodyId = AsperetaSheets.BodyBase + bodyId;
+    var target = monsters.FirstOrDefault(m => m.Id == outputBodyId && m.Animations.Count > 0);
+    if (target is null)
+    {
+        Console.WriteLine($"Aspereta body {bodyId}: no resource for output body {outputBodyId}; nothing written");
+        foreach (var e in monsterErrors) Console.WriteLine($"  MONSTER {e}");
+        return;
+    }
+
+    var illutiaAdfs = LoadIllutiaAdfs(Paths.IllutiaData, out int illutiaSkipped);
+    if (illutiaAdfs.Count == 0)
+    {
+        Console.WriteLine($"Illutia sheets unreadable under {Paths.IllutiaData}; nothing written");
+        return;
+    }
+
+    var appearance = new List<CompiledSpriteFramesResource>();
+    foreach (var ca in new CompiledEnc(Paths.CompiledEnc).CompiledAnimations)
+    {
+        try
+        {
+            appearance.Add(CompiledAnimationBuilder.BuildCharacterResource(ca, illutiaAdfs));
+        }
+        catch
+        {
+            // Same per-resource tolerance as AnimationBatchConverter.Convert's build loop.
+            illutiaSkipped++;
+        }
+    }
+    appearance.AddRange(monsters);
+
+    string resourcesDir = Path.Combine(repoRoot, "Assets", "Resources");
+    var heights = AnimationMetadataWriter.MergeHeights(new[]
+    {
+        AnimationMetadataWriter.LoadHeights(Path.Combine(resourcesDir, "AnimationHeights.txt")),
+        target.AnimationHeights,
+    });
+    var firstFrames = AnimationMetadataWriter.MergeFirstFrames(new[]
+    {
+        AnimationMetadataWriter.LoadFirstFrames(Path.Combine(resourcesDir, "AnimationToFirstFrame.txt")),
+        target.AnimationToFirstFrame,
+    });
+
+    var outputs = new List<(string Path, string Content)>
+    {
+        (Path.Combine(repoRoot, target.RelativeOutputPath),
+            SpriteFramesWriter.Build(target.Animations)),
+        (Path.Combine(resourcesDir, "AnimationHeights.txt"),
+            AnimationMetadataWriter.BuildHeightsText(heights)),
+        (Path.Combine(resourcesDir, "AnimationToFirstFrame.txt"),
+            AnimationMetadataWriter.BuildFirstFrameText(firstFrames)),
+        (Path.Combine(repoRoot, "Assets", "Sprites", "appearance-manifest.json"),
+            AppearanceManifestBuilder.Build(appearance)),
+        (Path.Combine(repoRoot, "Assets", "Sprites", ManifestFileStore.AnimationFileName),
+            AnimationManifestBuilder.BuildCombined(
+                Paths.IllutiaData, Paths.CompiledEnc, Paths.AsperetaData, Paths.AsperetaCompiledEnc,
+                Paths.ItemTileSheets)),
+    };
+
+    int written = 0;
+    foreach (var (path, content) in outputs)
+        written += PublishIfChanged(path, content);
+
+    Console.WriteLine($"Aspereta body {bodyId} -> output body {outputBodyId}: {written} file(s) written, {monsters.Count} monster resources total, {illutiaSkipped} illutia resources skipped");
+    foreach (var e in monsterErrors) Console.WriteLine($"  MONSTER {e}");
+    return;
+}
+
 if (args.Length >= 1 && args[0] == "tiles")
 {
     string repoRoot = args.Length >= 2
@@ -221,4 +334,4 @@ if (args.Length >= 1 && args[0] == "tiles")
     return;
 }
 
-Console.WriteLine("Usage: AssetConverter batch [outDir] | frames <id> | animations [repoRoot] | maps [outDir] | manifest [outPath] | aspereta-mapping [outPath] | aspereta [repoRoot] | tiles [repoRoot] | all [repoRoot]");
+Console.WriteLine("Usage: AssetConverter batch [outDir] | frames <id> | animations [repoRoot] | maps [outDir] | manifest [outPath] | aspereta-mapping [outPath] | aspereta [repoRoot] | aspereta-body <id> [repoRoot] | tiles [repoRoot] | all [repoRoot]");
