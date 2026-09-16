@@ -1277,7 +1277,7 @@ Expected: all unit tests pass; integration test passes **only after the asset-pi
 **Step 4: Real run + eyeball**
 
 Run: `cd tools/server-remap && python3 -m remap.main`
-Expected output: `wrote /home/hayden/Downloads/Aspereta Goose Data (Illutia).xlsx` and a warnings count. Open the warnings file and review — expected classes of warnings: injected displays with no Illutia art (`Body:…` for the 66 monsters until the pipeline's monster synthesis lands, the 7 dangling bodies), unmapped hairs cleared, tiles not in the graphics mapping (should be zero — investigate any).
+Expected output: `wrote /home/hayden/Downloads/Aspereta Goose Data (Illutia).xlsx` and a warnings count. Open the warnings file and review — expected classes of warnings: injected displays with no Illutia art (`Body:…` for the 67 monster bodies until the pipeline's monster synthesis lands, the 7 dangling bodies), unmapped hairs cleared, tiles not in the graphics mapping (should be zero — investigate any).
 
 **Step 5: Commit**
 

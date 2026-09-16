@@ -217,7 +217,7 @@ public static class AnimationManifestBuilder
         var bodySheets = new Dictionary<int, HashSet<int>>();
         foreach (var entry in AsperetaCompiledEnc.Load(asperetaCompiledEncPath))
         {
-            if (entry.Type != AnimationType.Body || entry.Id <= 100) continue;
+            if (entry.Type != AnimationType.Body || entry.Id < 100) continue;
             var reached = new HashSet<int>();
             for (int facing = 0; facing < 4; facing++)
             {

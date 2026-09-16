@@ -2,7 +2,7 @@
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
-**Goal:** Extend `tools/AssetConverter` so Aspereta's graphics and maps are converted into the Goose2/Illutia asset space — reusing pixel-identical Illutia frames where they exist, injecting the rest under collision-free IDs, converting Aspereta maps to the Goose2 binary map format, and building Godot animation resources for Aspereta's 66 monsters.
+**Goal:** Extend `tools/AssetConverter` so Aspereta's graphics and maps are converted into the Goose2/Illutia asset space — reusing pixel-identical Illutia frames where they exist, injecting the rest under collision-free IDs, converting Aspereta maps to the Goose2 binary map format, and building Godot animation resources for Aspereta's 67 monsters.
 
 **Architecture:** Three new offline components inside the existing AssetConverter tool: (1) an Aspereta `.adf` decoder + a deterministic frame-matching step that emits a committed mapping table (`asp graphic → reuse Illutia graphic | inject as 700000+id`); (2) an Aspereta map converter that rewrites the 100×100/4-layer Aspereta map format into the Goose2 5-layer format using that table; (3) a monster-animation synthesizer that reshapes Aspereta's 4×8 `compiled.enc` entries into Illutia-layout `CompiledAnimation` objects and feeds them through the existing `CompiledAnimationBuilder`/`SpriteFramesWriter` pipeline. All output lands in the gitignored `Assets/` tree exactly like the Illutia pipeline; only the mapping table (a decision record) is committed.
 
@@ -21,7 +21,7 @@ These were established by decoding both complete datasets and pixel-hashing ever
 - Aspereta `.adf` payloads are **BMP**; Illutia's are **GIF**. Same byte-obfuscation and 790-byte interleave, different header layout (see Task 1).
 - Transparency in the original Aspereta client is a **constant black color key** — `AsperetaCS-1.8/adfDecode.bas` sets `ddck.low = 0 : ddck.high = 0` on every surface. This is behaviorally identical to the Godot pipeline's GIF rule `r <= 1 && g == 0 && b == 0` (`Gif/GifLoader.cs:100`): no Aspereta frame that matches an Illutia frame contains an `(1,0,0)` pixel (verified exhaustively). Do NOT use a top-left-pixel key (that is a known bug in the gooseclient reimplementation).
 - The two games' graphic-ID and sheet-number spaces are unrelated (Illutia `1.adf` is a font; Aspereta `1.adf` is bodies). Illutia graphic IDs occupy up to 621,709; Illutia sheet numbers occupy 0–4,962; Illutia body IDs occupy 1–308.
-- Aspereta `compiled.enc` has 241 entries: 72 Body (6 players ≤100, **66 monsters >100**), the rest player equipment (discarded — Illutia's own equipment art is used instead).
+- Aspereta `compiled.enc` has 243 entries: 72 Body (**5 players** at ids 1, 2, 3, 11, 12 — the only rows carrying the multi-bodyState layout — plus **67 non-player bodies at ids 100–166**), the rest player equipment (discarded — Illutia's own equipment art is used instead). Body 100 is an NPC body (Bat/Nibbles), not a player: its nonzero slots are walk+attack column 0 only, exactly like 101–166, so the monster boundary is `Id >= 100` — the same rule the client uses (`Scripts/Character/Character.cs:274`).
 - Aspereta maps: 44 files at `maps/Map<N>.map`, fixed 100×100, 4 layers, with a small trailing blob after the tile grid that the client ignores (`Map1.map` is 170,264 bytes; the tile grid is 4 + 100×100×17 = 170,004).
 
 ### ID schemes (fixed, deterministic — used by this plan and the future server-data plan)
@@ -30,7 +30,7 @@ These were established by decoding both complete datasets and pixel-hashing ever
 |---|---|---|
 | Injected graphic IDs | `700000 + aspGraphicId` | Illutia max graphic ID is 621,709; graphic is `Int32` in maps/manifest |
 | Injected sheet numbers | `20000 + rank` where rank = index of the Aspereta file number in the ascending sorted list of all Aspereta **graphic** adf file numbers (0-based) | Sheet is `Int16` in the map format (`Scripts/MapFile.cs:81`); Illutia uses ≤4,962; 20000+486 = 20486 < 32767. Raw Aspereta file numbers can't be used: they collide with Illutia (1.adf) AND overflow Int16 (50008.adf) |
-| Monster body IDs | `10000 + aspBodyId` (→ 10101–10166) | Illutia body IDs ≤ 308 |
+| Monster body IDs | `10000 + aspBodyId` (→ 10100–10166) | Illutia body IDs ≤ 308 |
 | Map numbers | `Map<N>.map` → `Map<10000+N>.bytes` | Aspereta and Illutia both have a Map1 etc. |
 
 ### APIs verified (path:line)
@@ -1061,11 +1061,11 @@ namespace AssetConverter.Tests;
 public class AsperetaMonsterConverterTests
 {
     [Fact]
-    public void CompiledEnc_Has66MonsterEntries()
+    public void CompiledEnc_Has67MonsterEntries()
     {
         var entries = AsperetaCompiledEnc.Load(Paths.AsperetaCompiledEnc);
-        Assert.Equal(241, entries.Count);
-        Assert.Equal(66, entries.Count(e => e.Type == AnimationType.Body && e.Id > 100));
+        Assert.Equal(243, entries.Count);
+        Assert.Equal(67, entries.Count(e => e.Type == AnimationType.Body && e.Id >= 100));
     }
 
     [Fact]
@@ -1076,10 +1076,10 @@ public class AsperetaMonsterConverterTests
             AsperetaCompiledEnc.Load(Paths.AsperetaCompiledEnc), sheets, out var errors);
 
         Assert.Empty(errors);
-        Assert.Equal(66, monsters.Count);
+        Assert.Equal(67, monsters.Count);
 
         var m = monsters.First();
-        Assert.InRange(m.Id, 10101, 10166);
+        Assert.InRange(m.Id, 10100, 10166);
         Assert.Equal(AnimationType.Body, m.Type);
         Assert.StartsWith("Assets/Sprites/Bodies/1", m.RelativeOutputPath);
         // walk + attack clips exist for all 4 directions (plus idle/aliases from the builder)
@@ -1176,7 +1176,7 @@ public static class AsperetaMonsterConverter
         }
 
         var resources = new List<CompiledSpriteFramesResource>();
-        foreach (var entry in entries.Where(e => e.Type == AnimationType.Body && e.Id > 100))
+        foreach (var entry in entries.Where(e => e.Type == AnimationType.Body && e.Id >= 100))
         {
             var ca = new CompiledAnimation(AnimationType.Body, AsperetaSheets.BodyBase + entry.Id);
 
@@ -1411,7 +1411,7 @@ git commit -m "test(assetconverter): aspereta map->manifest->sheet integration i
 
 ## Out of scope (next plan)
 
-- Server-data remapping: rewrite graphic ids (`700000+`/matched donors from the same TSV), body ids (`10000+`), and map numbers (`10000+`) in GooseServer2 data; server-side handling of Aspereta spawns pointing at monster bodies 10101–10166.
+- Server-data remapping: rewrite graphic ids (`700000+`/matched donors from the same TSV), body ids (`10000+`), and map numbers (`10000+`) in GooseServer2 data; server-side handling of Aspereta spawns pointing at monster bodies 10100–10166.
 - Item/spell **icon id** references in server data (pure data remap through the same table).
 - Any Godot client changes (none are needed for rendering; the client is data-driven).
 - Aspereta sound `.adf` conversion (487 of the 974 files are sounds/non-graphics — untouched).

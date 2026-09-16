@@ -8,11 +8,11 @@ namespace AssetConverter.Tests;
 public class AsperetaMonsterConverterTests
 {
     [Fact]
-    public void CompiledEnc_Has66MonsterEntries()
+    public void CompiledEnc_Has67MonsterEntries()
     {
         var entries = AsperetaCompiledEnc.Load(Paths.AsperetaCompiledEnc);
         Assert.Equal(243, entries.Count);
-        Assert.Equal(66, entries.Count(e => e.Type == AnimationType.Body && e.Id > 100));
+        Assert.Equal(67, entries.Count(e => e.Type == AnimationType.Body && e.Id >= 100));
     }
 
     [Fact]
@@ -23,10 +23,10 @@ public class AsperetaMonsterConverterTests
             AsperetaCompiledEnc.Load(Paths.AsperetaCompiledEnc), sheets, out var errors);
 
         Assert.Empty(errors);
-        Assert.Equal(66, monsters.Count);
+        Assert.Equal(67, monsters.Count);
 
         var m = monsters.First();
-        Assert.InRange(m.Id, 10101, 10166);
+        Assert.InRange(m.Id, 10100, 10166);
         Assert.Equal(AnimationType.Body, m.Type);
         Assert.StartsWith("Assets/Sprites/Bodies/1", m.RelativeOutputPath);
 

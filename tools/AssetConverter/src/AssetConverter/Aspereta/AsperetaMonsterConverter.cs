@@ -5,7 +5,7 @@ namespace Goose2.AssetConverter.Aspereta;
 
 /// <summary>
 /// Synthesizes Illutia-style 4×11 compiled body resources for Aspereta monsters
-/// (body id &gt; 100) from their 4×8 compiled.enc entries (walk + attack only).
+/// (body id &gt;= 100) from their 4×8 compiled.enc entries (walk + attack only).
 /// Output body ids are offset by <see cref="AsperetaSheets.BodyBase"/>.
 /// </summary>
 public static class AsperetaMonsterConverter
@@ -77,7 +77,7 @@ public static class AsperetaMonsterConverter
         }
 
         var resources = new List<CompiledSpriteFramesResource>();
-        foreach (var entry in entries.Where(e => e.Type == AnimationType.Body && e.Id > 100))
+        foreach (var entry in entries.Where(e => e.Type == AnimationType.Body && e.Id >= 100))
         {
             // Pre-register any frame-as-animation ids this monster uses.
             for (int facing = 0; facing < 4; facing++)
