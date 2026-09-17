@@ -229,6 +229,11 @@ namespace Goose2Client.Network
             Send($"CAST{slot + 1},{targetId}");
         }
 
+        public void RequestSpellInfo(int slot)
+        {
+            Send($"SID{slot + 1}");
+        }
+
         public void Quit()
         {
             Send($"QUIT");

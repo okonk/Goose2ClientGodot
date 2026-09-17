@@ -41,6 +41,7 @@ public partial class SpellbookWindow : BaseWindow, IWindow
         _nextButton.Window = this;
 
         _pages = new SpellbookPage[PageCount];
+
         for (int p = 0; p < PageCount; p++)
         {
             var grid = new GridContainer { Columns = 5 };
@@ -57,6 +58,7 @@ public partial class SpellbookWindow : BaseWindow, IWindow
                 slot.SlotNumber = p * SlotsPerPage + j;
                 slot.Window = this;
                 slot.OnDoubleClick = UseSpell;
+                slot.OnRightClick = info => GameManager.Instance.NetworkClient.RequestSpellInfo(info.SlotNumber);
                 slot.OnMoveSpell = MoveSpell;
                 slots[j] = slot;
             }

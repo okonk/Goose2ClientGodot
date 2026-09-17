@@ -19,6 +19,7 @@ namespace Goose2Client.UI
         public IWindow Window { get; set; }
 
         public Action<SpellInfo> OnDoubleClick { get; set; }
+        public Action<SpellInfo> OnRightClick { get; set; }
         public Action<int, int> OnMoveSpell { get; set; }
 
         public override void _Ready()
@@ -62,15 +63,18 @@ namespace Goose2Client.UI
 
         public override void _GuiInput(InputEvent @event)
         {
-            if (@event is InputEventMouseButton mb &&
-                mb.ButtonIndex == MouseButton.Left &&
-                mb.DoubleClick &&
-                HasSpell)
+            if (!(@event is InputEventMouseButton mb && mb.Pressed && HasSpell)) return;
+
+            if (mb.ButtonIndex == MouseButton.Left && mb.DoubleClick)
             {
                 if (GameManager.Instance.SpellCooldownManager.GetCooldownRemaining(Info) > TimeSpan.Zero)
                     return;
 
                 OnDoubleClick?.Invoke(Info);
+            }
+            else if (mb.ButtonIndex == MouseButton.Right)
+            {
+                OnRightClick?.Invoke(Info);
             }
         }
 
