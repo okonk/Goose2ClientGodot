@@ -14,59 +14,59 @@ public class TargetCyclerTests
     [Fact] public void FiltersToPlayersWhenTargetTypeIsPlayer()
     {
         var all = new List<TargetCandidate>{ C(1,5,5,CharacterType.Monster), C(2,6,5,CharacterType.Player) };
-        Assert.Equal(2, TargetCycler.Next(all, null, (5,5), 100, SpellTargetType.Player, true, true)?.LoginId);
+        Assert.Equal(2, TargetCycler.Next(all, null, (5,5), 100, (10,8), SpellTargetType.Player, true, true)?.LoginId);
     }
 
     [Fact] public void FiltersOutPlayersWhenTargetTypeIsNpc()
     {
         var all = new List<TargetCandidate>{ C(1,5,5,CharacterType.Monster), C(2,6,5,CharacterType.Player) };
-        Assert.Equal(1, TargetCycler.Next(all, null, (5,5), 100, SpellTargetType.NPC, true, true)?.LoginId);
+        Assert.Equal(1, TargetCycler.Next(all, null, (5,5), 100, (10,8), SpellTargetType.NPC, true, true)?.LoginId);
     }
 
     [Fact] public void SkipsCandidatesOutsideViewWindow()
     {
         var all = new List<TargetCandidate>{ C(1,50,50,CharacterType.Monster) };
-        Assert.Null(TargetCycler.Next(all, null, (5,5), 100, SpellTargetType.NPC, true, true));
+        Assert.Null(TargetCycler.Next(all, null, (5,5), 100, (10,8), SpellTargetType.NPC, true, true));
     }
 
     [Fact] public void WrapsAroundWhenSearchingPastEnd()
     {
         var all = new List<TargetCandidate>{ C(1,5,5,CharacterType.Monster), C(2,7,5,CharacterType.Monster) };
-        Assert.Equal(1, TargetCycler.Next(all, C(2,7,5,CharacterType.Monster), (6,5), 100,
+        Assert.Equal(1, TargetCycler.Next(all, C(2,7,5,CharacterType.Monster), (6,5), 100, (10,8),
             SpellTargetType.NPC, true, true)?.LoginId);
     }
 
     [Fact] public void PlayerTargetTypeIncludesPets()
     {
         var all = new List<TargetCandidate>{ C(1,5,5,CharacterType.Monster), C(2,6,5,CharacterType.Pet) };
-        Assert.Equal(2, TargetCycler.Next(all, null, (5,5), 100, SpellTargetType.Player, true, true)?.LoginId);
+        Assert.Equal(2, TargetCycler.Next(all, null, (5,5), 100, (10,8), SpellTargetType.Player, true, true)?.LoginId);
     }
 
     [Fact] public void NpcTargetTypeExcludesPetsWhenPvpDisabled()
     {
         var all = new List<TargetCandidate>{ C(1,5,5,CharacterType.Monster), C(2,6,5,CharacterType.Pet) };
-        Assert.Equal(1, TargetCycler.Next(all, null, (5,5), 100, SpellTargetType.NPC, true, true)?.LoginId);
+        Assert.Equal(1, TargetCycler.Next(all, null, (5,5), 100, (10,8), SpellTargetType.NPC, true, true)?.LoginId);
     }
 
     [Fact] public void NpcTargetTypeExcludesPlayerSideEvenWhenPvpEnabled()
     {
         CurrentMapFlags.Value = new MapFlags(true, true, true);
         var all = new List<TargetCandidate>{ C(1,5,5,CharacterType.Monster), C(2,6,5,CharacterType.Player), C(3,7,5,CharacterType.Pet) };
-        Assert.Equal(1, TargetCycler.Next(all, null, (5,5), 100, SpellTargetType.NPC, true, true)?.LoginId);
+        Assert.Equal(1, TargetCycler.Next(all, null, (5,5), 100, (10,8), SpellTargetType.NPC, true, true)?.LoginId);
     }
 
     [Fact] public void NpcPlayerTargetTypeExcludesPlayerSideWhenPvpDisabled()
     {
         var all = new List<TargetCandidate>{ C(1,5,5,CharacterType.Player), C(2,6,5,CharacterType.Monster) };
-        Assert.Equal(2, TargetCycler.Next(all, null, (5,5), 100, SpellTargetType.NPCPlayer, true, true)?.LoginId);
+        Assert.Equal(2, TargetCycler.Next(all, null, (5,5), 100, (10,8), SpellTargetType.NPCPlayer, true, true)?.LoginId);
     }
 
     [Fact] public void NpcPlayerTargetTypeIncludesPlayerAndPetWhenPvpEnabled()
     {
         CurrentMapFlags.Value = new MapFlags(true, true, true);
         var all = new List<TargetCandidate>{ C(1,5,5,CharacterType.Monster), C(2,6,5,CharacterType.Player), C(3,7,5,CharacterType.Pet) };
-        Assert.Equal(2, TargetCycler.Next(all, C(1,5,5,CharacterType.Monster), (5,5), 100, SpellTargetType.NPCPlayer, true, true)?.LoginId);
-        Assert.Equal(3, TargetCycler.Next(all, C(2,6,5,CharacterType.Player), (5,5), 100, SpellTargetType.NPCPlayer, true, true)?.LoginId);
+        Assert.Equal(2, TargetCycler.Next(all, C(1,5,5,CharacterType.Monster), (5,5), 100, (10,8), SpellTargetType.NPCPlayer, true, true)?.LoginId);
+        Assert.Equal(3, TargetCycler.Next(all, C(2,6,5,CharacterType.Player), (5,5), 100, (10,8), SpellTargetType.NPCPlayer, true, true)?.LoginId);
     }
 
     [Fact] public void BackwardCycleLandsOnLastCandidateWhenCurrentIsFilteredOut()
@@ -80,7 +80,7 @@ public class TargetCyclerTests
         };
         // Current target is a Player (login 99) — filtered out when cycling NPCs
         var current = C(99, 0, 0, CharacterType.Player);
-        var result = TargetCycler.Next(all, current, (1, 1), 100, SpellTargetType.NPC, true, false);
+        var result = TargetCycler.Next(all, current, (1, 1), 100, (10,8), SpellTargetType.NPC, true, false);
         // Backward from no-match should wrap to last candidate (login 3), not second-to-last (login 2)
         Assert.Equal(3, result?.LoginId);
     }

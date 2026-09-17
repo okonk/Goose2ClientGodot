@@ -122,6 +122,25 @@ namespace Goose2Client
         }
 
         /// <summary>
+        /// Half-extent of the visible world in whole tiles around the camera anchor (the local
+        /// player's tile center): ceil(half sub-viewport size / TileSize) per axis. Anything
+        /// on screen is within this range. Falls back to <see cref="TargetCycler"/>'s default
+        /// when no layout has been applied yet.
+        /// </summary>
+        public Vector2I ViewRangeTiles
+        {
+            get
+            {
+                var s = Layout.SubViewportSize;
+                if (s == Vector2I.Zero)
+                    return new Vector2I(TargetCycler.ViewRangeX, TargetCycler.ViewRangeY);
+                return new Vector2I(
+                    (int)System.Math.Ceiling(s.X / (2f * Map.MapCoords.TileSize)),
+                    (int)System.Math.Ceiling(s.Y / (2f * Map.MapCoords.TileSize)));
+            }
+        }
+
+        /// <summary>
         /// Stores the mode and, if a map is attached, recomputes the layout from the current
         /// root window size and applies it to the sub-viewport and display rect. Sole mutator of
         /// <see cref="Current"/>.Size / <see cref="Layout"/> / the display rect. No-op (mode

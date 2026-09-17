@@ -11,8 +11,8 @@ namespace Goose2Client
         
         public static TargetCandidate? Next(
             IEnumerable<TargetCandidate> all, TargetCandidate? current,
-            (int x, int y) player, int mapWidth, SpellTargetType type, 
-            bool filteringEnabled, bool searchDown)
+            (int x, int y) player, int mapWidth, (int x, int y) viewRange,
+            SpellTargetType type, bool filteringEnabled, bool searchDown)
         {
             var filtered = all.ToList();
             
@@ -31,8 +31,8 @@ namespace Goose2Client
             
             // Filter by view window
             filtered = filtered.Where(c => 
-                System.Math.Abs(c.X - player.x) <= ViewRangeX && 
-                System.Math.Abs(c.Y - player.y) <= ViewRangeY).ToList();
+                System.Math.Abs(c.X - player.x) <= viewRange.x && 
+                System.Math.Abs(c.Y - player.y) <= viewRange.y).ToList();
             
             if (!filtered.Any()) return null;
             

@@ -112,9 +112,14 @@ public partial class SpellTargetManager : Node
         TargetCandidate? current = _target != null ? new TargetCandidate(_target.LoginId, _target.X, _target.Y, _target.CharacterType) : (TargetCandidate?)null;
         
         var filteringEnabled = GameManager.Instance.CharacterSettings.GetOption<bool>(Options.TargetFiltering, true);
-        
+
+        var vw = GameManager.Instance.WorldViewport;
+        var viewRange = vw != null ? vw.ViewRangeTiles
+            : new Vector2I(TargetCycler.ViewRangeX, TargetCycler.ViewRangeY);
+
         var next = TargetCycler.Next(candidates, current, (player.X, player.Y), 
             GameManager.Instance.CurrentMap?.Width ?? 100,
+            (viewRange.X, viewRange.Y),
             _pendingSpell.TargetType, filteringEnabled, searchDown);
         
         if (next != null)
