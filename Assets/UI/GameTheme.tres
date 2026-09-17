@@ -6,9 +6,17 @@
 
 [sub_resource type="StyleBoxTexture" id="sb_btn_n"]
 texture = ExtResource("btn_n")
+texture_margin_left = 1.0
+texture_margin_right = 1.0
+texture_margin_top = 1.0
+texture_margin_bottom = 1.0
 
 [sub_resource type="StyleBoxTexture" id="sb_btn_p"]
 texture = ExtResource("btn_p")
+texture_margin_left = 1.0
+texture_margin_right = 1.0
+texture_margin_top = 1.0
+texture_margin_bottom = 1.0
 
 [sub_resource type="StyleBoxEmpty" id="sb_empty"]
 
