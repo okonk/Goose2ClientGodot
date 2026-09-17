@@ -1,6 +1,7 @@
 using Godot;
 using Goose2Client.Map;
 using Goose2Client.Network.Packets;
+using Goose2Client.UI;
 using MapEditor.Core;
 
 namespace Goose2Client;
@@ -23,6 +24,12 @@ public partial class MapManager : Node2D
     private Node2D _characterRoot;
     private Character.Character _localPlayer;
     private bool _listenersRegistered;
+
+    // A fast double-click sends two LCs before the first MKW lands; the server treats the
+    // second as a fresh open and strands the first window. Drop same-tile repeats.
+    private const int LcDedupMs = 500;
+    private Vector2I _lastLcTile = new(-1, -1);
+    private ulong _lastLcMsec;
 
     /// <summary>Weapon speed in ms received from the server via WPS (0 = not yet set).</summary>
     public int WeaponSpeed { get; private set; }
@@ -259,7 +266,20 @@ public partial class MapManager : Node2D
         if (hit != null) { tx = hit.X; ty = hit.Y; }
         else { (tx, ty) = MapCoords.WorldToTile(worldPos); }
         if (button == MouseButton.Left)
+        {
+            // The server drops the NPC's prior quest window on a re-click without telling the
+            // client, so a second LC would leave a dead window behind.
+            var questWindows = GameManager.Instance.Hud?.QuestWindows;
+            if (hit != null && questWindows != null && questWindows.HasWindowForNpc(hit.LoginId))
+                return;
+            ulong now = Time.GetTicksMsec();
+            var tile = new Vector2I(tx, ty);
+            if (tile == _lastLcTile && now - _lastLcMsec < LcDedupMs)
+                return;
+            _lastLcTile = tile;
+            _lastLcMsec = now;
             GameManager.Instance.NetworkClient.LeftClick(tx, ty);
+        }
         else
             GameManager.Instance.NetworkClient.RightClick(tx, ty);
     }

@@ -68,6 +68,14 @@ public abstract partial class BaseMultipleWindowManager<T> : Node where T : Base
         _windows.Remove(window.WindowId);
     }
 
+    public bool HasWindowForNpc(int npcId)
+    {
+        if (npcId == 0) return false;
+        foreach (var w in _windows.Values)
+            if (w.NpcId == npcId) return true;
+        return false;
+    }
+
     private void OnEndWindow(object o)
     {
         var p = (EndWindowPacket)o;

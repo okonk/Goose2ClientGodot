@@ -23,6 +23,7 @@ public partial class GameHud : Control
     public VendorWindow Vendor { get; private set; }
     public BankWindow Bank { get; private set; }
     public CombineBagContainerWindow CombineBag { get; private set; }
+    public QuestWindowManager QuestWindows { get; private set; }
 
     /// <summary>Instantiate a scene and add it as a child, returning the typed node.</summary>
     private T Add<T>(string path) where T : Node
@@ -69,7 +70,8 @@ public partial class GameHud : Control
         CombineBag = Add<CombineBagContainerWindow>("res://Scenes/UI/CombineBagContainerWindow.tscn");
 
         // 5. Multi-window managers (plain Node subclasses, instantiable via new).
-        AddChild(new QuestWindowManager());
+        QuestWindows = new QuestWindowManager();
+        AddChild(QuestWindows);
         AddChild(new InfoWindowCreator());
 
         // 6. Wire cross-references (after AddChild so each node's _Ready has run).
