@@ -22,7 +22,7 @@ public abstract partial class BaseMultipleWindow : BaseWindow, IWindow
     protected Control[] _lines;
     protected Button _backButton;
     protected Button _nextButton;
-    protected Button _okButton;
+    protected Button? _okButton;
     protected Button _closeButton;
 
     public Action<BaseMultipleWindow> OnCloseWindow { get; set; }

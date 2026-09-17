@@ -39,7 +39,9 @@ offset_left = 4.0
 offset_top = 2.0
 offset_right = 180.0
 offset_bottom = 18.0
-text = "Options"
+mouse_filter = 2
+text = ""
+clip_text = true
 
 [node name="CloseButton" type="Button" parent="TitleBar"]
 layout_mode = 2

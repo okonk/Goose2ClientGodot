@@ -19,6 +19,7 @@ public class DefaultWindowLayoutTests
     [InlineData("Info", true)]
     [InlineData("Bank", true)]
     [InlineData("CombineBag", true)]
+    [InlineData("OptionList", true)]
     [InlineData("Inventory", false)]
     [InlineData("Character", false)]
     [InlineData("Spellbook", false)]

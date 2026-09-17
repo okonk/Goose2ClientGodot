@@ -7,6 +7,8 @@ namespace Goose2Client.UI;
 public partial class OptionListWindow : BaseMultipleWindow
 {
     public const int MaxLines = 10;
+    // WBC button id = LineClickOffset + line index; must match Goose.Window.LineClickOffset
+    // (server). See aspereta-info/protocol.txt.
     public const int LineClickOffset = 20;
 
     private const int LinePaddingY = 5;
@@ -33,7 +35,8 @@ public partial class OptionListWindow : BaseMultipleWindow
             Name = "Line" + index,
             Text = " ",
             Flat = true,
-            Disabled = true,
+            Visible = false,
+            ClipText = true,
             Alignment = HorizontalAlignment.Left,
             FocusMode = FocusModeEnum.None,
         };
@@ -56,7 +59,9 @@ public partial class OptionListWindow : BaseMultipleWindow
     {
         var button = (Button)_lines[index];
         button.Text = text;
-        button.Disabled = string.IsNullOrEmpty(text);
+        // Invisible rows let clicks fall through to the world; a disabled Button would
+        // still swallow them (Godot hit-testing is not clipped to the parent rect).
+        button.Visible = !string.IsNullOrEmpty(text);
         if (!string.IsNullOrEmpty(text) && index > _maxLine)
             _maxLine = index;
     }
@@ -66,13 +71,9 @@ public partial class OptionListWindow : BaseMultipleWindow
         base.Relayout();
         var factor = UiScaleApplier.Instance.Factor;
         var lineSize = new Vector2(UiScale.ScaleSize(LinesWidth, factor), UiScale.ScaleSize(LineHeight, factor));
-        var padding = UiScale.ScaleSize(LinePaddingY, factor);
         for (int i = 0; i < _lines.Length; i++)
         {
-            var line = (Button)_lines[i];
-            line.Size = lineSize;
-            line.AddThemeConstantOverride("margin_top", padding);
-            line.AddThemeConstantOverride("margin_bottom", padding);
+            ((Button)_lines[i]).Size = lineSize;
         }
         Size = ComputedSize(factor);
         PlaceBottomButtons(factor);
