@@ -97,7 +97,7 @@ public abstract partial class BaseMultipleWindow : BaseWindow, IWindow
     }
 
     /// <summary>Called by the manager when a MakeWindowPacket arrives for this window.</summary>
-    public void OnMakeWindow(MakeWindowPacket packet)
+    public virtual void OnMakeWindow(MakeWindowPacket packet)
     {
         NpcId = packet.NpcId;
         Title = packet.Title;

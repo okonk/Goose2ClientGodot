@@ -32,6 +32,7 @@ mono_crash.*
 # ---- Local editor/agent config ----
 .claude/
 *.csproj.old
+*.csproj.old.*
 
 # ---- OS / editor cruft ----
 .DS_Store

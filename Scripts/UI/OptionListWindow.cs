@@ -1,6 +1,7 @@
 using System;
 using Godot;
 using Goose2Client;
+using Goose2Client.Network.Packets;
 
 namespace Goose2Client.UI;
 
@@ -10,17 +11,6 @@ public partial class OptionListWindow : BaseMultipleWindow
     // WBC button id = LineClickOffset + line index; must match Goose.Window.LineClickOffset
     // (server). See aspereta-info/protocol.txt.
     public const int LineClickOffset = 20;
-
-    private const int LinePaddingY = 5;
-    private const int LineTextHeight = 13;
-    private const int LineHeight = LineTextHeight + LinePaddingY * 2;
-    private const float LinesOriginX = 6f;
-    private const float LinesOriginY = 22f;
-    private const float LinesWidth = 248f;
-    private const float BottomMargin = 6f;
-    private const float ButtonGap = 6f;
-    private const float ButtonRowHeight = 26f;
-    private const float ButtonWidth = 56f;
 
     private int _maxLine = -1;
 
@@ -46,14 +36,7 @@ public partial class OptionListWindow : BaseMultipleWindow
     }
 
     protected override Vector2 LinePosition(int index, float factor)
-    {
-        var pos = new Vector2(LinesOriginX, LinesOriginY + index * LineHeight);
-        if (factor == 1f)
-            return pos;
-        return new Vector2(
-            UiScale.ScaleCoordinate(pos.X, factor),
-            UiScale.ScaleCoordinate(pos.Y, factor));
-    }
+        => OptionListMetrics.LinePosition(index, factor);
 
     protected override void SetLineText(int index, string text)
     {
@@ -66,16 +49,20 @@ public partial class OptionListWindow : BaseMultipleWindow
             _maxLine = index;
     }
 
+    public override void OnMakeWindow(MakeWindowPacket packet)
+    {
+        _maxLine = -1;
+        base.OnMakeWindow(packet);
+    }
+
     public override void Relayout()
     {
         base.Relayout();
         var factor = UiScaleApplier.Instance.Factor;
-        var lineSize = new Vector2(UiScale.ScaleSize(LinesWidth, factor), UiScale.ScaleSize(LineHeight, factor));
+        var lineSize = OptionListMetrics.LineSize(factor);
         for (int i = 0; i < _lines.Length; i++)
-        {
             ((Button)_lines[i]).Size = lineSize;
-        }
-        Size = ComputedSize(factor);
+        Size = new Vector2(Size.X, OptionListMetrics.WindowHeight(Math.Max(_maxLine + 1, 1), factor, AnyBottomButtonVisible()));
         PlaceBottomButtons(factor);
     }
 
@@ -89,23 +76,14 @@ public partial class OptionListWindow : BaseMultipleWindow
         Position = pos;
     }
 
-    private Vector2 ComputedSize(float factor)
-    {
-        int lines = Math.Max(_maxLine + 1, 1);
-        float h = LinesOriginY + lines * LineHeight + BottomMargin;
-        if (AnyBottomButtonVisible())
-            h += ButtonGap + ButtonRowHeight;
-        return new Vector2(Size.X, UiScale.ScaleSize(h, factor));
-    }
-
     private bool AnyBottomButtonVisible()
         => _backButton.Visible || _nextButton.Visible || _closeButton.Visible
             || (_okButton != null && _okButton.Visible);
 
     private void PlaceBottomButtons(float factor)
     {
-        var y = Size.Y - UiScale.ScaleSize(BottomMargin + ButtonRowHeight, factor);
-        var size = new Vector2(UiScale.ScaleSize(ButtonWidth, factor), UiScale.ScaleSize(ButtonRowHeight, factor));
+        var y = OptionListMetrics.BottomButtonY(Size.Y, factor);
+        var size = OptionListMetrics.BottomButtonSize(factor);
         foreach (var b in new[] { _backButton, _nextButton, _okButton, _closeButton })
         {
             if (b == null || !b.Visible) continue;

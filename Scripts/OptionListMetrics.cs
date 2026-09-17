@@ -1,0 +1,46 @@
+using Godot;
+
+namespace Goose2Client;
+
+public static class OptionListMetrics
+{
+    private const int LinePaddingY = 5;
+    private const int LineTextHeight = 13;
+    private const int LineHeight = LineTextHeight + LinePaddingY * 2;
+    private const float LinesOriginX = 6f;
+    private const float LinesOriginY = 22f;
+    private const float LinesWidth = 248f;
+    private const float BottomMargin = 6f;
+    private const float ButtonGap = 6f;
+    private const float ButtonRowHeight = 26f;
+    private const float ButtonWidth = 56f;
+
+    // Absolute base position per line (not a scaled per-step pitch: scaling a pitch and
+    // multiplying by the index accumulates rounding drift, and the origin would stay unscaled).
+    public static Vector2 LinePosition(int index, float factor)
+    {
+        var basePos = new Vector2(LinesOriginX, LinesOriginY + index * LineHeight);
+        if (factor == 1f)
+            return basePos;
+        return new Vector2(
+            UiScale.ScaleCoordinate(basePos.X, factor),
+            UiScale.ScaleCoordinate(basePos.Y, factor));
+    }
+
+    public static Vector2 LineSize(float factor)
+        => new(UiScale.ScaleSize(LinesWidth, factor), UiScale.ScaleSize(LineHeight, factor));
+
+    public static float WindowHeight(int lineCount, float factor, bool bottomButtons)
+    {
+        var h = LinesOriginY + lineCount * LineHeight + BottomMargin;
+        if (bottomButtons)
+            h += ButtonGap + ButtonRowHeight;
+        return UiScale.ScaleSize(h, factor);
+    }
+
+    public static Vector2 BottomButtonSize(float factor)
+        => new(UiScale.ScaleSize(ButtonWidth, factor), UiScale.ScaleSize(ButtonRowHeight, factor));
+
+    public static float BottomButtonY(float windowHeight, float factor)
+        => windowHeight - UiScale.ScaleSize(BottomMargin + ButtonRowHeight, factor);
+}
