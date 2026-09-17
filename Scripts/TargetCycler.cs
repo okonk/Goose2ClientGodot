@@ -11,7 +11,7 @@ namespace Goose2Client
         
         public static TargetCandidate? Next(
             IEnumerable<TargetCandidate> all, TargetCandidate? current,
-            (int x, int y) player, int mapWidth, (int x, int y) viewRange,
+            (int x, int y) player, int playerLoginId, int mapWidth, (int x, int y) viewRange,
             SpellTargetType type, bool filteringEnabled, bool searchDown)
         {
             var filtered = all.ToList();
@@ -21,6 +21,7 @@ namespace Goose2Client
                 var pvpEnabled = CurrentMapFlags.Value.PvPEnabled;
                 filtered = filtered.Where(c =>
                 {
+                    if (c.LoginId == playerLoginId) return true;
                     var playerSide = c.Type is CharacterType.Player or CharacterType.Pet;
                     if (type == SpellTargetType.Player) return playerSide;
                     if (type == SpellTargetType.NPC) return !playerSide;
@@ -51,11 +52,32 @@ namespace Goose2Client
             }
             
             // Move to next (or previous) with wrap.
-            // When current is not in the filtered list (idx == -1), forward goes to first,
-            // backward goes to last — avoiding the off-by-one where (-1-1+n)%n picks n-2.
+            // When current is not in the filtered list (idx == -1) but is non-null (stale target:
+            // out of view or filtered out), search from the stale target's position key — nearest
+            // candidate in the search direction, wrapping to the far end if none — matching the
+            // legacy client. Only a null current jumps straight to first/last.
             if (idx == -1)
             {
-                idx = searchDown ? 0 : filtered.Count - 1;
+                if (current == null)
+                {
+                    idx = searchDown ? 0 : filtered.Count - 1;
+                }
+                else
+                {
+                    int currentKey = current.Value.Y * mapWidth + current.Value.X;
+                    if (searchDown)
+                    {
+                        idx = 0;
+                        while (idx < filtered.Count && filtered[idx].Y * mapWidth + filtered[idx].X <= currentKey) idx++;
+                        if (idx == filtered.Count) idx = 0;
+                    }
+                    else
+                    {
+                        idx = filtered.Count - 1;
+                        while (idx >= 0 && filtered[idx].Y * mapWidth + filtered[idx].X >= currentKey) idx--;
+                        if (idx < 0) idx = filtered.Count - 1;
+                    }
+                }
             }
             else if (searchDown)
             {

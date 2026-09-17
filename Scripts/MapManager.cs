@@ -211,6 +211,7 @@ public partial class MapManager : Node2D
         if (_characters.Remove(p.LoginId, out var c))
         {
             if (c == _localPlayer) _localPlayer = null;
+            GameManager.Instance?.SpellTargetManager?.OnCharacterErased(c);
             c.QueueFree();
         }
     }

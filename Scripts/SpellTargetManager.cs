@@ -71,25 +71,38 @@ public partial class SpellTargetManager : Node
         GetViewport().GuiReleaseFocus();
         var mm = GameManager.Instance.CurrentMapManager;
         if (mm == null) { ExitTargeting(); return; }
+        var viewRange = GetViewRange();
+        var player = mm.LocalPlayer;
         if (_target == null
             || !GodotObject.IsInstanceValid(_target)
             || mm.GetCharacter(_target.LoginId) != _target
             || FilterRejects(_target)
-            || _target.IsHiddenFromViewer)
+            || _target.IsHiddenFromViewer
+            || System.Math.Abs(_target.X - player.X) > viewRange.X
+            || System.Math.Abs(_target.Y - player.Y) > viewRange.Y)
         {
-            _target = mm.LocalPlayer;
+            _target = player;
         }
         PositionReticle();
+    }
+    
+    private Vector2I GetViewRange()
+    {
+        var vw = GameManager.Instance.WorldViewport;
+        return vw != null ? vw.ViewRangeTiles
+            : new Vector2I(TargetCycler.ViewRangeX, TargetCycler.ViewRangeY);
     }
     
     /// <summary>
     /// FilterRejects — mirrors Unity SetTarget filter mismatch check.
     /// Returns true when the target's character type does not match the spell's required
     /// target type (e.g. a player-target spell pointed at an NPC), causing the remembered
-    /// target to be discarded and replaced with the local player.
+    /// target to be discarded and replaced with the local player. The local player itself is
+    /// never rejected — it is always a valid target.
     /// </summary>
     private bool FilterRejects(Character.Character target)
     {
+        if (target.IsLocalPlayer) return false;
         var filteringEnabled = GameManager.Instance.CharacterSettings.GetOption<bool>(Options.TargetFiltering, true);
         if (!filteringEnabled) return false;
         var playerSide = target.CharacterType is CharacterType.Player or CharacterType.Pet;
@@ -102,6 +115,17 @@ public partial class SpellTargetManager : Node
     public void OnCharacterBecameHidden(Character.Character c)
     {
         if (c != _target) return;
+        ResetTargetToPlayer();
+    }
+
+    public void OnCharacterErased(Character.Character c)
+    {
+        if (c != _target) return;
+        ResetTargetToPlayer();
+    }
+
+    private void ResetTargetToPlayer()
+    {
         var mm = GameManager.Instance.CurrentMapManager;
         if (mm == null) return;
         _target = mm.LocalPlayer;
@@ -134,11 +158,9 @@ public partial class SpellTargetManager : Node
         
         var filteringEnabled = GameManager.Instance.CharacterSettings.GetOption<bool>(Options.TargetFiltering, true);
 
-        var vw = GameManager.Instance.WorldViewport;
-        var viewRange = vw != null ? vw.ViewRangeTiles
-            : new Vector2I(TargetCycler.ViewRangeX, TargetCycler.ViewRangeY);
+        var viewRange = GetViewRange();
 
-        var next = TargetCycler.Next(candidates, current, (player.X, player.Y), 
+        var next = TargetCycler.Next(candidates, current, (player.X, player.Y), player.LoginId,
             GameManager.Instance.CurrentMap?.Width ?? 100,
             (viewRange.X, viewRange.Y),
             _pendingSpell.TargetType, filteringEnabled, searchDown);
