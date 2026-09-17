@@ -11,9 +11,8 @@ public static class OptionListMetrics
     private const float LinesOriginY = 22f;
     private const float LinesWidth = 248f;
     private const float BottomMargin = 6f;
-    private const float ButtonGap = 6f;
     private const float ButtonRowHeight = 26f;
-    private const float ButtonWidth = 56f;
+    private const float ButtonWidth = 74f;
 
     // Absolute base position per line (not a scaled per-step pitch: scaling a pitch and
     // multiplying by the index accumulates rounding drift, and the origin would stay unscaled).
@@ -29,14 +28,6 @@ public static class OptionListMetrics
 
     public static Vector2 LineSize(float factor)
         => new(UiScale.ScaleSize(LinesWidth, factor), UiScale.ScaleSize(LineHeight, factor));
-
-    public static float WindowHeight(int lineCount, float factor, bool bottomButtons)
-    {
-        var h = LinesOriginY + lineCount * LineHeight + BottomMargin;
-        if (bottomButtons)
-            h += ButtonGap + ButtonRowHeight;
-        return UiScale.ScaleSize(h, factor);
-    }
 
     public static Vector2 BottomButtonSize(float factor)
         => new(UiScale.ScaleSize(ButtonWidth, factor), UiScale.ScaleSize(ButtonRowHeight, factor));

@@ -2,7 +2,7 @@
 
 [ext_resource type="Script" path="res://Scripts/UI/OptionListWindow.cs" id="1_olw"]
 [ext_resource type="Theme" path="res://Assets/UI/GameTheme.tres" id="theme"]
-[ext_resource type="Texture2D" path="res://Assets/UI/info.png" id="bg_tex"]
+[ext_resource type="Texture2D" path="res://Assets/UI/quest.png" id="bg_tex"]
 
 [node name="OptionListWindow" type="Control"]
 script = ExtResource("1_olw")
@@ -14,16 +14,12 @@ offset_right = 260.0
 offset_bottom = 290.0
 WindowName = "OptionList"
 
-[node name="Background" type="NinePatchRect" parent="."]
+[node name="Background" type="TextureRect" parent="."]
 layout_mode = 2
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 texture = ExtResource("bg_tex")
-patch_margin_left = 1
-patch_margin_top = 19
-patch_margin_right = 1
-patch_margin_bottom = 1
 mouse_filter = 2
 
 [node name="TitleBar" type="Control" parent="."]
@@ -69,33 +65,24 @@ layout_mode = 2
 anchors_preset = 0
 offset_left = 6.0
 offset_top = 258.0
-offset_right = 62.0
+offset_right = 80.0
 offset_bottom = 284.0
 text = "Back"
-
-[node name="NextButton" type="Button" parent="Content"]
-layout_mode = 2
-anchors_preset = 0
-offset_left = 68.0
-offset_top = 258.0
-offset_right = 124.0
-offset_bottom = 284.0
-text = "Next"
-
-[node name="OkButton" type="Button" parent="Content"]
-layout_mode = 2
-anchors_preset = 0
-offset_left = 130.0
-offset_top = 258.0
-offset_right = 186.0
-offset_bottom = 284.0
-text = "OK"
 
 [node name="CloseButton" type="Button" parent="Content"]
 layout_mode = 2
 anchors_preset = 0
-offset_left = 192.0
+offset_left = 90.0
+offset_top = 258.0
+offset_right = 164.0
+offset_bottom = 284.0
+text = "Close"
+
+[node name="NextButton" type="Button" parent="Content"]
+layout_mode = 2
+anchors_preset = 0
+offset_left = 174.0
 offset_top = 258.0
 offset_right = 248.0
 offset_bottom = 284.0
-text = "Close"
+text = "Next"

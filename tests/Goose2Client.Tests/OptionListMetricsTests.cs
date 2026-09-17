@@ -39,23 +39,10 @@ public class OptionListMetricsTests
         Assert.Equal(new Vector2(496, 46), OptionListMetrics.LineSize(2f));
     }
 
-    [Theory]
-    [InlineData(1, false, 51f)]
-    [InlineData(2, true, 106f)]
-    [InlineData(4, true, 152f)]
-    [InlineData(10, false, 258f)]
-    [InlineData(10, true, 290f)]
-    public void WindowHeight_At1x(int lineCount, bool bottomButtons, float expected)
-        => Assert.Equal(expected, OptionListMetrics.WindowHeight(lineCount, 1f, bottomButtons));
-
-    [Fact]
-    public void WindowHeight_At2x()
-        => Assert.Equal(304f, OptionListMetrics.WindowHeight(4, 2f, true));
-
     [Fact]
     public void BottomButtons()
     {
-        Assert.Equal(new Vector2(56, 26), OptionListMetrics.BottomButtonSize(1f));
+        Assert.Equal(new Vector2(74, 26), OptionListMetrics.BottomButtonSize(1f));
         Assert.Equal(120f, OptionListMetrics.BottomButtonY(152f, 1f));
         Assert.Equal(240f, OptionListMetrics.BottomButtonY(304f, 2f));
     }

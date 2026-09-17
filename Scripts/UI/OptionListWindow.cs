@@ -1,4 +1,3 @@
-using System;
 using Godot;
 using Goose2Client;
 using Goose2Client.Network.Packets;
@@ -11,8 +10,6 @@ public partial class OptionListWindow : BaseMultipleWindow
     // WBC button id = LineClickOffset + line index; must match Goose.Window.LineClickOffset
     // (server). See aspereta-info/protocol.txt.
     public const int LineClickOffset = 20;
-
-    private int _maxLine = -1;
 
     public override WindowFrames WindowFrame => WindowFrames.OptionList;
 
@@ -45,14 +42,6 @@ public partial class OptionListWindow : BaseMultipleWindow
         // Invisible rows let clicks fall through to the world; a disabled Button would
         // still swallow them (Godot hit-testing is not clipped to the parent rect).
         button.Visible = !string.IsNullOrEmpty(text);
-        if (!string.IsNullOrEmpty(text) && index > _maxLine)
-            _maxLine = index;
-    }
-
-    public override void OnMakeWindow(MakeWindowPacket packet)
-    {
-        _maxLine = -1;
-        base.OnMakeWindow(packet);
     }
 
     public override void Relayout()
@@ -62,23 +51,18 @@ public partial class OptionListWindow : BaseMultipleWindow
         var lineSize = OptionListMetrics.LineSize(factor);
         for (int i = 0; i < _lines.Length; i++)
             ((Button)_lines[i]).Size = lineSize;
-        Size = new Vector2(Size.X, OptionListMetrics.WindowHeight(Math.Max(_maxLine + 1, 1), factor, AnyBottomButtonVisible()));
         PlaceBottomButtons(factor);
     }
 
     internal override void OnEndWindow()
     {
         base.OnEndWindow();
-        // The snapshot apply inside Relayout resets the root rect to the tscn size; the
-        // manager-set position must survive the resize.
+        // The snapshot apply inside Relayout resets the root rect to the tscn rect, which
+        // drops the manager-set position; restore it afterwards.
         var pos = Position;
         Relayout();
         Position = pos;
     }
-
-    private bool AnyBottomButtonVisible()
-        => _backButton.Visible || _nextButton.Visible || _closeButton.Visible
-            || (_okButton != null && _okButton.Visible);
 
     private void PlaceBottomButtons(float factor)
     {
