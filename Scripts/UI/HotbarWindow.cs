@@ -339,6 +339,8 @@ public partial class HotbarWindow : BaseWindow, IWindow
         if (GetViewport().GuiGetFocusOwner() is LineEdit) return;
         // Spell targeting captures input — don't fire hotkeys while choosing a target.
         if (GameManager.Instance.IsTargeting) return;
+        var targetManager = GameManager.Instance.SpellTargetManager;
+        if (targetManager != null && targetManager.HotkeyConfirmThisFrame) return;
 
         for (int i = 0; i < SlotsPerPage; i++)
         {

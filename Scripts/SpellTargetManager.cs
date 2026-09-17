@@ -9,9 +9,14 @@ public partial class SpellTargetManager : Node
     private Character.Character _target;
     private SpellInfo _pendingSpell;
     private SpellTarget _reticle;
+    private ulong _hotkeyConfirmFrame = ulong.MaxValue;
     
     /// <summary>Whether the player is currently in targeting mode.</summary>
     public bool IsTargeting { get; private set; }
+    
+    // A hotkey press that confirmed a cast must not re-fire the hotbar's _Process poll on the
+    // same frame (IsTargeting is already false by then, so its guard no longer applies).
+    public bool HotkeyConfirmThisFrame => Engine.GetProcessFrames() == _hotkeyConfirmFrame;
     
     public override void _Ready()
     {
@@ -40,6 +45,11 @@ public partial class SpellTargetManager : Node
         else if (@event.IsActionPressed("TargetDown") || @event.IsActionPressed("MoveDown") || @event.IsActionPressed("MoveRight"))
             CycleTarget(searchDown: true);
         else if (@event.IsActionPressed("ConfirmTarget")) ConfirmTarget();
+        else if (IsHotkeyPressed(@event))
+        {
+            _hotkeyConfirmFrame = Engine.GetProcessFrames();
+            ConfirmTarget();
+        }
         else if (@event.IsActionPressed("CancelTarget")) CancelTarget();
         else if (@event.IsActionPressed("TargetHome")) GoHome();
         else return;
@@ -100,6 +110,17 @@ public partial class SpellTargetManager : Node
         if (IsTargeting) PositionReticle();
     }
 
+    // exactMatch: Shift+digit is the emote layer and must not cast.
+    private static bool IsHotkeyPressed(InputEvent @event)
+    {
+        for (int i = 0; i < 10; i++)
+        {
+            string action = i == 9 ? "Hotkey0" : $"Hotkey{i + 1}";
+            if (@event.IsActionPressed(action, exactMatch: true)) return true;
+        }
+        return false;
+    }
+    
     private void CycleTarget(bool searchDown)
     {
         var mm = GameManager.Instance.CurrentMapManager;
