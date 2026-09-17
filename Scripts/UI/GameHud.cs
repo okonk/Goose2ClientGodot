@@ -24,6 +24,7 @@ public partial class GameHud : Control
     public BankWindow Bank { get; private set; }
     public CombineBagContainerWindow CombineBag { get; private set; }
     public QuestWindowManager QuestWindows { get; private set; }
+    public OptionListWindowManager OptionListWindows { get; private set; }
 
     /// <summary>Instantiate a scene and add it as a child, returning the typed node.</summary>
     private T Add<T>(string path) where T : Node
@@ -73,6 +74,8 @@ public partial class GameHud : Control
         QuestWindows = new QuestWindowManager();
         AddChild(QuestWindows);
         AddChild(new InfoWindowCreator());
+        OptionListWindows = new OptionListWindowManager();
+        AddChild(OptionListWindows);
 
         // 6. Wire cross-references (after AddChild so each node's _Ready has run).
         Hotbar.InventoryWindow = Inventory;

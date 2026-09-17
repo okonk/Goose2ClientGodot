@@ -30,7 +30,7 @@ public static class DefaultWindowLayout
     /// the right edge at larger canvases — it is top-center at 720p, so keeping it put matches
     /// the hotbar rationale.
     /// </summary>
-    public static bool IsDialog(string windowName) => windowName is "Quest" or "Vendor" or "Info" or "Bank" or "CombineBag";
+    public static bool IsDialog(string windowName) => windowName is "Quest" or "Vendor" or "Info" or "Bank" or "CombineBag" or "OptionList";
 
     public static Vector2 For(string windowName)
         => windowName != null && Defaults.TryGetValue(windowName, out var p) ? p : new Vector2(100, 100);

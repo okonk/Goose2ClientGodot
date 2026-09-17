@@ -14,15 +14,16 @@ public abstract partial class BaseMultipleWindow : BaseWindow, IWindow
 {
     protected override bool DefaultVisible => false;
 
-    public const int LineCount = 20;
+    protected virtual int LineCount => 20;
 
-    private const int LineFontSize = 10;
+    protected const int LineFontSize = 10;
     private const int ButtonFontSize = 12;
 
-    private Label[] _lines;
-    private Button _backButton;
-    private Button _nextButton;
-    private Button _closeButton;
+    protected Control[] _lines;
+    protected Button _backButton;
+    protected Button _nextButton;
+    protected Button _okButton;
+    protected Button _closeButton;
 
     public Action<BaseMultipleWindow> OnCloseWindow { get; set; }
 
@@ -41,29 +42,31 @@ public abstract partial class BaseMultipleWindow : BaseWindow, IWindow
         // Hidden until MakeWindow.Buttons says otherwise.
         _backButton = GetNode<Button>("Content/BackButton");
         _nextButton = GetNode<Button>("Content/NextButton");
+        _okButton = GetNodeOrNull<Button>("Content/OkButton");
         _closeButton = GetNode<Button>("Content/CloseButton");
         _backButton.Visible = false;
         _nextButton.Visible = false;
+        if (_okButton != null) _okButton.Visible = false;
         _closeButton.Visible = false;
         _backButton.Pressed += BackClicked;
         _nextButton.Pressed += NextClicked;
+        if (_okButton != null) _okButton.Pressed += OkClicked;
         _closeButton.Pressed += CloseWindow;
         var applier = UiScaleApplier.Instance;
-        foreach (var b in new[] { _backButton, _nextButton, _closeButton })
-            applier.ApplyFontSize(b, ButtonFontSize);
+        foreach (var b in new[] { _backButton, _nextButton, _okButton, _closeButton })
+            if (b != null) applier.ApplyFontSize(b, ButtonFontSize);
 
-        _lines = new Label[LineCount];
+        _lines = new Control[LineCount];
         var content = GetNode<Control>("Content");
         for (int i = 0; i < LineCount; i++)
         {
-            var label = new Label { Text = " ", Name = "Line" + i };
-            applier.ApplyFontSize(label, LineFontSize);
+            var line = CreateLine(i);
             // Line geometry is owned by the metrics + Relayout override; the generic snapshot
             // must not capture it (a snapshot record would double-scale already-scaled offsets).
-            label.SetMeta(UiScaleLayout.SkipMeta, true);
-            label.Position = MultiWindowMetrics.LinePosition(i, applier.Factor);
-            content.AddChild(label);
-            _lines[i] = label;
+            line.SetMeta(UiScaleLayout.SkipMeta, true);
+            line.Position = LinePosition(i, applier.Factor);
+            content.AddChild(line);
+            _lines[i] = line;
         }
 
         ScaleRegister();
@@ -74,7 +77,23 @@ public abstract partial class BaseMultipleWindow : BaseWindow, IWindow
         base.Relayout();
         var factor = UiScaleApplier.Instance.Factor;
         for (int i = 0; i < _lines.Length; i++)
-            _lines[i].Position = MultiWindowMetrics.LinePosition(i, factor);
+            _lines[i].Position = LinePosition(i, factor);
+    }
+
+    protected virtual Control CreateLine(int index)
+    {
+        var label = new Label { Text = " ", Name = "Line" + index };
+        UiScaleApplier.Instance.ApplyFontSize(label, LineFontSize);
+        return label;
+    }
+
+    protected virtual Vector2 LinePosition(int index, float factor)
+        => MultiWindowMetrics.LinePosition(index, factor);
+
+    protected virtual void SetLineText(int index, string text)
+    {
+        if (_lines[index] is Label label)
+            label.Text = text + " ";
     }
 
     /// <summary>Called by the manager when a MakeWindowPacket arrives for this window.</summary>
@@ -88,14 +107,16 @@ public abstract partial class BaseMultipleWindow : BaseWindow, IWindow
         _closeButton.Visible = WindowButtonFlags.IsEnabled(packet.Buttons, WindowButtons.Close);
         _backButton.Visible = WindowButtonFlags.IsEnabled(packet.Buttons, WindowButtons.Back);
         _nextButton.Visible = WindowButtonFlags.IsEnabled(packet.Buttons, WindowButtons.Next);
+        if (_okButton != null)
+            _okButton.Visible = WindowButtonFlags.IsEnabled(packet.Buttons, WindowButtons.OK);
 
         // Clear all lines
-        foreach (var l in _lines)
-            l.Text = " ";
+        for (int i = 0; i < _lines.Length; i++)
+            SetLineText(i, "");
     }
 
     /// <summary>Called by the manager when an EndWindowPacket arrives for this window.</summary>
-    internal void OnEndWindow()
+    internal virtual void OnEndWindow()
     {
         Visible = true;
     }
@@ -104,7 +125,7 @@ public abstract partial class BaseMultipleWindow : BaseWindow, IWindow
     internal void OnWindowLine(WindowLinePacket packet)
     {
         if (packet.LineNumber < 0 || packet.LineNumber >= _lines.Length) return;
-        _lines[packet.LineNumber].Text = packet.Text + " ";
+        SetLineText(packet.LineNumber, packet.Text);
     }
 
     protected override void OnClosePressed()
@@ -128,5 +149,10 @@ public abstract partial class BaseMultipleWindow : BaseWindow, IWindow
     public void BackClicked()
     {
         GameManager.Instance.NetworkClient.WindowButtonClick(WindowButtons.Back, WindowId, NpcId);
+    }
+
+    public void OkClicked()
+    {
+        GameManager.Instance.NetworkClient.WindowButtonClick(WindowButtons.OK, WindowId, NpcId);
     }
 }

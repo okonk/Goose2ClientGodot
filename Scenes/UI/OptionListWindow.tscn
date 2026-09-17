@@ -1,0 +1,95 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://Scripts/UI/OptionListWindow.cs" id="1_olw"]
+[ext_resource type="Theme" path="res://Assets/UI/GameTheme.tres" id="theme"]
+[ext_resource type="Texture2D" path="res://Assets/UI/info.png" id="bg_tex"]
+
+[node name="OptionListWindow" type="Control"]
+script = ExtResource("1_olw")
+theme = ExtResource("theme")
+layout_mode = 3
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 260.0
+offset_bottom = 290.0
+WindowName = "OptionList"
+
+[node name="Background" type="TextureRect" parent="."]
+layout_mode = 2
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+texture = ExtResource("bg_tex")
+mouse_filter = 2
+
+[node name="TitleBar" type="Control" parent="."]
+layout_mode = 2
+anchors_preset = 10
+anchor_right = 0.0
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 260.0
+offset_bottom = 20.0
+mouse_filter = 0
+
+[node name="TitleLabel" type="Label" parent="TitleBar"]
+layout_mode = 2
+anchors_preset = 0
+offset_left = 4.0
+offset_top = 2.0
+offset_right = 180.0
+offset_bottom = 18.0
+text = "Options"
+
+[node name="CloseButton" type="Button" parent="TitleBar"]
+layout_mode = 2
+anchors_preset = 0
+offset_left = 243.0
+offset_top = 2.0
+offset_right = 259.0
+offset_bottom = 18.0
+flat = true
+
+[node name="Content" type="Control" parent="."]
+layout_mode = 2
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 1
+
+
+[node name="BackButton" type="Button" parent="Content"]
+layout_mode = 2
+anchors_preset = 0
+offset_left = 6.0
+offset_top = 258.0
+offset_right = 62.0
+offset_bottom = 284.0
+text = "Back"
+
+[node name="NextButton" type="Button" parent="Content"]
+layout_mode = 2
+anchors_preset = 0
+offset_left = 68.0
+offset_top = 258.0
+offset_right = 124.0
+offset_bottom = 284.0
+text = "Next"
+
+[node name="OkButton" type="Button" parent="Content"]
+layout_mode = 2
+anchors_preset = 0
+offset_left = 130.0
+offset_top = 258.0
+offset_right = 186.0
+offset_bottom = 284.0
+text = "OK"
+
+[node name="CloseButton" type="Button" parent="Content"]
+layout_mode = 2
+anchors_preset = 0
+offset_left = 192.0
+offset_top = 258.0
+offset_right = 248.0
+offset_bottom = 284.0
+text = "Close"

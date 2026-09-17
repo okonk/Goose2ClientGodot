@@ -28,5 +28,6 @@ namespace Goose2Client
         Paper = 24,
         Trade = 25,
         Bank = 26,
+        OptionList = 27,
     }
 }
