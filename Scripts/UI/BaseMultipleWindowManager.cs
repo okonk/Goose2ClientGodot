@@ -16,7 +16,7 @@ public abstract partial class BaseMultipleWindowManager<T> : Node where T : Base
     private bool _listenersRegistered;
 
     public abstract string PrefabPath { get; }
-    public abstract WindowFrames WindowFrame { get; }
+    public abstract bool MatchesFrame(WindowFrames frame);
 
     public override void _Ready()
     {
@@ -37,25 +37,15 @@ public abstract partial class BaseMultipleWindowManager<T> : Node where T : Base
     private void OnMakeWindow(object o)
     {
         var p = (MakeWindowPacket)o;
-        if (p.WindowFrame != WindowFrame) return;
+        if (!MatchesFrame(p.WindowFrame)) return;
 
         if (!_windows.TryGetValue(p.WindowId, out var w))
         {
-            // Paging (Back/Next) makes the server send a fresh WindowId for the next page of the
-            // same conversation. Reuse the window already open for that NPC — re-keyed to the new
-            // id — instead of stacking a second window on top of it.
-            w = FindByNpc(p.NpcId);
-            if (w != null)
-            {
-                _windows.Remove(w.WindowId);
-            }
-            else
-            {
-                var scene = GD.Load<PackedScene>(PrefabPath);
-                w = scene.Instantiate<T>();
-                AddChild(w);
-                w.OnCloseWindow = OnCloseWindow;
-            }
+            var scene = GD.Load<PackedScene>(PrefabPath);
+            w = scene.Instantiate<T>();
+            AddChild(w);
+            w.OnCloseWindow = OnCloseWindow;
+            CascadePosition(w);
 
             _windows[p.WindowId] = w;
         }
@@ -63,20 +53,14 @@ public abstract partial class BaseMultipleWindowManager<T> : Node where T : Base
         w.OnMakeWindow(p);
     }
 
-    /// <summary>
-    /// Finds the open window belonging to an NPC. NpcId 0 means "not tied to an NPC",
-    /// so those windows are always independent and never reused.
-    /// </summary>
-    private T FindByNpc(int npcId)
+    // Same-frame dialogs all default to the same position (centered or the shared saved
+    // position), so step each new window down-right from the ones already open to keep it
+    // visible.
+    private void CascadePosition(T w)
     {
-        if (npcId == 0) return null;
-
-        foreach (var w in _windows.Values)
-        {
-            if (w.NpcId == npcId) return w;
-        }
-
-        return null;
+        if (_windows.Count == 0) return;
+        var step = 30f * (UiScaleApplier.Instance?.Factor ?? 1f);
+        w.Position += new Vector2(step, step) * _windows.Count;
     }
 
     public void OnCloseWindow(BaseMultipleWindow window)
