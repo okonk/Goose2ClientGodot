@@ -10,6 +10,8 @@ namespace Goose2Client.UI;
 /// </summary>
 public partial class BankWindow : BaseWindow, IWindow
 {
+    protected override bool DefaultVisible => false;
+
     public const int BankSlots = 30;
 
     private static readonly PackedScene SlotScene = GD.Load<PackedScene>("res://Scenes/UI/ItemSlot.tscn");

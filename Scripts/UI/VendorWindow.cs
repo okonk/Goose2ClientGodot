@@ -10,6 +10,8 @@ namespace Goose2Client.UI;
 /// </summary>
 public partial class VendorWindow : BaseWindow, IWindow, INpcWindow
 {
+    protected override bool DefaultVisible => false;
+
     public const int VendorSlots = 40;
 
     private static readonly PackedScene SlotScene = GD.Load<PackedScene>("res://Scenes/UI/ItemSlot.tscn");

@@ -9,6 +9,8 @@ namespace Goose2Client.UI;
 /// </summary>
 public partial class OptionsWindow : BaseWindow
 {
+    protected override bool DefaultVisible => false;
+
     private CheckBox _targetFiltering;
     private CheckBox _showSpiritBar;
     private CheckBox _nativeRender;
@@ -17,6 +19,7 @@ public partial class OptionsWindow : BaseWindow
     private HSlider _scaleSlider;
     private Label _scaleValueLabel;
     private ButtonGroup _scaleModeGroup;
+    private Button _resetLayoutButton;
     private bool _dragging;
     private bool _initializing;
 
@@ -64,6 +67,9 @@ public partial class OptionsWindow : BaseWindow
         _scaleSlider.DragStarted += () => _dragging = true;
         _scaleSlider.DragEnded += OnScaleDragEnded;
         _scaleSlider.ValueChanged += OnScaleValueChanged;
+
+        _resetLayoutButton = GetNode<Button>("Content/ResetLayoutButton");
+        _resetLayoutButton.Pressed += OnResetLayoutPressed;
         // Synchronous clear, not a next-frame await: a deferred clear would race the
         // deferred ScaleRegister and ready-flush ordering.
         _initializing = false;
@@ -162,6 +168,19 @@ public partial class OptionsWindow : BaseWindow
 
     private static string FormatFactor(float f)
         => (f % 1f == 0f) ? ((int)f).ToString() : f.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture);
+
+    // Reposition only: the options window is the control panel running the reset and must stay open.
+    public override void ResetToDefault()
+    {
+        RepositionFromSaved();
+    }
+
+    private void OnResetLayoutPressed()
+    {
+        GameManager.Instance.CharacterSettings.ResetWindowSettings();
+        foreach (var w in GameManager.Instance.HudWindows())
+            w.ResetToDefault();
+    }
 
     public override void Relayout()
     {

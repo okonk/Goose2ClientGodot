@@ -11,6 +11,8 @@ namespace Goose2Client.UI;
 /// </summary>
 public partial class SpellbookWindow : BaseWindow, IWindow
 {
+    protected override bool DefaultVisible => false;
+
     public const int PageCount = 8;
 
     private int SlotsPerPage => Constants.SpellbookSlotsPerPage;

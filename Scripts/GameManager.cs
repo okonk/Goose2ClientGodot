@@ -415,6 +415,15 @@ namespace Goose2Client
                 w.RepositionFromSaved();
         }
 
+        /// <summary>Every live BaseWindow under the HUD layer (depth-first), for layout-wide
+        /// operations such as the options window's reset-to-default.</summary>
+        public IEnumerable<BaseWindow> HudWindows()
+        {
+            if (UiLayer == null) yield break;
+            foreach (var w in CollectBaseWindows(UiLayer))
+                yield return w;
+        }
+
         /// <summary>Recursive depth-first walk of <paramref name="root"/>'s children collecting every
         /// BaseWindow. The subtree is small (few dozen nodes) and resize events are cheap, so a
         /// plain walk beats a registry; lazily created windows are found on the next walk.</summary>

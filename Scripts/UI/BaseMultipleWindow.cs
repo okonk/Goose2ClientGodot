@@ -12,6 +12,8 @@ namespace Goose2Client.UI;
 /// </summary>
 public abstract partial class BaseMultipleWindow : BaseWindow, IWindow
 {
+    protected override bool DefaultVisible => false;
+
     public const int LineCount = 20;
 
     private const int LineFontSize = 10;

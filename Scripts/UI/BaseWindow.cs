@@ -32,6 +32,18 @@ public partial class BaseWindow : Control, IScalableWindow
 
     public string Title { set { if (TitleLabel != null) TitleLabel.Text = value; } }
 
+    /// <summary>First-run visibility (tscn/design state before any saved settings apply).
+    /// Server-spawned and toggle-closed windows override to false.</summary>
+    protected virtual bool DefaultVisible => true;
+
+    /// <summary>Restore this window's first-run visibility and default position
+    /// (call after <c>CharacterSettings.ResetWindowSettings</c> so no saved entry remains).</summary>
+    public virtual void ResetToDefault()
+    {
+        Visible = DefaultVisible;
+        RepositionFromSaved();
+    }
+
     public override void _Ready()
     {
         // tscn size is the 1x base for placement math; relayout (below, via ScaleRegister)
@@ -159,7 +171,9 @@ public partial class BaseWindow : Control, IScalableWindow
                 if (_dragCancelled)
                     _dragCancelled = false;
                 else if (WindowName != null)
-                    GameManager.Instance.CharacterSettings.SetWindowSetting(WindowName, Position, Size, UiScaleApplier.Instance != null ? UiScaleApplier.Instance.Factor : 1f, null, (Vector2I)GetTree().Root.GetVisibleRect().Size);
+                    // Live Visible, not null: a fresh WindowSettings entry defaults to Visible=false,
+                    // and a null here would persist that and hide the window on next login.
+                    GameManager.Instance.CharacterSettings.SetWindowSetting(WindowName, Position, Size, UiScaleApplier.Instance != null ? UiScaleApplier.Instance.Factor : 1f, Visible, (Vector2I)GetTree().Root.GetVisibleRect().Size);
             }
         }
         else if (@event is InputEventMouseMotion motion && _dragging)
@@ -170,7 +184,7 @@ public partial class BaseWindow : Control, IScalableWindow
                 if (_dragCancelled)
                     _dragCancelled = false;
                 else if (WindowName != null)
-                    GameManager.Instance.CharacterSettings.SetWindowSetting(WindowName, Position, Size, UiScaleApplier.Instance != null ? UiScaleApplier.Instance.Factor : 1f, null, (Vector2I)GetTree().Root.GetVisibleRect().Size);
+                    GameManager.Instance.CharacterSettings.SetWindowSetting(WindowName, Position, Size, UiScaleApplier.Instance != null ? UiScaleApplier.Instance.Factor : 1f, Visible, (Vector2I)GetTree().Root.GetVisibleRect().Size);
                 return;
             }
             Position += motion.Relative;

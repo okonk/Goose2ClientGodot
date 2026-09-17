@@ -302,6 +302,31 @@ namespace Goose2Client.Tests
             }
         }
 
+        [Fact]
+        public void ResetWindowSettings_ClearsAllEntriesAndPersists()
+        {
+            var dir = Path.Combine(Path.GetTempPath(), "gs2-" + Path.GetRandomFileName());
+            Directory.CreateDirectory(dir);
+            try
+            {
+                var cs = new TempCharacterSettings(dir);
+                cs.SetWindowVisible("Hotbar", false);
+                cs.SetWindowSetting("Inventory", new Vector2(900, 360), new Vector2(300, 400), 1f, true, new Vector2I(1280, 720));
+
+                cs.ResetWindowSettings();
+
+                Assert.Empty(cs.WindowSettings);
+                var reloaded = new TempCharacterSettings(dir);
+                Assert.True(reloaded.Load());
+                Assert.Null(reloaded.GetWindowSettings("Hotbar"));
+                Assert.Null(reloaded.GetWindowSettings("Inventory"));
+            }
+            finally
+            {
+                Directory.Delete(dir, true);
+            }
+        }
+
         private sealed class TempCharacterSettings : CharacterSettings
         {
             private readonly string _path;

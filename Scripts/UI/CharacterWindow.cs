@@ -10,6 +10,8 @@ namespace Goose2Client.UI;
 /// </summary>
 public partial class CharacterWindow : BaseWindow, IWindow
 {
+    protected override bool DefaultVisible => false;
+
     public const int EquippedSlotCount = 14;
     private const int FirstSlotNumber = 31;
 

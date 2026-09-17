@@ -192,6 +192,12 @@ namespace Goose2Client
             Save();
         }
 
+        public void ResetWindowSettings()
+        {
+            WindowSettings = new();
+            Save();
+        }
+
         // Drag-end save: the ONLY writer of the full quad (all four fields atomically; Placed
         // must never be set with an incomplete quad — Part 1B trusts a Placed quad wholesale).
         public void SetWindowSetting(string windowName, Vector2 position, Vector2 size, float factor, bool? visible, Vector2I canvas)
