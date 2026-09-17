@@ -136,6 +136,12 @@ public abstract partial class BaseMultipleWindow : BaseWindow, IWindow
     public void CloseWindow()
     {
         GameManager.Instance.NetworkClient.WindowButtonClick(WindowButtons.Close, WindowId, NpcId);
+        Free();
+    }
+
+    // Server-initiated close (CLW): free without sending a WBC back.
+    internal void Free()
+    {
         Visible = false;
         OnCloseWindow?.Invoke(this);
         QueueFree();

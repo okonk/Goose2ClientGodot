@@ -23,6 +23,7 @@ public abstract partial class BaseMultipleWindowManager<T> : Node where T : Base
         GameManager.Instance.PacketManager.Listen<MakeWindowPacket>(OnMakeWindow);
         GameManager.Instance.PacketManager.Listen<EndWindowPacket>(OnEndWindow);
         GameManager.Instance.PacketManager.Listen<WindowLinePacket>(OnWindowLine);
+        GameManager.Instance.PacketManager.Listen<CloseWindowPacket>(OnCloseWindowPacket);
         _listenersRegistered = true;
     }
 
@@ -32,6 +33,7 @@ public abstract partial class BaseMultipleWindowManager<T> : Node where T : Base
         GameManager.Instance.PacketManager.Remove<MakeWindowPacket>(OnMakeWindow);
         GameManager.Instance.PacketManager.Remove<EndWindowPacket>(OnEndWindow);
         GameManager.Instance.PacketManager.Remove<WindowLinePacket>(OnWindowLine);
+        GameManager.Instance.PacketManager.Remove<CloseWindowPacket>(OnCloseWindowPacket);
     }
 
     private void OnMakeWindow(object o)
@@ -66,6 +68,13 @@ public abstract partial class BaseMultipleWindowManager<T> : Node where T : Base
     public void OnCloseWindow(BaseMultipleWindow window)
     {
         _windows.Remove(window.WindowId);
+    }
+
+    private void OnCloseWindowPacket(object o)
+    {
+        var p = (CloseWindowPacket)o;
+        if (_windows.Remove(p.WindowId, out var w))
+            w.Free();
     }
 
     public bool HasWindowForNpc(int npcId)
