@@ -39,40 +39,28 @@ public class BattleTextLayoutTests
     }
 
     [Fact]
-    public void Spread_FourthCall_childCount3_returnsOffset4_neg8_positionBecomes3()
+    public void Spread_FourthCall_childCount3_wrapsToOffset4_0_positionBecomes0()
     {
         int position = 0;
         BattleTextLayout.ComputeSpreadOffset(BattleTextType.Red1, 0, ref position);
         BattleTextLayout.ComputeSpreadOffset(BattleTextType.Red1, 1, ref position);
         BattleTextLayout.ComputeSpreadOffset(BattleTextType.Red1, 2, ref position);
         var offset = BattleTextLayout.ComputeSpreadOffset(BattleTextType.Red1, 3, ref position);
-        Assert.Equal(new Vector2(4, -8), offset);
-        Assert.Equal(3, position);
+        Assert.Equal(new Vector2(4, 0), offset);
+        Assert.Equal(0, position);
     }
 
     [Fact]
-    public void Spread_FullCycle9Calls_producesCorrectSequence()
+    public void Spread_FullCycle3Calls_producesCorrectSequence()
     {
-        // Expected offsets (Godot sign: y negated from Unity):
-        // call  childCount  position  x    y_unity  y_godot
-        //  1       0          0       4     0        0
-        //  2       1          1      -4     0        0
-        //  3       2          2      12     0        0
-        //  4       3          3       4     8       -8
-        //  5       4          4      -4     8       -8
-        //  6       5          5      12     8       -8
-        //  7       6          6       4    16      -16
-        //  8       7          7      -4    16      -16
-        //  9       8          8      12    16      -16
+        // X jitter only — vertical spacing is handled by BattleText pushing existing lines up.
         var expected = new Vector2[]
         {
             new(4, 0), new(-4, 0), new(12, 0),
-            new(4, -8), new(-4, -8), new(12, -8),
-            new(4, -16), new(-4, -16), new(12, -16),
         };
 
         int position = 0;
-        for (int i = 0; i < 9; i++)
+        for (int i = 0; i < 3; i++)
         {
             var offset = BattleTextLayout.ComputeSpreadOffset(BattleTextType.Red1, i, ref position);
             Assert.Equal(expected[i], offset);
@@ -80,14 +68,14 @@ public class BattleTextLayoutTests
     }
 
     [Fact]
-    public void Spread_PositionWrapsAfter9()
+    public void Spread_PositionWrapsAfter3()
     {
         int position = 0;
-        for (int i = 0; i < 9; i++)
+        for (int i = 0; i < 3; i++)
             BattleTextLayout.ComputeSpreadOffset(BattleTextType.Red1, i, ref position);
-        // 10th call: childCount=9, position wraps to 0
-        var offset = BattleTextLayout.ComputeSpreadOffset(BattleTextType.Red1, 9, ref position);
-        Assert.Equal(new Vector2(4, -16), offset);  // y capped at 16 (min(9/3,2)*8 = min(3,2)*8 = 16)
+        // 4th call: childCount=3, position wraps to 0
+        var offset = BattleTextLayout.ComputeSpreadOffset(BattleTextType.Red1, 3, ref position);
+        Assert.Equal(new Vector2(4, 0), offset);
         Assert.Equal(0, position);
     }
 

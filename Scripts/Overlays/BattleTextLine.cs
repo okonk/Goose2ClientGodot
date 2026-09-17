@@ -4,6 +4,9 @@ namespace Goose2Client.Overlays
 {
     public partial class BattleTextLine : WorldOverlay
     {
+        private const float LabelWidth = 100f;
+        private const float LabelHeight = 16f;
+
         private Label _label;
         private Vector2 _baseOffset;
         private float _scale = 1f;
@@ -28,13 +31,19 @@ namespace Goose2Client.Overlays
             Lifetime = new OverlayLifetime(1.0, risePixelsPerSecond: 32);
         }
 
+        public void PushUpOneLine()
+        {
+            if (_worldScale <= 0f) return;
+            _baseOffset.Y -= LabelHeight * _scale / _worldScale;
+        }
+
         public void ApplyScale(float textScale, float worldScale)
         {
             _scale = textScale;
             _worldScale = worldScale;
             _label.AddThemeFontSizeOverride("font_size", Mathf.Max(1, Mathf.RoundToInt(12f * textScale)));
             _label.AddThemeConstantOverride("outline_size", Mathf.RoundToInt(4f * textScale));
-            _label.Size = new Vector2(100f, 16f) * textScale;
+            _label.Size = new Vector2(LabelWidth, LabelHeight) * textScale;
             _label.Position = new Vector2(-_label.Size.X / 2f, 0);
         }
 
