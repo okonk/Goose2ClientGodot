@@ -93,10 +93,10 @@ mouse_filter = 1
 script = ExtResource("2_cws")
 layout_mode = 0
 mouse_filter = 0
-offset_left = 148.0
-offset_top = 84.0
-offset_right = 180.0
-offset_bottom = 116.0
+offset_left = 300.0
+offset_top = 183.0
+offset_right = 332.0
+offset_bottom = 215.0
 
 [node name="Background" type="TextureRect" parent="Content/LookSlot"]
 layout_mode = 0
@@ -122,10 +122,10 @@ stretch_mode = 0
 [node name="LookCaption" type="Label" parent="Content"]
 layout_mode = 0
 mouse_filter = 2
-offset_left = 140.0
-offset_top = 118.0
-offset_right = 188.0
-offset_bottom = 132.0
+offset_left = 292.0
+offset_top = 217.0
+offset_right = 340.0
+offset_bottom = 231.0
 text = "Graphic"
 horizontal_alignment = 1
 
@@ -133,10 +133,10 @@ horizontal_alignment = 1
 script = ExtResource("2_cws")
 layout_mode = 0
 mouse_filter = 0
-offset_left = 182.0
-offset_top = 84.0
-offset_right = 214.0
-offset_bottom = 116.0
+offset_left = 334.0
+offset_top = 183.0
+offset_right = 366.0
+offset_bottom = 215.0
 
 [node name="Background" type="TextureRect" parent="Content/StatsSlot"]
 layout_mode = 0
@@ -162,10 +162,10 @@ stretch_mode = 0
 [node name="StatsCaption" type="Label" parent="Content"]
 layout_mode = 0
 mouse_filter = 2
-offset_left = 174.0
-offset_top = 118.0
-offset_right = 222.0
-offset_bottom = 132.0
+offset_left = 326.0
+offset_top = 217.0
+offset_right = 374.0
+offset_bottom = 231.0
 text = "Stats"
 horizontal_alignment = 1
 
@@ -173,18 +173,18 @@ horizontal_alignment = 1
 script = ExtResource("3_cpc")
 layout_mode = 0
 offset_left = 300.0
-offset_top = 52.0
+offset_top = 30.0
 offset_right = 430.0
-offset_bottom = 202.0
+offset_bottom = 180.0
 mouse_filter = 2
 clip_contents = true
 
 [node name="Swatch" type="TextureRect" parent="Content"]
 layout_mode = 0
 offset_left = 10.0
-offset_top = 84.0
+offset_top = 30.0
 offset_right = 138.0
-offset_bottom = 212.0
+offset_bottom = 158.0
 expand_mode = 1
 stretch_mode = 5
 
@@ -200,9 +200,9 @@ texture = SubResource("GradientTexture2D_cursor")
 [node name="HueBar" type="TextureRect" parent="Content"]
 layout_mode = 0
 offset_left = 10.0
-offset_top = 218.0
+offset_top = 164.0
 offset_right = 138.0
-offset_bottom = 230.0
+offset_bottom = 176.0
 expand_mode = 1
 stretch_mode = 5
 texture = SubResource("GradientTexture2D_hue")
@@ -219,9 +219,9 @@ texture = SubResource("GradientTexture2D_bar")
 [node name="LightBar" type="TextureRect" parent="Content"]
 layout_mode = 0
 offset_left = 10.0
-offset_top = 234.0
+offset_top = 180.0
 offset_right = 138.0
-offset_bottom = 246.0
+offset_bottom = 192.0
 expand_mode = 1
 stretch_mode = 5
 
@@ -238,17 +238,17 @@ texture = SubResource("GradientTexture2D_bar")
 layout_mode = 0
 mouse_filter = 2
 offset_left = 148.0
-offset_top = 134.0
+offset_top = 30.0
 offset_right = 164.0
-offset_bottom = 152.0
+offset_bottom = 48.0
 text = "R"
 
 [node name="RSlider" type="HSlider" parent="Content"]
 layout_mode = 0
 offset_left = 166.0
-offset_top = 134.0
+offset_top = 30.0
 offset_right = 262.0
-offset_bottom = 152.0
+offset_bottom = 48.0
 max_value = 255.0
 value = 255.0
 
@@ -256,26 +256,26 @@ value = 255.0
 layout_mode = 0
 mouse_filter = 2
 offset_left = 264.0
-offset_top = 134.0
+offset_top = 30.0
 offset_right = 290.0
-offset_bottom = 152.0
+offset_bottom = 48.0
 text = "255"
 
 [node name="GLabel" type="Label" parent="Content"]
 layout_mode = 0
 mouse_filter = 2
 offset_left = 148.0
-offset_top = 158.0
+offset_top = 54.0
 offset_right = 164.0
-offset_bottom = 176.0
+offset_bottom = 72.0
 text = "G"
 
 [node name="GSlider" type="HSlider" parent="Content"]
 layout_mode = 0
 offset_left = 166.0
-offset_top = 158.0
+offset_top = 54.0
 offset_right = 262.0
-offset_bottom = 176.0
+offset_bottom = 72.0
 max_value = 255.0
 value = 255.0
 
@@ -283,26 +283,26 @@ value = 255.0
 layout_mode = 0
 mouse_filter = 2
 offset_left = 264.0
-offset_top = 158.0
+offset_top = 54.0
 offset_right = 290.0
-offset_bottom = 176.0
+offset_bottom = 72.0
 text = "255"
 
 [node name="BLabel" type="Label" parent="Content"]
 layout_mode = 0
 mouse_filter = 2
 offset_left = 148.0
-offset_top = 182.0
+offset_top = 78.0
 offset_right = 164.0
-offset_bottom = 200.0
+offset_bottom = 96.0
 text = "B"
 
 [node name="BSlider" type="HSlider" parent="Content"]
 layout_mode = 0
 offset_left = 166.0
-offset_top = 182.0
+offset_top = 78.0
 offset_right = 262.0
-offset_bottom = 200.0
+offset_bottom = 96.0
 max_value = 255.0
 value = 255.0
 
@@ -310,26 +310,26 @@ value = 255.0
 layout_mode = 0
 mouse_filter = 2
 offset_left = 264.0
-offset_top = 182.0
+offset_top = 78.0
 offset_right = 290.0
-offset_bottom = 200.0
+offset_bottom = 96.0
 text = "255"
 
 [node name="ALabel" type="Label" parent="Content"]
 layout_mode = 0
 mouse_filter = 2
 offset_left = 148.0
-offset_top = 206.0
+offset_top = 102.0
 offset_right = 164.0
-offset_bottom = 224.0
+offset_bottom = 120.0
 text = "A"
 
 [node name="ASlider" type="HSlider" parent="Content"]
 layout_mode = 0
 offset_left = 166.0
-offset_top = 206.0
+offset_top = 102.0
 offset_right = 262.0
-offset_bottom = 224.0
+offset_bottom = 120.0
 max_value = 200.0
 value = 160.0
 
@@ -337,23 +337,23 @@ value = 160.0
 layout_mode = 0
 mouse_filter = 2
 offset_left = 264.0
-offset_top = 206.0
+offset_top = 102.0
 offset_right = 290.0
-offset_bottom = 224.0
+offset_bottom = 120.0
 text = "160"
 
 [node name="NameField" type="LineEdit" parent="Content"]
 layout_mode = 0
-offset_left = 300.0
-offset_top = 212.0
+offset_left = 10.0
+offset_top = 233.0
 offset_right = 430.0
-offset_bottom = 236.0
+offset_bottom = 255.0
 max_length = 255
 
 [node name="CreateButton" type="Button" parent="Content"]
 layout_mode = 0
-offset_left = 300.0
-offset_top = 244.0
+offset_left = 10.0
+offset_top = 257.0
 offset_right = 430.0
-offset_bottom = 270.0
+offset_bottom = 282.0
 text = "Create"

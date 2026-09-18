@@ -170,9 +170,17 @@ public partial class CustomWindow : BaseWindow, IWindow
             BuildSwatchTexture(_hue);
             BuildLightBarTexture(_hue);
         }
-        _swatchCursor.Position = new Vector2(s * _swatch.Size.X, (1f - l) * _swatch.Size.Y) - _swatchCursor.Size / 2;
-        _hueCursor.Position = new Vector2(_hue / 360f * _hueBar.Size.X, 0f) - _hueCursor.Size / 2;
-        _lightCursor.Position = new Vector2(l * _lightBar.Size.X, 0f) - _lightCursor.Size / 2;
+        _swatchCursor.Position = LockCursor(new Vector2(s * _swatch.Size.X, (1f - l) * _swatch.Size.Y), _swatchCursor.Size, _swatch.Size);
+        _hueCursor.Position = LockCursor(new Vector2(_hue / 360f * _hueBar.Size.X, _hueBar.Size.Y / 2f), _hueCursor.Size, _hueBar.Size);
+        _lightCursor.Position = LockCursor(new Vector2(l * _lightBar.Size.X, _lightBar.Size.Y / 2f), _lightCursor.Size, _lightBar.Size);
+    }
+
+    private static Vector2 LockCursor(Vector2 center, Vector2 cursorSize, Vector2 parentSize)
+    {
+        var pos = center - cursorSize / 2f;
+        pos.X = Mathf.Clamp(pos.X, 0f, Mathf.Max(0f, parentSize.X - cursorSize.X));
+        pos.Y = Mathf.Clamp(pos.Y, 0f, Mathf.Max(0f, parentSize.Y - cursorSize.Y));
+        return pos;
     }
 
     private void OnSwatchGuiInput(InputEvent @event)
@@ -190,7 +198,7 @@ public partial class CustomWindow : BaseWindow, IWindow
         var nl = 1f - Mathf.Clamp(pos.Y / _swatch.Size.Y, 0f, 1f);
         var (r, g, b) = HslColor.ToRgb(_hue, ns, nl);
         SetRgb(r, g, b);
-        _swatchCursor.Position = pos - _swatchCursor.Size / 2;
+        _swatchCursor.Position = LockCursor(pos, _swatchCursor.Size, _swatch.Size);
     }
 
     private void OnHueGuiInput(InputEvent @event)
@@ -209,7 +217,7 @@ public partial class CustomWindow : BaseWindow, IWindow
         SetRgb(r, g, b);
         // Grey RGB produces no ValueChanged, so SyncHsl must run here to rebuild textures for the new hue.
         SyncHsl();
-        _hueCursor.Position = pos - _hueCursor.Size / 2;
+        _hueCursor.Position = LockCursor(pos, _hueCursor.Size, _hueBar.Size);
     }
 
     private void OnLightBarGuiInput(InputEvent @event)
@@ -226,7 +234,7 @@ public partial class CustomWindow : BaseWindow, IWindow
         var nl = Mathf.Clamp(pos.X / _lightBar.Size.X, 0f, 1f);
         var (r, g, b) = HslColor.ToRgb(_hue, s, nl);
         SetRgb(r, g, b);
-        _lightCursor.Position = pos - _lightCursor.Size / 2;
+        _lightCursor.Position = LockCursor(pos, _lightCursor.Size, _lightBar.Size);
     }
 
     private void UpdateTint()
