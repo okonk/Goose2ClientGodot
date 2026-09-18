@@ -8,7 +8,7 @@ public static class CustomWindowMetrics
     public const int DefaultR = 255;
     public const int DefaultG = 255;
     public const int DefaultB = 255;
-    public const int DefaultA = 0;
+    public const int DefaultA = 160;
 
     // Corners: red (top-left), green (top-right), blue (bottom-left), white (bottom-right).
     public static Vector3I SampleGradient(Vector2 pos)

@@ -1,17 +1,27 @@
 using Godot;
+using Goose2Client.Character;
 
 namespace Goose2Client.UI;
 
 public static class CustomPreviewMetrics
 {
-    public static (Vector2 Size, Vector2 Position) Layout(Vector2 textureSize, Vector2 controlSize)
-    {
-        if (textureSize.X <= 0f || textureSize.Y <= 0f)
-            return (Vector2.Zero, new Vector2(controlSize.X / 2f, controlSize.Y));
+    // Standard character frame: 48px wide; 64px is the AnimationHeights default height.
+    public const float FrameWidth = 48f;
+    public const float FrameHeight = 64f;
 
-        float scale = Mathf.Min(controlSize.X / textureSize.X, controlSize.Y / textureSize.Y);
-        var size = textureSize * scale;
-        var pos = new Vector2((controlSize.X - size.X) / 2f, controlSize.Y - size.Y);
-        return (size, pos);
+    public static float Scale(Vector2 controlSize)
+    {
+        if (controlSize.X <= 0f || controlSize.Y <= 0f) return 0f;
+        return Mathf.Min(controlSize.X / FrameWidth, controlSize.Y / FrameHeight);
+    }
+
+    public static (Vector2 Size, Vector2 Position) Layout(Vector2 frameSize, Vector2 controlSize)
+    {
+        float s = Scale(controlSize);
+        var size = frameSize * s;
+        // A 64px frame occupies 56px above the ground line (CharacterAnchor.OffsetY).
+        float groundY = controlSize.Y * 56f / 64f;
+        var center = new Vector2(controlSize.X / 2f, groundY + CharacterAnchor.OffsetY((int)frameSize.Y) * s);
+        return (size, center - size / 2f);
     }
 }

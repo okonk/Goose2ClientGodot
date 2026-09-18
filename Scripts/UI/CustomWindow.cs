@@ -343,6 +343,7 @@ public partial class CustomWindow : BaseWindow, IWindow
         _aValue.Text = _a.ToString();
         _nameField.Text = "";
         _cursor.Position = Vector2.Zero;
+        _preview.SetTint(_r, _g, _b, _a);
         _preview.SetCustomGraphic(null, 0, 0);
         _preview.Refresh();
         RefreshCreate();

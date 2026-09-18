@@ -6,8 +6,6 @@ namespace Goose2Client.UI;
 public partial class CustomWindowSlot : Panel
 {
     private TextureRect _icon;
-    private Label _label;
-    private string _defaultText;
 
     public ItemStats Stats { get; private set; }
     public bool HasItem => Stats != null;
@@ -17,22 +15,18 @@ public partial class CustomWindowSlot : Panel
     public override void _Ready()
     {
         _icon = GetNode<TextureRect>("Icon");
-        _label = GetNode<Label>("Label");
-        _defaultText = _label.Text;
     }
 
     public void SetItem(ItemStats stats)
     {
         Stats = stats;
         Icon.Apply(_icon, stats.GraphicFile, stats.GraphicId, stats.GraphicR, stats.GraphicG, stats.GraphicB, stats.GraphicA);
-        _label.Text = stats.Name;
     }
 
     public void ClearItem()
     {
         Stats = null;
         Icon.Clear(_icon);
-        _label.Text = _defaultText;
     }
 
     public override Variant _GetDragData(Vector2 atPosition)
