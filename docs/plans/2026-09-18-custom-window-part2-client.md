@@ -21,23 +21,24 @@ Work in the worktree: `/home/agent/workspace/Goose2ClientGodot/.worktrees/custom
 
 | API | Citation |
 | --- | --- |
-| Client `WindowFrames` enum (last = `OptionList = 27`) | `Scripts/WindowFrames.cs:3-29` |
-| `BaseMultipleWindowManager<T>` constraint (`where T : BaseMultipleWindow`) — why the manager pattern is NOT used | `Scripts/UI/BaseMultipleWindowManager.cs:14` |
-| Single-instance server-window pattern: HUD child, `Listen<MakeWindowPacket>` matched by frame, `WindowId` stored, `OnClosePressed` → WBC Close + Hide | `Scripts/UI/BankWindow.cs:43-46, 74-86, 131-135`, `Scripts/UI/GameHud.cs:56-69` |
-| `BaseWindow`: `Title`, `DefaultVisible`, `WindowName`, TitleBar/CloseButton/Content nodes, drag/hover/scale plumbing | `Scripts/UI/BaseWindow.cs:16-100` |
+| Client `WindowFrames` enum (last = `OptionList = 27`) | `Scripts/WindowFrames.cs:3-31` |
+| `BaseMultipleWindowManager<T>` constraint (`where T : BaseMultipleWindow`) — why the manager pattern is NOT used | `Scripts/UI/BaseMultipleWindowManager.cs:13` |
+| Single-instance server-window pattern: HUD child, `Listen<MakeWindowPacket>` matched by frame, `WindowId` stored, `OnClosePressed` → WBC Close + Hide | `Scripts/UI/BankWindow.cs:24, 57-61, 74-91, 131-135`, `Scripts/UI/GameHud.cs:56-69` |
+| `BaseWindow`: `Title`, `DefaultVisible`, `WindowName` (`BaseWindow.cs:13`), TitleBar/CloseButton/TitleLabel/Content resolved via `GetNodeOrNull` (`BaseWindow.cs:53-57`), `OnClosePressed` virtual (`BaseWindow.cs:219`) | `Scripts/UI/BaseWindow.cs` |
 | `IWindow`: `WindowId`, `WindowFrame` | used by `WorldDropTarget.cs:37`, `InventoryWindow.cs:20-21` |
-| Drag payload: `_GetDragData` returns `Dictionary { "kind": "item", "slot": ItemSlot }`; drop targets implement `_CanDropData`/`_DropData` | `Scripts/UI/ItemSlot.cs:68-96`, `Scripts/UI/WorldDropTarget.cs:17-56` |
+| Drag payload: `_GetDragData` returns `Dictionary { "kind": "item", "slot": ItemSlot }`; drop targets implement `_CanDropData`/`_DropData` and read the dictionary **directly** — `ItemSlot.OnDropItem` passes only `(IWindow, int, int)` and discards the source control's `Stats`, so the custom slots must NOT rely on it | `Scripts/UI/ItemSlot.cs:68-107`, `Scripts/UI/WorldDropTarget.cs:17-56` |
 | `ItemSlot` control: `Stats`, `HasItem`, `SlotNumber`, `Window`, `SetItem`, `ClearItem`, `OnDropItem(srcWindow, srcSlot, dstSlot)` | `Scripts/UI/ItemSlot.cs:14-46` |
 | Inventory slot numbers are **0-based client-side** (`SlotNumber = p.GetInt32() - 1`); outbound packets add 1 (`Send($"DRP{fromSlot + 1},...")`) | `Scripts/Network/Packets/InventorySlotPacket.cs:64`, `Scripts/Network/NetworkClient.cs:212-215` |
 | `NetworkClient.Send(string)` (main thread) and per-packet helper pattern | `Scripts/Network/NetworkClient.cs:80-90, 176-258` |
 | Packet registration: `PacketManager.Listen<T>` keys handlers by `Prefix`; `Parse(new PacketParser(data, prefix))` | `Scripts/Network/PacketManager.cs:11-60`, `Scripts/Network/PacketHandler.cs:5-20` |
 | Packet parse test pattern | `tests/Goose2Client.Tests/MapFlagsPacketTests.cs:8-14` |
 | Client item enums: `ItemUseType` (Armor=2, Weapon=3), `ItemSlotType` (Helmet=1, Chestpiece=2, Pauldrons=3, Gloves=4, Pants=5, Shoes=6, Cloak=7, Belt=8, Necklace=9, Bracelet=10, Weapon=11, Shield=12, Mount=13) | `Scripts/Constants.cs:28-38, 76-92` |
-| Server sends `item.BodyType` (1H and 2H both = 11) and `(int)item.UseType` in the item slot packet | `illutiagooseserver Goose/Packets.cs:472-473`, `Goose/ItemTemplate.cs:164-187` |
-| Sprite asset path per slot: `res://Assets/Sprites/{TypeFolder(slot)}/{id}/animations.tres`; folder map (Chest/Helms/Legs/Feet/Hands/Bodies/Hair/Eyes) | `Scripts/Character/Character.cs:331`, `Scripts/Character/CharacterLayout.cs:39-52` |
-| Slot tint: `ShaderMaterial { Shader = TintMaterial.Shader }`, param `"tint"`, alpha = blend factor, 0 = no tint | `Scripts/Character/Character.cs:344-355`, `Scripts/TintMaterial.cs:11-31` |
+| Server sends `item.BodyType` (1H and 2H both = 11) and `(int)item.UseType` in the item slot packet | `illutiagooseserver Goose/Packets.cs:473-474`, `Goose/ItemTemplate.cs:164-187` |
+| Sprite asset path per slot: `res://Assets/Sprites/{TypeFolder(slot)}/{id}/animations.tres`; folder map (Chest/Helms/Legs/Feet/Hands/Bodies/Hair/Eyes) | `Scripts/Character/Character.cs:321`, `Scripts/Character/CharacterLayout.cs:39-52` |
+| Clip resolution: `AnimationNames.Candidates(motion, bodyState, direction)` — Hands idle clips are `idle-equip`/`idle`/`idle-no-equip` variants chosen by equipped state (`bodyState != 3`); missing clip → hidden, never substituted | `Scripts/Character/AnimationNames.cs:30-62`, `Scripts/Character/Character.cs:716-724` |
+| Slot tint: `ShaderMaterial { Shader = TintMaterial.Shader }`, param `"tint"`, alpha = blend factor, 0 = no tint; protocol alpha converts as `a / 255f` (custom A maxes at 200 but still divides by 255) | `Scripts/Character/Character.cs:303-314, 344-355`, `Scripts/TintMaterial.cs:11-31` |
 | Static idle-frame pick pattern (`idle-down` else `idle`, frame 0) | `Scripts/UI/VitalsCharacterDisplay.cs:49-66` |
-| Local player + appearance-update event: `GameManager.Instance.CurrentMapManager.LocalPlayer`, `GameManager.Instance.CharacterUpdated` | `Scripts/UI/VitalsCharacterDisplay.cs:25-30`, `Scripts/GameManager.cs:58-59` |
+| Local player + appearance-update event: `GameManager.Instance.CurrentMapManager.LocalPlayer`, `GameManager.Instance.CharacterUpdated` (subscribed in `_Ready`, filtered to the local player) | `Scripts/UI/VitalsCharacterDisplay.cs:11-20`, `Scripts/GameManager.cs:58-59` |
 | `Character` private slot store: `_slots` (`Slot { AnimatedSprite2D Sprite; int GraphicId }`) — no public per-slot accessor exists yet | `Scripts/Character/Character.cs:41, 326-359` |
 | Metrics test pattern | `tests/Goose2Client.Tests/OptionListMetricsTests.cs` (mirrors `Scripts/OptionListMetrics.cs`) |
 | Scene pattern for a manager-owned window (Background/TitleBar/TitleLabel/CloseButton/Content) | `Scenes/UI/OptionListWindow.tscn` |
@@ -68,13 +69,14 @@ Server rules (design doc): armor/weapon only; exclude ring/necklace/pauldrons/cl
 
 - `CWG` parse: `new CustomWindowGraphicPacket().Parse(new PacketParser("CWG777,6", "CWG"))` → `EquippedId == 777`, `Pose == 6`.
 - `CWG` with `EquippedId == 0` parses (0 is valid — no equipped art).
+- Outbound format (pure statics on the packet class or a `CustomWindowPackets` helper, so the 0-based→1-based convention is testable without a `NetworkClient`): `FormatCws(5, 6) == "CWS5,6"`, `FormatCws(0, 3) == "CWS0,3"` (empty look = 0), `FormatCwc(5, 6, 10, 20, 30, 40, "My Sword") == "CWC5,6,10,20,30,40,My Sword"`. `NetworkClient` helpers delegate to these.
 
 Run: `dotnet test tests/Goose2Client.Tests --filter CustomWindowPacketsTests` — expected FAIL (type missing).
 
 **Step 2: Implement**
 
 - `CustomWindowGraphicPacket : PacketHandler`, `Prefix => "CWG"`, `Parse`: `EquippedId = p.GetInt32(); Pose = p.GetInt32();` (pattern `MakeWindowPacket.cs:14-28`).
-- `NetworkClient` helpers (pattern `WindowButtonClick`, `NetworkClient.cs:252-256`):
+- `NetworkClient` helpers (pattern `WindowButtonClick`, `NetworkClient.cs:252-256`), delegating to the pure format functions:
 
 ```csharp
 public void CustomWindowSlots(int lookSlot, int statsSlot)
@@ -119,6 +121,7 @@ public static class CustomWindowValidation
 {
     public static bool IsValidCandidate(ItemStats item);
     public static bool TypesCompatible(ItemStats a, ItemStats b);
+    public static bool IsInventorySource(IWindow srcWindow);   // WindowFrame == Inventory
     public static CharacterSlot? PreviewTarget(ItemStats item);   // null for Mount/excluded
 }
 ```
@@ -127,6 +130,7 @@ Tests (construct `ItemStats` literals — plain POCO, `Scripts/ItemStats.cs:5`):
 
 - `IsValidCandidate`: Armor + Chestpiece → true; Weapon + Weapon(11) → true; each excluded type (Pauldrons, Gloves, Cloak, Belt, Necklace, Bracelet) → false; `ItemUseType.NoUse`/`OneTime` → false (adversarial: catches a check that only looks at slot type).
 - `TypesCompatible`: Chestpiece+Chestpiece → true; Chestpiece+Helmet → false (adversarial: catches dropping the same-type rule); Weapon+Weapon → true (1H/2H both 11 — the exception); Mount+Mount → true (mounts pass the rules; only the preview skips them).
+- `IsInventorySource`: inventory window → true; equipped/combine-bag/vendor frames → false.
 - `PreviewTarget`: the six mappings above; Mount → null; excluded types → null.
 
 Run: `dotnet test tests/Goose2Client.Tests --filter CustomWindowValidationTests` — expected FAIL.
@@ -155,12 +159,14 @@ git commit -m "feat(ui): custom window drop pre-validation"
 The preview needs every slot's graphic id + current tint from the local player's `Character`, which today only exposes `GetAppearance()` (body/hair/face/chest/helm, `Character.cs:361`). Add:
 
 ```csharp
-/// <summary>Per-slot graphic id and current tint (Color(0,0,0,0) = untinted) for static previews.</summary>
 public bool TryGetSlotGraphic(CharacterSlot slot, out int graphicId, out Color tint)
 ```
 
+(no doc comment — repo rule, `AGENTS.md`)
+
 - Reads `_slots` (`Character.cs:41`): `graphicId = s.GraphicId`; `tint` from `s.Sprite.Material`'s `"tint"` shader param when it is a `ShaderMaterial`, else `new Color(0,0,0,0)` (mirrors `NoTint`, `Character.cs:317`).
-- Returns false when the slot has no entry (empty slot / missing art — `ApplySlot` removes slots with `graphicId <= 0` or missing assets, `Character.cs:331-333`).
+- Returns false when the slot has no entry (empty slot / missing art — `ApplySlot` removes slots with `graphicId <= 0` or missing assets, `Character.cs:321-323`).
+- The ids in `_slots` are the same wire ids the server uses for equipped art (`eq[i][0]` from UCP flows straight into `ApplySlot`, `Character.cs:306-314`) — the same id space as `CWG`'s `equippedId` (`item.GraphicEquipped`).
 
 **Mutation impact:** none — read-only accessor over existing state; no propagation needed. Invariant: values match what the character renders (same `_slots` source of truth). Proof: Task 4's manual E2E (preview background matches the on-map character); a headless unit test of a private node's material state is not practical in `Goose2Client.Tests` (no Godot runtime there) — explicitly deferred to E2E.
 
@@ -184,12 +190,13 @@ git commit -m "feat(character): expose per-slot graphic snapshot for previews"
 - `Refresh()` — for each `CharacterSlot` in `CharacterLayout.All` **except `Mount`** (design: skip mounts):
   - source = `GameManager.Instance.CurrentMapManager?.LocalPlayer`; null → hide all.
   - `source.TryGetSlotGraphic(slot, out var id, out var tint)` (Task 3); false → hide that layer.
-  - **Replaced slot:** if a custom graphic is set for this slot (see below), use the custom `equippedId` and the current picker RGBA instead of the character's id/tint.
-  - Load `res://Assets/Sprites/{CharacterLayout.TypeFolder(slot)}/{id}/animations.tres` (`Character.cs:331`); missing → hide layer.
-  - Frame: `idle-down` else `idle`, frame 0 (`VitalsCharacterDisplay.cs:57-60`); `TextureFilter = Nearest`.
-  - Tint: `ShaderMaterial { Shader = TintMaterial.Shader }` with `"tint"` = rgba (alpha as blend factor; 0 = no material), `TintMaterial.cs:11-31`.
-  - Layer positions/sizes: a `CustomPreviewMetrics` static class (pure math, unit-tested) — scale each layer to fit the control rect, anchored bottom-center, using the same back-to-front order as `CharacterLayout.All` (draw order = child order).
-- `SetCustomGraphic(CharacterSlot slot, int equippedId, int pose)` / `ClearCustomGraphic()` — stores the replacement target; `pose` is stored for the record (static frame selection does not vary by pose; the weapon clip variant is the same asset folder — if the chosen idle frame is missing for a weapon id, hide the layer rather than substitute, matching `Character.ResolveClip`'s missing-clip behaviour, `Character.cs:716-723`).
+  - **Replaced slot:** if a custom graphic is set for this slot (see below), use the custom `equippedId` and the current picker RGBA instead of the character's id/tint. A custom `equippedId == 0` keeps the layer **replaced but hidden** (the chosen look intentionally has no equipped art — do NOT restore the player's normal equipment, design: "0 allowed, no special handling").
+  - Load `res://Assets/Sprites/{CharacterLayout.TypeFolder(slot)}/{id}/animations.tres` (`Character.cs:321`); missing → hide layer.
+  - Clip: first candidate from `AnimationNames.Candidates("idle", bodyState, Direction.Down)` that the `SpriteFrames` contains, frame 0 (`AnimationNames.cs:30-62`, `Character.ResolveClip` pattern `Character.cs:716-724`); `bodyState` = the CWG `pose` for the replaced slot, the local player's `BodyState` for background slots; no candidate → hide the layer (missing art hides, never substitutes).
+  - `TextureFilter = Nearest`.
+  - Tint: `ShaderMaterial { Shader = TintMaterial.Shader }` with `"tint"` = `Color(r / 255f, g / 255f, b / 255f, a / 255f)` — **alpha always divides by 255** even though A maxes at 200 (`Character.cs:303-314`); a == 0 → no material.
+  - Layer positions/sizes: a `CustomPreviewMetrics` static class (pure math, unit-tested) — scale each layer to fit the control rect, anchored bottom-center; child order follows `CharacterLayout.All` back-to-front (first child = drawn first = bottom, matching the character's draw order).
+- `SetCustomGraphic(CharacterSlot? slot, int equippedId, int pose)` / `ClearCustomGraphic()` — stores the replacement target (`null` slot = no replacement, e.g. mounts); `pose` stored for clip resolution. Call this **immediately** on any look-slot change or clear (before any `CWG` arrives) so a stale replacement never lingers — with `equippedId = 0` as a placeholder that hides the layer.
 - `SetTint(int r, int g, int b, int a)` — updates **only** the replaced slot's shader param (`mat.SetShaderParameter("tint", ...)`); no re-load, no re-layout. This is the live-update path.
 - Subscribes to `GameManager.Instance.CharacterUpdated` (local player only) → `Refresh()` (design gap 3: re-equip while open rebuilds the background).
 - `HideAll()` on exit.
@@ -217,27 +224,34 @@ git commit -m "feat(ui): full-body custom preview with live tint"
 
 Packet listeners in `_Ready`/`_ExitTree` (pattern `BankWindow.cs:43-46, 59-64`): `MakeWindowPacket` (frame `Custom` → show, title, `WindowId`, `Preview.Refresh()`, re-enable Create), `EndWindowPacket` (matching id → `Visible = true`, `BankWindow.cs:88-91`), `CloseWindowPacket` (matching id → hide + full state reset: slots, ids, pending, preview, name, sliders — the server only sends CLW on successful create, `BaseMultipleWindowManager.cs:73-77` shows the packet shape), `CustomWindowGraphicPacket` (Task 5 behaviour below), `ServerMessagePacket` (pending-`CWS` error handling below).
 
-Scene layout (tscn, pattern `OptionListWindow.tscn` — Background/TitleBar/TitleLabel/CloseButton/Content; `BaseWindow._Ready` resolves those node names, `BaseWindow.cs:44-50`):
+Scene layout (tscn, pattern `OptionListWindow.tscn` — Background/TitleBar/TitleLabel/CloseButton/Content; `BaseWindow._Ready` resolves those node names via `GetNodeOrNull`, `BaseWindow.cs:53-57`):
 
-- Two drop slots (`Content/LookSlot`, `Content/StatsSlot`) — `ItemSlot` controls from `res://Scenes/UI/ItemSlot.tscn` (icon + drag/drop for free, `ItemSlot.cs:68-96`), labelled. Their `OnDropItem` is wired by the window (not the default inventory behaviour).
+- Two drop slots (`Content/LookSlot`, `Content/StatsSlot`) — dedicated `CustomWindowSlot : Panel` controls (icon `TextureRect` + `Label`), **not** `ItemSlot` controls: `ItemSlot.OnDropItem` passes only `(IWindow, int, int)` and the window would have no access to the source item's `Stats` for pre-validation (`ItemSlot.cs:101-107`). Each implements `_CanDropData`/`_DropData` and reads the drag dictionary directly (`{ "kind": "item", "slot": ItemSlot }`, `ItemSlot.cs:68-88`) to get the source `ItemSlot`'s `Stats` and `Window`.
 - `Content/Preview` — the `CustomPreviewControl`.
-- Colour section: `Content/Gradient` (2D RGB cross-gradient `TextureRect`, generated at `_Ready` via `Image.create` — red/green/blue/white corners — with `_GuiInput` click/drag mapping position → r/g/b), four `HSlider`s (R/G/B 0–255, A 0–200) + value `Label`s, all kept in sync (slider input → gradient highlight/position; gradient input → sliders).
+- Colour section: `Content/Gradient` (2D RGB cross-gradient `TextureRect`, generated at `_Ready` via `Image.Create` — red/green/blue/white corners — with `_GuiInput` click/drag), four `HSlider`s (R/G/B `MinValue=0` `MaxValue=255`, A `MinValue=0` `MaxValue=200`) + value `Label`s.
 - `Content/NameField` — `LineEdit`, `MaxLength = 255`, commas filtered on `TextChanged` (strip `,`).
 - `Content/CreateButton` — the OK button (visible per `MKW` flags; the window is only created by the server with `0,1,0,0,1`).
 
+**Gradient mapping (fully specified):** corners are red (top-left), green (top-right), blue (bottom-left), white (bottom-right). Gradient input (click/drag) maps position → RGB by bilinear interpolation of the four corner colours; that RGB drives the sliders and the preview. Slider input drives the preview directly; the gradient **cursor** (a small marker `TextureRect`) moves only on gradient input — an arbitrary slider RGB has no unique position on the pad, so no inverse mapping is attempted.
+
 Behaviour:
 
-- **Drop handling** (on each slot's `OnDropItem(srcWindow, srcSlotNumber, _)`):
-  - Accept if `srcWindow.WindowFrame == WindowFrames.Inventory` (design: inventory only) and `CustomWindowValidation.IsValidCandidate(src.Stats)`; when the other window slot is filled, also require `TypesCompatible`.
-  - Accept a drop **from the other window slot** (move between slots) and a drop **from this window's own slot** (clear).
-  - Rejected drops: do nothing (the native drag leaves the source item in place — no `OnDropItem` side effects to undo).
-  - On accept: set/clear the slot icon (`SetItem`/`ClearItem`), update `_lookSlotId`/`_statsSlotId` (1-based: `src.SlotNumber + 1`, 0 when empty), `GameManager.Instance.NetworkClient.CustomWindowSlots(_lookSlotId, _statsSlotId)`, and set `_pendingCwsSlot` (Look/Stats/none).
-- **`CWG`**: clear `_pendingCwsSlot`; if `EquippedId > 0` → `Preview.SetCustomGraphic(CustomWindowValidation.PreviewTarget(lookItemStats), EquippedId, Pose)`; if 0 → `Preview.ClearCustomGraphic()` (design: 0 allowed, no special handling). Apply to the look slot of the pending `CWS` (1:1 ordering, design doc).
-- **Server message while pending** (`Listen<ServerMessagePacket>`): if `_pendingCwsSlot != none` → clear that window slot (icon + id + `Preview.ClearCustomGraphic()`), clear pending. (Design: the message is the error signal; an unrelated message in the same instant clearing a slot is accepted — noted in the design's error section.)
+- **State:** `_lookInvSlotId` / `_statsInvSlotId` (1-based server ids, 0 = empty), `_pendingCws` (bool), `_cwcPending` (bool), current RGBA, look item `ItemStats` (kept for `PreviewTarget`).
+- **Drop handling** (each `CustomWindowSlot._DropData`):
+  - Source from the drag dictionary: `src` = the `ItemSlot` control.
+  - Accept an inventory drop if `src.Window.WindowFrame == WindowFrames.Inventory` (design: inventory only) and `CustomWindowValidation.IsValidCandidate(src.Stats)`; when the other window slot is filled, also require `TypesCompatible`.
+  - Accept a drop **from the other custom slot** (move between slots — copy the stored inventory id, do NOT re-derive from the control) and a drop **from this custom slot's own item** (clear).
+  - Rejected drops: do nothing (native drag leaves the source item in place).
+  - On accept: set/clear the slot icon, update `_lookInvSlotId`/`_statsInvSlotId`, and — if the look slot changed — immediately `Preview.SetCustomGraphic(PreviewTarget(lookStats) ?? null, 0, 0)` (hide the replaced layer until the `CWG` arrives; a look clear gets no `CWG`, so this is the only invalidation path).
+  - Send `NetworkClient.CustomWindowSlots(_lookInvSlotId, _statsInvSlotId)`; set `_pendingCws = _lookInvSlotId != 0` (a `CWS` with look = 0 produces neither `CWG` nor an error, so only look-bearing requests are trackable).
+- **`CWG`**: if `_pendingCws` → clear it; apply to the preview: `EquippedId > 0` → `Preview.SetCustomGraphic(CustomWindowValidation.PreviewTarget(_lookStats), EquippedId, Pose)`; `EquippedId == 0` → `Preview.SetCustomGraphic(PreviewTarget(_lookStats), 0, Pose)` (replaced-but-hidden, Task 4). Rapid `CWS` requests: responses arrive in order and each reflects the server's view of the latest look slot, so applying every `CWG` converges to the correct final state; a transient stale frame mid-flight is accepted (no request id in the fixed protocol).
+- **Server message** (`Listen<ServerMessagePacket>`): if `_pendingCws` → clear it, clear the look slot (icon + id + `Preview.SetCustomGraphic(null, 0, 0)`). If `_cwcPending` → clear it and re-enable Create (the server keeps the window open on create failure — without this the button would stay disabled forever). Known limitation (accepted, fixed protocol): an unrelated server message inside the pending window can clear a valid look slot; the player re-drops.
 - **Live tint:** slider/gradient input → `Preview.SetTint(r, g, b, a)` (shader param only).
-- **Create:** enabled when both slots filled, name non-empty after trim (RGBA is always in range — sliders are clamped). On press: `name = NameField.Text.Trim().Replace(",", "")`; `NetworkClient.CustomWindowCreate(_lookSlotId, _statsSlotId, r, g, b, a, name)`; disable the button (re-enabled only by the next `MKW` — the server closes the window on success and `CLW` hides + resets it).
-- **Close:** override `OnClosePressed` (pattern `BankWindow.cs:131-135`): `NetworkClient.WindowButtonClick(WindowButtons.Close, WindowId, 0)` + `Hide()` (server just removes the window, no CLW echo — `illutiagooseserver Goose/Window.cs:133-141`).
-- `CustomWindowMetrics` — pure layout math (slot/gradient/slider/preview rects from the control size), unit-tested.
+- **Create:** enabled when both slots filled, name non-empty after trim, and not `_cwcPending` (RGBA is always in range — sliders are clamped). On press: `name = NameField.Text.Trim().Replace(",", "")`; `_cwcPending = true`; disable the button; `NetworkClient.CustomWindowCreate(_lookInvSlotId, _statsSlotId, r, g, b, a, name)`.
+- **Reset** (one routine, used by both paths): clear slot icons + ids, `_pendingCws`/`_cwcPending`, RGBA to defaults, name field, gradient cursor, `Preview.SetCustomGraphic(null, 0, 0)` + `Preview.Refresh()`, refresh CreateButton visibility from the latest `MKW` flags.
+- **`MKW`** (frame `Custom`): `Visible = true`, `Title = packet.Title`, `WindowId = packet.WindowId`, `Preview.Refresh()`, re-enable Create per the enable rule.
+- **`CLW`** (matching id): hide + **Reset**.
+- **Close:** override `OnClosePressed` (pattern `BankWindow.cs:131-135`): `NetworkClient.WindowButtonClick(WindowButtons.Close, WindowId, 0)` + **Reset** + `Hide()` (server just removes the window, no CLW echo — `illutiagooseserver Goose/CustomWindow` overrides `Clicked`; design: X and CLW both discard everything).
 
 **Step 1:** write `CustomWindowMetricsTests` (red) → **Step 2:** implement window/scene/metrics (green: `dotnet test tests/Goose2Client.Tests` all pass; `dotnet build` clean) → **Step 3: Commit**
 
@@ -274,15 +288,19 @@ No commit (verification only); note results in the PR description.
 | Invariant | Proved by |
 | --- | --- |
 | `CWG` parses equipped id + pose (incl. id 0) | `CustomWindowPacketsTests` (Task 1) |
-| Outbound `CWS`/`CWC` use 1-based server slot ids | `NetworkClient` helpers mirror `Drop`/`MoveItemInInventory` convention (`NetworkClient.cs:187-190, 212-215`); E2E step 7 (Task 6) |
-| Drop pre-validation matches server rules (use type, exclusions, same-type, 1H/2H) | `CustomWindowValidationTests` (Task 2) |
+| Outbound `CWS`/`CWC` use 1-based server slot ids | `FormatCws`/`FormatCwc` pure-function tests (Task 1) + E2E step 7 (Task 6) |
+| Drop pre-validation matches server rules (use type, exclusions, same-type, 1H/2H, inventory-only source) | `CustomWindowValidationTests` (Task 2) |
 | Inventory-only drop source | `CustomWindow` drop handler check + E2E step 3 (Tasks 5, 6) |
-| Preview shows local player's full body with target slot replaced | E2E steps 2, 5 (Task 6); snapshot API reads the same `_slots` source of truth as the renderer (`Character.cs:41`) |
+| Preview clip resolution matches the character renderer (idle-equip variants, pose for weapons, missing → hidden) | `AnimationNames.Candidates` reuse (Task 4, `AnimationNames.cs:30-62`); E2E step 2 (Task 6) |
+| `GraphicEquipped == 0` → replaced layer hidden, normal equipment NOT restored | `SetCustomGraphic(slot, 0, pose)` semantics (Task 4); E2E (Task 6) |
+| Look clear/replace invalidates the preview immediately (no stale replacement) | immediate `SetCustomGraphic(..., 0, 0)` on look change (Task 5) |
+| Failed create is retryable (button re-enabled on error) | `_cwcPending` + `ServerMessagePacket` handling (Task 5); E2E step 8 (Task 6) |
 | Live tint updates without re-render/server traffic | `SetTint` touches only the shader param (Task 4); E2E step 5 |
 | A capped at 200 client-side | slider `MaxValue = 200` (Task 5); server backstop in Part 1 |
 | Preview rebuilds on local re-equip | `CharacterUpdated` subscription (Task 4); E2E step 6 |
 | Create disabled until slots + name valid | `CustomWindow` enable logic (Task 5); E2E steps 7-8 |
-| Window hidden + reset on `CLW`; close sends WBC not CLW | `CloseWindowPacket` listener + `OnClosePressed` override (`BankWindow.cs:131-135` pattern); E2E steps 7, 9 |
+| Preview shows local player's full body with target slot replaced | E2E steps 2, 5 (Task 6); snapshot API reads the same `_slots` source of truth as the renderer (`Character.cs:41`) |
+| Window hidden + reset on `CLW` **and** on X-close; close sends WBC not CLW | single Reset routine used by both paths + `OnClosePressed` override (`BankWindow.cs:131-135` pattern); E2E steps 7, 9 (Task 6) |
 
 ## Design alignment
 
