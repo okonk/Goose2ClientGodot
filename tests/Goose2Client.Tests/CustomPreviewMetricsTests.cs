@@ -36,7 +36,7 @@ public class CustomPreviewMetricsTests
     }
 
     [Fact]
-    public void Layout_StandardFrameFillsHeightConstrainedControl()
+    public void Layout_StandardFrameAtLockedScale()
     {
         var (size, pos) = CustomPreviewMetrics.Layout(new Vector2(48, 64), Control);
         Assert.Equal(new Vector2(96, 128), size);
@@ -53,13 +53,13 @@ public class CustomPreviewMetricsTests
     }
 
     [Fact]
-    public void Layout_WidthConstrainedControl()
+    public void Layout_ScaleLockedForNarrowControl()
     {
         var control = new Vector2(64f, 128f);
-        Assert.Equal(64f / 48f, CustomPreviewMetrics.Scale(control));
+        Assert.Equal(2.0f, CustomPreviewMetrics.Scale(control));
         var (size, pos) = CustomPreviewMetrics.Layout(new Vector2(48, 48), control);
-        Assert.Equal(new Vector2(64, 64), size);
-        Assert.Equal(new Vector2(0, 48), pos);
+        Assert.Equal(new Vector2(96, 96), size);
+        Assert.Equal(new Vector2(-16, 16), pos);
     }
 
     [Fact]

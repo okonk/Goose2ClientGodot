@@ -5,14 +5,10 @@ namespace Goose2Client.UI;
 
 public static class CustomPreviewMetrics
 {
-    // Standard character frame: 48px wide; 64px is the AnimationHeights default height.
-    public const float FrameWidth = 48f;
-    public const float FrameHeight = 64f;
-
     public static float Scale(Vector2 controlSize)
     {
         if (controlSize.X <= 0f || controlSize.Y <= 0f) return 0f;
-        return Mathf.Min(controlSize.X / FrameWidth, controlSize.Y / FrameHeight);
+        return 2.0f;
     }
 
     public static (Vector2 Size, Vector2 Position) Layout(Vector2 frameSize, Vector2 controlSize)
