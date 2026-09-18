@@ -29,5 +29,6 @@ namespace Goose2Client
         Trade = 25,
         Bank = 26,
         OptionList = 27,
+        Custom = 28,
     }
 }

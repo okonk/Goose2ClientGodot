@@ -3,6 +3,7 @@ using System.Net.Sockets;
 using System.Text;
 using System.Threading;
 using Godot;
+using Goose2Client.Network.Packets;
 
 namespace Goose2Client.Network
 {
@@ -252,6 +253,17 @@ namespace Goose2Client.Network
         public void WindowButtonClick(WindowButtons button, int windowId, int npcId, int unknownId1 = 0, int unknownId2 = 0)
         {
             Send($"WBC{(int)button},{windowId},{npcId},{unknownId1},{unknownId2}");
+        }
+
+        public void CustomWindowSlots(int lookSlot, int statsSlot)
+        {
+            // lookSlot/statsSlot are 1-based server slot ids (0 = empty)
+            Send(CustomWindowGraphicPacket.FormatCws(lookSlot, statsSlot));
+        }
+
+        public void CustomWindowCreate(int lookSlot, int statsSlot, int r, int g, int b, int a, string name)
+        {
+            Send(CustomWindowGraphicPacket.FormatCwc(lookSlot, statsSlot, r, g, b, a, name));
         }
 
         public void VendorPurchaseItem(int npcId, int slotId)
