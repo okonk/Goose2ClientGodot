@@ -360,6 +360,16 @@ namespace Goose2Client.Character
 
         public AppearanceData GetAppearance() => _appearance;
 
+        public bool TryGetSlotGraphic(CharacterSlot slot, out int graphicId, out Color tint)
+        {
+            graphicId = 0;
+            tint = NoTint;
+            if (!_slots.TryGetValue(slot, out var s)) return false;
+            graphicId = s.GraphicId;
+            tint = s.Sprite.Material is ShaderMaterial mat ? (Color)mat.GetShaderParameter("tint") : NoTint;
+            return true;
+        }
+
         /// <summary>
         /// Body height used for name, HP/MP bars, chat bubbles, and emotes.
         /// Always taken from the resting pose (idle, or mounted-idle when mounted) so taller
