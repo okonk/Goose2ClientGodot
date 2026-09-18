@@ -15,8 +15,12 @@ public partial class CustomWindow : BaseWindow, IWindow
     private CustomWindowSlot _lookSlot;
     private CustomWindowSlot _statsSlot;
     private CustomPreviewControl _preview;
-    private TextureRect _gradient;
-    private TextureRect _cursor;
+    private TextureRect _swatch;
+    private TextureRect _swatchCursor;
+    private TextureRect _hueBar;
+    private TextureRect _hueCursor;
+    private TextureRect _lightBar;
+    private TextureRect _lightCursor;
     private HSlider _rSlider;
     private HSlider _gSlider;
     private HSlider _bSlider;
@@ -39,6 +43,8 @@ public partial class CustomWindow : BaseWindow, IWindow
     private int _g = CustomWindowMetrics.DefaultG;
     private int _b = CustomWindowMetrics.DefaultB;
     private int _a = CustomWindowMetrics.DefaultA;
+    private float _lastHue = -1f;
+    private float _hue;
 
     public override void _Ready()
     {
@@ -53,10 +59,17 @@ public partial class CustomWindow : BaseWindow, IWindow
 
         _preview = GetNode<CustomPreviewControl>("Content/Preview");
 
-        _gradient = GetNode<TextureRect>("Content/Gradient");
-        _cursor = GetNode<TextureRect>("Content/Gradient/Cursor");
-        _gradient.GuiInput += OnGradientGuiInput;
-        BuildGradientTexture();
+        _swatch = GetNode<TextureRect>("Content/Swatch");
+        _swatchCursor = GetNode<TextureRect>("Content/Swatch/Cursor");
+        _hueBar = GetNode<TextureRect>("Content/HueBar");
+        _hueCursor = GetNode<TextureRect>("Content/HueBar/Cursor");
+        _lightBar = GetNode<TextureRect>("Content/LightBar");
+        _lightCursor = GetNode<TextureRect>("Content/LightBar/Cursor");
+        _swatch.GuiInput += OnSwatchGuiInput;
+        _hueBar.GuiInput += OnHueGuiInput;
+        _lightBar.GuiInput += OnLightBarGuiInput;
+        _swatch.TextureFilter = CanvasItem.TextureFilterEnum.Linear;
+        SyncHsl();
 
         _rSlider = GetNode<HSlider>("Content/RSlider");
         _gSlider = GetNode<HSlider>("Content/GSlider");
@@ -104,21 +117,122 @@ public partial class CustomWindow : BaseWindow, IWindow
         // CustomPreviewControl has no resize handling and lays out against its Size at
         // Refresh() time, so Relayout must re-run the layout after UI scale changes.
         _preview.Refresh();
+        SyncHsl();
     }
 
-    private void BuildGradientTexture()
+    private void BuildSwatchTexture(float hue)
     {
-        const int size = 128;
+        const int size = 64;
         var img = Image.CreateEmpty(size, size, false, Image.Format.Rgba8);
         for (int y = 0; y < size; y++)
         {
             for (int x = 0; x < size; x++)
             {
-                var c = CustomWindowMetrics.SampleGradient(new Vector2(x / (size - 1f), y / (size - 1f)));
-                img.SetPixel(x, y, new Color(c.X / 255f, c.Y / 255f, c.Z / 255f, 1f));
+                var (r, g, b) = HslColor.ToRgb(hue, x / (size - 1f), 1f - y / (size - 1f));
+                img.SetPixel(x, y, new Color(r / 255f, g / 255f, b / 255f, 1f));
             }
         }
-        _gradient.Texture = ImageTexture.CreateFromImage(img);
+        _swatch.Texture = ImageTexture.CreateFromImage(img);
+    }
+
+    private void BuildLightBarTexture(float hue)
+    {
+        var (r, g, b) = HslColor.ToRgb(hue, 1f, 0.5f);
+        var grad = new Gradient
+        {
+            Colors = new[] { Colors.Black, new Color(r / 255f, g / 255f, b / 255f), Colors.White },
+            Offsets = new[] { 0f, 0.5f, 1f },
+        };
+        _lightBar.Texture = new GradientTexture2D
+        {
+            Gradient = grad,
+            Width = 128,
+            Height = 12,
+            FillFrom = new Vector2(0, 0.5f),
+            FillTo = new Vector2(1, 0.5f),
+        };
+    }
+
+    private void SetRgb(int r, int g, int b)
+    {
+        _rSlider.Value = r;
+        _gSlider.Value = g;
+        _bSlider.Value = b;
+    }
+
+    private void SyncHsl()
+    {
+        var (h, s, l) = HslColor.FromRgb(_r, _g, _b);
+        if (s > 0f) _hue = h;
+        if (Math.Abs(_hue - _lastHue) > 0.5f)
+        {
+            _lastHue = _hue;
+            BuildSwatchTexture(_hue);
+            BuildLightBarTexture(_hue);
+        }
+        _swatchCursor.Position = new Vector2(s * _swatch.Size.X, (1f - l) * _swatch.Size.Y) - _swatchCursor.Size / 2;
+        _hueCursor.Position = new Vector2(_hue / 360f * _hueBar.Size.X, 0f) - _hueCursor.Size / 2;
+        _lightCursor.Position = new Vector2(l * _lightBar.Size.X, 0f) - _lightCursor.Size / 2;
+    }
+
+    private void OnSwatchGuiInput(InputEvent @event)
+    {
+        if (@event is InputEventMouseButton { ButtonIndex: MouseButton.Left, Pressed: true } mb)
+            ApplySwatchAt(mb.Position);
+        else if (@event is InputEventMouseMotion mm && Input.IsMouseButtonPressed(MouseButton.Left))
+            ApplySwatchAt(mm.Position);
+    }
+
+    private void ApplySwatchAt(Vector2 pos)
+    {
+        var (_, s, l) = HslColor.FromRgb(_r, _g, _b);
+        var ns = Mathf.Clamp(pos.X / _swatch.Size.X, 0f, 1f);
+        var nl = 1f - Mathf.Clamp(pos.Y / _swatch.Size.Y, 0f, 1f);
+        var (r, g, b) = HslColor.ToRgb(_hue, ns, nl);
+        SetRgb(r, g, b);
+        _swatchCursor.Position = pos - _swatchCursor.Size / 2;
+    }
+
+    private void OnHueGuiInput(InputEvent @event)
+    {
+        if (@event is InputEventMouseButton { ButtonIndex: MouseButton.Left, Pressed: true } mb)
+            ApplyHueAt(mb.Position);
+        else if (@event is InputEventMouseMotion mm && Input.IsMouseButtonPressed(MouseButton.Left))
+            ApplyHueAt(mm.Position);
+    }
+
+    private void ApplyHueAt(Vector2 pos)
+    {
+        var (_, s, l) = HslColor.FromRgb(_r, _g, _b);
+        _hue = Mathf.Clamp(pos.X / _hueBar.Size.X, 0f, 1f) * 360f;
+        var (r, g, b) = HslColor.ToRgb(_hue, s, l);
+        SetRgb(r, g, b);
+        // Grey RGB produces no ValueChanged, so SyncHsl must run here to rebuild textures for the new hue.
+        SyncHsl();
+        _hueCursor.Position = pos - _hueCursor.Size / 2;
+    }
+
+    private void OnLightBarGuiInput(InputEvent @event)
+    {
+        if (@event is InputEventMouseButton { ButtonIndex: MouseButton.Left, Pressed: true } mb)
+            ApplyLightAt(mb.Position);
+        else if (@event is InputEventMouseMotion mm && Input.IsMouseButtonPressed(MouseButton.Left))
+            ApplyLightAt(mm.Position);
+    }
+
+    private void ApplyLightAt(Vector2 pos)
+    {
+        var (_, s, l) = HslColor.FromRgb(_r, _g, _b);
+        var nl = Mathf.Clamp(pos.X / _lightBar.Size.X, 0f, 1f);
+        var (r, g, b) = HslColor.ToRgb(_hue, s, nl);
+        SetRgb(r, g, b);
+        _lightCursor.Position = pos - _lightCursor.Size / 2;
+    }
+
+    private void UpdateTint()
+    {
+        _preview.SetTint(_r, _g, _b, _a);
+        SyncHsl();
     }
 
     private void OnMakeWindow(object o)
@@ -131,6 +245,7 @@ public partial class CustomWindow : BaseWindow, IWindow
         if (p.WindowId != WindowId)
             ResetState();
         Visible = true;
+        SyncHsl();
         Title = p.Title;
         WindowId = p.WindowId;
         _preview.Refresh();
@@ -265,31 +380,6 @@ public partial class CustomWindow : BaseWindow, IWindow
         RefreshCreate();
     }
 
-    private void OnGradientGuiInput(InputEvent @event)
-    {
-        if (@event is InputEventMouseButton { ButtonIndex: MouseButton.Left, Pressed: true } mb)
-            ApplyGradientAt(mb.Position);
-        else if (@event is InputEventMouseMotion mm && Input.IsMouseButtonPressed(MouseButton.Left))
-            ApplyGradientAt(mm.Position);
-    }
-
-    private void ApplyGradientAt(Vector2 pos)
-    {
-        var n = new Vector2(
-            Mathf.Clamp(pos.X / _gradient.Size.X, 0f, 1f),
-            Mathf.Clamp(pos.Y / _gradient.Size.Y, 0f, 1f));
-        var rgb = CustomWindowMetrics.SampleGradient(n);
-        _rSlider.Value = rgb.X;
-        _gSlider.Value = rgb.Y;
-        _bSlider.Value = rgb.Z;
-        _cursor.Position = pos - _cursor.Size / 2;
-    }
-
-    private void UpdateTint()
-    {
-        _preview.SetTint(_r, _g, _b, _a);
-    }
-
     private void OnNameTextChanged(string text)
     {
         var filtered = text.Replace(",", "");
@@ -342,7 +432,9 @@ public partial class CustomWindow : BaseWindow, IWindow
         _bValue.Text = _b.ToString();
         _aValue.Text = _a.ToString();
         _nameField.Text = "";
-        _cursor.Position = Vector2.Zero;
+        _lastHue = -1f;
+        _hue = 0f;
+        SyncHsl();
         _preview.SetTint(_r, _g, _b, _a);
         _preview.SetCustomGraphic(null, 0, 0);
         _preview.Refresh();

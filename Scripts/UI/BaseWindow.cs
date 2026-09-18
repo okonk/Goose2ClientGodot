@@ -66,7 +66,7 @@ public partial class BaseWindow : Control, IScalableWindow
 
         if (WindowName != null)
         {
-            var ws = GameManager.Instance.CharacterSettings.GetWindowSettings(WindowName);
+            var ws = GameManager.Instance?.CharacterSettings?.GetWindowSettings(WindowName);
             if (ws != null) Visible = ws.Visible;
         }
 
