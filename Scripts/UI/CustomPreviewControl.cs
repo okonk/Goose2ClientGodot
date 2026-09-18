@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using Godot;
 using Goose2Client.Character;
 
@@ -12,13 +13,14 @@ public partial class CustomPreviewControl : Control
     private int _customId;
     private int _customPose;
     private int _tintR, _tintG, _tintB, _tintA;
+    private Direction _facing;
 
     public override void _Ready()
     {
         foreach (var slot in CharacterLayout.All)
         {
             if (slot == CharacterSlot.Mount) continue;
-            // Child order = CharacterLayout.All back-to-front, so first child draws bottom.
+            // Initial child order = CharacterLayout.All back-to-front (first child draws bottom); Refresh re-sorts per facing.
             _layers[slot] = new TextureRect
             {
                 Name = slot.ToString(),
@@ -29,6 +31,15 @@ public partial class CustomPreviewControl : Control
         }
 
         GameManager.Instance.CharacterUpdated += OnCharacterUpdated;
+        Refresh();
+    }
+
+    // CharacterUpdated fires only on appearance changes, so poll for facing changes.
+    public override void _Process(double delta)
+    {
+        var source = GameManager.Instance.CurrentMapManager?.LocalPlayer;
+        if (source == null || source.Facing == _facing) return;
+        _facing = source.Facing;
         Refresh();
     }
 
@@ -46,6 +57,13 @@ public partial class CustomPreviewControl : Control
             HideAll();
             return;
         }
+        var facing = source.Facing;
+        _facing = facing;
+
+        // Shield/weapon flip in front of/behind the body per facing (mirrors Character.ApplyDrawOrder).
+        int i = 0;
+        foreach (var layer in _layers.OrderBy(kv => CharacterLayout.SortOrder(kv.Key, facing)).Select(kv => kv.Value))
+            MoveChild(layer, i++);
 
         foreach (var (slot, layer) in _layers)
         {
@@ -84,7 +102,7 @@ public partial class CustomPreviewControl : Control
 
             var frames = GD.Load<SpriteFrames>(path);
             string clip = null;
-            foreach (var cand in AnimationNames.Candidates("idle", state, Direction.Down))
+            foreach (var cand in AnimationNames.Candidates("idle", state, facing))
             {
                 if (frames.HasAnimation(cand))
                 {
