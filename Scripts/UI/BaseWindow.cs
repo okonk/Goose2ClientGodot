@@ -158,7 +158,11 @@ public partial class BaseWindow : Control, IScalableWindow
                 Name = "TitleLabel",
                 Text = WindowName ?? "",
                 MouseFilter = MouseFilterEnum.Pass,
-                VerticalAlignment = VerticalAlignment.Center
+                VerticalAlignment = VerticalAlignment.Center,
+                // Without clipping the label's minimum size is the full text width; in a
+                // narrow window (CombineBag, 69px) that pushes the label over the close
+                // button and its Pass filter forwards X-clicks to the title-bar drag handle.
+                ClipText = true
             };
             TitleLabel.SetAnchorsPreset(LayoutPreset.FullRect);
             TitleLabel.OffsetLeft = 6f;
