@@ -113,11 +113,11 @@ public class ThemeResourceTests
     }
 
     [Fact]
-    public void ToolbarButtons_UseIconButtonSoTheyRespondToHover()
+    public void ToolbarButtons_UseTheThemedToolbarStyleSoTheyRespondToHover()
     {
         var scene = Read("Scenes/UI/Toolbar.tscn");
 
-        Assert.Equal(4, Occurrences(scene, "theme_type_variation = &\"IconButton\""));
+        Assert.Equal(4, Occurrences(scene, "theme_type_variation = &\"ToolbarButton\""));
         Assert.DoesNotContain("flat = true", scene);
     }
 
