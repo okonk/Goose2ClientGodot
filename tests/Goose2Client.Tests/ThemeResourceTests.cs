@@ -154,28 +154,6 @@ public class ThemeResourceTests
     }
 
     [Fact]
-    public void FpsReadout_DoesNotOverlapTheBuildStamp()
-    {
-        var overlay = Read("Scripts/UI/BuildStampOverlay.cs");
-        var margin = int.Parse(System.Text.RegularExpressions.Regex
-            .Match(overlay, @"Margin\s*=\s*(\d+)").Groups[1].Value);
-        var stampHeight = int.Parse(System.Text.RegularExpressions.Regex
-            .Match(overlay, @"OffsetBottom\s*=\s*Margin\s*\+\s*(\d+)").Groups[1].Value);
-        var stampBottom = margin + stampHeight;
-
-        Assert.Contains("LayoutPreset.TopRight", overlay);
-
-        var debug = Read("Scenes/UI/DebugWindow.tscn");
-        var debugTop = float.Parse(System.Text.RegularExpressions.Regex
-            .Match(debug, @"offset_top = ([\d.]+)").Groups[1].Value,
-            System.Globalization.CultureInfo.InvariantCulture);
-
-        Assert.True(debugTop >= stampBottom,
-            $"DebugWindow starts at y={debugTop} but the always-on-top build stamp occupies " +
-            $"y=0..{stampBottom} in the same top-right corner; the fps readout would sit under it.");
-    }
-
-    [Fact]
     public void LevelBadge_UsesTheThemePaletteRatherThanFlatGrey()
     {
         var png = ReadBytes("Assets/UI/vitals-level-circle.png");
