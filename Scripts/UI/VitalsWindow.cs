@@ -35,6 +35,12 @@ namespace Goose2Client.UI
         private List<UiScaleLayout.GeomRecord> _geom = null!;
         private VitalsCharacterDisplay _portrait;
 
+        private const double FillTweenSeconds = 0.25;
+        private Tween _hpTween;
+        private Tween _mpTween;
+        private Tween _spTween;
+        private bool _barsSeeded;
+
         public override void _Ready()
         {
             _hpBar = GetNode<TextureProgressBar>("HpBar");
@@ -117,6 +123,24 @@ namespace Goose2Client.UI
             }
         }
 
+        // A status packet can land every frame during combat, so each bar keeps a single
+        // tween that is restarted rather than stacked.
+        private void FillTo(TextureProgressBar bar, ref Tween tween, double target)
+        {
+            if (tween != null && tween.IsValid())
+                tween.Kill();
+
+            if (!_barsSeeded || !bar.Visible || Mathf.IsEqualApprox((float)bar.Value, (float)target))
+            {
+                bar.Value = target;
+                return;
+            }
+
+            tween = CreateTween();
+            tween.SetTrans(Tween.TransitionType.Sine).SetEase(Tween.EaseType.Out);
+            tween.TweenProperty(bar, "value", target, FillTweenSeconds);
+        }
+
         public override void _ExitTree()
         {
             GameManager.Instance.PacketManager.Remove<StatusInfoPacket>(OnStatusInfo);
@@ -126,17 +150,17 @@ namespace Goose2Client.UI
         {
             var p = (StatusInfoPacket)packetObj;
 
-            _hpBar.Value = p.MaxHP == 0 ? 0 : p.CurrentHP / (double)p.MaxHP;
+            FillTo(_hpBar, ref _hpTween, p.MaxHP == 0 ? 0 : p.CurrentHP / (double)p.MaxHP);
             _hpText.Text = p.CurrentHP.ToString("N0");
             _hpTooltip = $"Health: {p.CurrentHP:N0} / {p.MaxHP:N0}";
 
-            _mpBar.Value = p.MaxMP == 0 ? 0 : p.CurrentMP / (double)p.MaxMP;
+            FillTo(_mpBar, ref _mpTween, p.MaxMP == 0 ? 0 : p.CurrentMP / (double)p.MaxMP);
             _mpText.Text = p.CurrentMP.ToString("N0");
             _mpTooltip = $"Mana: {p.CurrentMP:N0} / {p.MaxMP:N0}";
 
             _snfReceived = true;
             _lastMaxSp = p.MaxSP;
-            _spBar.Value = p.MaxSP == 0 ? 0 : p.CurrentSP / (double)p.MaxSP;
+            FillTo(_spBar, ref _spTween, p.MaxSP == 0 ? 0 : p.CurrentSP / (double)p.MaxSP);
             _spText.Text = p.CurrentSP.ToString("N0");
             _spTooltip = $"Spirit: {p.CurrentSP:N0} / {p.MaxSP:N0}";
 
@@ -151,6 +175,10 @@ namespace Goose2Client.UI
 
             _levelText.Text = p.Level.ToString();
             _levelTooltip = $"Level: {p.Level}";
+
+            // The first status packet is the login snapshot, not a change: seed the bars
+            // at their real fill instead of sweeping them up from empty.
+            _barsSeeded = true;
         }
     }
 }

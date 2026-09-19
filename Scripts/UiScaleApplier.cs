@@ -35,6 +35,22 @@ public class UiScaleApplier
         public Control ControlRef { get; }
     }
 
+    // CheckBox draws its check/radio glyph at the icon's native size, so unlike fonts and
+    // offsets it does not follow the scale factor unless the theme icons are re-rasterised.
+    private static readonly (string Type, string Icon, string Path)[] ScaledThemeIcons =
+    {
+        ("CheckBox", "checked", "res://Assets/UI/checkbox-on.svg"),
+        ("CheckBox", "unchecked", "res://Assets/UI/checkbox-off.svg"),
+        ("CheckBox", "checked_disabled", "res://Assets/UI/checkbox-on.svg"),
+        ("CheckBox", "unchecked_disabled", "res://Assets/UI/checkbox-off.svg"),
+        ("CheckBox", "radio_checked", "res://Assets/UI/radio-on.svg"),
+        ("CheckBox", "radio_unchecked", "res://Assets/UI/radio-off.svg"),
+        ("CheckBox", "radio_checked_disabled", "res://Assets/UI/radio-on.svg"),
+        ("CheckBox", "radio_unchecked_disabled", "res://Assets/UI/radio-off.svg"),
+    };
+
+    private float _iconFactor;
+
     private readonly List<WindowRegistration> _windows = new();
     private readonly List<(Control C, StringName Prop, float Base)> _fonts = new();
     private bool _appliedOnce;
@@ -94,6 +110,25 @@ public class UiScaleApplier
         return i >= 0;
     }
 
+    private void ScaleThemeIcons(float factor)
+    {
+        if (_iconFactor == factor)
+            return;
+        _iconFactor = factor;
+
+        foreach (var (type, icon, path) in ScaledThemeIcons)
+        {
+            var source = GD.Load<Texture2D>(path);
+            if (source == null)
+                continue;
+
+            var image = source.GetImage();
+            // Pixel-art glyphs: integer nearest-neighbour keeps the 1px ring crisp.
+            image.Resize(ScaleSize(image.GetWidth()), ScaleSize(image.GetHeight()), Image.Interpolation.Nearest);
+            Theme.SetIcon(icon, type, ImageTexture.CreateFromImage(image));
+        }
+    }
+
     public void Apply(float factor, ApplyReason reason)
     {
         var f = UiScale.NormalizeFactor(factor);
@@ -111,6 +146,7 @@ public class UiScaleApplier
             TooltipManager.Instance.HideAll();
 
         Theme.SetDefaultFontSize(ScaleSize(10));
+        ScaleThemeIcons(f);
 
         // Removal during the apply foreach would throw; collect dead refs first.
         var invalid = _fonts

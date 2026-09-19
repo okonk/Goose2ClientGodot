@@ -1,8 +1,7 @@
-[gd_scene load_steps=4 format=3]
+[gd_scene load_steps=3 format=3]
 
 [ext_resource type="Script" path="res://Scripts/UI/VendorWindow.cs" id="1_vnd"]
 [ext_resource type="Theme" path="res://Assets/UI/GameTheme.tres" id="theme"]
-[ext_resource type="Texture2D" path="res://Assets/UI/vendor.png" id="bg_tex"]
 
 [node name="VendorWindow" type="Control"]
 script = ExtResource("1_vnd")
@@ -19,7 +18,6 @@ layout_mode = 2
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
-texture = ExtResource("bg_tex")
 mouse_filter = 2
 
 [node name="TitleBar" type="Control" parent="."]
@@ -70,6 +68,15 @@ mouse_filter = 1
 columns = 5
 theme_override_constants/h_separation = 1
 theme_override_constants/v_separation = 1
+
+[node name="FooterSeparator" type="HSeparator" parent="Content"]
+layout_mode = 2
+anchors_preset = 0
+offset_left = 4.0
+offset_top = 240.0
+offset_right = 164.0
+offset_bottom = 241.0
+mouse_filter = 2
 
 [node name="CloseButton" type="Button" parent="Content"]
 layout_mode = 2

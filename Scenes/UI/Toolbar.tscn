@@ -26,7 +26,7 @@ theme_override_constants/separation = 2
 [node name="DestroyButton" type="Button" parent="."]
 custom_minimum_size = Vector2(32, 32)
 layout_mode = 2
-theme_type_variation = &"IconButton"
+theme_type_variation = &"ToolbarButton"
 script = ExtResource("1_db")
 icon = ExtResource("3_destroy")
 expand_icon = true
@@ -34,7 +34,7 @@ expand_icon = true
 [node name="CombineBagButton" type="Button" parent="."]
 custom_minimum_size = Vector2(32, 32)
 layout_mode = 2
-theme_type_variation = &"IconButton"
+theme_type_variation = &"ToolbarButton"
 script = ExtResource("2_ti")
 icon = ExtResource("4_combine")
 expand_icon = true
@@ -43,7 +43,7 @@ ItemType = 1
 [node name="OptionsButton" type="Button" parent="."]
 custom_minimum_size = Vector2(32, 32)
 layout_mode = 2
-theme_type_variation = &"IconButton"
+theme_type_variation = &"ToolbarButton"
 script = ExtResource("2_ti")
 icon = ExtResource("5_options")
 expand_icon = true
@@ -52,7 +52,7 @@ ItemType = 2
 [node name="ExitButton" type="Button" parent="."]
 custom_minimum_size = Vector2(32, 32)
 layout_mode = 2
-theme_type_variation = &"IconButton"
+theme_type_variation = &"ToolbarButton"
 script = ExtResource("2_ti")
 icon = ExtResource("6_exit")
 expand_icon = true

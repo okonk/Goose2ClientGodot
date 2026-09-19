@@ -28,7 +28,18 @@ public partial class BaseWindow : Control, IScalableWindow
 
     protected Label TitleLabel { get; private set; }
     protected Control Content { get; private set; }
-    protected TextureRect Background { get; private set; }
+    protected Control Background { get; private set; }
+
+    private static readonly Texture2D CloseIcon = GD.Load<Texture2D>("res://Assets/UI/window-close.svg");
+    private static BaseWindow _activeWindow;
+
+    private Panel _panelBg;
+    private Panel _titleBarBg;
+    private bool _chromeReady;
+
+    /// <summary>Windows whose Background art is a shaped sprite rather than a rectangular
+    /// frame (the hotbar) opt out and keep their texture.</summary>
+    protected virtual bool ThemedChrome => true;
 
     public string Title { set { if (TitleLabel != null) TitleLabel.Text = value; } }
 
@@ -54,7 +65,9 @@ public partial class BaseWindow : Control, IScalableWindow
         _closeButton = GetNodeOrNull<Button>("TitleBar/CloseButton");
         TitleLabel = GetNodeOrNull<Label>("TitleBar/TitleLabel");
         Content = GetNodeOrNull<Control>("Content");
-        Background = GetNodeOrNull<TextureRect>("Background");
+        Background = GetNodeOrNull<Control>("Background");
+
+        BuildChrome();
 
         // The full-rect Content (MouseFilter=Pass) is drawn on top of the TitleBar and
         // swallows its clicks — Pass forwards unhandled events to the PARENT, never to the
@@ -93,9 +106,154 @@ public partial class BaseWindow : Control, IScalableWindow
         if (_titleBar != null)
             MoveChild(_titleBar, GetChildCount() - 1);
 
+        _chromeReady = true;
+
         // Deferred so subclass _Ready build code runs first; their synchronous ScaleRegister
         // calls make this a no-op (idempotent via _scaleRegistered).
         Callable.From(() => ScaleRegister()).CallDeferred();
+    }
+
+    /// <summary>Swaps the baked window art for themed panels and normalises the title bar,
+    /// so every window shares one frame, one title style and one close button.</summary>
+    private void BuildChrome()
+    {
+        if (!ThemedChrome) return;
+
+        if (Background is TextureRect art)
+        {
+            int index = art.GetIndex();
+            RemoveChild(art);
+            art.QueueFree();
+
+            _panelBg = new Panel
+            {
+                Name = "Background",
+                ThemeTypeVariation = "WindowPanel",
+                MouseFilter = MouseFilterEnum.Ignore
+            };
+            _panelBg.SetAnchorsPreset(LayoutPreset.FullRect);
+            AddChild(_panelBg);
+            MoveChild(_panelBg, index);
+            Background = _panelBg;
+        }
+
+        // A zero-height TitleBar is a bare drag handle (hotbar), not a caption.
+        if (_titleBar == null || _titleBar.OffsetBottom - _titleBar.OffsetTop <= 0)
+            return;
+
+        _titleBarBg = new Panel
+        {
+            Name = "TitleBarBackground",
+            ThemeTypeVariation = "WindowTitleBar",
+            MouseFilter = MouseFilterEnum.Ignore
+        };
+        _titleBarBg.SetAnchorsPreset(LayoutPreset.FullRect);
+        _titleBar.AddChild(_titleBarBg);
+        _titleBar.MoveChild(_titleBarBg, 0);
+
+        if (TitleLabel == null)
+        {
+            TitleLabel = new Label
+            {
+                Name = "TitleLabel",
+                Text = WindowName ?? "",
+                MouseFilter = MouseFilterEnum.Pass,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            TitleLabel.SetAnchorsPreset(LayoutPreset.FullRect);
+            TitleLabel.OffsetLeft = 6f;
+            TitleLabel.OffsetRight = -20f;
+            _titleBar.AddChild(TitleLabel);
+        }
+        TitleLabel.ThemeTypeVariation = "WindowTitle";
+
+        if (_closeButton != null)
+        {
+            _closeButton.ThemeTypeVariation = "WindowCloseButton";
+            _closeButton.Flat = false;
+            _closeButton.Text = "";
+            _closeButton.Icon = CloseIcon;
+            _closeButton.ExpandIcon = true;
+            _closeButton.FocusMode = FocusModeEnum.None;
+            _closeButton.TooltipText = "Close";
+        }
+    }
+
+    /// <summary>Raises this window above its siblings and gives it the focused frame.</summary>
+    public void Activate()
+    {
+        if (_activeWindow == this)
+        {
+            MoveToFront();
+            return;
+        }
+
+        if (GodotObject.IsInstanceValid(_activeWindow))
+            _activeWindow.SetChromeActive(false);
+
+        _activeWindow = this;
+        SetChromeActive(true);
+        MoveToFront();
+    }
+
+    private void SetChromeActive(bool active)
+    {
+        if (_panelBg != null)
+            _panelBg.ThemeTypeVariation = active ? "WindowPanelActive" : "WindowPanel";
+        if (_titleBarBg != null)
+            _titleBarBg.ThemeTypeVariation = active ? "WindowTitleBarActive" : "WindowTitleBar";
+        if (TitleLabel != null && ThemedChrome)
+            TitleLabel.ThemeTypeVariation = active ? "WindowTitleActive" : "WindowTitle";
+    }
+
+    private void Deactivate()
+    {
+        if (_activeWindow != this) return;
+        _activeWindow = null;
+        SetChromeActive(false);
+    }
+
+    // Windows are also shown by server packets and by subclasses that bypass Toggle, so
+    // focus follows visibility rather than any one call site.
+    public override void _Notification(int what)
+    {
+        if (what != NotificationVisibilityChanged || !_chromeReady)
+            return;
+
+        if (Visible)
+            Activate();
+        else
+            Deactivate();
+    }
+
+    public override void _Input(InputEvent @event)
+    {
+        if (!Visible || @event is not InputEventMouseButton { Pressed: true } mb)
+            return;
+        if (mb.ButtonIndex != MouseButton.Left && mb.ButtonIndex != MouseButton.Right)
+            return;
+        if (!GetGlobalRect().HasPoint(mb.Position) || !IsTopmostAt(mb.Position))
+            return;
+
+        Activate();
+    }
+
+    // Siblings after this one in tree order draw on top, so a hit on any of them
+    // is not a hit on this window.
+    private bool IsTopmostAt(Vector2 point)
+    {
+        var parent = GetParent();
+        if (parent == null) return true;
+
+        bool above = false;
+        foreach (Node sibling in parent.GetChildren())
+        {
+            if (sibling == this) { above = true; continue; }
+            if (!above) continue;
+            if (sibling is Control c && c.Visible && c.GetGlobalRect().HasPoint(point))
+                return false;
+        }
+        return true;
     }
 
     // Single owner of placement+scale at registration: the snapshot (1x base) must precede

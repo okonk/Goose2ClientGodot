@@ -1,10 +1,9 @@
-[gd_scene load_steps=11 format=3]
+[gd_scene load_steps=10 format=3]
 
 [ext_resource type="Script" path="res://Scripts/UI/CustomWindow.cs" id="1_cw"]
 [ext_resource type="Script" path="res://Scripts/UI/CustomWindowSlot.cs" id="2_cws"]
 [ext_resource type="Script" path="res://Scripts/UI/CustomPreviewControl.cs" id="3_cpc"]
 [ext_resource type="Theme" path="res://Assets/UI/GameTheme.tres" id="theme"]
-[ext_resource type="Texture2D" path="res://Assets/UI/quest.png" id="bg_tex"]
 [ext_resource type="Texture2D" path="res://Assets/UI/slot-frame.png" id="slot_bg"]
 
 [sub_resource type="Gradient" id="Gradient_cursor"]
@@ -49,7 +48,6 @@ layout_mode = 2
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
-texture = ExtResource("bg_tex")
 mouse_filter = 2
 
 [node name="TitleBar" type="Control" parent="."]

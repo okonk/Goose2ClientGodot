@@ -1,9 +1,11 @@
-[gd_resource type="Theme" load_steps=29 format=3]
+[gd_resource type="Theme" load_steps=38 format=3]
 
 [ext_resource type="FontFile" path="res://Assets/UI/Fonts/LiberationSans.ttf" id="font"]
 [ext_resource type="Texture2D" path="res://Assets/UI/checkbox-off.svg" id="check_off"]
 [ext_resource type="Texture2D" path="res://Assets/UI/checkbox-on.svg" id="check_on"]
 [ext_resource type="Texture2D" path="res://Assets/UI/slider-grabber.svg" id="slider_grabber"]
+[ext_resource type="Texture2D" path="res://Assets/UI/radio-off.svg" id="radio_off"]
+[ext_resource type="Texture2D" path="res://Assets/UI/radio-on.svg" id="radio_on"]
 
 [sub_resource type="StyleBoxFlat" id="panel"]
 content_margin_left = 5.0
@@ -299,6 +301,105 @@ corner_radius_top_right = 2
 corner_radius_bottom_right = 2
 corner_radius_bottom_left = 2
 
+[sub_resource type="StyleBoxFlat" id="window_panel"]
+bg_color = Color(0.047059, 0.066667, 0.12549, 0.96)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.372549, 0.294118, 0.164706, 1)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
+shadow_color = Color(0, 0, 0, 0.5)
+shadow_size = 6
+shadow_offset = Vector2(0, 2)
+
+[sub_resource type="StyleBoxFlat" id="window_panel_active"]
+bg_color = Color(0.054902, 0.078431, 0.145098, 0.97)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.584314, 0.447059, 0.235294, 1)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
+shadow_color = Color(0, 0, 0, 0.62)
+shadow_size = 9
+shadow_offset = Vector2(0, 3)
+
+[sub_resource type="StyleBoxFlat" id="window_title_bar"]
+bg_color = Color(0.094118, 0.117647, 0.196078, 1)
+border_width_bottom = 1
+border_color = Color(0.372549, 0.294118, 0.164706, 1)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+
+[sub_resource type="StyleBoxFlat" id="window_title_bar_active"]
+bg_color = Color(0.141176, 0.168627, 0.262745, 1)
+border_width_bottom = 1
+border_color = Color(0.584314, 0.447059, 0.235294, 1)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+
+[sub_resource type="StyleBoxFlat" id="window_close_hover"]
+bg_color = Color(0.639216, 0.176471, 0.176471, 0.85)
+corner_radius_top_left = 2
+corner_radius_top_right = 2
+corner_radius_bottom_right = 2
+corner_radius_bottom_left = 2
+
+[sub_resource type="StyleBoxFlat" id="toolbar_normal"]
+content_margin_left = 3.0
+content_margin_top = 3.0
+content_margin_right = 3.0
+content_margin_bottom = 3.0
+bg_color = Color(0.086275, 0.109804, 0.196078, 0.85)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.352941, 0.294118, 0.203922, 1)
+corner_radius_top_left = 2
+corner_radius_top_right = 2
+corner_radius_bottom_right = 2
+corner_radius_bottom_left = 2
+
+[sub_resource type="StyleBoxFlat" id="toolbar_hover"]
+content_margin_left = 3.0
+content_margin_top = 3.0
+content_margin_right = 3.0
+content_margin_bottom = 3.0
+bg_color = Color(0.145098, 0.196078, 0.321569, 0.95)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.92549, 0.72549, 0.337255, 1)
+corner_radius_top_left = 2
+corner_radius_top_right = 2
+corner_radius_bottom_right = 2
+corner_radius_bottom_left = 2
+
+[sub_resource type="StyleBoxFlat" id="toolbar_pressed"]
+content_margin_left = 3.0
+content_margin_top = 3.0
+content_margin_right = 3.0
+content_margin_bottom = 3.0
+bg_color = Color(0.039216, 0.160784, 0.290196, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.321569, 0.768627, 1, 1)
+corner_radius_top_left = 2
+corner_radius_top_right = 2
+corner_radius_bottom_right = 2
+corner_radius_bottom_left = 2
+
 [resource]
 default_font = ExtResource("font")
 default_font_size = 10
@@ -336,6 +437,10 @@ CheckBox/icons/checked = ExtResource("check_on")
 CheckBox/icons/unchecked = ExtResource("check_off")
 CheckBox/icons/checked_disabled = ExtResource("check_on")
 CheckBox/icons/unchecked_disabled = ExtResource("check_off")
+CheckBox/icons/radio_checked = ExtResource("radio_on")
+CheckBox/icons/radio_unchecked = ExtResource("radio_off")
+CheckBox/icons/radio_checked_disabled = ExtResource("radio_on")
+CheckBox/icons/radio_unchecked_disabled = ExtResource("radio_off")
 CheckBox/styles/normal = SubResource("empty")
 CheckBox/styles/hover = SubResource("empty")
 CheckBox/styles/pressed = SubResource("empty")
@@ -384,3 +489,40 @@ IconButton/styles/disabled = SubResource("empty")
 IconButton/styles/focus = SubResource("empty")
 SlotPanel/base_type = &"Panel"
 SlotPanel/styles/panel = SubResource("slot_panel")
+WindowPanel/base_type = &"Panel"
+WindowPanel/styles/panel = SubResource("window_panel")
+WindowPanelActive/base_type = &"Panel"
+WindowPanelActive/styles/panel = SubResource("window_panel_active")
+WindowTitleBar/base_type = &"Panel"
+WindowTitleBar/styles/panel = SubResource("window_title_bar")
+WindowTitleBarActive/base_type = &"Panel"
+WindowTitleBarActive/styles/panel = SubResource("window_title_bar_active")
+WindowTitle/base_type = &"Label"
+WindowTitle/colors/font_color = Color(0.807843, 0.690196, 0.454902, 1)
+WindowTitleActive/base_type = &"Label"
+WindowTitleActive/colors/font_color = Color(0.964706, 0.847059, 0.560784, 1)
+WindowCloseButton/base_type = &"Button"
+WindowCloseButton/colors/icon_normal_color = Color(0.588235, 0.615686, 0.694118, 1)
+WindowCloseButton/colors/icon_hover_color = Color(1, 0.925490, 0.925490, 1)
+WindowCloseButton/colors/icon_pressed_color = Color(1, 0.784314, 0.784314, 1)
+WindowCloseButton/styles/normal = SubResource("empty")
+WindowCloseButton/styles/hover = SubResource("window_close_hover")
+WindowCloseButton/styles/pressed = SubResource("window_close_hover")
+WindowCloseButton/styles/focus = SubResource("empty")
+InsetPanel/base_type = &"Panel"
+InsetPanel/styles/panel = SubResource("panel_inset")
+SectionHeader/base_type = &"Label"
+SectionHeader/colors/font_color = Color(0.494118, 0.541176, 0.65098, 1)
+StatValue/base_type = &"Label"
+StatValue/colors/font_color = Color(0.949020, 0.929412, 0.858824, 1)
+ToolbarButton/base_type = &"Button"
+ToolbarButton/colors/icon_normal_color = Color(0.905882, 0.905882, 0.905882, 1)
+ToolbarButton/colors/icon_hover_color = Color(1, 1, 1, 1)
+ToolbarButton/colors/icon_pressed_color = Color(1, 1, 1, 1)
+ToolbarButton/colors/icon_disabled_color = Color(0.5, 0.5, 0.5, 0.6)
+ToolbarButton/constants/icon_max_width = 0
+ToolbarButton/styles/normal = SubResource("toolbar_normal")
+ToolbarButton/styles/hover = SubResource("toolbar_hover")
+ToolbarButton/styles/pressed = SubResource("toolbar_pressed")
+ToolbarButton/styles/disabled = SubResource("toolbar_normal")
+ToolbarButton/styles/focus = SubResource("empty")

@@ -56,6 +56,13 @@ namespace Goose2Client.Character
         private Overlays.EmoteAnimation _emote;
         private readonly HealthBarAutoHide _healthBarAutoHide = new();
 
+        private const double BarTweenSeconds = 0.25;
+        private const float HpBarHeight = 3f;
+        private const float MpBarHeight = 2f;
+        private Tween _hpBarTween;
+        private Tween _mpBarTween;
+        private bool _barsSeeded;
+
         private void EnsureBars()
         {
             if (_hpBar != null) return;
@@ -96,12 +103,34 @@ namespace Goose2Client.Character
             HPPercent = hpPercent;
             MPPercent = mpPercent;
             EnsureBars();
-            _hpBar.Size = new Vector2(BarWidth * Mathf.Clamp(hpPercent, 0f, 1f), 3);
-            _hpBar.Color = hpPercent > 0.66f ? GameColors.HpGreen : hpPercent > 0.33f ? GameColors.HpOrange : GameColors.HpRed;
-            _mpBar.Size = new Vector2(BarWidth * Mathf.Clamp(mpPercent, 0f, 1f), 2);
+            var hpColor = hpPercent > 0.66f ? GameColors.HpGreen : hpPercent > 0.33f ? GameColors.HpOrange : GameColors.HpRed;
+            FillBar(_hpBar, ref _hpBarTween, hpPercent, HpBarHeight, hpColor);
+            FillBar(_mpBar, ref _mpBarTween, mpPercent, MpBarHeight, null);
+            _barsSeeded = true;
 
             _healthBarAutoHide.OnVitalsChanged(hpPercent, mpPercent, Time.GetTicksMsec() / 1000.0);
             ApplyBarVisibility();
+        }
+
+        /// <summary>Animates a bar to its new fill. The first update after the character
+        /// spawns snaps, so a character walking into view does not sweep its bars up from zero.</summary>
+        private void FillBar(ColorRect bar, ref Tween tween, float percent, float height, Color? color)
+        {
+            if (tween != null && tween.IsValid())
+                tween.Kill();
+
+            var size = new Vector2(BarWidth * Mathf.Clamp(percent, 0f, 1f), height);
+            if (!_barsSeeded || bar.Size == size)
+            {
+                bar.Size = size;
+                if (color.HasValue) bar.Color = color.Value;
+                return;
+            }
+
+            tween = CreateTween().SetParallel().SetTrans(Tween.TransitionType.Sine).SetEase(Tween.EaseType.Out);
+            tween.TweenProperty(bar, "size", size, BarTweenSeconds);
+            if (color.HasValue)
+                tween.TweenProperty(bar, "color", color.Value, BarTweenSeconds);
         }
 
         private void ApplyBarVisibility()
