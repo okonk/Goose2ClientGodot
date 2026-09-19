@@ -196,5 +196,6 @@ offset_top = 36.0
 offset_right = 57.0
 offset_bottom = 56.0
 mouse_filter = 0
+theme_override_colors/font_color = Color(1, 0.858824, 0.47451, 1)
 horizontal_alignment = 1
 vertical_alignment = 1
