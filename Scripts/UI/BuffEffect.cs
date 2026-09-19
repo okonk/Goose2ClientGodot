@@ -27,6 +27,7 @@ namespace Goose2Client.UI
             _icon = GetNode<TextureRect>("Icon");
             // Empty slots must not steal mouse from the world / neighboring icons.
             MouseFilter = MouseFilterEnum.Ignore;
+            Visible = false;
 
             MouseEntered += OnMouseEntered;
             MouseExited += OnMouseExited;
@@ -45,6 +46,7 @@ namespace Goose2Client.UI
             _tooltipText = BuildTooltip(packet.Name, durationText: null);
             Goose2Client.UI.Icon.Apply(_icon, packet.GraphicFile, packet.GraphicId, 0, 0, 0, 0);
             MouseFilter = MouseFilterEnum.Stop;
+            Visible = true;
         }
 
         public void ClearEffect()
@@ -53,6 +55,7 @@ namespace Goose2Client.UI
             _tooltipText = null;
             Goose2Client.UI.Icon.Clear(_icon);
             MouseFilter = MouseFilterEnum.Ignore;
+            Visible = false;
         }
 
         private static string BuildTooltip(string name, string durationText)
