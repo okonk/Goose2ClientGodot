@@ -53,6 +53,13 @@ namespace Goose2Client.Network.Packets
         /// Appended after GraphicA, so an older server that does not send it leaves this null.</summary>
         public string CurrencyName { get; set; }
 
+        /// <summary>Comma-separated item stats the client cannot otherwise show, in wire
+        /// order: haste, spell damage, spell crit, melee damage, melee crit, damage
+        /// reduction, then percent/flat pairs for HP, MP and SP regeneration. Percentages
+        /// are basis points. Appended after the currency name, so an older server leaves
+        /// this null.</summary>
+        public string ExtraStats { get; set; }
+
         public override string Prefix { get; } = "SIS";
 
         public override object Parse(PacketParser p)
@@ -105,6 +112,7 @@ namespace Goose2Client.Network.Packets
                 GraphicB = p.GetInt32(),
                 GraphicA = p.GetInt32(),
                 CurrencyName = p.LengthRemaining() > 0 ? p.GetString() : null,
+                ExtraStats = p.LengthRemaining() > 0 ? p.GetString() : null,
             };
         }
     }

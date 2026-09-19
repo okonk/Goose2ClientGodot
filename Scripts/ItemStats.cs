@@ -1,4 +1,8 @@
+using System;
+using System.Globalization;
 using Goose2Client.Network.Packets;
+
+using static System.Globalization.CultureInfo;
 
 namespace Goose2Client
 {
@@ -52,6 +56,8 @@ namespace Goose2Client
         /// value, and on anything an older server sent.</summary>
         public string CurrencyName { get; set; }
 
+        public int[] ExtraStats { get; set; } = Array.Empty<int>();
+
         public static ItemStats FromPacket(InventorySlotPacket packet)
         {
             return new ItemStats
@@ -100,7 +106,20 @@ namespace Goose2Client
                 GraphicB = packet.GraphicB,
                 GraphicA = packet.GraphicA,
                 CurrencyName = packet.CurrencyName,
+                ExtraStats = ParseExtraStats(packet.ExtraStats),
             };
+        }
+
+        private static int[] ParseExtraStats(string extraStats)
+        {
+            if (string.IsNullOrEmpty(extraStats)) return Array.Empty<int>();
+
+            var parts = extraStats.Split(',');
+            var values = new int[parts.Length];
+            for (int i = 0; i < parts.Length; i++)
+                int.TryParse(parts[i], NumberStyles.Integer, InvariantCulture, out values[i]);
+
+            return values;
         }
 
         public static ItemStats FromPacket(MapObjectPacket packet)
