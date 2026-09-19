@@ -108,6 +108,16 @@ namespace Goose2Client.UI
                     $"{FormatNumber(s.SpiritResist)} Spirit Resistance",
                     ItemTooltipColor.Resistance));
 
+            for (int i = 0; i < ExtraStatLines.Length && i < s.ExtraStats.Length; i++)
+            {
+                int value = s.ExtraStats[i];
+                if (value == 0) continue;
+
+                lines.Add((
+                    $"{FormatExtraStat(value, ExtraStatLines[i].IsPercent)} {ExtraStatLines[i].Label}",
+                    ItemTooltipColor.Stat));
+            }
+
             if (s.ClassRestrictions1 != 0)
             {
                 int offset = s.ClassRestrictions1 < 50 ? 0 : -50;
@@ -186,6 +196,33 @@ namespace Goose2Client.UI
                 ItemUseType.Scroll => "Scroll",
                 _ => "Miscellaneous",
             };
+        }
+
+        private static readonly (string Label, bool IsPercent)[] ExtraStatLines =
+        [
+            ("Melee Attack Speed", true),
+            ("Spell Damage", true),
+            ("Spell Critical Chance", true),
+            ("Melee Damage", true),
+            ("Melee Critical Chance", true),
+            ("Damage Reduction", true),
+            ("Health Regeneration", true),
+            ("Health Regeneration", false),
+            ("Mana Regeneration", true),
+            ("Mana Regeneration", false),
+            ("Spirit Regeneration", true),
+            ("Spirit Regeneration", false),
+        ];
+
+        private static string FormatPercent(int basisPoints) =>
+            (basisPoints / 100m).ToString("0.##", Inv) + "%";
+
+        private static string FormatExtraStat(int value, bool isPercent)
+        {
+            if (!isPercent) return FormatNumber(value);
+
+            string text = FormatPercent(value);
+            return value > 0 ? "+" + text : text;
         }
 
         private static string GetMaterialText(ItemMaterial type)

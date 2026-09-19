@@ -70,6 +70,116 @@ public class ItemTooltipTextTests
     }
 
     [Fact]
+    public void Build_Extra_stats_lines_in_wire_order()
+    {
+        var s = new ItemStats
+        {
+            ExtraStats = new[] { 400, 450, 1200, 800, 600, 350, 225, 2400, 150, 300, 90, 1500 }
+        };
+        var lines = ItemTooltipText.Build(s, ClassName);
+
+        var statLines = lines.Where(l => l.Color == ItemTooltipColor.Stat).Select(l => l.Text).ToList();
+        Assert.Equal(new[]
+        {
+            "+4% Melee Attack Speed",
+            "+4.5% Spell Damage",
+            "+12% Spell Critical Chance",
+            "+8% Melee Damage",
+            "+6% Melee Critical Chance",
+            "+3.5% Damage Reduction",
+            "+2.25% Health Regeneration",
+            "+2,400 Health Regeneration",
+            "+1.5% Mana Regeneration",
+            "+300 Mana Regeneration",
+            "+0.9% Spirit Regeneration",
+            "+1,500 Spirit Regeneration",
+        }, statLines);
+    }
+
+    [Fact]
+    public void Build_Omits_zero_extra_stats()
+    {
+        var withZeros = new ItemStats
+        {
+            Description = "desc",
+            AC = 20,
+            Strength = 5,
+            Value = 100,
+            ExtraStats = new int[12],
+        };
+        var withDefault = new ItemStats
+        {
+            Description = "desc",
+            AC = 20,
+            Strength = 5,
+            Value = 100,
+        };
+
+        var linesWithZeros = ItemTooltipText.Build(withZeros, ClassName);
+        var linesWithDefault = ItemTooltipText.Build(withDefault, ClassName);
+
+        Assert.Equal(linesWithDefault, linesWithZeros);
+        Assert.Equal(1, linesWithZeros.Count(l => l.Color == ItemTooltipColor.Stat));
+    }
+
+    [Fact]
+    public void Build_Formats_fractional_percent()
+    {
+        var s = new ItemStats { ExtraStats = new int[12] };
+        s.ExtraStats[1] = 450;
+        var lines = ItemTooltipText.Build(s, ClassName);
+
+        var line = lines.FirstOrDefault(l => l.Color == ItemTooltipColor.Stat);
+        Assert.Equal("+4.5% Spell Damage", line.Text);
+    }
+
+    [Fact]
+    public void Build_Formats_negative_extra_stat()
+    {
+        var s = new ItemStats { ExtraStats = new int[12] };
+        s.ExtraStats[0] = -400;
+        var lines = ItemTooltipText.Build(s, ClassName);
+
+        var line = lines.FirstOrDefault(l => l.Color == ItemTooltipColor.Stat);
+        Assert.Equal("-4% Melee Attack Speed", line.Text);
+    }
+
+    [Fact]
+    public void Build_Reports_both_regen_halves()
+    {
+        var s = new ItemStats { ExtraStats = new int[12] };
+        s.ExtraStats[6] = 225;
+        s.ExtraStats[7] = 2400;
+        var lines = ItemTooltipText.Build(s, ClassName);
+
+        var statLines = lines.Where(l => l.Color == ItemTooltipColor.Stat).Select(l => l.Text).ToList();
+        Assert.Equal(new[] { "+2.25% Health Regeneration", "+2,400 Health Regeneration" }, statLines);
+    }
+
+    [Fact]
+    public void Build_Places_extra_stats_before_the_requirements()
+    {
+        var s = new ItemStats { MinLevel = 10, MaxLevel = 20, ExtraStats = new int[12] };
+        s.ExtraStats[3] = 800;
+        var lines = ItemTooltipText.Build(s, ClassName);
+
+        int statIndex = lines.FindIndex(l => l.Color == ItemTooltipColor.Stat);
+        int reqIndex = lines.FindIndex(l => l.Color == ItemTooltipColor.Requirement);
+
+        Assert.True(statIndex < reqIndex, $"Stat at {statIndex} should be before Requirement at {reqIndex}");
+        Assert.Equal("+8% Melee Damage", lines[statIndex].Text);
+    }
+
+    [Fact]
+    public void Build_Ignores_entries_beyond_the_label_table()
+    {
+        var s = new ItemStats { ExtraStats = Enumerable.Range(1, 14).ToArray() };
+        var lines = ItemTooltipText.Build(s, ClassName);
+
+        Assert.Equal(12, lines.Count(l => l.Color == ItemTooltipColor.Stat));
+    }
+
+    [Fact]
     public void Build_Class_restriction_positive_and_negative()
     {
         // Positive (offset 0): ClassRestrictions1=3
