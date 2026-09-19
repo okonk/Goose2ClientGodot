@@ -8,9 +8,11 @@
 #     character positions/camera and trail the sprite by one frame (T2 failure). This is
 #     why WorldTextBridge drives projection from its own _Process, NOT from process_frame.
 #  2. Within a frame's processing stage, LOWER process_priority runs first. A priority-0
-#     node (Character / MapManager camera / WorldOverlay all use the default 0) mutates
+#     node (Character / WorldOverlay use the default 0) mutates
 #     state, and a priority-100 node (WorldTextBridge) observes that mutation in the SAME
 #     frame, before rendering. The bridge must set ProcessPriority above every world node.
+#     The same rule is why MapManager's camera follow runs at 50: Character (0) must move
+#     before the camera reads its position, or the camera trails the player by a frame.
 #
 # Usage: godot-mono --headless --script tools/tests/text_bridge_order.gd
 extends SceneTree

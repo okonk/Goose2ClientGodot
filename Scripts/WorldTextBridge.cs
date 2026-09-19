@@ -6,7 +6,7 @@ namespace Goose2Client
     /// runs in the bridge's own _Process at priority 100 (not process_frame — probed: emitted before node _process), so after every world node.</summary>
     public partial class WorldTextBridge : CanvasLayer
     {
-        /// Must exceed every world node's process priority (all default 0 today); lower priority runs first (text_bridge_order.gd).
+        /// Must exceed every world node's process priority (Character 0, MapManager's camera follow 50); lower priority runs first (text_bridge_order.gd).
         private const int ProjectionProcessPriority = 100;
 
         /// Text scale — the geometric mean of the UI factor and the world render scale, so labels
@@ -104,6 +104,11 @@ namespace Goose2Client
                 if (element.AnchorOwner.IsRoofOccluded) { item.Visible = false; continue; }
                 var pos = _worldViewport.WorldToWindow(element.AnchorOwner.GlobalPosition)   // calls the shared forward transform (lockstep with WindowToWorld)
                     + element.LocalOffsetWorld * _worldScale;
+                // Whole window pixels: the anchor projects integrally (snapped character, snapped
+                // camera, integer scale), but the centering offsets do not — BridgedNameLabel's
+                // -w/2 lands on a half pixel for any odd label width, which rasterizes the glyphs
+                // softly and asymmetrically. Rounding here covers every element's offset at once.
+                pos = pos.Round();
                 // No Position on CanvasItem — branch on the concrete base (elements are always one or the other):
                 if (item is Node2D n) n.Position = pos;
                 else if (item is Control c) c.Position = pos;

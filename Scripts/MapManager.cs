@@ -45,6 +45,18 @@ public partial class MapManager : Node2D
 
     public System.Collections.Generic.IEnumerable<Character.Character> Characters => _characters.Values;
 
+    /// <summary>Camera follow must run AFTER every Character has moved this frame. MapManager
+    /// sits on "World", the PARENT of "Characters", and equal-priority nodes process in tree
+    /// order (parents first), so at the default 0 the camera reads the previous frame's player
+    /// position and trails it by one frame. Harmless while everything was fractional; once both
+    /// camera and character snap to whole pixels it shows up as the player visibly bouncing
+    /// between a 2px and 3px offset from centre as the step pattern alternates.
+    /// Below WorldTextBridge's 100 so world text still projects after the camera settles
+    /// (tools/tests/text_bridge_order.gd pins the priority contract).</summary>
+    private const int CameraFollowPriority = 50;
+
+    public override void _EnterTree() => ProcessPriority = CameraFollowPriority;   // before the first _Process
+
     public override void _Ready()
     {
         _map = GameManager.Instance.CurrentMap;
@@ -248,8 +260,19 @@ public partial class MapManager : Node2D
     {
         if (_localPlayer != null && GodotObject.IsInstanceValid(_localPlayer))
         {
-            CenterCameraOn(_localPlayer.X, _localPlayer.Y);   // roof toggle keyed on tile
-            _camera.GlobalPosition = _localPlayer.Position;   // smooth-follow the lerped position
+            UpdateRoofVisibility(_localPlayer.X, _localPlayer.Y);   // roof toggle keyed on tile
+            // Smooth-follow the lerped position, but on whole pixels: the world renders 1:1 into
+            // the sub-viewport and is blitted at an integer scale, so a fractional camera makes
+            // tile and sprite edges rasterize inconsistently (1px seams, shimmer). Rounded here,
+            // WorldViewportScale.CameraParityOffset makes the whole canvas transform integral.
+            _camera.GlobalPosition = _localPlayer.Position.Round();
+            // Camera2D pushes its transform to the viewport from its own internal process at
+            // priority 0 — i.e. BEFORE this write — and the transform-changed notification that
+            // would refresh it is deferred to the end of the frame. Rendering picks that up, but
+            // anything reading GetCanvasTransform() during processing (WorldTextBridge, at 100)
+            // would project this frame's character position through last frame's camera and jitter
+            // by the step size. Push it now (tools/tests/camera_scroll_order.gd).
+            _camera.ForceUpdateScroll();
         }
     }
 
@@ -288,6 +311,7 @@ public partial class MapManager : Node2D
     private void CenterCameraOn(int x, int y)
     {
         _camera.GlobalPosition = MapCoords.TileCenter(x, y);
+        _camera.ForceUpdateScroll();   // same-frame canvas transform for world-text projection (see _Process)
         UpdateRoofVisibility(x, y);
     }
 

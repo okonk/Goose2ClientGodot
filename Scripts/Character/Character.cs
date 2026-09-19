@@ -456,6 +456,10 @@ namespace Goose2Client.Character
             PlayCurrent();
         }
 
+        /// <summary>Exact (fractional) world position. <see cref="Node2D.Position"/> carries the
+        /// pixel-snapped version of this for rendering; all motion math must read and write
+        /// <c>_exactPosition</c>, never <c>Position</c> — see <see cref="SetWorldPosition"/>.</summary>
+        private Vector2 _exactPosition;
         private Vector2 _targetPosition;
         private bool _moving;
         protected bool IsMoving => _moving;   // replaces the Task 6 stub
@@ -509,7 +513,7 @@ namespace Goose2Client.Character
             }
 
             // Snap to previous target if a chained packet arrives mid-move
-            if (_moving) Position = _targetPosition;
+            if (_moving) SetWorldPosition(_targetPosition);
 
             ApplyDeltaFacing(x - X, y - Y);
 
@@ -533,8 +537,8 @@ namespace Goose2Client.Character
         public void TeleportTo(int x, int y)
         {
             X = x; Y = y;
-            Position = Goose2Client.Map.MapCoords.TileBottomCenter(x, y);
-            _targetPosition = Position;
+            SetWorldPosition(Goose2Client.Map.MapCoords.TileBottomCenter(x, y));
+            _targetPosition = _exactPosition;
             _moving = false;
             PlayState();   // walk -> idle, matching Unity SetMoving(false)
         }
@@ -545,6 +549,18 @@ namespace Goose2Client.Character
             UpdateTileMovement(delta);
             TickAttackLock(delta);   // defined in Task 8
             ApplyBarVisibility();
+        }
+
+        /// <summary>Sole writer of the character's world position. Keeps the exact fractional
+        /// position for the motion math and renders on whole pixels: the world is drawn 1:1 into
+        /// the sub-viewport and upscaled at an integer scale, so a sprite at a fractional
+        /// position rasterizes inconsistently frame to frame (visible jitter/shimmer). Rounding
+        /// must not feed back into the accumulator — see <see cref="CharacterMotion.SnapToPixel"/>.
+        /// </summary>
+        private void SetWorldPosition(Vector2 exact)
+        {
+            _exactPosition = exact;
+            Position = CharacterMotion.SnapToPixel(exact);
         }
 
         /// <summary>Lerp toward the current tile target. On arrival, local players may chain the
@@ -559,15 +575,15 @@ namespace Goose2Client.Character
             const int maxTilesPerFrame = 8;
             for (int n = 0; n < maxTilesPerFrame; n++)
             {
-                float dist = Position.DistanceTo(_targetPosition);
-                Position = Position.MoveToward(_targetPosition, remaining);
+                float dist = _exactPosition.DistanceTo(_targetPosition);
+                SetWorldPosition(_exactPosition.MoveToward(_targetPosition, remaining));
                 remaining = CharacterMotion.RemainingStepBudget(remaining, dist);
 
-                if (!Position.IsEqualApprox(_targetPosition))
+                if (!_exactPosition.IsEqualApprox(_targetPosition))
                     return;   // still mid-tile
 
                 // Snap exactly onto the tile anchor (avoids float drift on IsEqualApprox).
-                Position = _targetPosition;
+                SetWorldPosition(_targetPosition);
                 _moving = false;
 
                 // Same-frame chain: keep walking if a held key can start the next step.

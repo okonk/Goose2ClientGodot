@@ -1,3 +1,5 @@
+using Godot;
+
 namespace Goose2Client.Character
 {
     public static class CharacterMotion
@@ -16,6 +18,13 @@ namespace Goose2Client.Character
             int safe = moveSpeed <= 0 ? 250 : moveSpeed;   // guard against div-by-zero / bad data
             return 32f * (1000f / safe);
         }
+
+        /// <summary>Render position for an exact (fractional) world position: whole pixels, so the
+        /// sprite rasterizes on the pixel grid instead of shimmering as it upscales.
+        /// The exact position must be stored separately and be the one the motion math advances.
+        /// Rounding into the accumulator instead biases every frame's step toward zero and
+        /// measurably slows the character (~6% at the default MoveSpeed's 2.13 px/frame).</summary>
+        public static Vector2 SnapToPixel(Vector2 exact) => exact.Round();
 
         /// <summary>After a tile step finishes: only return to idle when the next step was not
         /// chained in the same frame (key still held + valid tile).</summary>

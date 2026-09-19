@@ -1,3 +1,4 @@
+using Godot;
 using Goose2Client.Character;
 using Xunit;
 
@@ -56,5 +57,34 @@ public class CharacterMotionTests
         Assert.Equal(0f, CharacterMotion.RemainingStepBudget(10f, 12f), 3);
         Assert.Equal(0f, CharacterMotion.RemainingStepBudget(0f, 5f), 3);
         Assert.Equal(5f, CharacterMotion.RemainingStepBudget(5f, 0f), 3);
+    }
+
+    [Fact]
+    public void SnapToPixel_rounds_to_whole_pixels()
+    {
+        Assert.Equal(new Vector2(2f, -3f), CharacterMotion.SnapToPixel(new Vector2(2.13f, -3.4f)));
+        Assert.Equal(new Vector2(5f, 5f), CharacterMotion.SnapToPixel(new Vector2(5f, 5f)));
+    }
+
+    [Fact]
+    public void SnapToPixel_must_not_feed_back_into_the_motion_accumulator()
+    {
+        // Why Character keeps _exactPosition separate from the snapped Node2D.Position:
+        // snapping into the accumulator drops the sub-pixel remainder every frame, so the
+        // character silently walks slower than MoveSpeed says.
+        const float perFrame = 32f * 1000f / 250f / 60f;   // default MoveSpeed at 60fps = 2.133 px
+        const int frames = 60;
+
+        var exact = Vector2.Zero;
+        var fedBack = Vector2.Zero;
+        for (int i = 0; i < frames; i++)
+        {
+            exact += new Vector2(perFrame, 0f);
+            fedBack = CharacterMotion.SnapToPixel(fedBack + new Vector2(perFrame, 0f));
+        }
+
+        Assert.Equal(128f, exact.X, 2);                                   // a full 4 tiles/second
+        Assert.Equal(128f, CharacterMotion.SnapToPixel(exact).X, 2);      // snapping the total is free
+        Assert.Equal(120f, fedBack.X, 2);                                 // feeding it back loses ~6%
     }
 }
