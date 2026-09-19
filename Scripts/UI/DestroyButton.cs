@@ -7,6 +7,14 @@ namespace Goose2Client.UI
     /// </summary>
     public partial class DestroyButton : Button
     {
+        public override void _Ready()
+        {
+            base._Ready();
+            MouseEntered += () => TooltipManager.Instance?.ShowTextTooltip(
+                "Destroy \u2014 drag an item or spell here", this);
+            MouseExited += () => TooltipManager.Instance?.HideTextTooltip();
+        }
+
         public override bool _CanDropData(Vector2 atPosition, Variant data)
         {
             if (data.VariantType != Variant.Type.Dictionary)

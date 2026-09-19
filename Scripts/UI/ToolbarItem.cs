@@ -26,7 +26,18 @@ public partial class ToolbarItem : Button
     {
         base._Ready();
         Pressed += OnPressed;
+
+        MouseEntered += () => TooltipManager.Instance?.ShowTextTooltip(TooltipFor(ItemType), this);
+        MouseExited += () => TooltipManager.Instance?.HideTextTooltip();
     }
+
+    private static string TooltipFor(ToolbarItemType type) => type switch
+    {
+        ToolbarItemType.CombineBag => "Combine bag",
+        ToolbarItemType.Options => "Options",
+        ToolbarItemType.Exit => "Exit game",
+        _ => "Destroy"
+    };
 
     private void OnPressed()
     {
