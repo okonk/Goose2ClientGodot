@@ -1,11 +1,10 @@
-[gd_scene load_steps=8 format=3]
+[gd_scene load_steps=7 format=3]
 
 [ext_resource type="Script" path="res://Scripts/UI/TooltipManager.cs" id="1_manager"]
 [ext_resource type="Script" path="res://Scripts/UI/ItemTooltipControl.cs" id="2_item"]
 [ext_resource type="Script" path="res://Scripts/UI/SpellTooltipControl.cs" id="3_spell"]
 [ext_resource type="Script" path="res://Scripts/UI/TextTooltipControl.cs" id="4_text"]
 [ext_resource type="Script" path="res://Scripts/UI/MapItemTooltipControl.cs" id="5_mapitem"]
-[ext_resource type="Texture2D" path="res://Assets/UI/hotbar-slot-background.png" id="6_slotbg"]
 
 [sub_resource type="StyleBoxFlat" id="sb_tooltip_bg"]
 content_margin_left = 6.0
@@ -48,16 +47,14 @@ anchor_bottom = 1.0
 mouse_filter = 2
 theme_override_styles/panel = SubResource("sb_tooltip_bg")
 
-[node name="IconBackground" type="TextureRect" parent="ItemTooltip"]
+[node name="IconBackground" type="Panel" parent="ItemTooltip"]
 layout_mode = 0
 mouse_filter = 2
-expand_mode = 1
-stretch_mode = 0
+theme_type_variation = &"SlotPanel"
 offset_left = 4.0
 offset_top = 4.0
 offset_right = 36.0
 offset_bottom = 36.0
-texture = ExtResource("6_slotbg")
 
 [node name="Icon" type="TextureRect" parent="ItemTooltip"]
 layout_mode = 0

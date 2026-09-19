@@ -8,7 +8,7 @@ namespace Goose2Client.UI
     public partial class ItemTooltipControl : Control
     {
         private TextureRect _iconRect;
-        private TextureRect _iconBackground;
+        private Panel _iconBackground;
         private Label _nameLabel;
         private Label _typeLabel;
         private Label _flagsLabel;
@@ -19,7 +19,7 @@ namespace Goose2Client.UI
         public override void _Ready()
         {
             _iconRect = GetNode<TextureRect>("Icon");
-            _iconBackground = GetNode<TextureRect>("IconBackground");
+            _iconBackground = GetNode<Panel>("IconBackground");
             _nameLabel = GetNode<Label>("Name");
             _typeLabel = GetNode<Label>("Type");
             _flagsLabel = GetNode<Label>("Flags");
