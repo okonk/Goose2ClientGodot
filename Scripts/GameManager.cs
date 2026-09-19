@@ -44,6 +44,11 @@ namespace Goose2Client
 
         public bool CanSeeInvisible { get; set; }
 
+        private readonly HashSet<int> _partyIds = new();
+        private readonly int[] _partySlots = new int[PartyWindow.MaxMembers];
+
+        public bool IsInParty(int loginId) => _partyIds.Contains(loginId);
+
         /// <summary>The active MapManager node, set/cleared by MapManager itself.</summary>
         public MapManager CurrentMapManager { get; set; }
 
@@ -132,6 +137,7 @@ namespace Goose2Client
             // Listen for class table updates for the lifetime of the app.
             PacketManager.Listen<ClassUpdatePacket>(OnClassUpdate);
             PacketManager.Listen<PingPacket>(OnPing);
+            PacketManager.Listen<GroupUpdatePacket>(OnGroupUpdate);
             // GameManager persists across scene swaps and owns ChangeMap.
             // SendCurrentMapPacket drives warp / door / death-recall map transitions
             // that arrive after login — login scene is freed and would drop them.
@@ -338,6 +344,24 @@ namespace Goose2Client
         {
             var packet = (ClassUpdatePacket)packetObj;
             Classes[packet.ClassId] = packet.Name;
+        }
+
+        private void OnGroupUpdate(object packetObj)
+        {
+            var p = (GroupUpdatePacket)packetObj;
+            if (p.LineNumber < 0 || p.LineNumber >= _partySlots.Length) return;
+            int oldId = _partySlots[p.LineNumber];
+            _partySlots[p.LineNumber] = p.LoginId;
+            if (oldId != 0) _partyIds.Remove(oldId);
+            if (p.LoginId != 0) _partyIds.Add(p.LoginId);
+            ReapplyInvisibility(oldId);
+            ReapplyInvisibility(p.LoginId);
+        }
+
+        private void ReapplyInvisibility(int loginId)
+        {
+            if (loginId == 0) return;
+            CurrentMapManager?.GetCharacter(loginId)?.ApplyInvisibility();
         }
 
         public override void _Notification(int what)

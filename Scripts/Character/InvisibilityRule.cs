@@ -4,9 +4,9 @@ namespace Goose2Client.Character
 
     public static class InvisibilityRule
     {
-        public static InvisibilityState Evaluate(bool isInvisible, bool canSeeInvisible, bool isLocalPlayer)
+        public static InvisibilityState Evaluate(bool isInvisible, bool canSeeInvisible, bool isLocalPlayer, bool isPartyMember)
             => isInvisible
-                ? (isLocalPlayer || canSeeInvisible ? InvisibilityState.Translucent : InvisibilityState.Hidden)
+                ? (isLocalPlayer || canSeeInvisible || isPartyMember ? InvisibilityState.Translucent : InvisibilityState.Hidden)
                 : InvisibilityState.Normal;
     }
 }

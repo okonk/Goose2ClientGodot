@@ -273,7 +273,8 @@ namespace Goose2Client.Character
         public void ApplyInvisibility()
         {
             var rule = InvisibilityRule.Evaluate(
-                IsInvisible, GameManager.Instance?.CanSeeInvisible ?? false, IsLocalPlayer);
+                IsInvisible, GameManager.Instance?.CanSeeInvisible ?? false, IsLocalPlayer,
+                GameManager.Instance?.IsInParty(LoginId) ?? false);
             bool hidden = rule == InvisibilityState.Hidden;
             IsHiddenFromViewer = hidden;
             Visible = !hidden;
