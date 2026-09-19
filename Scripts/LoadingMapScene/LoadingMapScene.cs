@@ -11,7 +11,7 @@ public partial class LoadingMapScene : Control, IScalableWindow
 
     public override void _Ready()
     {
-        _statusLabel = GetNode<Label>("StatusLabel");
+        _statusLabel = GetNode<Label>("LoadingPanel/Padding/VBox/StatusLabel");
         UpdateLabel();
 
         var applier = UiScaleApplier.Instance;

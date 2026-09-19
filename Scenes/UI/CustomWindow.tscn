@@ -91,6 +91,7 @@ mouse_filter = 1
 
 [node name="LookSlot" type="Panel" parent="Content"]
 script = ExtResource("2_cws")
+theme_type_variation = &"SlotPanel"
 layout_mode = 0
 mouse_filter = 0
 offset_left = 173.0
@@ -131,6 +132,7 @@ horizontal_alignment = 1
 
 [node name="StatsSlot" type="Panel" parent="Content"]
 script = ExtResource("2_cws")
+theme_type_variation = &"SlotPanel"
 layout_mode = 0
 mouse_filter = 0
 offset_left = 213.0

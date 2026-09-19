@@ -26,10 +26,10 @@ public partial class LoginScene : Control, IScalableWindow
     public override void _Ready()
     {
         // 1. Cache UI nodes
-        _nameInput = GetNode<LineEdit>("MarginContainer/VBox/NameInput");
-        _passwordInput = GetNode<LineEdit>("MarginContainer/VBox/PasswordInput");
-        _loginButton = GetNode<Button>("MarginContainer/VBox/LoginButton");
-        _statusLabel = GetNode<Label>("MarginContainer/VBox/StatusLabel");
+        _nameInput = GetNode<LineEdit>("LoginLayout/Center/LoginCard/CardPadding/VBox/NameInput");
+        _passwordInput = GetNode<LineEdit>("LoginLayout/Center/LoginCard/CardPadding/VBox/PasswordInput");
+        _loginButton = GetNode<Button>("LoginLayout/Center/LoginCard/CardPadding/VBox/LoginButton");
+        _statusLabel = GetNode<Label>("LoginLayout/Center/LoginCard/CardPadding/VBox/StatusLabel");
 
         // 2. Autofill from credential store
         var (name, password) = LoginCredentialStore.Load();

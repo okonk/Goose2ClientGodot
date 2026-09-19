@@ -8,20 +8,22 @@
 [ext_resource type="Texture2D" path="res://Assets/UI/hotbar-slot-background.png" id="6_slotbg"]
 
 [sub_resource type="StyleBoxFlat" id="sb_tooltip_bg"]
-content_margin_left = 2.0
-content_margin_top = 2.0
-content_margin_right = 2.0
-content_margin_bottom = 2.0
-bg_color = Color(0, 0, 0, 1)
+content_margin_left = 6.0
+content_margin_top = 5.0
+content_margin_right = 6.0
+content_margin_bottom = 5.0
+bg_color = Color(0.019608, 0.027451, 0.058824, 0.98)
 border_width_left = 1
 border_width_top = 1
 border_width_right = 1
 border_width_bottom = 1
-corner_radius_top_left = 8
-corner_radius_top_right = 8
-corner_radius_bottom_right = 8
-corner_radius_bottom_left = 8
-border_color = Color(1, 1, 1, 1)
+corner_radius_top_left = 2
+corner_radius_top_right = 2
+corner_radius_bottom_right = 2
+corner_radius_bottom_left = 2
+border_color = Color(0.92549, 0.72549, 0.337255, 1)
+shadow_color = Color(0, 0, 0, 0.7)
+shadow_size = 4
 
 [node name="TooltipManager" type="Control"]
 script = ExtResource("1_manager")
@@ -79,7 +81,7 @@ offset_left = 40.0
 offset_top = 17.0
 offset_right = -4.0
 offset_bottom = 31.0
-theme_override_colors/font_color = Color(0.627, 0.659, 0.627, 1)
+theme_override_colors/font_color = Color(0.65098, 0.760784, 0.898039, 1)
 
 [node name="Flags" type="Label" parent="ItemTooltip"]
 layout_mode = 0
@@ -88,7 +90,7 @@ offset_left = 40.0
 offset_top = 30.0
 offset_right = -4.0
 offset_bottom = 44.0
-theme_override_colors/font_color = Color(0.439, 0.486, 0.784, 1)
+theme_override_colors/font_color = Color(0.443137, 0.831373, 1, 1)
 
 [node name="StatsVBox" type="VBoxContainer" parent="ItemTooltip"]
 layout_mode = 0
@@ -177,5 +179,5 @@ offset_top = 24.0
 offset_right = 400.0
 offset_bottom = 40.0
 text = "This item will bind on pickup"
-theme_override_colors/font_color = Color(0.91, 0.471, 0.439, 1)
+theme_override_colors/font_color = Color(1, 0.431373, 0.384314, 1)
 visible = false

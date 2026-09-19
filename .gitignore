@@ -28,6 +28,10 @@ mono_crash.*
 #     dotnet run --project tools/AssetConverter/src/AssetConverter -- all "$PWD"
 # See tools/AssetConverter/src/AssetConverter/Paths.cs for the source paths.
 /Assets/
+!/Assets/
+/Assets/*
+!/Assets/UI/
+!/Assets/UI/**
 
 # ---- Local editor/agent config ----
 .claude/

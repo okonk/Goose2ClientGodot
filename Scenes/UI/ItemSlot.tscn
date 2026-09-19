@@ -4,6 +4,7 @@
 
 [node name="ItemSlot" type="Panel"]
 script = ExtResource("1_itemslot")
+theme_type_variation = &"SlotPanel"
 custom_minimum_size = Vector2(32, 32)
 layout_mode = 0
 mouse_filter = 0
