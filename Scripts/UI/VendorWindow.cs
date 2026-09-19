@@ -5,14 +5,14 @@ using Goose2Client.Network.Packets;
 namespace Goose2Client.UI;
 
 /// <summary>
-/// Vendor window — 40-slot server-spawned shop grid.
+/// Vendor window — 30-slot server-spawned shop grid.
 /// Hidden until a MakeWindow/EndWindow pair for this frame arrives.
 /// </summary>
 public partial class VendorWindow : BaseWindow, IWindow, INpcWindow
 {
     protected override bool DefaultVisible => false;
 
-    public const int VendorSlots = 40;
+    public const int VendorSlots = 30;
 
     private static readonly PackedScene SlotScene = GD.Load<PackedScene>("res://Scenes/UI/ItemSlot.tscn");
 
