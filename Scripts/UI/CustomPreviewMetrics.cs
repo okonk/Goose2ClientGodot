@@ -8,7 +8,7 @@ public static class CustomPreviewMetrics
     public static float Scale(Vector2 controlSize)
     {
         if (controlSize.X <= 0f || controlSize.Y <= 0f) return 0f;
-        return 2.0f;
+        return 3.0f;
     }
 
     public static (Vector2 Size, Vector2 Position) Layout(Vector2 frameSize, Vector2 controlSize)
