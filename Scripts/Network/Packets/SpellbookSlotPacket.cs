@@ -23,6 +23,8 @@ namespace Goose2Client.Network.Packets
 
         public long Cooldown { get; set; }
 
+        public long CooldownRemainingMs { get; set; }
+
         public override string Prefix { get; } = "SSS";
 
         public override object Parse(PacketParser p)
@@ -42,6 +44,8 @@ namespace Goose2Client.Network.Packets
                 packet.GraphicId = p.GetInt32();
                 packet.GraphicFile = p.GetInt32();
                 packet.Cooldown = p.GetInt64();
+                if (p.LengthRemaining() > 0)
+                    packet.CooldownRemainingMs = p.GetInt64();
             }
 
             return packet;

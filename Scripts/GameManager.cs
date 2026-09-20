@@ -144,6 +144,7 @@ namespace Goose2Client
             PacketManager.Listen<SendCurrentMapPacket>(OnSendCurrentMap);
             PacketManager.Listen<MapFlagsPacket>(OnMapFlags);
             PacketManager.Listen<SpellCooldownPacket>(OnSpellCooldown);
+            PacketManager.Listen<SpellbookSlotPacket>(OnSpellbookSlot);
 
             // Nothing else observes a dropped connection after login; without this it
             // is invisible (the game just sits frozen on a dead socket).
@@ -365,6 +366,12 @@ namespace Goose2Client
             SpellCooldownManager.Sync(p.SlotNumber, System.TimeSpan.FromMilliseconds(p.RemainingMilliseconds));
         }
 
+        private void OnSpellbookSlot(object packetObj)
+        {
+            var p = (SpellbookSlotPacket)packetObj;
+            SpellCooldownManager.Sync(p.SlotNumber, System.TimeSpan.FromMilliseconds(p.CooldownRemainingMs));
+        }
+
         private void ReapplyInvisibility(int loginId)
         {
             if (loginId == 0) return;
@@ -480,6 +487,7 @@ namespace Goose2Client
             PacketManager.Remove<SendCurrentMapPacket>(OnSendCurrentMap);
             PacketManager.Remove<MapFlagsPacket>(OnMapFlags);
             PacketManager.Remove<SpellCooldownPacket>(OnSpellCooldown);
+            PacketManager.Remove<SpellbookSlotPacket>(OnSpellbookSlot);
             NetworkClient.Disconnected -= OnDisconnected;
             NetworkClient.SocketError -= OnSocketError;
             NetworkClient?.Disconnect();
