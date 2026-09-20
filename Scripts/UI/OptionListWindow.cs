@@ -45,17 +45,16 @@ public partial class OptionListWindow : BaseMultipleWindow
 
     protected override Control CreateLine(int index)
     {
+        // The Button is a full-row click layer (empty text); the label + icon are children
+        // positioned explicitly so both share the row's vertical centre.
         var button = new Button
         {
             Name = "Line" + index,
-            Text = " ",
+            Text = "",
             Flat = true,
             Visible = false,
-            ClipText = true,
-            Alignment = HorizontalAlignment.Left,
             FocusMode = FocusModeEnum.None,
         };
-        UiScaleApplier.Instance.ApplyFontSize(button, LineFontSize);
         button.Pressed += () => LineClicked(index);
 
         var icon = new TextureRect
@@ -67,6 +66,18 @@ public partial class OptionListWindow : BaseMultipleWindow
             StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
         };
         button.AddChild(icon);
+
+        var label = new Label
+        {
+            Name = "Label",
+            Text = "",
+            ClipText = true,
+            HorizontalAlignment = HorizontalAlignment.Left,
+            VerticalAlignment = VerticalAlignment.Center,
+            MouseFilter = Control.MouseFilterEnum.Ignore,
+        };
+        UiScaleApplier.Instance.ApplyFontSize(label, LineFontSize);
+        button.AddChild(label);
         return button;
     }
 
@@ -76,7 +87,7 @@ public partial class OptionListWindow : BaseMultipleWindow
     protected override void SetLineText(int index, string text)
     {
         var button = (Button)_lines[index];
-        button.Text = text;
+        GetLabel(index).Text = text;
         var visible = !string.IsNullOrWhiteSpace(text);
         button.Visible = visible;
         if (visible)
@@ -137,15 +148,19 @@ public partial class OptionListWindow : BaseMultipleWindow
         var factor = UiScaleApplier.Instance.Factor;
         var lineSize = OptionListMetrics.LineSize(factor);
         var iconSize = UiScale.ScaleSize(OptionListMetrics.IconSize, factor);
-        var indent = OptionListMetrics.LineTextIndent(factor);
+        var iconX = UiScale.ScaleSize(OptionListMetrics.IconX, factor);
+        var textX = OptionListMetrics.LineTextIndent(factor);
+        var textWidth = OptionListMetrics.LineTextWidth(factor);
         for (int i = 0; i < _lines.Length; i++)
         {
             var button = (Button)_lines[i];
             button.Size = lineSize;
-            button.AddThemeConstantOverride("content_margin_left", indent);
             var icon = GetIcon(i);
             icon.Size = new Vector2(iconSize, iconSize);
-            icon.Position = new Vector2(0f, (lineSize.Y - iconSize) / 2f);
+            icon.Position = new Vector2(iconX, (lineSize.Y - iconSize) / 2f);
+            var label = GetLabel(i);
+            label.Position = new Vector2(textX, 0f);
+            label.Size = new Vector2(textWidth, lineSize.Y);
         }
 
         _heading.Visible = _headingVisible;
@@ -191,19 +206,14 @@ public partial class OptionListWindow : BaseMultipleWindow
     private TextureRect GetIcon(int index)
         => ((Button)_lines[index]).GetNode<TextureRect>("Icon");
 
+    private Label GetLabel(int index)
+        => ((Button)_lines[index]).GetNode<Label>("Label");
+
     private void SetLineColor(int index, Color c)
-    {
-        var button = (Button)_lines[index];
-        foreach (var prop in new[] { "font_color", "font_hover_color", "font_pressed_color", "font_focus_color" })
-            button.AddThemeColorOverride(prop, c);
-    }
+        => GetLabel(index).AddThemeColorOverride("font_color", c);
 
     private void ResetLineColor(int index)
-    {
-        var button = (Button)_lines[index];
-        foreach (var prop in new[] { "font_color", "font_hover_color", "font_pressed_color", "font_focus_color" })
-            button.RemoveThemeColorOverride(prop);
-    }
+        => GetLabel(index).RemoveThemeColorOverride("font_color");
 
     private void LineClicked(int index)
     {

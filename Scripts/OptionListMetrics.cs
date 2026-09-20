@@ -6,12 +6,13 @@ public static class OptionListMetrics
 {
     public const int IconSize = 32;
     public const int IconTextGap = 4;
+    public const int IconX = 0;
     private const int LinePaddingY = 2;
     private const int LineHeight = IconSize + LinePaddingY * 2;
     private const int HeadingHeight = 18;
     private const float LinesOriginX = 6f;
     private const float LinesOriginY = 22f;
-    private const float LinesWidth = 248f;
+    public const float LinesWidth = 248f;
     private const float BottomMargin = 6f;
     private const float ButtonRowHeight = 26f;
     private const float ButtonWidth = 74f;
@@ -43,6 +44,9 @@ public static class OptionListMetrics
     // text column stays aligned whether or not a given line has an icon).
     public static int LineTextIndent(float factor)
         => (int)UiScale.ScaleSize(IconSize + IconTextGap, factor);
+
+    public static int LineTextWidth(float factor)
+        => (int)UiScale.ScaleSize(LinesWidth - (IconSize + IconTextGap), factor);
 
     public static int WindowHeight(int lineCount, float factor, bool hasHeading, bool bottomButtons)
     {
