@@ -15,8 +15,11 @@ namespace Goose2Client.UI
         public static readonly Vector2 SlotSize = new(20, 20);
 
         private TextureRect _icon;
+        private CooldownOverlay _sweep;
         private string _effectName;
         private string _tooltipText;
+        private long _durationMs;
+        private DateTimeOffset _expiresAt;
 
         internal static float BlinkAlpha(double nowSeconds) => Mathf.Clamp(0.65f + 0.35f * (float)Math.Sin(2 * Math.PI * nowSeconds), 0.3f, 1.0f);
 
@@ -27,6 +30,7 @@ namespace Goose2Client.UI
         {
             CustomMinimumSize = SlotSize;
             _icon = GetNode<TextureRect>("Icon");
+            _sweep = GetNode<CooldownOverlay>("Sweep");
             // Empty slots must not steal mouse from the world / neighboring icons.
             MouseFilter = MouseFilterEnum.Ignore;
             Visible = false;
@@ -44,8 +48,10 @@ namespace Goose2Client.UI
             }
 
             _effectName = packet.Name;
-            // Protocol currently ships name only; keep duration optional for future packets.
-            _tooltipText = BuildTooltip(packet.Name, durationText: null);
+            _durationMs = packet.DurationMs;
+            _expiresAt = DateTimeOffset.UtcNow.AddMilliseconds(_durationMs);
+            _icon.Modulate = Colors.White;
+            _tooltipText = BuildTooltip(packet.Name, _durationMs > 0 ? CooldownOverlay.FormatCountdown(_durationMs / 1000.0) : null);
             Goose2Client.UI.Icon.Apply(_icon, packet.GraphicFile, packet.GraphicId, 0, 0, 0, 0);
             MouseFilter = MouseFilterEnum.Stop;
             Visible = true;
@@ -55,9 +61,25 @@ namespace Goose2Client.UI
         {
             _effectName = null;
             _tooltipText = null;
+            _durationMs = 0;
+            _sweep.Visible = false;
+            _icon.Modulate = Colors.White;
             Goose2Client.UI.Icon.Clear(_icon);
             MouseFilter = MouseFilterEnum.Ignore;
             Visible = false;
+        }
+
+        public override void _Process(double delta)
+        {
+            if (_effectName == null || _durationMs <= 0)
+                return;
+
+            var remaining = (_expiresAt - DateTimeOffset.UtcNow).TotalSeconds;
+            _sweep.Update(remaining, _durationMs / 1000.0, growthMode: true, dangerSeconds: 10);
+
+            _icon.Modulate = remaining <= 15
+                ? new Color(1, 1, 1, BlinkAlpha(Time.GetTicksMsec() / 1000.0))
+                : Colors.White;
         }
 
         private static string BuildTooltip(string name, string durationText)

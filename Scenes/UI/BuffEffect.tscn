@@ -1,6 +1,7 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene load_steps=3 format=3]
 
 [ext_resource type="Script" path="res://Scripts/UI/BuffEffect.cs" id="1_buff"]
+[ext_resource type="Script" path="res://Scripts/UI/CooldownOverlay.cs" id="2_sweep"]
 
 [node name="BuffEffect" type="Panel"]
 script = ExtResource("1_buff")
@@ -17,6 +18,16 @@ layout_mode = 0
 mouse_filter = 2
 expand_mode = 1
 stretch_mode = 5
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 20.0
+offset_bottom = 20.0
+
+[node name="Sweep" type="Control" parent="."]
+layout_mode = 0
+mouse_filter = 2
+visible = false
+script = ExtResource("2_sweep")
 offset_left = 0.0
 offset_top = 0.0
 offset_right = 20.0
