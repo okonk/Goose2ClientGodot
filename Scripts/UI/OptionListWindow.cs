@@ -7,7 +7,7 @@ namespace Goose2Client.UI;
 
 public partial class OptionListWindow : BaseMultipleWindow
 {
-    public const int MaxLines = 10;
+    public const int MaxLines = 8;
     // WBC button id = LineClickOffset + line index; must match Goose.Window.LineClickOffset
     // (server). See aspereta-info/protocol.txt.
     public const int LineClickOffset = 20;
@@ -149,8 +149,15 @@ public partial class OptionListWindow : BaseMultipleWindow
         var lineSize = OptionListMetrics.LineSize(factor);
         var iconSize = UiScale.ScaleSize(OptionListMetrics.IconSize, factor);
         var iconX = UiScale.ScaleSize(OptionListMetrics.IconX, factor);
-        var textX = OptionListMetrics.LineTextIndent(factor);
-        var textWidth = OptionListMetrics.LineTextWidth(factor);
+        // Indent the text column only when at least one visible line carries an icon, so an
+        // icon-less list doesn't leave a blank gap on the left.
+        var anyIcon = false;
+        for (int i = 0; i < _lines.Length; i++)
+            if (((Button)_lines[i]).Visible && GetIcon(i).Texture != null) { anyIcon = true; break; }
+        var textX = anyIcon ? OptionListMetrics.LineTextIndent(factor) : 0;
+        var textWidth = anyIcon
+            ? OptionListMetrics.LineTextWidth(factor)
+            : UiScale.ScaleSize(OptionListMetrics.LinesWidth, factor);
         for (int i = 0; i < _lines.Length; i++)
         {
             var button = (Button)_lines[i];
