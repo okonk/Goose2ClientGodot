@@ -48,6 +48,8 @@ namespace Goose2Client.UI
                     VerticalAlignment = VerticalAlignment.Center
                 };
                 _text.AddThemeColorOverride("font_color", Colors.White);
+                _text.AddThemeColorOverride("font_outline_color", Colors.Black);
+                _text.AddThemeConstantOverride("outline_size", 8);
                 _text.SetAnchorsPreset(LayoutPreset.FullRect);
                 AddChild(_text);
             }
