@@ -99,11 +99,7 @@ public partial class OptionListWindow : BaseMultipleWindow
 
         // Invisible rows let clicks fall through to the world; a disabled Button would
         // still swallow them (Godot hit-testing is not clipped to the parent rect).
-        var icon = GetIcon(index);
-        icon.Texture = null;
-        icon.Visible = false;
-        icon.Material = null;
-        ResetLineColor(index);
+        Icon.Clear(GetIcon(index));
     }
 
     public override void OnMakeWindow(MakeWindowPacket packet)
@@ -131,16 +127,9 @@ public partial class OptionListWindow : BaseMultipleWindow
 
     private void ApplyLineGraphics(int index, WindowLinePacket p)
     {
-        var icon = GetIcon(index);
-        var tex = p.GraphicSheet != 0 ? GameManager.Instance.Sprites.Get(p.GraphicSheet, p.GraphicId) : null;
-        icon.Texture = tex;
-        icon.Visible = tex != null;
-        icon.Material = null;
-
-        if (p.HasColor)
-            SetLineColor(index, new Color(p.GraphicR / 255f, p.GraphicG / 255f, p.GraphicB / 255f, 1f));
-        else
-            ResetLineColor(index);
+        // The trailing r|g|b|a tints the icon (a is the blend factor, as in item slots); a=0
+        // (the "*" shortcut) leaves it untinted.
+        Icon.Apply(GetIcon(index), p.GraphicSheet, p.GraphicId, p.GraphicR, p.GraphicG, p.GraphicB, p.GraphicA);
     }
 
     public override void Relayout()
@@ -221,12 +210,6 @@ public partial class OptionListWindow : BaseMultipleWindow
 
     private Label GetLabel(int index)
         => ((Button)_lines[index]).GetNode<Label>("Label");
-
-    private void SetLineColor(int index, Color c)
-        => GetLabel(index).AddThemeColorOverride("font_color", c);
-
-    private void ResetLineColor(int index)
-        => GetLabel(index).RemoveThemeColorOverride("font_color");
 
     private void LineClicked(int index)
     {

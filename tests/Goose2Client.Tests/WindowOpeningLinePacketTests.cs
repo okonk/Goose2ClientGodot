@@ -37,7 +37,7 @@ namespace Goose2Client.Network.Packets.Tests
     public class WindowLinePacketTests
     {
         [Fact]
-        public void ParsesSheetGraphicAndColor()
+        public void ParsesSheetGraphicAndTint()
         {
             var p = (WindowLinePacket)new WindowLinePacket().Parse(
                 new PacketParser("WNF1001,3,Do it|0|0|5|7|255|128|0|255", "WNF"));
@@ -50,11 +50,10 @@ namespace Goose2Client.Network.Packets.Tests
             Assert.Equal(128, p.GraphicG);
             Assert.Equal(0, p.GraphicB);
             Assert.Equal(255, p.GraphicA);
-            Assert.True(p.HasColor);
         }
 
         [Fact]
-        public void StarShortcutMeansNoColor()
+        public void StarShortcutMeansNoTint()
         {
             var p = (WindowLinePacket)new WindowLinePacket().Parse(
                 new PacketParser("WNF1001,1,Hi|0|0|0|0|*", "WNF"));
@@ -62,17 +61,8 @@ namespace Goose2Client.Network.Packets.Tests
             Assert.Equal("Hi", p.Text);
             Assert.Equal(0, p.GraphicSheet);
             Assert.Equal(0, p.GraphicId);
-            Assert.False(p.HasColor);
             Assert.Equal(0, p.GraphicR);
-        }
-
-        [Fact]
-        public void BlackColorIsDistinguishedFromNoColor()
-        {
-            var black = (WindowLinePacket)new WindowLinePacket().Parse(
-                new PacketParser("WNF1,1,x|0|0|0|0|0|0|0|255", "WNF"));
-            Assert.True(black.HasColor);
-            Assert.Equal(0, black.GraphicR);
+            Assert.Equal(0, p.GraphicA);
         }
     }
 }

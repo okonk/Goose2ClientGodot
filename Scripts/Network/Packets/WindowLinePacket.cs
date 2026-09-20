@@ -23,10 +23,6 @@ namespace Goose2Client.Network.Packets
         public int GraphicB { get; set; }
         public int GraphicA { get; set; }
 
-        // True when the trailing field was r|g|b|a (a real colour); false for the "*" shortcut.
-        // Needed because a black text colour (0,0,0) is indistinguishable from "no colour" once parsed.
-        public bool HasColor { get; set; }
-
         public override string Prefix { get; } = "WNF";
 
         public override object Parse(PacketParser p)
@@ -57,7 +53,6 @@ namespace Goose2Client.Network.Packets
             }
             else
             {
-                packet.HasColor = true;
                 packet.GraphicR = p.GetInt32();
                 packet.GraphicG = p.GetInt32();
                 packet.GraphicB = p.GetInt32();
