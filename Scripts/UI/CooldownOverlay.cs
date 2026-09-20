@@ -25,9 +25,11 @@ namespace Goose2Client.UI
             if (totalSeconds >= 60)
                 return $"{totalSeconds / 60}:{totalSeconds % 60:D2}";
 
-            return remainingSeconds >= 1
-                ? totalSeconds.ToString()
-                : remainingSeconds.ToString("F1");
+            if (remainingSeconds >= 1)
+                return totalSeconds.ToString();
+
+            string subSecond = remainingSeconds.ToString("F1");
+            return subSecond == "1.0" ? "1" : subSecond;
         }
 
         public override void _Ready()
