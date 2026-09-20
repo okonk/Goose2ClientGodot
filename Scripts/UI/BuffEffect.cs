@@ -49,6 +49,7 @@ namespace Goose2Client.UI
 
             _effectName = packet.Name;
             _durationMs = packet.DurationMs;
+            _sweep.Visible = _durationMs > 0;
             _expiresAt = DateTimeOffset.UtcNow.AddMilliseconds(_durationMs);
             _icon.Modulate = Colors.White;
             _tooltipText = BuildTooltip(packet.Name, _durationMs > 0 ? CooldownOverlay.FormatCountdown(_durationMs / 1000.0) : null);
