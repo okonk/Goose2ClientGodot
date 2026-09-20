@@ -14,6 +14,7 @@ public partial class OptionListWindow : BaseMultipleWindow
 
     private Label _heading;
     private bool _headingVisible;
+    private bool _anyIcon;
     private int _maxLine = -1;
 
     public override WindowFrames WindowFrame => WindowFrames.OptionList;
@@ -82,7 +83,7 @@ public partial class OptionListWindow : BaseMultipleWindow
     }
 
     protected override Vector2 LinePosition(int index, float factor)
-        => OptionListMetrics.LinePosition(index, factor, _headingVisible);
+        => OptionListMetrics.LinePosition(index, factor, _headingVisible, _anyIcon);
 
     protected override void SetLineText(int index, string text)
     {
@@ -144,18 +145,16 @@ public partial class OptionListWindow : BaseMultipleWindow
 
     public override void Relayout()
     {
+        _anyIcon = ComputeAnyIcon();
         base.Relayout();
         var factor = UiScaleApplier.Instance.Factor;
-        var lineSize = OptionListMetrics.LineSize(factor);
+        var lineSize = OptionListMetrics.LineSize(factor, _anyIcon);
         var iconSize = UiScale.ScaleSize(OptionListMetrics.IconSize, factor);
         var iconX = UiScale.ScaleSize(OptionListMetrics.IconX, factor);
         // Indent the text column only when at least one visible line carries an icon, so an
         // icon-less list doesn't leave a blank gap on the left.
-        var anyIcon = false;
-        for (int i = 0; i < _lines.Length; i++)
-            if (((Button)_lines[i]).Visible && GetIcon(i).Texture != null) { anyIcon = true; break; }
-        var textX = anyIcon ? OptionListMetrics.LineTextIndent(factor) : 0;
-        var textWidth = anyIcon
+        var textX = _anyIcon ? OptionListMetrics.LineTextIndent(factor) : 0;
+        var textWidth = _anyIcon
             ? OptionListMetrics.LineTextWidth(factor)
             : UiScale.ScaleSize(OptionListMetrics.LinesWidth, factor);
         for (int i = 0; i < _lines.Length; i++)
@@ -179,8 +178,15 @@ public partial class OptionListWindow : BaseMultipleWindow
 
         Size = new Vector2(
             Size.X,
-            OptionListMetrics.WindowHeight(Math.Max(_maxLine + 1, 1), factor, _headingVisible, AnyBottomButtonVisible()));
+            OptionListMetrics.WindowHeight(Math.Max(_maxLine + 1, 1), factor, _headingVisible, AnyBottomButtonVisible(), _anyIcon));
         PlaceBottomButtons(factor);
+    }
+
+    private bool ComputeAnyIcon()
+    {
+        for (int i = 0; i < _lines.Length; i++)
+            if (((Button)_lines[i]).Visible && GetIcon(i).Texture != null) return true;
+        return false;
     }
 
     internal override void OnEndWindow()
