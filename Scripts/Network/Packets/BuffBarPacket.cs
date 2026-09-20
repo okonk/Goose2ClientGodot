@@ -9,6 +9,7 @@ namespace Goose2Client.Network.Packets
         public int GraphicId { get; set; }
         public int GraphicFile { get; set; }
         public string Name { get; set; }
+        public long DurationMs { get; set; }
 
         public override string Prefix { get; } = "BUF";
 
@@ -24,6 +25,8 @@ namespace Goose2Client.Network.Packets
                 packet.GraphicId = p.GetInt32();
                 packet.GraphicFile = p.GetInt32();
                 packet.Name = p.GetString();
+                if (p.LengthRemaining() > 0)
+                    packet.DurationMs = p.GetInt64();
             }
 
             return packet;
