@@ -5,8 +5,8 @@ namespace Goose2Client.UI
 {
     // Mirrors the original Unity client's cooldown display: a black pie that
     // covers the icon at cast time and unwinds clockwise from the top, with a
-    // centered countdown (mm:ss at >= 1 minute, whole seconds while >= 1s,
-    // one decimal below that).
+    // centered countdown (h/m at >= 1 hour, mm:ss at >= 1 minute, whole
+    // seconds while >= 1s, one decimal below that).
     public partial class CooldownOverlay : Control
     {
         private Label _text;
@@ -15,7 +15,14 @@ namespace Goose2Client.UI
         internal static string FormatCountdown(double remainingSeconds)
         {
             int totalSeconds = Mathf.CeilToInt(remainingSeconds);
-            if (remainingSeconds >= 60)
+            if (totalSeconds >= 3600)
+            {
+                int hours = totalSeconds / 3600;
+                int minutes = (totalSeconds % 3600) / 60;
+                return minutes > 0 ? $"{hours}h{minutes}m" : $"{hours}h";
+            }
+
+            if (totalSeconds >= 60)
                 return $"{totalSeconds / 60}:{totalSeconds % 60:D2}";
 
             return remainingSeconds >= 1
