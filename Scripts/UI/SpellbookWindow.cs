@@ -124,7 +124,7 @@ public partial class SpellbookWindow : BaseWindow, IWindow
 
         if (info.TargetType == SpellTargetType.None)
         {
-            GameManager.Instance.SpellCooldownManager.Cast(info.SlotNumber);
+            GameManager.Instance.SpellCooldownManager.Cast(info.SlotNumber, info.Cooldown);
             GameManager.Instance.NetworkClient.CastSpell(
                 info.SlotNumber,
                 lp?.LoginId ?? GameManager.Instance.CurrentMapManager?.MyLoginId ?? 0);

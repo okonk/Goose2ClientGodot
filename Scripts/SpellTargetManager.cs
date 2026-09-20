@@ -210,7 +210,7 @@ public partial class SpellTargetManager : Node
     {
         if (_target != null && _pendingSpell != null)
         {
-            GameManager.Instance.SpellCooldownManager.Cast(_pendingSpell.SlotNumber);
+            GameManager.Instance.SpellCooldownManager.Cast(_pendingSpell.SlotNumber, _pendingSpell.Cooldown);
             GameManager.Instance.NetworkClient.CastSpell(_pendingSpell.SlotNumber, _target.LoginId);
         }
         ExitTargeting();

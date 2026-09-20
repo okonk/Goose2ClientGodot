@@ -22,7 +22,7 @@ namespace Goose2Client.Tests
             var manager = new SpellCooldownManager();
             var spell = new SpellInfo { SlotNumber = 1, Cooldown = TimeSpan.FromHours(1) };
 
-            manager.Cast(1);
+            manager.Cast(1, TimeSpan.FromHours(1));
 
             var remaining = manager.GetCooldownRemaining(spell);
 
@@ -35,7 +35,7 @@ namespace Goose2Client.Tests
             var manager = new SpellCooldownManager();
             var spell = new SpellInfo { SlotNumber = 1, Cooldown = TimeSpan.FromHours(1) };
 
-            manager.Cast(1);
+            manager.Cast(1, TimeSpan.FromHours(1));
             manager.Clear(1);
 
             var remaining = manager.GetCooldownRemaining(spell);
@@ -50,7 +50,7 @@ namespace Goose2Client.Tests
             var spell1 = new SpellInfo { SlotNumber = 1, Cooldown = TimeSpan.FromHours(1) };
             var spell2 = new SpellInfo { SlotNumber = 2, Cooldown = TimeSpan.FromHours(1) };
 
-            manager.Cast(1);
+            manager.Cast(1, TimeSpan.FromHours(1));
             manager.Swap(1, 2);
 
             var remaining1 = manager.GetCooldownRemaining(spell1);
@@ -58,6 +58,32 @@ namespace Goose2Client.Tests
 
             Assert.Equal(TimeSpan.Zero, remaining1);
             Assert.True(remaining2 > TimeSpan.FromMinutes(59));
+        }
+
+        [Fact]
+        public void Sync_WithRemaining_OverridesLocalCastTime()
+        {
+            var manager = new SpellCooldownManager();
+            var spell = new SpellInfo { SlotNumber = 1, Cooldown = TimeSpan.FromHours(1) };
+
+            manager.Cast(1, TimeSpan.FromHours(1));
+            manager.Sync(1, TimeSpan.FromSeconds(30));
+
+            var remaining = manager.GetCooldownRemaining(spell);
+
+            Assert.InRange(remaining, TimeSpan.FromSeconds(29), TimeSpan.FromSeconds(30));
+        }
+
+        [Fact]
+        public void Sync_WithZeroRemaining_ClearsSlot()
+        {
+            var manager = new SpellCooldownManager();
+            var spell = new SpellInfo { SlotNumber = 1, Cooldown = TimeSpan.FromHours(1) };
+
+            manager.Cast(1, TimeSpan.FromHours(1));
+            manager.Sync(1, TimeSpan.Zero);
+
+            Assert.Equal(TimeSpan.Zero, manager.GetCooldownRemaining(spell));
         }
     }
 }

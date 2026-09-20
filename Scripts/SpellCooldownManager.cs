@@ -5,44 +5,51 @@ namespace Goose2Client
 {
     public class SpellCooldownManager
     {
-        private Dictionary<int, DateTimeOffset> lastCastTimes = new Dictionary<int, DateTimeOffset>();
+        private Dictionary<int, DateTimeOffset> nextCastableTimes = new Dictionary<int, DateTimeOffset>();
 
         public TimeSpan GetCooldownRemaining(SpellInfo spell)
         {
-            if (!lastCastTimes.TryGetValue(spell.SlotNumber, out var lastCast))
+            if (!nextCastableTimes.TryGetValue(spell.SlotNumber, out var nextCastable))
                 return TimeSpan.Zero;
 
-            var nextCast = lastCast + spell.Cooldown;
-            if (nextCast <= DateTimeOffset.UtcNow)
+            if (nextCastable <= DateTimeOffset.UtcNow)
                 return TimeSpan.Zero;
 
-            return nextCast - DateTimeOffset.UtcNow;
+            return nextCastable - DateTimeOffset.UtcNow;
         }
 
         public void Swap(int slot1, int slot2)
         {
-            bool hasSlot1 = lastCastTimes.TryGetValue(slot1, out var slot1LastCast);
-            bool hasSlot2 = lastCastTimes.TryGetValue(slot2, out var slot2LastCast);
+            bool hasSlot1 = nextCastableTimes.TryGetValue(slot1, out var slot1NextCastable);
+            bool hasSlot2 = nextCastableTimes.TryGetValue(slot2, out var slot2NextCastable);
 
             if (hasSlot2)
-                lastCastTimes[slot1] = slot2LastCast;
+                nextCastableTimes[slot1] = slot2NextCastable;
             else
                 Clear(slot1);
 
             if (hasSlot1)
-                lastCastTimes[slot2] = slot1LastCast;
+                nextCastableTimes[slot2] = slot1NextCastable;
             else
                 Clear(slot2);
         }
 
-        public void Cast(int slot)
+        public void Cast(int slot, TimeSpan cooldown)
         {
-            lastCastTimes[slot] = DateTimeOffset.UtcNow;
+            nextCastableTimes[slot] = DateTimeOffset.UtcNow + cooldown;
+        }
+
+        public void Sync(int slot, TimeSpan remaining)
+        {
+            if (remaining <= TimeSpan.Zero)
+                Clear(slot);
+            else
+                nextCastableTimes[slot] = DateTimeOffset.UtcNow + remaining;
         }
 
         public void Clear(int slot)
         {
-            lastCastTimes.Remove(slot);
+            nextCastableTimes.Remove(slot);
         }
     }
 }
