@@ -18,6 +18,8 @@ namespace Goose2Client.UI
         private string _effectName;
         private string _tooltipText;
 
+        internal static float BlinkAlpha(double nowSeconds) => Mathf.Clamp(0.65f + 0.35f * (float)Math.Sin(2 * Math.PI * nowSeconds), 0.3f, 1.0f);
+
         public int SlotNumber { get; set; }
         public Action<int> OnDoubleClick { get; set; }
 

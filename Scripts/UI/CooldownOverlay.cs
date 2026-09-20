@@ -11,6 +11,8 @@ namespace Goose2Client.UI
     {
         private Label _text;
         private float _progress;
+        private double _remaining;
+        private double _dangerSeconds;
 
         internal static string FormatCountdown(double remainingSeconds)
         {
@@ -37,7 +39,16 @@ namespace Goose2Client.UI
             MouseFilter = MouseFilterEnum.Ignore;
         }
 
-        public void Update(double remainingSeconds, double totalSeconds)
+        internal static float ComputeProgress(double remainingSeconds, double totalSeconds, bool growthMode)
+        {
+            if (totalSeconds <= 0)
+                return 0f;
+            float ratio = (float)(remainingSeconds / totalSeconds);
+            ratio = Mathf.Clamp(ratio, 0f, 1f);
+            return growthMode ? 1f - ratio : ratio;
+        }
+
+        public void Update(double remainingSeconds, double totalSeconds, bool growthMode = false, double dangerSeconds = 0)
         {
             if (_text == null)
             {
@@ -54,8 +65,22 @@ namespace Goose2Client.UI
                 AddChild(_text);
             }
 
-            if (remainingSeconds <= 0 || totalSeconds <= 0)
+            _remaining = remainingSeconds;
+            _dangerSeconds = dangerSeconds;
+
+            if (totalSeconds <= 0 || remainingSeconds <= 0)
             {
+                if (growthMode && remainingSeconds <= 0)
+                {
+                    // Client clock can reach 0 before the server's remove packet lands; keep the pie full until the slot is cleared.
+                    _progress = 1f;
+                    Visible = true;
+                    _text.Visible = true;
+                    _text.Text = "0";
+                    QueueRedraw();
+                    return;
+                }
+
                 if (!Visible)
                     return;
                 _progress = 0f;
@@ -64,7 +89,7 @@ namespace Goose2Client.UI
                 return;
             }
 
-            _progress = Mathf.Clamp((float)(remainingSeconds / totalSeconds), 0f, 1f);
+            _progress = ComputeProgress(remainingSeconds, totalSeconds, growthMode);
             Visible = true;
             _text.Visible = true;
             _text.Text = FormatCountdown(remainingSeconds);
@@ -85,7 +110,10 @@ namespace Goose2Client.UI
                 var a = -Mathf.Pi / 2f + _progress * Mathf.Tau * (i / (float)segments);
                 points.Add(center + new Vector2(Mathf.Cos(a), Mathf.Sin(a)) * radius);
             }
-            DrawColoredPolygon(points.ToArray(), new Color(0, 0, 0, 0.7f));
+            var color = _dangerSeconds > 0 && _remaining <= _dangerSeconds
+                ? new Color(0.8f, 0.1f, 0.1f, 0.7f)
+                : new Color(0, 0, 0, 0.7f);
+            DrawColoredPolygon(points.ToArray(), color);
         }
     }
 }
