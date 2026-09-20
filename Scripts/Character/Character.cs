@@ -603,7 +603,8 @@ namespace Goose2Client.Character
         }
 
         private const double MoveStartDelay = 0.1;   // Unity hold threshold: short release → turn in place
-        private double _movePressedTime;
+        private double _heldTime;
+        private int _heldMask;
         private bool _wasMovingVertical;
         private Direction? _heldDir;
 
@@ -626,46 +627,53 @@ namespace Goose2Client.Character
                 }
             }
 
+            bool up = Input.IsActionPressed("MoveUp");
+            bool down = Input.IsActionPressed("MoveDown");
+            bool left = Input.IsActionPressed("MoveLeft");
+            bool right = Input.IsActionPressed("MoveRight");
+
             // Resolve currently held movement actions through MovementInput.
             // Use a local copy so diagonal direction stays stable while waiting for the hold
             // delay, while moving, and across blocked attempts; commit the alternation state
             // only when movement succeeds.
             bool nextWasMovingVertical = _wasMovingVertical;
-            Direction? dir = MovementInput.Resolve(
-                Input.IsActionPressed("MoveUp"),
-                Input.IsActionPressed("MoveDown"),
-                Input.IsActionPressed("MoveLeft"),
-                Input.IsActionPressed("MoveRight"),
-                ref nextWasMovingVertical);
+            Direction? dir = MovementInput.Resolve(up, down, left, right, ref nextWasMovingVertical);
 
             // No direction — tap-to-turn: if we were holding a key but released within delay, turn in place
             if (dir == null)
             {
-                if (_heldDir.HasValue && _movePressedTime < MoveStartDelay)
+                if (_heldDir.HasValue && _heldTime < MoveStartDelay)
                 {
                     SetFacing(_heldDir.Value);
                     GameManager.Instance.NetworkClient.Face(_heldDir.Value);
                 }
                 _heldDir = null;
-                _movePressedTime = 0;
+                _heldTime = 0;
+                _heldMask = 0;
                 return;
             }
 
             _heldDir = dir;
 
-            // Already moving — preserve accumulated duration for seamless chained movement
+            // Aged even while moving: the delay belongs to the key combination, not to the current
+            // direction, so a key pressed mid-step has to be held before it can take the next step.
+            int mask = MovementInput.KeyMask(up, down, left, right);
+            _heldTime = MovementInput.HeldTime(mask, _heldMask, _heldTime, delta);
+            _heldMask = mask;
+
+            // Already moving — the step in progress chains from TryChainLocalStep on arrival
             if (_moving) return;
 
-            // Accumulate delta only while standing
-            _movePressedTime += delta;
-            if (_movePressedTime < MoveStartDelay) return;
+            if (_heldTime < MoveStartDelay) return;
 
             TryCommitStep(dir.Value, nextWasMovingVertical);
         }
 
         /// <summary>Start the next tile step from currently held keys if input allows.
         /// Used on tile arrival so continuous walking never flashes idle between tiles.
-        /// Skips the 0.1s standstill delay (already walking).</summary>
+        /// A combination held since before this step started chains with no extra wait; one pressed
+        /// during the step must still earn its delay, so a tap released inside the delay turns in
+        /// place instead of walking.</summary>
         private bool TryChainLocalStep()
         {
             if (!IsLocalPlayer) return false;
@@ -686,8 +694,9 @@ namespace Goose2Client.Character
                 return false;
             }
 
+            if (_heldTime < MoveStartDelay) return false;
+
             _heldDir = dir;
-            // Chaining mid-run: hold delay already satisfied when the first step began.
             return TryCommitStep(dir.Value, nextWasMovingVertical);
         }
 

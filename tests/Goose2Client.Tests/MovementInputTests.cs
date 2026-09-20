@@ -137,4 +137,61 @@ public class MovementInputTests
         }
         Assert.True(wasMovingVertical);
     }
+
+    [Fact]
+    public void KeyMask_is_zero_when_released_and_distinct_per_combination()
+    {
+        Assert.Equal(0, MovementInput.KeyMask(false, false, false, false));
+        Assert.Equal(MovementInput.KeyMask(true, false, false, true),
+                     MovementInput.KeyMask(true, false, false, true));
+        Assert.NotEqual(MovementInput.KeyMask(false, false, false, true),
+                        MovementInput.KeyMask(true, false, false, true));
+    }
+
+    /// <summary>Regression: a key pressed mid-walk restarts the delay, so a tap released inside it
+    /// cannot chain a step off the timer the previous direction had already earned.</summary>
+    [Fact]
+    public void HeldTime_restarts_when_a_new_key_joins_the_held_combination()
+    {
+        const double frame = 1.0 / 60.0;
+        int walkingRight = MovementInput.KeyMask(false, false, false, true);
+        int rightAndUp = MovementInput.KeyMask(true, false, false, true);
+
+        double held = 0;
+        for (int i = 0; i < 30; i++)
+            held = MovementInput.HeldTime(walkingRight, walkingRight, held, frame);
+        Assert.True(held > 0.1);
+
+        Assert.Equal(0, MovementInput.HeldTime(rightAndUp, walkingRight, held, frame));
+
+        held = 0;
+        for (int i = 0; i < 5; i++)
+            held = MovementInput.HeldTime(rightAndUp, rightAndUp, held, frame);
+        Assert.True(held < 0.1);   // a tap: too short to step
+
+        for (int i = 0; i < 6; i++)
+            held = MovementInput.HeldTime(rightAndUp, rightAndUp, held, frame);
+        Assert.True(held >= 0.1);  // held: earns the step
+    }
+
+    /// <summary>Staircase diagonals keep one held combination, so the alternated direction must not
+    /// pay the hold delay again on every chained step.</summary>
+    [Fact]
+    public void HeldTime_stable_diagonal_survives_axis_alternation()
+    {
+        const double frame = 1.0 / 60.0;
+        int diagonal = MovementInput.KeyMask(true, false, false, true);
+
+        double held = 0;
+        bool wasMovingVertical = false;
+        for (int step = 0; step < 8; step++)
+        {
+            bool next = wasMovingVertical;
+            Assert.NotNull(MovementInput.Resolve(true, false, false, true, ref next));
+            wasMovingVertical = next;
+            held = MovementInput.HeldTime(diagonal, diagonal, held, frame);
+        }
+
+        Assert.True(held >= 0.1);
+    }
 }
