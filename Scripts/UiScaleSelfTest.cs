@@ -331,7 +331,7 @@ internal static class UiScaleSelfTest
             questMgr.QueueFree();
             await Frame();
         }
-        // OptionList leg: fixed tscn height over a stretched frame.
+        // OptionList leg: dynamic height over a stretched frame.
         var ol = GD.Load<PackedScene>(gm.Hud.OptionListWindows.PrefabPath).Instantiate<OptionListWindow>();
         gm.Hud.OptionListWindows.AddChild(ol);
         await Frame();
@@ -347,13 +347,13 @@ internal static class UiScaleSelfTest
             ol.OnWindowLine(new WindowLinePacket { WindowId = 1002, LineNumber = i, Text = $"opt {i}" });
         ol.OnEndWindow();
         await Frame();
-        Assert(ol.Size == new Vector2(520, 580), $"option-list 4-line size 2x {ol.Size} != (520,580)");
+        Assert(ol.Size == new Vector2(520, 396), $"option-list 4-line size 2x {ol.Size} != (520,396)");
         var ol0 = ol.GetNode<Button>("Content/Line0");
-        Assert(ol0.Position == OptionListMetrics.LinePosition(0, 2f), $"option-list line0 pos 2x {ol0.Position} != {OptionListMetrics.LinePosition(0, 2f)}");
+        Assert(ol0.Position == OptionListMetrics.LinePosition(0, 2f, false), $"option-list line0 pos 2x {ol0.Position} != {OptionListMetrics.LinePosition(0, 2f, false)}");
         Assert(ol0.Size == OptionListMetrics.LineSize(2f), $"option-list line0 size 2x {ol0.Size} != {OptionListMetrics.LineSize(2f)}");
         Assert(!ol.GetNode<Button>("Content/Line4").Visible, "empty option-list line must be invisible");
         Assert(ol.GetNode<TextureRect>("Background") != null, "option-list bg must be a TextureRect");
-        // A repopulated page keeps the fixed height; stale lines are cleared by MakeWindow.
+        // A repopulated page shrinks to its populated lines; stale lines are cleared by MakeWindow.
         ol.OnMakeWindow(new MakeWindowPacket
         {
             WindowId = 1002,
@@ -366,7 +366,7 @@ internal static class UiScaleSelfTest
         ol.OnWindowLine(new WindowLinePacket { WindowId = 1002, LineNumber = 1, Text = "b" });
         ol.OnEndWindow();
         await Frame();
-        Assert(ol.Size == new Vector2(520, 580), $"option-list 2-line size 2x {ol.Size} != (520,580)");
+        Assert(ol.Size == new Vector2(520, 252), $"option-list 2-line size 2x {ol.Size} != (520,252)");
         Assert(!ol.GetNode<Button>("Content/Line2").Visible, "stale option-list line must be hidden after repopulate");
         applier.Apply(1f, ApplyReason.UserCommit);
         await Frame();

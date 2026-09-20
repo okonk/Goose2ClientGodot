@@ -122,11 +122,15 @@ public abstract partial class BaseMultipleWindow : BaseWindow, IWindow
     }
 
     /// <summary>Called by the manager when a WindowLinePacket arrives for this window.</summary>
-    internal void OnWindowLine(WindowLinePacket packet)
+    internal virtual void OnWindowLine(WindowLinePacket packet)
     {
         if (packet.LineNumber < 0 || packet.LineNumber >= _lines.Length) return;
         SetLineText(packet.LineNumber, packet.Text);
     }
+
+    /// <summary>Called by the manager when a WindowOpeningLinePacket (WNL) arrives. No-op by
+    /// default; only windows that render an opening line override it.</summary>
+    internal virtual void OnOpeningLine(string text) { }
 
     protected override void OnClosePressed()
     {
