@@ -38,7 +38,7 @@ namespace Goose2Client.Character
         public int BodyState { get; private set; } = 3;
 
         // Per-slot live sprite + the graphic id it was built from (needed for the height lookup).
-        private sealed class Slot { public AnimatedSprite2D Sprite; public int GraphicId; }
+        private sealed class Slot { public AnimatedSprite2D Sprite; public CharacterSlot Kind; public int GraphicId; public int AnchorHeight; }
         private readonly Dictionary<CharacterSlot, Slot> _slots = new();
         private static AnimationHeights _heights;
         private AppearanceData _appearance;
@@ -353,12 +353,13 @@ namespace Goose2Client.Character
 
             if (!_slots.TryGetValue(slot, out var s))
             {
-                s = new Slot { Sprite = new AnimatedSprite2D
+                s = new Slot { Kind = slot, Sprite = new AnimatedSprite2D
                 {
                     Name = slot.ToString(),
                     TextureFilter = CanvasItem.TextureFilterEnum.Nearest,
                 } };
                 AddChild(s.Sprite);
+                s.Sprite.FrameChanged += () => AlignSlotSprite(s);
                 _slots[slot] = s;
             }
             s.GraphicId = graphicId;
@@ -368,7 +369,8 @@ namespace Goose2Client.Character
             // frames' centers on the feet and the art floats mid-body / into the ground.
             EnsureHeights();
             int h = _heights.GetHeight($"{HeightPrefix(slot)}-{graphicId}-idle-equip-down");
-            s.Sprite.Offset = new Vector2(0, CharacterAnchor.OffsetY(h));
+            s.AnchorHeight = h;
+            AlignSlotSprite(s);
             // Only dyed slots get the tint shader; untinted slots use the default canvas path so they
             // render byte-identically to pre-shader behaviour (no global color-management shift).
             if (tint.A > 0f)
@@ -386,6 +388,22 @@ namespace Goose2Client.Character
         private void RemoveSlot(CharacterSlot slot)
         {
             if (_slots.Remove(slot, out var s)) s.Sprite.QueueFree();
+        }
+
+        private static void AlignSlotSprite(Slot slot)
+        {
+            var sprite = slot.Sprite;
+            var frames = sprite.SpriteFrames;
+            if (frames == null || !frames.HasAnimation(sprite.Animation) || sprite.Frame >= frames.GetFrameCount(sprite.Animation))
+                return;
+            var texture = frames.GetFrameTexture(sprite.Animation, sprite.Frame);
+            if (texture != null)
+            {
+                var offset = CharacterAnchor.SpriteOffset(slot.AnchorHeight, texture.GetSize());
+                if (slot.Kind == CharacterSlot.Hair)
+                    offset.Y += CharacterAnchor.MountedHairYOffset(slot.GraphicId, sprite.Animation, sprite.Frame);
+                sprite.Offset = offset;
+            }
         }
 
         public AppearanceData GetAppearance() => _appearance;
@@ -763,11 +781,12 @@ namespace Goose2Client.Character
 
                 s.Sprite.Visible = true;
                 int h = _heights.GetHeight($"{HeightPrefix(slot)}-{s.GraphicId}-{clip}");
-                s.Sprite.Offset = new Vector2(0, CharacterAnchor.OffsetY(h));
+                s.AnchorHeight = h;
                 // Keep an already-playing walk cycle running across chained tiles; restarting
                 // every step is what made high move-speed look jittery.
                 if (s.Sprite.Animation != clip || !s.Sprite.IsPlaying())
                     s.Sprite.Play(clip);
+                AlignSlotSprite(s);
             }
 
             // Overlays use resting-pose Height; still refresh after mount/appearance-driven PlayCurrent.
