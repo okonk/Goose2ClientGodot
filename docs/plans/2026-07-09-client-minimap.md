@@ -31,11 +31,15 @@
 | `TileUpdatePacket` fields: `X`, `Y`, `Tiles` (10 ints), `Flags` | `Scripts/Network/Packets/TileUpdatePacket.cs:8-11` |
 | Test project compiles `Scripts/**/*.cs` and references `MapEditor.Core` + GodotSharp (Godot value types like `Color`/`Vector2I` are usable in pure tests) | `tests/Goose2Client.Tests/Goose2Client.Tests.csproj` |
 
-Godot runtime APIs used (standard Godot 4, GodotSharp 4.6.2): `Texture2D.GetImage()`,
-`Image.GetPixelv(Vector2I)`, `Image.Create(w, h, false, Image.Format.Rgba8)`,
-`Image.SetPixelv(Vector2I, Color)`, `ImageTexture.CreateFromImage(Image)`,
-`ImageTexture.Update()`, `Control.SetAnchorsPreset(LayoutPreset.TopRight)`,
-`CanvasItem.TextureFilter`, `CanvasItem.DrawTextureRect`, `DrawColoredPolygon`, `QueueRedraw`.
+Godot runtime APIs used (standard Godot 4, GodotSharp 4.6.2 — verified against the
+GodotSharp 4.6.2 assembly): `Texture2D.GetImage()`, `Image.GetPixelv(Vector2I)`,
+`Image.Create(w, h, false, Image.Format.Rgba8)`, `Image.SetPixelv(Vector2I, Color)`,
+`ImageTexture.CreateFromImage(Image)`, `ImageTexture.Update(Image)`,
+`Control.SetAnchorsPreset(LayoutPreset.TopRight)`, `Control.ClipContents`,
+`CanvasItem.TextureFilter`, `CanvasItem.DrawTextureRect(Texture2D, Rect2, bool tile,
+Color? modulate, bool transpose)` (no source-rect overload exists in the C# binding —
+the whole bitmap is drawn offset and clipped via `ClipContents`),
+`CanvasItem.DrawColoredPolygon`, `QueueRedraw`.
 
 ## Invariant-to-test matrix
 
@@ -121,7 +125,7 @@ manual smoke in Task 5.
     (null covers sheet==0, missing manifest rect, missing PNG — `Scripts/Map/SpriteCache.cs:25`)
   - `var img = atlas.Atlas.GetImage();` iterate `atlas.Region` pixels via
     `img.GetPixelv(new Vector2I(px, py))` for `py in [Y, Y+H)`, `px in [X, X+W)`; average
-    **only pixels with A > 0** (accumulate R/G/B as int, divide by opaque count).
+    **only pixels with A > 0** (accumulate R/G/B as double, divide by opaque count).
   - Zero opaque pixels → null (empty layer, falls through in `PickColor`).
   - Memoized per (sheet, graphic).
 - Builder body:
@@ -174,10 +178,11 @@ git commit -m "feat(minimap): whole-map 1px/tile average-color bitmap builder"
 - `_Draw()`:
   - if `_bitmap == null` return.
   - Window origin: `winX = Mathf.Clamp(playerX - WindowTiles / 2, 0, Mathf.Max(0, _mapWidth - WindowTiles));` (same for Y); use the last known player tile (if no player yet, origin 0,0).
-  - `srcW = Mathf.Min(WindowTiles, _mapWidth)`, `srcH = Mathf.Min(WindowTiles, _mapHeight)`; `source = new Rect2(winX, winY, srcW, srcH)`.
-  - `float px = Size.X / WindowTiles;` `dest = new Rect2(0, 0, srcW * px, srcH * px);`
+  - `float px = Size.X / WindowTiles;`
     (local size scales with UI factor because the snapshot-scaled offsets resize the control rect; drawing in local units keeps it correct at every factor).
-  - `DrawTextureRect(_bitmap, source, dest);`
+  - `DrawTextureRect(_bitmap, new Rect2(-winX * px, -winY * px, _mapWidth * px, _mapHeight * px), false, Colors.White);`
+    with `ClipContents = true` — the C# binding has no source-rect overload, so the whole
+    bitmap is drawn offset and clipped to the control rect.
   - Player arrow (only when a player tile is known and inside the map):
     `ax = (playerX - winX) * px + px / 2;` `ay = (playerY - winY) * px + px / 2;`
     `DrawColoredPolygon` upward triangle `[(ax, ay - 4), (ax - 4, ay + 4), (ax + 4, ay + 4)]` in white.
@@ -217,7 +222,7 @@ git commit -m "feat(minimap): top-right HUD minimap control (64x64 tile window, 
 - Required propagation sequence (inside `OnTileUpdate`, after `MapTileUpdate.Apply`):
   1. `var c = MinimapColors.PickColor(_map[p.X, p.Y], TileColor);`
   2. `_minimapImage.SetPixelv(new Vector2I(p.X, p.Y), c ?? Colors.Black);`
-  3. `_minimapTexture.Update();` (re-uploads the image to the GPU)
+  3. `_minimapTexture.Update(_minimapImage);` (re-uploads the image to the GPU)
   4. `GameManager.Instance.Hud?.Minimap?.Invalidate();`
 - Invariants to preserve:
   - Minimap pixel always matches the current tile's selected color.

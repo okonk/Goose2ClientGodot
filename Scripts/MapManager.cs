@@ -21,6 +21,9 @@ public partial class MapManager : Node2D
     private readonly System.Collections.Generic.Dictionary<int, MapItem> _mapObjects = new();
     private int _myLoginId = -1;
     private readonly System.Collections.Generic.Dictionary<int, Character.Character> _characters = new();
+    private Image _minimapImage;
+    private ImageTexture _minimapTexture;
+    private readonly System.Collections.Generic.Dictionary<(int, int), Color?> _tileColorMemo = new();
     private Node2D _characterRoot;
     private Character.Character _localPlayer;
     private bool _listenersRegistered;
@@ -113,6 +116,10 @@ public partial class MapManager : Node2D
 
         GameManager.Instance.CurrentMapManager = this;
         GameManager.Instance.EnsureHud();
+
+        _minimapImage = MinimapBitmapBuilder.Build(_map, TileColor);
+        _minimapTexture = ImageTexture.CreateFromImage(_minimapImage);
+        GameManager.Instance.Hud?.Minimap?.SetMap(_map.Width, _map.Height, _minimapTexture);
     }
 
     public override void _ExitTree()
@@ -384,6 +391,42 @@ public partial class MapManager : Node2D
             if (layer == 2) _objectLayer.RefreshCell(p.X, p.Y);        // Y-sorted layer: rebuild the cell
             else _layers[layer].RefreshCell(p.X, p.Y);                 // TileMapLayer: update one cell
         });
+
+        _minimapImage.SetPixelv(new Vector2I(p.X, p.Y), MinimapColors.PickColor(_map[p.X, p.Y], TileColor) ?? Colors.Black);
+        _minimapTexture.Update(_minimapImage);
+        GameManager.Instance.Hud?.Minimap?.Invalidate();
+    }
+
+    private Color? TileColor(int sheet, int graphic)
+    {
+        var key = (sheet, graphic);
+        if (_tileColorMemo.TryGetValue(key, out var cached)) return cached;
+
+        Color? color = null;
+        var atlas = _cache.Get(sheet, graphic);
+        if (atlas != null)
+        {
+            var img = atlas.Atlas.GetImage();
+            var r = atlas.Region;
+            int x0 = (int)r.Position.X, x1 = (int)(r.Position.X + r.Size.X);
+            int y0 = (int)r.Position.Y, y1 = (int)(r.Position.Y + r.Size.Y);
+            double cr = 0, cg = 0, cb = 0;
+            int count = 0;
+            for (int py = y0; py < y1; py++)
+                for (int px = x0; px < x1; px++)
+                {
+                    var c = img.GetPixelv(new Vector2I(px, py));
+                    if (c.A > 0)
+                    {
+                        cr += c.R; cg += c.G; cb += c.B;
+                        count++;
+                    }
+                }
+            if (count > 0)
+                color = new Color((float)(cr / count), (float)(cg / count), (float)(cb / count), 1f);
+        }
+        _tileColorMemo[key] = color;
+        return color;
     }
 
     internal static int ItemKey(MapDocument map, int x, int y) => y * map.Width + x;
