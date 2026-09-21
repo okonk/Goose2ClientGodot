@@ -357,7 +357,9 @@ public partial class HotbarWindow : BaseWindow, IWindow
             }
             else if (repeatTick && Input.IsActionPressed(action, exactMatch: true))
             {
-                UseSlot(i);
+                var repeatSlot = _pages[_pageIndex].Slots[i];
+                if (repeatSlot.SpellInfo != null)
+                    UseSlot(i);
             }
         }
     }
