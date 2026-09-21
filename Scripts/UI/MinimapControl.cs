@@ -12,8 +12,8 @@ public partial class MinimapControl : Control, IScalableWindow
     private ImageTexture _bitmap;
     private int _mapWidth;
     private int _mapHeight;
-    private int _playerTileX = -1;
-    private int _playerTileY = -1;
+    private Vector2 _playerPos;
+    private bool _hasPlayer;
     private List<UiScaleLayout.GeomRecord> _geom;
 
     public void SetMap(int mapWidth, int mapHeight, ImageTexture bitmap)
@@ -21,8 +21,7 @@ public partial class MinimapControl : Control, IScalableWindow
         _mapWidth = mapWidth;
         _mapHeight = mapHeight;
         _bitmap = bitmap;
-        _playerTileX = -1;
-        _playerTileY = -1;
+        _hasPlayer = false;
         QueueRedraw();
     }
 
@@ -52,20 +51,19 @@ public partial class MinimapControl : Control, IScalableWindow
         var player = GameManager.Instance?.CurrentMapManager?.LocalPlayer;
         if (player == null)
         {
-            if (_playerTileX != -1 || _playerTileY != -1)
+            if (_hasPlayer)
             {
-                _playerTileX = -1;
-                _playerTileY = -1;
+                _hasPlayer = false;
                 QueueRedraw();
             }
             return;
         }
         if (_bitmap == null) return;
-        var (tx, ty) = MapCoords.WorldToTile(player.GlobalPosition);
-        if (tx != _playerTileX || ty != _playerTileY)
+        var pos = player.GlobalPosition;
+        if (!_hasPlayer || pos.DistanceSquaredTo(_playerPos) > 0.0001f)
         {
-            _playerTileX = tx;
-            _playerTileY = ty;
+            _playerPos = pos;
+            _hasPlayer = true;
             QueueRedraw();
         }
     }
@@ -74,17 +72,18 @@ public partial class MinimapControl : Control, IScalableWindow
     {
         if (_bitmap == null) return;
 
-        int anchorX = _playerTileX >= 0 ? _playerTileX : 0;
-        int anchorY = _playerTileY >= 0 ? _playerTileY : 0;
-        int winX = Mathf.Clamp(anchorX - WindowTiles / 2, 0, Mathf.Max(0, _mapWidth - WindowTiles));
-        int winY = Mathf.Clamp(anchorY - WindowTiles / 2, 0, Mathf.Max(0, _mapHeight - WindowTiles));
-
         float px = Size.X / WindowTiles;
-        DrawTextureRect(_bitmap, new Rect2(-winX * px, -winY * px, _mapWidth * px, _mapHeight * px), false, Colors.White);
+        // Fractional bitmap coordinates: bitmap pixel (x, y) covers world [x*32, (x+1)*32).
+        float bx = _hasPlayer ? _playerPos.X / MapCoords.TileSize : 0;
+        float by = _hasPlayer ? _playerPos.Y / MapCoords.TileSize : 0;
+        float camX = Mathf.Clamp(bx - WindowTiles / 2f, 0, Mathf.Max(0, _mapWidth - WindowTiles));
+        float camY = Mathf.Clamp(by - WindowTiles / 2f, 0, Mathf.Max(0, _mapHeight - WindowTiles));
 
-        if (_playerTileX < 0 || _playerTileY < 0 || _playerTileX >= _mapWidth || _playerTileY >= _mapHeight) return;
-        float ax = (_playerTileX - winX) * px + px / 2;
-        float ay = (_playerTileY - winY) * px + px / 2;
+        DrawTextureRect(_bitmap, new Rect2(-camX * px, -camY * px, _mapWidth * px, _mapHeight * px), false, Colors.White);
+
+        if (!_hasPlayer) return;
+        float ax = (bx - camX) * px;
+        float ay = (by - camY) * px;
         float r = px * 4f / 3f;
         DrawColoredPolygon(new[]
         {
