@@ -50,7 +50,17 @@ public partial class MinimapControl : Control, IScalableWindow
     public override void _Process(double delta)
     {
         var player = GameManager.Instance?.CurrentMapManager?.LocalPlayer;
-        if (player == null || _bitmap == null) return;
+        if (player == null)
+        {
+            if (_playerTileX != -1 || _playerTileY != -1)
+            {
+                _playerTileX = -1;
+                _playerTileY = -1;
+                QueueRedraw();
+            }
+            return;
+        }
+        if (_bitmap == null) return;
         var (tx, ty) = MapCoords.WorldToTile(player.GlobalPosition);
         if (tx != _playerTileX || ty != _playerTileY)
         {
@@ -75,11 +85,12 @@ public partial class MinimapControl : Control, IScalableWindow
         if (_playerTileX < 0 || _playerTileY < 0 || _playerTileX >= _mapWidth || _playerTileY >= _mapHeight) return;
         float ax = (_playerTileX - winX) * px + px / 2;
         float ay = (_playerTileY - winY) * px + px / 2;
+        float r = px * 4f / 3f;
         DrawColoredPolygon(new[]
         {
-            new Vector2(ax, ay - 4),
-            new Vector2(ax - 4, ay + 4),
-            new Vector2(ax + 4, ay + 4)
+            new Vector2(ax, ay - r),
+            new Vector2(ax - r, ay + r),
+            new Vector2(ax + r, ay + r)
         }, Colors.White);
     }
 }

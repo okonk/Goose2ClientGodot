@@ -32,6 +32,30 @@ public class MinimapColorsTests
     }
 
     [Fact]
+    public void PickColor_Layer3BeatsLayer2()
+    {
+        _colors = new Dictionary<(int, int), Color>
+        {
+            [(2, 10)] = new Color(1, 0, 0),
+            [(3, 20)] = new Color(0, 1, 0),
+        };
+        var tile = Tile((2, 2, 10), (3, 3, 20));
+        Assert.Equal(new Color(0, 1, 0), MinimapColors.PickColor(tile, Provider));
+    }
+
+    [Fact]
+    public void PickColor_Layer2BeatsLayer0()
+    {
+        _colors = new Dictionary<(int, int), Color>
+        {
+            [(1, 10)] = new Color(1, 0, 0),
+            [(2, 20)] = new Color(0, 1, 0),
+        };
+        var tile = Tile((0, 1, 10), (2, 2, 20));
+        Assert.Equal(new Color(0, 1, 0), MinimapColors.PickColor(tile, Provider));
+    }
+
+    [Fact]
     public void PickColor_IgnoresLayer1()
     {
         _colors = new Dictionary<(int, int), Color> { [(3, 30)] = new Color(0, 0, 1) };

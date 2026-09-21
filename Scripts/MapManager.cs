@@ -24,6 +24,7 @@ public partial class MapManager : Node2D
     private Image _minimapImage;
     private ImageTexture _minimapTexture;
     private readonly System.Collections.Generic.Dictionary<(int, int), Color?> _tileColorMemo = new();
+    private readonly System.Collections.Generic.Dictionary<int, Image> _sheetImages = new();
     private Node2D _characterRoot;
     private Character.Character _localPlayer;
     private bool _listenersRegistered;
@@ -406,7 +407,11 @@ public partial class MapManager : Node2D
         var atlas = _cache.Get(sheet, graphic);
         if (atlas != null)
         {
-            var img = atlas.Atlas.GetImage();
+            if (!_sheetImages.TryGetValue(sheet, out var img))
+            {
+                img = atlas.Atlas.GetImage();
+                _sheetImages[sheet] = img;
+            }
             var r = atlas.Region;
             int x0 = (int)r.Position.X, x1 = (int)(r.Position.X + r.Size.X);
             int y0 = (int)r.Position.Y, y1 = (int)(r.Position.Y + r.Size.Y);
