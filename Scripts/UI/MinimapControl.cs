@@ -7,7 +7,7 @@ namespace Goose2Client.UI;
 public partial class MinimapControl : Control, IScalableWindow
 {
     public const int WindowTiles = 64;
-    public const int BasePixels = 192;
+    public const int BasePixels = 128;
 
     private ImageTexture _bitmap;
     private int _mapWidth;

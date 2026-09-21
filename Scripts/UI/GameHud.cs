@@ -57,6 +57,10 @@ public partial class GameHud : Control
         var tooltips = GD.Load<PackedScene>("res://Scenes/UI/Tooltips.tscn").Instantiate<Control>();
         tooltipLayer.AddChild(tooltips);
 
+        // Behind every window so debug/build-info overlays paint on top of it.
+        Minimap = new MinimapControl();
+        AddChild(Minimap);
+
         // 4. Instantiate each window scene.
         Vitals = Add<VitalsWindow>("res://Scenes/UI/VitalsWindow.tscn");
         Inventory = Add<InventoryWindow>("res://Scenes/UI/InventoryWindow.tscn");
@@ -74,9 +78,6 @@ public partial class GameHud : Control
         CombineBag = Add<CombineBagContainerWindow>("res://Scenes/UI/CombineBagContainerWindow.tscn");
         Custom = Add<CustomWindow>("res://Scenes/UI/CustomWindow.tscn");
         Hairdye = Add<HairdyeWindow>("res://Scenes/UI/HairdyeWindow.tscn");
-
-        Minimap = new MinimapControl();
-        AddChild(Minimap);
 
         // 5. Multi-window managers (plain Node subclasses, instantiable via new).
         QuestWindows = new QuestWindowManager();
