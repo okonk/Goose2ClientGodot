@@ -20,6 +20,7 @@ namespace Goose2Client.UI
         private string _effectName;
         private string _tooltipText;
         private long _remainingMs;
+        private long _totalMs;
         private DateTimeOffset _expiresAt;
         private bool _hovering;
 
@@ -52,9 +53,12 @@ namespace Goose2Client.UI
             }
 
             // The packet carries the buff's *remaining* ms, so every full-bar resend is
-            // self-describing and the deadline is simply reset from it.
+            // self-describing and the deadline is simply reset from it. Total is the
+            // sweep bar's denominator so a resend doesn't reset the bar to full; older
+            // servers omit it, in which case remaining is both numerator and denominator.
             _effectName = packet.Name;
             _remainingMs = packet.RemainingMs;
+            _totalMs = packet.TotalMs > 0 ? packet.TotalMs : _remainingMs;
             _sweep.Visible = _remainingMs > 0;
             _expiresAt = DateTimeOffset.UtcNow.AddMilliseconds(_remainingMs);
             _icon.Modulate = Colors.White;
@@ -70,6 +74,7 @@ namespace Goose2Client.UI
             _hovering = false;
             _tooltipText = null;
             _remainingMs = 0;
+            _totalMs = 0;
             _sweep.Visible = false;
             _countdown.Visible = false;
             _icon.Modulate = Colors.White;
@@ -84,7 +89,7 @@ namespace Goose2Client.UI
                 return;
 
             var remaining = (_expiresAt - DateTimeOffset.UtcNow).TotalSeconds;
-            _sweep.Update(remaining, _remainingMs / 1000.0, dangerSeconds: 10);
+            _sweep.Update(remaining, _totalMs / 1000.0, dangerSeconds: 10);
 
             var showCountdown = remaining < 30;
             if (_countdown.Visible != showCountdown)
