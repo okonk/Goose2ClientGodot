@@ -37,9 +37,9 @@ public partial class MinimapControl : Control, IScalableWindow
         ClipContents = true;
         SetAnchorsPreset(LayoutPreset.TopRight);
         OffsetLeft = -BasePixels - 8;
-        OffsetTop = 8;
+        OffsetTop = 28;
         OffsetRight = -8;
-        OffsetBottom = 8 + BasePixels;
+        OffsetBottom = 28 + BasePixels;
         MouseFilter = MouseFilterEnum.Ignore;
         Visible = GameManager.Instance?.CharacterSettings.GetOption<bool>(Options.Minimap, true) ?? true;
 
