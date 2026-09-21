@@ -7,17 +7,22 @@ shipped inside the build.
 
 ## Host requirements
 
-**Linux only.** The export-template lookup assumes the XDG layout
+`build.sh` runs on **Linux only**. Its export-template lookup assumes the XDG layout
 (`${XDG_DATA_HOME:-$HOME/.local/share}/godot/export_templates/`); macOS and Windows hosts
-put templates elsewhere and are not supported by the script.
+put templates elsewhere.
 
-On PATH: `dotnet`, `git`, `tar`, `zip`, `du`. Plus a Godot **mono** build — the script
-looks for `/usr/bin/godot-mono` and honours `GODOT=/path/to/godot`.
+On PATH: `dotnet`, `git`, `tar`, `zip`, `du`. macOS builds also need `unzip` and
+[`rcodesign`](https://github.com/indygreg/apple-platform-rs/releases/tag/apple-codesign%2F0.29.0);
+version 0.29.0 was tested. On Arch, install the
+[`rcodesign-bin` AUR package](https://aur.archlinux.org/packages/rcodesign-bin).
+Set `RCODESIGN=/path/to/rcodesign` if it is not on PATH.
+The script looks for a Godot **mono** build at `/usr/bin/godot-mono` and honours
+`GODOT=/path/to/godot`.
 
 ## Godot and export templates
 
 The engine and its export templates must be the same version, and the templates must be
-the **mono** set. The current pair is **4.7.1** (`4.7.1.stable.mono`). Install them from
+the **mono** set. The current pair is **4.7.2** (`4.7.2.stable.mono`). Install them from
 the editor: **Editor → Manage Export Templates**.
 
 `build.sh` checks this up front and names the missing directory, because a version
@@ -107,11 +112,11 @@ through `Godot.FileAccess` directly. Code that uses `System.IO` on a globalized 
 path works in the editor and fails in every export.
 
 Builds are staged under `build/.staging` and published into `build/` only after **every**
-requested platform succeeds — a partial release set is worse than none.
+requested export and signing step succeeds.
 
 ## Outputs
 
-Three archives in `build/`, approximate sizes:
+The Linux build produces three archives in `build/`, approximate sizes:
 
 | Artifact | Size |
 | --- | --- |
@@ -119,20 +124,32 @@ Three archives in `build/`, approximate sizes:
 | `Goose2Client-<id>-windows.zip` | ~88M |
 | `Goose2Client-<id>-macos.zip` | ~140M |
 
+The macOS ZIP is re-signed on Linux before publication. Extract it on an Apple silicon
+Mac and launch the app normally before distributing a new build. Confirm the login
+screen and a rendered map.
+
 Linux uses tar rather than zip to preserve the executable bit on the binary.
 
 ## macOS limitations
 
-The macOS artifact is a **universal** binary (the 4.7.1 template ships universal only; an
-x86_64-specific preset fails outright), **ad-hoc signed**, and **not notarized**.
+The macOS artifact is a **universal** binary (the 4.7.2 template ships universal only; an
+architecture-specific preset fails outright), **ad-hoc signed**, and **not notarized**.
+
+On macOS 27.0, the Godot 4.7.2 built-in ad-hoc signature failed at launch because AMFI
+could not parse its DER entitlements. `codesign --verify` still passed. Re-signing the
+extracted app with Apple's `codesign --generate-entitlement-der` made it launch.
+Re-signing the Godot export on Linux with `rcodesign` 0.29.0 and the four .NET runtime
+entitlements in `macos.entitlements` also launched on that Mac. `sign-macos.sh` performs
+that step during the build, checks that both universal slices have parseable DER
+entitlements, and verifies the ZIP before publication.
 
 Ad-hoc signing is not optional: without it the `.app` will not launch on Apple Silicon at
 all. Because it is unnotarized, a user's first launch needs **right-click → Open** rather
 than a double-click.
 
 Proper signing and notarization would need an Apple Developer account and are not
-implemented. The macOS artifact also cannot be smoke-tested from a Linux build host — it
-is the one output that ships unverified.
+implemented. The Linux build host cannot run the macOS app, so each release still needs
+the target Mac UI check above.
 
 ## Validating artifacts
 
@@ -140,7 +157,7 @@ is the one output that ships unverified.
 # Integrity
 tar -tzf build/Goose2Client-*-linux.tar.gz >/dev/null && echo "linux ok"
 unzip -t build/Goose2Client-*-windows.zip >/dev/null && echo "windows ok"
-unzip -t build/Goose2Client-*-macos.zip   >/dev/null && echo "macos ok"
+unzip -t build/Goose2Client-*-macos.zip >/dev/null && echo "macos ok"
 
 # The executable bit survived the tar — must show -rwx, or the archive is
 # broken for users.

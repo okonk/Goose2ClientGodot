@@ -43,6 +43,13 @@ done
 for cmd in dotnet git tar zip du; do
   command -v "$cmd" >/dev/null || die "required command '$cmd' not found on PATH"
 done
+if [[ " ${PLATFORMS[*]} " == *" macos "* ]]; then
+  command -v unzip >/dev/null || die "required command 'unzip' not found on PATH"
+  RCODESIGN="${RCODESIGN:-rcodesign}"
+  command -v "$RCODESIGN" >/dev/null || die "rcodesign not found; set RCODESIGN=/path/to/rcodesign"
+  [ -f sign-macos.sh ] || die "sign-macos.sh not found"
+  [ -f macos.entitlements ] || die "macos.entitlements not found"
+fi
 
 [ -x "$GODOT" ] || die "godot not found at '$GODOT' — set GODOT=/path/to/godot"
 
@@ -132,9 +139,9 @@ archive_platform() {
       (cd "$STAGING_DIR/$plat" && zip -qr "../$out" .) || die "windows archive failed"
       ;;
     macos)
-      # Godot already emits a self-contained, ad-hoc-signed .zip of the .app.
+      # macOS 27 rejects Godot's built-in DER entitlements; rcodesign replaces them.
       out="Goose2Client-$BUILD_ID-macos.zip"
-      mv "$STAGING_DIR/$plat/Goose2Client.zip" "$STAGING_DIR/$out" || die "macos archive failed"
+      RCODESIGN="$RCODESIGN" bash ./sign-macos.sh "$STAGING_DIR/$plat/Goose2Client.zip" "$STAGING_DIR/$out" || die "macos signing failed"
       ;;
   esac
   [ -s "$STAGING_DIR/$out" ] || die "$plat archive '$out' is missing or empty"
