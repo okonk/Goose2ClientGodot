@@ -48,6 +48,24 @@ namespace Goose2Client.Network.Tests
         }
 
         [Fact]
+        public void Drain_StopsAtMaximumAndPreservesRemainder()
+        {
+            bool paused = true;
+            var recorded = new List<string>();
+            var queue = new PausablePacketQueue(() => paused, recorded.Add);
+            queue.Handle("A");
+            queue.Handle("B");
+            queue.Handle("C");
+            paused = false;
+
+            int drained = queue.Drain(2, () => true);
+
+            Assert.Equal(2, drained);
+            Assert.Equal(new[] { "A", "B" }, recorded);
+            Assert.Equal(1, queue.Count);
+        }
+
+        [Fact]
         public void Handle_AfterUnpause_DispatchesInline()
         {
             // Arrange
@@ -134,6 +152,26 @@ namespace Goose2Client.Network.Tests
 
             // Assert: all three dispatched in FIFO order
             Assert.Equal(new[] { "A", "MAP_CHANGE", "B" }, recorded);
+            Assert.Equal(0, queue.Count);
+        }
+
+        [Fact]
+        public void Clear_DropsBufferedPacketsWithoutDispatching()
+        {
+            // Arrange
+            bool paused = true;
+            var recorded = new List<string>();
+            var queue = new PausablePacketQueue(() => paused, s => recorded.Add(s));
+
+            queue.Handle("A");
+            queue.Handle("B");
+            queue.Handle("C");
+
+            // Act
+            queue.Clear();
+
+            // Assert: nothing dispatched, queue empty
+            Assert.Empty(recorded);
             Assert.Equal(0, queue.Count);
         }
 

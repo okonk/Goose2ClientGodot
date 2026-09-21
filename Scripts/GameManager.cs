@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using Godot;
+using Goose2Client.Diagnostics;
 using Goose2Client.Map;
 using Goose2Client.Network;
 using Goose2Client.Network.Packets;
@@ -17,9 +18,15 @@ namespace Goose2Client
         public PacketManager PacketManager { get; private set; }
 
         private PausablePacketQueue _packetQueue;
+        private MainThreadStallMonitor _stallMonitor;
+        private const int MaxNetworkPacketsPerFrame = 64;
+        private const ulong NetworkPacketBudgetUsec = 4000;
 
         /// <summary>Persistent CanvasLayer that survives scene swaps. HUD windows attach here.</summary>
         public CanvasLayer UiLayer { get; private set; }
+
+        /// <summary>Shown when the server drops the connection in-game; offers a return-to-login path.</summary>
+        public UI.DisconnectOverlay DisconnectOverlay { get; private set; }
 
         /// <summary>Per-character settings (hotkeys, window positions, options).</summary>
         public CharacterSettings CharacterSettings { get; set; }
@@ -79,8 +86,52 @@ namespace Goose2Client
             instance = this;
 
             PacketManager = new PacketManager();
-            NetworkClient = new NetworkClient(this);
+            NetworkClient = new NetworkClient();
+            _stallMonitor = new MainThreadStallMonitor(
+                ProjectSettings.GlobalizePath("user://client-stalls.log"),
+                () => NetworkClient.PendingPacketCount);
+            NetworkClient.StallMonitor = _stallMonitor;
             _packetQueue = new PausablePacketQueue(() => NetworkClient.Pause, PacketManager.Handle);
+        }
+
+        public override void _Process(double delta)
+        {
+            _stallMonitor.Heartbeat("frame-start");
+            try
+            {
+                if (NetworkClient.Pause)
+                    return;
+
+                ulong deadline = Time.GetTicksUsec() + NetworkPacketBudgetUsec;
+                bool HasBudget() => Time.GetTicksUsec() < deadline;
+                int processed = _packetQueue.Drain(MaxNetworkPacketsPerFrame, HasBudget);
+
+                if (NetworkClient.Pause || processed >= MaxNetworkPacketsPerFrame || !HasBudget())
+                    return;
+                if (_packetQueue.Count > 0)
+                    return;
+
+                NetworkClient.DrainPackets(
+                    MaxNetworkPacketsPerFrame - processed,
+                    () => !NetworkClient.Pause && HasBudget(),
+                    HandlePacket);
+            }
+            finally
+            {
+                _stallMonitor.SetActivity(StallFrameActivity());
+            }
+        }
+
+        private string StallFrameActivity()
+        {
+            var window = GetWindow();
+            if (window == null)
+                return "frame-complete-no-window";
+            if (window.Mode == Window.ModeEnum.Minimized)
+                return "frame-complete-minimized";
+            return window.HasFocus()
+                ? "frame-complete-focused"
+                : "frame-complete-unfocused";
         }
 
         public override void _Input(InputEvent @event)
@@ -99,6 +150,11 @@ namespace Goose2Client
 
         public override void _Ready()
         {
+            if (_stallMonitor.IsEnabled)
+                GD.Print($"[stall] watchdog log: {_stallMonitor.LogPath}");
+            else
+                GD.PushWarning($"Stall watchdog disabled: {_stallMonitor.InitializationError}");
+
             UiScaleApplier.Instance = new UiScaleApplier();
             var startupCanvas = (Vector2I)GetTree().Root.GetVisibleRect().Size;
             UiScaleApplier.Instance.Apply(UiScale.AutoFactor(startupCanvas.Y), ApplyReason.Startup);
@@ -134,9 +190,11 @@ namespace Goose2Client
             // breaks is useless for identifying which build broke.
             AddChild(new UI.BuildStampOverlay());
 
+            DisconnectOverlay = new UI.DisconnectOverlay();
+            AddChild(DisconnectOverlay);
+
             // Listen for class table updates for the lifetime of the app.
             PacketManager.Listen<ClassUpdatePacket>(OnClassUpdate);
-            PacketManager.Listen<PingPacket>(OnPing);
             PacketManager.Listen<GroupUpdatePacket>(OnGroupUpdate);
             // GameManager persists across scene swaps and owns ChangeMap.
             // SendCurrentMapPacket drives warp / door / death-recall map transitions
@@ -159,28 +217,22 @@ namespace Goose2Client
                 _ = UiScaleSelfTest.Run(this);
         }
 
-        /// <summary>
-        /// Main-thread entry point. The NetworkClient receive thread marshals each complete
-        /// packet here via CallDeferred("HandlePacket", packet). The Pause flag is honored
-        /// HERE (on the main thread), not on the receive thread.
-        /// While paused, packets are buffered in a FIFO queue; on unpause they are drained
-        /// in order before any newly-arriving packet is handled.
-        /// </summary>
         public void HandlePacket(string packet)
         {
-            _packetQueue.Handle(packet);
+            _stallMonitor.SetActivity($"packet {PacketManager.IdentifyPrefix(packet)}");
+            try
+            {
+                _packetQueue.Handle(packet);
+            }
+            finally
+            {
+                _stallMonitor.SetActivity("frame");
+            }
         }
 
-        /// <summary>
-        /// Sets the pause flag. When transitioning to unpaused, drains any buffered packets
-        /// in FIFO order. All callers that change pause state MUST use this method
-        /// (not <c>NetworkClient.Pause = value</c>) so the drain always fires.
-        /// </summary>
         public void SetPaused(bool paused)
         {
             NetworkClient.Pause = paused;
-            if (!paused)
-                _packetQueue.Drain();
         }
 
         /// <summary>
@@ -205,7 +257,8 @@ namespace Goose2Client
                 if (Hud != null && GodotObject.IsInstanceValid(Hud))
                     Hud.Chat?.ClearAndUnfocus();
 
-                SetPaused(true);   // buffer gameplay packets during the transition (drained on unpause)
+                SetPaused(true);
+                _stallMonitor.SetActivity("map-loading-overlay");
 
                 // Previous world, tracked explicitly (I7) — scene reassignment never frees it:
                 //  - previousMap: the currently attached map (later entries). CurrentScene never
@@ -221,9 +274,11 @@ namespace Goose2Client
                 // Hide the bridge for the transition: it's a root CanvasLayer that draws ABOVE the loading
                 // UI, and old-map characters (names/bubbles/battle text) stay alive until the new map's first frame.
                 WorldTextBridge.Visible = false;
+                _stallMonitor.SetActivity("map-wait-frame");
                 await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
                 loading.SetMapName(mapName);
 
+                _stallMonitor.SetActivity("map-load-file");
                 var nextMap = LoadMap(mapFile);
                 if (nextMap == null) return;
                 CurrentMap = nextMap;
@@ -238,7 +293,9 @@ namespace Goose2Client
                 // previous map until the swap (no black flash). MapManager._Ready (fired inside
                 // Attach's AddChild) has already registered CurrentMapManager by the time
                 // DoneLoadingMap drains packets below.
+                _stallMonitor.SetActivity("map-instantiate-scene");
                 var mapScene = GD.Load<PackedScene>("res://Scenes/Map.tscn").Instantiate<SubViewport>();
+                _stallMonitor.SetActivity("map-attach-scene");
                 WorldViewport.Attach(mapScene);
 
                 // Present the new map's first clean frame before removing the old world:
@@ -286,11 +343,13 @@ namespace Goose2Client
                 onFrame = FinishRace;
                 RenderingServer.FramePostDraw += onPostDraw;
                 tree.ProcessFrame += onFrame;
+                _stallMonitor.SetActivity("map-wait-render");
                 await ToSignal(this, RenderRaceSignal);
 
                 // Explicit lifecycle ownership: free the previous world only after the new map
                 // has rendered its first (now-presented) frame; failure before the await keeps
                 // the old world live.
+                _stallMonitor.SetActivity("map-cleanup");
                 if (previousScene != null && previousScene != mapScene && GodotObject.IsInstanceValid(previousScene))
                     previousScene.QueueFree();
                 if (previousMap != null && previousMap != mapScene && GodotObject.IsInstanceValid(previousMap))
@@ -306,7 +365,7 @@ namespace Goose2Client
                 if (loading != null && GodotObject.IsInstanceValid(loading))
                     loading.QueueFree();   // no leaked full-window Control
                 WorldTextBridge.Visible = true;
-                SetPaused(false);   // always drain queued gameplay packets, even if the transition throws
+                SetPaused(false);
             }
         }
 
@@ -322,10 +381,13 @@ namespace Goose2Client
             applier.Apply(UiScale.Resolve(mode, saved, canvas.Y), ApplyReason.Startup);
         }
 
-        private void OnPing(object packetObj) => NetworkClient.Pong();
-
         private void OnDisconnected()
-            => GD.Print($"[net] DISCONNECTED, server closed the socket (tick {Time.GetTicksMsec()}) {System.DateTime.UtcNow:HH:mm:ss}");
+        {
+            GD.Print($"[net] DISCONNECTED, server closed the socket (tick {Time.GetTicksMsec()}) {System.DateTime.UtcNow:HH:mm:ss}");
+            // In-game only: at the login screen the LoginScene handles its own connection errors.
+            if (CurrentMapManager != null)
+                DisconnectOverlay.ShowDisconnect();
+        }
 
         private void OnSocketError(System.Exception e)
             => GD.Print($"[net] SOCKET ERROR (tick {Time.GetTicksMsec()}) {System.DateTime.UtcNow:HH:mm:ss}: {e.GetType().Name}: {e.Message}");
@@ -414,6 +476,20 @@ namespace Goose2Client
         /// <summary>Quit the game (used by Toolbar Exit button).</summary>
         public void Quit() => GetTree().Quit();
 
+        /// <summary>Tears down the in-game state and returns to the login screen. Used by the
+        /// disconnect overlay after the server drops the connection.</summary>
+        public void ReturnToLogin()
+        {
+            NetworkClient.Disconnect();
+            _packetQueue.Clear();
+            SetPaused(false);
+            WorldViewport.Detach();
+            foreach (var child in UiLayer.GetChildren())
+                child.QueueFree();
+            Hud = null;
+            GetTree().ChangeSceneToFile("res://Scenes/Login.tscn");
+        }
+
         /// <summary>Instantiate the persistent HUD under the UI layer once; survives map swaps.</summary>
         public void EnsureHud()
         {
@@ -483,7 +559,6 @@ namespace Goose2Client
             if (window != null)
                 window.SizeChanged -= OnWindowResized;
             PacketManager.Remove<ClassUpdatePacket>(OnClassUpdate);
-            PacketManager.Remove<PingPacket>(OnPing);
             PacketManager.Remove<SendCurrentMapPacket>(OnSendCurrentMap);
             PacketManager.Remove<MapFlagsPacket>(OnMapFlags);
             PacketManager.Remove<SpellCooldownPacket>(OnSpellCooldown);
@@ -491,6 +566,7 @@ namespace Goose2Client
             NetworkClient.Disconnected -= OnDisconnected;
             NetworkClient.SocketError -= OnSocketError;
             NetworkClient?.Disconnect();
+            _stallMonitor?.Dispose();
         }
     }
 }

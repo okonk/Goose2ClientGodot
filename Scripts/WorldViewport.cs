@@ -122,6 +122,29 @@ namespace Goose2Client
         }
 
         /// <summary>
+        /// Detaches and frees the current map, clearing the display texture. Returns the world
+        /// to its pre-login state so the client can return to the login screen.
+        /// </summary>
+        public void Detach()
+        {
+            if (_pendingPresent != null)
+            {
+                RenderingServer.FramePostDraw -= _pendingPresent;
+                _pendingPresent = null;
+            }
+            _presentMap = null;
+            if (Current != null && GodotObject.IsInstanceValid(Current))
+            {
+                Current.RenderTargetUpdateMode = SubViewport.UpdateMode.WhenVisible;
+                Current.QueueFree();
+            }
+            Current = null;
+            WorldTexture.Texture = null;
+            _mouseInDisplay = false;
+            _forwardingHover = false;
+        }
+
+        /// <summary>
         /// Half-extent of the visible world in whole tiles around the camera anchor (the local
         /// player's tile center): ceil(half sub-viewport size / TileSize) per axis. Anything
         /// on screen is within this range. Falls back to <see cref="TargetCycler"/>'s default

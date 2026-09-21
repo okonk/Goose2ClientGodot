@@ -3,6 +3,7 @@ using System.Net.Sockets;
 using System.Text;
 using System.Threading;
 using Godot;
+using Goose2Client.Diagnostics;
 using Goose2Client.Network.Packets;
 
 namespace Goose2Client.Network
@@ -16,18 +17,22 @@ namespace Goose2Client.Network
 
         public bool IsConnected => socket != null && socket.Connected;
         public bool Pause { get; set; } = false;
+        public int PendingPacketCount => _packetInbox.Count;
+        internal MainThreadStallMonitor? StallMonitor { get; set; }
 
         private Socket? socket;
         private string packetBuffer = "";
 
-        private readonly Node dispatcher;   // GameManager autoload Node, used only for thread-safe CallDeferred
+        private readonly PacketInbox _packetInbox = new();
         private Thread? recvThread;
         private volatile bool running;
+        private readonly object _sendLock = new();
 
-        public NetworkClient(Node dispatcher)
-        {
-            this.dispatcher = dispatcher;
-        }
+        public int DrainPackets(int maximum, Action<string> dispatch)
+            => _packetInbox.Drain(maximum, dispatch);
+
+        public int DrainPackets(int maximum, Func<bool> hasBudget, Action<string> dispatch)
+            => _packetInbox.Drain(maximum, hasBudget, dispatch);
 
         public void Connect(string address, int port)
         {
@@ -76,23 +81,45 @@ namespace Goose2Client.Network
 
             socket = null;
             packetBuffer = "";
+            _packetInbox.Clear();
         }
 
         public void Send(string packet)
         {
             packet += '\x1';
+            StallMonitor?.SetActivity("network-send wait-lock");
             try
             {
-                socket!.Send(Encoding.ASCII.GetBytes(packet));
+                byte[] data = Encoding.ASCII.GetBytes(packet);
+                lock (_sendLock)
+                {
+                    StallMonitor?.SetActivity("network-send socket");
+                    socket!.Send(data);
+                }
             }
             catch (Exception e)
             {
                 SocketError?.Invoke(e);   // Send is called on the main thread
             }
+            finally
+            {
+                StallMonitor?.SetActivity("network-send-complete");
+            }
         }
 
-        // Background thread: touches ONLY the socket and packetBuffer. Everything that reaches
-        // PacketManager/observers/scene-tree is marshaled to the main thread via CallDeferred.
+        private void SendKeepalive()
+        {
+            try
+            {
+                byte[] data = Encoding.ASCII.GetBytes("PONG\x1");
+                lock (_sendLock)
+                {
+                    socket?.Send(data);
+                }
+            }
+            catch { /* dead socket; Disconnected/SocketError surfaces it on the main thread */ }
+        }
+
         private void ReceiveLoop()
         {
             var buffer = new byte[8192];
@@ -104,7 +131,7 @@ namespace Goose2Client.Network
                     if (received == 0)
                     {
                         if (running)
-                            Callable.From(() => Disconnected?.Invoke()).CallDeferred();
+                            _packetInbox.WhenEmpty(() => Disconnected?.Invoke());
                         break;
                     }
 
@@ -114,11 +141,15 @@ namespace Goose2Client.Network
                     string[] packets = packetBuffer.Split('\x1');
                     packetBuffer = packets[packets.Length - 1];   // keep the trailing incomplete fragment
 
-                    // Dispatch every complete packet to the main thread. The Pause flag is honored
-                    // in GameManager.HandlePacket (main thread), NOT here.
                     for (int i = 0; i < packets.Length - 1; i++)
                     {
-                        dispatcher.CallDeferred("HandlePacket", packets[i]);
+                        string packet = packets[i];
+                        if (packet.StartsWith("PING"))
+                        {
+                            SendKeepalive();
+                            continue;
+                        }
+                        _packetInbox.Enqueue(packet);
                     }
                 }
             }
@@ -126,13 +157,11 @@ namespace Goose2Client.Network
             {
                 if (running)   // only surface errors that aren't from our own Disconnect()
                 {
-                    // marshal the log + error event to the main thread (the receive thread must not
-                    // touch Godot APIs like GD.Print directly)
-                    Callable.From(() =>
+                    _packetInbox.WhenEmpty(() =>
                     {
                         GD.Print($"Network Exception: {e}");
                         SocketError?.Invoke(e);
-                    }).CallDeferred();
+                    });
                 }
             }
         }
@@ -147,11 +176,6 @@ namespace Goose2Client.Network
         public void LoginContinued()
         {
             Send($"LCNT");
-        }
-
-        public void Pong()
-        {
-            Send($"PONG");
         }
 
         public void DoneLoadingMap()

@@ -3,10 +3,6 @@ using System.Collections.Generic;
 
 namespace Goose2Client.Network
 {
-    /// <summary>
-    /// FIFO queue that buffers packets while paused and drains them on unpause.
-    /// Pure logic class — no Godot dependencies — so it is unit-testable.
-    /// </summary>
     public class PausablePacketQueue
     {
         private readonly Queue<string> _queued = new();
@@ -21,6 +17,9 @@ namespace Goose2Client.Network
 
         /// <summary>Number of packets currently buffered (paused) but not yet dispatched.</summary>
         public int Count => _queued.Count;
+
+        /// <summary>Drops all buffered packets without dispatching them.</summary>
+        public void Clear() => _queued.Clear();
 
         /// <summary>
         /// Enqueue the packet if paused; otherwise dispatch it immediately.
@@ -50,10 +49,17 @@ namespace Goose2Client.Network
         /// Calling Drain on an empty queue is a no-op.
         /// </para>
         /// </summary>
-        public void Drain()
+        public void Drain() => Drain(int.MaxValue, () => true);
+
+        public int Drain(int maximum, Func<bool> hasBudget)
         {
-            while (_queued.Count > 0 && !_isPaused())
+            int drained = 0;
+            while (drained < maximum && _queued.Count > 0 && !_isPaused() && hasBudget())
+            {
                 _dispatch(_queued.Dequeue());
+                drained++;
+            }
+            return drained;
         }
     }
 }

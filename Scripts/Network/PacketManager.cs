@@ -32,6 +32,17 @@ namespace Goose2Client.Network
             typeToHandler.Clear();
         }
 
+        public string IdentifyPrefix(string packet)
+        {
+            for (int i = 0; i < Math.Min(8, packet.Length); i++)
+            {
+                string prefix = packet.Substring(0, i + 1);
+                if (handlers.ContainsKey(prefix))
+                    return prefix;
+            }
+            return "unknown";
+        }
+
         public void Handle(string packet)
         {
             if (packet.Length == 0) return;
