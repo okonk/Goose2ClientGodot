@@ -25,6 +25,7 @@ public partial class GameHud : Control
     public CombineBagContainerWindow CombineBag { get; private set; }
     public CustomWindow Custom { get; private set; }
     public HairdyeWindow Hairdye { get; private set; }
+    public MinimapControl Minimap { get; private set; }
     public QuestWindowManager QuestWindows { get; private set; }
     public OptionListWindowManager OptionListWindows { get; private set; }
 
@@ -73,6 +74,9 @@ public partial class GameHud : Control
         CombineBag = Add<CombineBagContainerWindow>("res://Scenes/UI/CombineBagContainerWindow.tscn");
         Custom = Add<CustomWindow>("res://Scenes/UI/CustomWindow.tscn");
         Hairdye = Add<HairdyeWindow>("res://Scenes/UI/HairdyeWindow.tscn");
+
+        Minimap = new MinimapControl();
+        AddChild(Minimap);
 
         // 5. Multi-window managers (plain Node subclasses, instantiable via new).
         QuestWindows = new QuestWindowManager();
