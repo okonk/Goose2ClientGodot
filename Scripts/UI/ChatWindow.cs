@@ -67,6 +67,7 @@ public partial class ChatWindow : Control, IScalableWindow
 
         // Command handlers
         _commandHandlers["/quit"] = OnQuitCommand;
+        _commandHandlers["/hairdye"] = OnHairdyeCommand;
 
         // Chat type colors
         _chatColors[ChatType.Chat] = GameColors.White;
@@ -237,5 +238,15 @@ public partial class ChatWindow : Control, IScalableWindow
     private void OnQuitCommand(string command, string arguments)
     {
         GameManager.Instance.Quit();
+    }
+
+    private void OnHairdyeCommand(string command, string arguments)
+    {
+        if (string.IsNullOrWhiteSpace(arguments))
+        {
+            GameManager.Instance.Hud?.Hairdye.Open();
+            return;
+        }
+        GameManager.Instance.NetworkClient.Command($"{command} {arguments}");
     }
 }

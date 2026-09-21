@@ -14,6 +14,8 @@ public partial class CustomPreviewControl : Control
     private int _customPose;
     private int _tintR, _tintG, _tintB, _tintA;
     private Direction _facing;
+    private readonly HashSet<CharacterSlot> _hiddenSlots = new();
+    private readonly Dictionary<CharacterSlot, Color> _slotTints = new();
 
     public override void _Ready()
     {
@@ -67,6 +69,11 @@ public partial class CustomPreviewControl : Control
 
         foreach (var (slot, layer) in _layers)
         {
+            if (_hiddenSlots.Contains(slot))
+            {
+                HideLayer(layer);
+                continue;
+            }
             bool replaced = slot == _customSlot;
             int id;
             Color tint;
@@ -85,6 +92,8 @@ public partial class CustomPreviewControl : Control
             else
             {
                 state = source.BodyState;
+                if (_slotTints.TryGetValue(slot, out var tintOverride))
+                    tint = tintOverride;
             }
 
             if (id <= 0)
@@ -141,6 +150,25 @@ public partial class CustomPreviewControl : Control
     }
 
     public void ClearCustomGraphic() => SetCustomGraphic(null, 0, 0);
+
+    public void HideSlot(CharacterSlot slot) => _hiddenSlots.Add(slot);
+
+    public void ShowSlot(CharacterSlot slot) => _hiddenSlots.Remove(slot);
+
+    public void SetSlotTint(CharacterSlot slot, int r, int g, int b, int a)
+    {
+        var tint = new Color(r / 255f, g / 255f, b / 255f, a / 255f);
+        _slotTints[slot] = tint;
+        if (!_layers.TryGetValue(slot, out var layer) || !layer.Visible) return;
+        if (a == 0)
+        {
+            layer.Material = null;
+            return;
+        }
+        if (layer.Material is not ShaderMaterial mat)
+            layer.Material = mat = new ShaderMaterial { Shader = TintMaterial.Shader };
+        mat.SetShaderParameter("tint", tint);
+    }
 
     public void SetTint(int r, int g, int b, int a)
     {

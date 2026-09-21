@@ -45,6 +45,7 @@ public partial class CustomWindow : BaseWindow, IWindow
     private int _a = CustomWindowMetrics.DefaultA;
     private float _lastHue = -1f;
     private float _hue;
+    private bool _preservingHue;
 
     public override void _Ready()
     {
@@ -163,7 +164,9 @@ public partial class CustomWindow : BaseWindow, IWindow
     private void SyncHsl()
     {
         var (h, s, l) = HslColor.FromRgb(_r, _g, _b);
-        if (s > 0f) _hue = h;
+        // The swatch and lightness bar work at a fixed hue; re-deriving it from the
+        // quantized RGB round-trip would drift it (large near grey/extreme lightness).
+        if (!_preservingHue && s > 0f) _hue = h;
         if (Math.Abs(_hue - _lastHue) > 0.5f)
         {
             _lastHue = _hue;
@@ -197,7 +200,9 @@ public partial class CustomWindow : BaseWindow, IWindow
         var ns = Mathf.Clamp(pos.X / _swatch.Size.X, 0f, 1f);
         var nl = 1f - Mathf.Clamp(pos.Y / _swatch.Size.Y, 0f, 1f);
         var (r, g, b) = HslColor.ToRgb(_hue, ns, nl);
+        _preservingHue = true;
         SetRgb(r, g, b);
+        _preservingHue = false;
         _swatchCursor.Position = LockCursor(pos, _swatchCursor.Size, _swatch.Size);
     }
 
@@ -233,7 +238,9 @@ public partial class CustomWindow : BaseWindow, IWindow
         var (_, s, l) = HslColor.FromRgb(_r, _g, _b);
         var nl = Mathf.Clamp(pos.X / _lightBar.Size.X, 0f, 1f);
         var (r, g, b) = HslColor.ToRgb(_hue, s, nl);
+        _preservingHue = true;
         SetRgb(r, g, b);
+        _preservingHue = false;
         _lightCursor.Position = LockCursor(pos, _lightCursor.Size, _lightBar.Size);
     }
 

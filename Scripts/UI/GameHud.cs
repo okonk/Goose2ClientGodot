@@ -24,6 +24,7 @@ public partial class GameHud : Control
     public BankWindow Bank { get; private set; }
     public CombineBagContainerWindow CombineBag { get; private set; }
     public CustomWindow Custom { get; private set; }
+    public HairdyeWindow Hairdye { get; private set; }
     public QuestWindowManager QuestWindows { get; private set; }
     public OptionListWindowManager OptionListWindows { get; private set; }
 
@@ -71,6 +72,7 @@ public partial class GameHud : Control
         Bank = Add<BankWindow>("res://Scenes/UI/BankWindow.tscn");
         CombineBag = Add<CombineBagContainerWindow>("res://Scenes/UI/CombineBagContainerWindow.tscn");
         Custom = Add<CustomWindow>("res://Scenes/UI/CustomWindow.tscn");
+        Hairdye = Add<HairdyeWindow>("res://Scenes/UI/HairdyeWindow.tscn");
 
         // 5. Multi-window managers (plain Node subclasses, instantiable via new).
         QuestWindows = new QuestWindowManager();
