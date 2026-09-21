@@ -14,6 +14,7 @@ public partial class OptionsWindow : BaseWindow
     private CheckBox _targetFiltering;
     private CheckBox _showSpiritBar;
     private CheckBox _nativeRender;
+    private CheckBox _minimap;
     private CheckBox _scaleAuto;
     private CheckBox _scaleManual;
     private HSlider _scaleSlider;
@@ -41,6 +42,10 @@ public partial class OptionsWindow : BaseWindow
         _nativeRender = GetNode<CheckBox>("Content/NativeRenderCheck");
         _nativeRender.ButtonPressed = GameManager.Instance.CharacterSettings.GetOption<bool>(Options.RenderMode, false);
         _nativeRender.Toggled += OnNativeRenderChanged;
+
+        _minimap = GetNode<CheckBox>("Content/MinimapCheck");
+        _minimap.ButtonPressed = GameManager.Instance.CharacterSettings.GetOption<bool>(Options.Minimap, true);
+        _minimap.Toggled += OnMinimapChanged;
 
         _initializing = true;
         _scaleAuto = GetNode<CheckBox>("Content/ScaleAutoCheck");
@@ -92,6 +97,13 @@ public partial class OptionsWindow : BaseWindow
         GameManager.Instance.CharacterSettings.Options[Options.RenderMode] = pressed;
         GameManager.Instance.CharacterSettings.Save();
         GameManager.Instance.WorldViewport.ApplyMode(pressed ? WorldRenderMode.Native1x : WorldRenderMode.Integer2x);
+    }
+
+    private void OnMinimapChanged(bool pressed)
+    {
+        GameManager.Instance.CharacterSettings.Options[Options.Minimap] = pressed;
+        GameManager.Instance.CharacterSettings.Save();
+        GameManager.Instance.Hud?.Minimap?.SetEnabled(pressed);
     }
 
     private void OnScaleModeToggled(bool pressed)

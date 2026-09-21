@@ -24,7 +24,7 @@ layout_mode = 3
 offset_left = 0.0
 offset_top = 0.0
 offset_right = 240.0
-offset_bottom = 266.0
+offset_bottom = 292.0
 WindowName = "Options"
 
 [node name="Background" type="Panel" parent="."]
@@ -165,3 +165,14 @@ offset_right = 170.0
 offset_bottom = 252.0
 mouse_filter = 1
 text = "Reset UI Layout"
+
+[node name="MinimapCheck" type="CheckBox" parent="Content"]
+layout_mode = 2
+anchors_preset = 0
+offset_left = 8.0
+offset_top = 260.0
+offset_right = 232.0
+offset_bottom = 284.0
+mouse_filter = 1
+button_pressed = true
+text = "Minimap"

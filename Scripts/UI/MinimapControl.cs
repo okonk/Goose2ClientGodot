@@ -27,6 +27,8 @@ public partial class MinimapControl : Control, IScalableWindow
 
     public void Invalidate() => QueueRedraw();
 
+    public void SetEnabled(bool enabled) => Visible = enabled;
+
     public void Relayout() => UiScaleLayout.Apply(_geom, UiScaleApplier.Instance.Factor);
 
     public override void _Ready()
@@ -39,6 +41,7 @@ public partial class MinimapControl : Control, IScalableWindow
         OffsetRight = -8;
         OffsetBottom = 8 + BasePixels;
         MouseFilter = MouseFilterEnum.Ignore;
+        Visible = GameManager.Instance?.CharacterSettings.GetOption<bool>(Options.Minimap, true) ?? true;
 
         _geom = UiScaleLayout.Snapshot(this);
         UiScaleApplier.Instance.RegisterWindow(this);
@@ -49,23 +52,16 @@ public partial class MinimapControl : Control, IScalableWindow
     public override void _Process(double delta)
     {
         var player = GameManager.Instance?.CurrentMapManager?.LocalPlayer;
-        if (player == null)
+        if (player != null)
         {
-            if (_hasPlayer)
-            {
-                _hasPlayer = false;
-                QueueRedraw();
-            }
-            return;
-        }
-        if (_bitmap == null) return;
-        var pos = player.GlobalPosition;
-        if (!_hasPlayer || pos.DistanceSquaredTo(_playerPos) > 0.0001f)
-        {
-            _playerPos = pos;
+            _playerPos = player.GlobalPosition;
             _hasPlayer = true;
-            QueueRedraw();
         }
+        else if (_hasPlayer)
+        {
+            _hasPlayer = false;
+        }
+        if (_bitmap != null) QueueRedraw();
     }
 
     public override void _Draw()
@@ -91,5 +87,29 @@ public partial class MinimapControl : Control, IScalableWindow
             new Vector2(ax - r, ay + r),
             new Vector2(ax + r, ay + r)
         }, Colors.White);
+
+        var mm = GameManager.Instance?.CurrentMapManager;
+        if (mm == null) return;
+        float dr = px;
+        foreach (var c in mm.Characters)
+        {
+            if (c.IsLocalPlayer || c.IsHiddenFromViewer) continue;
+            float mx = (c.GlobalPosition.X / MapCoords.TileSize - camX) * px;
+            float my = (c.GlobalPosition.Y / MapCoords.TileSize - camY) * px;
+            if (mx < -dr || my < -dr || mx > Size.X + dr || my > Size.Y + dr) continue;
+            DrawCircle(new Vector2(mx, my), dr, MarkerColor(c));
+        }
+    }
+
+    private static Color MarkerColor(Character.Character c)
+    {
+        if (GameManager.Instance != null && GameManager.Instance.IsInParty(c.LoginId)) return GameColors.Yellow;
+        return c.CharacterType switch
+        {
+            CharacterType.Monster => GameColors.Red,
+            CharacterType.Vendor or CharacterType.Banker or CharacterType.Quest => GameColors.Green,
+            CharacterType.Pet => GameColors.Yellow,
+            _ => GameColors.White,
+        };
     }
 }
