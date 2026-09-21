@@ -115,6 +115,8 @@ public partial class GameHud : Control
             Hotbar.ToggleMount();
         else if (@event.IsActionPressed("PickUp"))
             GameManager.Instance.NetworkClient.Pickup();
+        else if (@event.IsActionPressed("ToggleChat"))
+            Chat.Toggle();
         else if (@event.IsActionPressed("StartChat"))
             Chat.FocusChat("");
         else if (@event.IsActionPressed("SlashCommand"))

@@ -172,6 +172,8 @@ public partial class ChatWindow : Control, IScalableWindow
     /// <summary>
     /// Called by GameHud to focus the chat input with an optional prefix.
     /// </summary>
+    public void Toggle() => Visible = !Visible;
+
     public void FocusChat(string prefill)
     {
         _input.Text = prefill;
