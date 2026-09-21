@@ -16,7 +16,6 @@ public partial class OptionsWindow : BaseWindow
     private CheckBox _nativeRender;
     private CheckBox _minimap;
     private HSlider _minimapOpacitySlider;
-    private Label _minimapOpacityValue;
     private CheckBox _scaleAuto;
     private CheckBox _scaleManual;
     private HSlider _scaleSlider;
@@ -50,7 +49,6 @@ public partial class OptionsWindow : BaseWindow
         _minimap.Toggled += OnMinimapChanged;
 
         _minimapOpacitySlider = GetNode<HSlider>("Content/MinimapOpacitySlider");
-        _minimapOpacityValue = GetNode<Label>("Content/MinimapOpacityValueLabel");
         _minimapOpacitySlider.Value = GameManager.Instance.CharacterSettings.GetOption<float>(Options.MinimapOpacity, 1f);
         _minimapOpacitySlider.ValueChanged += OnMinimapOpacityChanged;
 
@@ -118,7 +116,6 @@ public partial class OptionsWindow : BaseWindow
         float o = (float)v;
         GameManager.Instance.CharacterSettings.Options[Options.MinimapOpacity] = o;
         GameManager.Instance.CharacterSettings.Save();
-        _minimapOpacityValue.Text = $"{(int) Mathf.Round(o * 100f)}%";
         GameManager.Instance.Hud?.Minimap?.SetOpacity(o);
     }
 
