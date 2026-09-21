@@ -90,7 +90,7 @@ public partial class MinimapControl : Control, IScalableWindow
 
         var mm = GameManager.Instance?.CurrentMapManager;
         if (mm == null) return;
-        float dr = px;
+        float dr = px - 0.5f;
         foreach (var c in mm.Characters)
         {
             if (c.IsLocalPlayer || c.IsHiddenFromViewer) continue;
