@@ -29,6 +29,8 @@ public partial class MinimapControl : Control, IScalableWindow
 
     public void SetEnabled(bool enabled) => Visible = enabled;
 
+    public void SetOpacity(float opacity) => Modulate = new Color(1f, 1f, 1f, Mathf.Clamp(opacity, 0f, 1f));
+
     public void Relayout() => UiScaleLayout.Apply(_geom, UiScaleApplier.Instance.Factor);
 
     public override void _Ready()
@@ -42,6 +44,7 @@ public partial class MinimapControl : Control, IScalableWindow
         OffsetBottom = 28 + BasePixels;
         MouseFilter = MouseFilterEnum.Ignore;
         Visible = GameManager.Instance?.CharacterSettings.GetOption<bool>(Options.Minimap, true) ?? true;
+        SetOpacity(GameManager.Instance?.CharacterSettings.GetOption<float>(Options.MinimapOpacity, 1f) ?? 1f);
 
         _geom = UiScaleLayout.Snapshot(this);
         UiScaleApplier.Instance.RegisterWindow(this);

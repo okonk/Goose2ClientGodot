@@ -15,6 +15,8 @@ public partial class OptionsWindow : BaseWindow
     private CheckBox _showSpiritBar;
     private CheckBox _nativeRender;
     private CheckBox _minimap;
+    private HSlider _minimapOpacitySlider;
+    private Label _minimapOpacityValue;
     private CheckBox _scaleAuto;
     private CheckBox _scaleManual;
     private HSlider _scaleSlider;
@@ -46,6 +48,11 @@ public partial class OptionsWindow : BaseWindow
         _minimap = GetNode<CheckBox>("Content/MinimapCheck");
         _minimap.ButtonPressed = GameManager.Instance.CharacterSettings.GetOption<bool>(Options.Minimap, true);
         _minimap.Toggled += OnMinimapChanged;
+
+        _minimapOpacitySlider = GetNode<HSlider>("Content/MinimapOpacitySlider");
+        _minimapOpacityValue = GetNode<Label>("Content/MinimapOpacityValueLabel");
+        _minimapOpacitySlider.Value = GameManager.Instance.CharacterSettings.GetOption<float>(Options.MinimapOpacity, 1f);
+        _minimapOpacitySlider.ValueChanged += OnMinimapOpacityChanged;
 
         _initializing = true;
         _scaleAuto = GetNode<CheckBox>("Content/ScaleAutoCheck");
@@ -104,6 +111,15 @@ public partial class OptionsWindow : BaseWindow
         GameManager.Instance.CharacterSettings.Options[Options.Minimap] = pressed;
         GameManager.Instance.CharacterSettings.Save();
         GameManager.Instance.Hud?.Minimap?.SetEnabled(pressed);
+    }
+
+    private void OnMinimapOpacityChanged(double v)
+    {
+        float o = (float)v;
+        GameManager.Instance.CharacterSettings.Options[Options.MinimapOpacity] = o;
+        GameManager.Instance.CharacterSettings.Save();
+        _minimapOpacityValue.Text = $"{(int) Mathf.Round(o * 100f)}%";
+        GameManager.Instance.Hud?.Minimap?.SetOpacity(o);
     }
 
     private void OnScaleModeToggled(bool pressed)
