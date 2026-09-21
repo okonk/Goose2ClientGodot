@@ -83,7 +83,7 @@ Expected: build failure (type does not exist).
 - `public static Color? PickColor(MapTile tile, Func<int, int, Color?> provider)` —
   for `layer in {4, 3, 2, 0}`: `var l = tile.GetLayer(layer); if (l.Sheet == 0 || l.Graphic == 0) continue; var c = provider(l.Sheet, l.Graphic); if (c != null) return c;` return null.
 - `public static Color[] Build(MapDocument map, Func<int, int, Color?> provider)` —
-  `Color[] colors = new Color[map.Width * map.Height]`; per cell `colors[y * map.Width + x] = PickColor(map[x, y], provider) ?? Color.Black;`
+  `Color[] colors = new Color[map.Width * map.Height]`; per cell `colors[y * map.Width + x] = PickColor(map[x, y], provider) ?? Colors.Black;`
 
 No comments beyond what the codebase already has on similar pure helpers (see AGENTS.md).
 
@@ -126,7 +126,7 @@ manual smoke in Task 5.
   - Memoized per (sheet, graphic).
 - Builder body:
   - `var out = Image.Create(map.Width, map.Height, false, Image.Format.Rgba8);`
-    per cell: `out.SetPixelv(new Vector2I(x, y), MinimapColors.PickColor(map[x, y], provider) ?? Color.Black);`
+    per cell: `out.SetPixelv(new Vector2I(x, y), MinimapColors.PickColor(map[x, y], provider) ?? Colors.Black);`
   - Return `out`.
 
 Precondition: `map` non-null, `provider` non-null.
@@ -216,7 +216,7 @@ git commit -m "feat(minimap): top-right HUD minimap control (64x64 tile window, 
   reads the bitmap.
 - Required propagation sequence (inside `OnTileUpdate`, after `MapTileUpdate.Apply`):
   1. `var c = MinimapColors.PickColor(_map[p.X, p.Y], TileColor);`
-  2. `_minimapImage.SetPixelv(new Vector2I(p.X, p.Y), c ?? Color.Black);`
+  2. `_minimapImage.SetPixelv(new Vector2I(p.X, p.Y), c ?? Colors.Black);`
   3. `_minimapTexture.Update();` (re-uploads the image to the GPU)
   4. `GameManager.Instance.Hud?.Minimap?.Invalidate();`
 - Invariants to preserve:
