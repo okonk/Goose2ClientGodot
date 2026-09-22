@@ -72,6 +72,23 @@ public class MinimapColorsTests
     }
 
     [Fact]
+    public void PickColor_NearBlackTileBecomesEmpty()
+    {
+        _colors = new Dictionary<(int, int), Color> { [(1, 10)] = new Color(0.05f, 0.08f, 0.09f) };
+        var tile = Tile((0, 1, 10));
+        Assert.Equal(MinimapColors.Empty, MinimapColors.PickColor(tile, Provider));
+    }
+
+    [Fact]
+    public void PickColor_DarkButNotBlackTileIsKept()
+    {
+        var dark = new Color(0.05f, 0.05f, 0.2f);
+        _colors = new Dictionary<(int, int), Color> { [(1, 10)] = dark };
+        var tile = Tile((0, 1, 10));
+        Assert.Equal(dark, MinimapColors.PickColor(tile, Provider));
+    }
+
+    [Fact]
     public void PickColor_ReturnsNullWhenAllLayersEmpty()
     {
         _colors = new Dictionary<(int, int), Color>();
@@ -95,9 +112,9 @@ public class MinimapColorsTests
         Assert.Equal(6, colors.Length);
         Assert.Equal(new Color(1, 0, 0), colors[0]);
         Assert.Equal(new Color(0, 1, 0), colors[1]);
-        Assert.Equal(Colors.Black, colors[2]);
+        Assert.Equal(MinimapColors.Empty, colors[2]);
         Assert.Equal(new Color(0, 1, 0), colors[3]);
-        Assert.Equal(Colors.Black, colors[4]);
-        Assert.Equal(Colors.Black, colors[5]);
+        Assert.Equal(MinimapColors.Empty, colors[4]);
+        Assert.Equal(MinimapColors.Empty, colors[5]);
     }
 }

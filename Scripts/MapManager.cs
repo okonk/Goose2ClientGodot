@@ -120,7 +120,7 @@ public partial class MapManager : Node2D
 
         _minimapImage = MinimapBitmapBuilder.Build(_map, TileColor);
         _minimapTexture = ImageTexture.CreateFromImage(_minimapImage);
-        GameManager.Instance.Hud?.Minimap?.SetMap(_map.Width, _map.Height, _minimapTexture);
+        GameManager.Instance.Hud?.Minimap?.SetMap(_map.Width, _map.Height, _minimapTexture, GameManager.Instance.CurrentMapName);
     }
 
     public override void _ExitTree()
@@ -393,7 +393,7 @@ public partial class MapManager : Node2D
             else _layers[layer].RefreshCell(p.X, p.Y);                 // TileMapLayer: update one cell
         });
 
-        _minimapImage.SetPixelv(new Vector2I(p.X, p.Y), MinimapColors.PickColor(_map[p.X, p.Y], TileColor) ?? Colors.Black);
+        _minimapImage.SetPixelv(new Vector2I(p.X, p.Y), MinimapColors.PickColor(_map[p.X, p.Y], TileColor) ?? MinimapColors.Empty);
         _minimapTexture.Update(_minimapImage);
         GameManager.Instance.Hud?.Minimap?.Invalidate();
     }

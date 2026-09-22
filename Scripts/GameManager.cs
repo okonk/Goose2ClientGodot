@@ -36,6 +36,7 @@ namespace Goose2Client
 
         /// <summary>The parsed map for the scene currently being entered. Set in ChangeMap, read by MapManager._Ready.</summary>
         public MapDocument CurrentMap { get; set; }
+        public string CurrentMapName { get; private set; } = "";
 
         /// <summary>Shared UI/icon sprite cache used by HUD windows.</summary>
         public SpriteCache Sprites { get; private set; }
@@ -283,6 +284,7 @@ namespace Goose2Client
                 var nextMap = LoadMap(mapFile);
                 if (nextMap == null) return;
                 CurrentMap = nextMap;
+                CurrentMapName = mapName ?? "";
                 // finally: frees loading, unpauses; old world stays live, no DoneLoadingMap sent
 
                 // The Map scene IS its own SubViewport; attaching it to WorldViewport puts it in
