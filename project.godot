@@ -10,7 +10,7 @@ config_version=5
 
 [application]
 
-config/name="Goose2 Client"
+config/name="Goose2ClientGodot"
 run/main_scene="res://Scenes/Login.tscn"
 config/features=PackedStringArray("4.7", "C#", "Forward Plus")
 boot_splash/show_image=false

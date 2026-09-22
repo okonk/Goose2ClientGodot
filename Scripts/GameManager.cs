@@ -84,6 +84,7 @@ namespace Goose2Client
         public override void _EnterTree()
         {
             instance = this;
+            GetWindow().Title = "Goose2 Client";
 
             PacketManager = new PacketManager();
             NetworkClient = new NetworkClient();
