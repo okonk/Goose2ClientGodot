@@ -12,6 +12,7 @@ fi
 # Generated assets that exist only in the main checkout. SpriteCache throws without the
 # manifest (aborting GameManager._Ready before the self-test dispatch) and Character._Ready
 # throws without the heights file.
+mkdir -p Assets/Sprites Assets/Resources
 if [ ! -f Assets/Sprites/manifest.json ]; then
     printf '{"sheets": {}}' > Assets/Sprites/manifest.json
 fi
