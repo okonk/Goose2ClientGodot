@@ -40,6 +40,33 @@ public class CharacterAnchorTests
     }
 
     [Theory]
+    [InlineData(48, 32, 32, 0f, -92f)]      // 32x32 at normal body height: -(48 + 26 + 2 + 16)
+    [InlineData(64, 33, 17, 0.5f, -100.5f)] // odd width/height: half-pixel x keeps corners integral
+    [InlineData(40, 32, 32, 0f, -84f)]      // shorter body height lifts the icon
+    [InlineData(0, 32, 32, 0f, -92f)]       // Height <= 0 falls back to 48
+    [InlineData(-12, 33, 33, 0.5f, -92.5f)] // negative height falls back to 48 too
+    public void IconPosition_anchors_the_icon_above_the_name_anchor(int bodyHeight, int width, int height, float expectedX, float expectedY)
+    {
+        var pos = CharacterAnchor.IconPosition(bodyHeight, new Vector2(width, height), 26f, 2f);
+
+        Assert.Equal(new Vector2(expectedX, expectedY), pos);
+    }
+
+    [Theory]
+    [InlineData(48)]
+    [InlineData(64)]
+    [InlineData(96)]
+    [InlineData(0)]
+    public void IconPosition_bottom_edge_sits_exactly_gap_above_the_name_anchor(int bodyHeight)
+    {
+        var size = new Vector2(31, 19);
+        var pos = CharacterAnchor.IconPosition(bodyHeight, size, 26f, 2f);
+        int h = bodyHeight <= 0 ? 48 : bodyHeight;
+
+        Assert.Equal(-(h + 26f + 2f), pos.Y + size.Y / 2f);
+    }
+
+    [Theory]
     [InlineData(1, "mounted-walk-left", 2)]
     [InlineData(33, "walk-left", 2)]
     [InlineData(33, "mounted-idle-up", 0)]

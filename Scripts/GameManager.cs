@@ -217,6 +217,8 @@ namespace Goose2Client
 
             if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "+selftest=ui_scale") >= 0)
                 _ = UiScaleSelfTest.Run(this);
+            if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "+selftest=character_icon") >= 0)
+                _ = CharacterIconSelfTest.Run(this);
         }
 
         public void HandlePacket(string packet)

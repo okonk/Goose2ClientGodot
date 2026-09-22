@@ -16,6 +16,14 @@ namespace Goose2Client.Character
         public static Vector2 SpriteOffset(int height, Vector2 frameSize) =>
             new(frameSize.X % 2f * 0.5f, OffsetY(height) + frameSize.Y % 2f * 0.5f);
 
+        // 48 fallback mirrors RepositionOverlays / BridgedNameLabel: a character without a body
+        // slot must not anchor its icon to its feet.
+        public static Vector2 IconPosition(int bodyHeight, Vector2 textureSize, float nameTopOffset, float gap)
+        {
+            int h = bodyHeight <= 0 ? 48 : bodyHeight;
+            return new Vector2(textureSize.X % 2f * 0.5f, -(h + nameTopOffset + gap + textureSize.Y / 2f));
+        }
+
         public static int MountedHairYOffset(int graphicId, string animation, int frame)
         {
             // Hair 33's mounted frames bob on a different cadence from the rider body art.

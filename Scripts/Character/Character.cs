@@ -44,6 +44,8 @@ namespace Goose2Client.Character
         private AppearanceData _appearance;
 
         private Overlays.BridgedNameLabel _nameLabel;
+        private Sprite2D _icon;
+        private const float IconGap = 2f;
         private ColorRect _hpBarBackground;
         private ColorRect _hpBar;
         private ColorRect _mpBar;
@@ -175,6 +177,8 @@ namespace Goose2Client.Character
             if (_hpBarBackground != null) _hpBarBackground.Position = new Vector2(-16, -(h + 8));
             if (_hpBar != null) _hpBar.Position = new Vector2(-16, -(h + 8));
             if (_mpBar != null) _mpBar.Position = new Vector2(-16, -(h + 5));
+            if (_icon is { Texture: not null } icon)
+                icon.Position = CharacterAnchor.IconPosition(h, icon.Texture.GetSize(), NameTopOffset, IconGap);
             LayoutNameLabel();
             if (_chatBubble != null && GodotObject.IsInstanceValid(_chatBubble))
                 _chatBubble.UpdateAnchor();   // appearance/mount changes moved the nameplate — a live
@@ -238,7 +242,24 @@ namespace Goose2Client.Character
             ApplyInvisibility();
         }
 
-        public void SetIcon(Texture2D? texture) { }
+        public void SetIcon(Texture2D? texture)
+        {
+            if (_icon == null && texture != null)
+            {
+                _icon = new Sprite2D
+                {
+                    Name = "Icon",
+                    TextureFilter = CanvasItem.TextureFilterEnum.Nearest,
+                    // Absolute z: above the character/object band (15), below foreground/roof (30/40).
+                    ZIndex = 20,
+                    ZAsRelative = false,
+                };
+                AddChild(_icon);
+            }
+            if (_icon != null)
+                _icon.Texture = texture;
+            RepositionOverlays();
+        }
 
         /// <summary>Set GM state from an AMA (AdminModeActivate) packet and recolor the name.</summary>
         public void SetGm(bool gm)
