@@ -85,6 +85,12 @@ PY
 
 validate_oauth_client
 
+for required in Assets/Sprites/manifest.json Assets/Sprites/animation-manifest.json; do
+  [ -f "$required" ] || die "missing generated graphics: $required"
+done
+[ -d Assets/Sprites/sheets ] || die "missing generated graphics: Assets/Sprites/sheets"
+compgen -G 'Assets/Sprites/sheets/*.png' >/dev/null || die "missing generated graphics: Assets/Sprites/sheets/*.png"
+
 SKIP_TESTS=0
 REQUESTED=()
 for arg in "$@"; do
@@ -173,13 +179,17 @@ assert_no_token_directory() {
   fi
 }
 
-assert_no_godot_or_assets() {
+assert_no_godot() {
   if grep -qiE '(^|/)godot' <<<"$1"; then
     die "archive contains a Godot binary; refusing to publish"
   fi
-  if grep -qiE '(^|/)assets(/|$)' <<<"$1"; then
-    die "archive contains an asset directory; refusing to publish"
-  fi
+}
+
+assert_graphics() {
+  local listing="$1" root="$2"
+  assert_entry "$listing" "$root/Assets/Sprites/manifest.json"
+  assert_entry "$listing" "$root/Assets/Sprites/animation-manifest.json"
+  assert_entry "$listing" "$root/Assets/Sprites/sheets/"
 }
 
 for rid in "${RIDS[@]}"; do
@@ -193,6 +203,8 @@ for rid in "${RIDS[@]}"; do
       mkdir -p "$dist_dir/$top"
       cp -a "$out/." "$dist_dir/$top/"
       cp "$OAUTH_CLIENT" "$dist_dir/$top/google-oauth-client.json"
+      mkdir -p "$dist_dir/$top/Assets"
+      cp -a Assets/Sprites "$dist_dir/$top/Assets/"
       [ -x "$dist_dir/$top/MapEditor.App" ] || die "linux-x64 app host missing or not executable"
       archive="$STAGE/archives/map-editor-${BUILD_ID}-linux-x64.tar.gz"
       tar -czf "$archive" -C "$dist_dir" "$top"
@@ -201,17 +213,20 @@ for rid in "${RIDS[@]}"; do
       assert_entry "$listing" "$top/MapEditor.App.deps.json"
       assert_entry "$listing" "$top/MapEditor.App.runtimeconfig.json"
       assert_single_oauth_client "$listing" "$top/google-oauth-client.json"
+      assert_graphics "$listing" "$top"
       assert_no_token_directory "$listing"
       if ! tar -tvzf "$archive" | grep -E '^-rwx' | awk '{print $NF}' | grep -qx "$top/MapEditor.App"; then
         die "linux-x64 app host lost executable mode inside the archive"
       fi
-      assert_no_godot_or_assets "$listing"
+      assert_no_godot "$listing"
       ;;
     windows-x64)
       top="map-editor-windows-x64"
       mkdir -p "$dist_dir/$top"
       cp -a "$out/." "$dist_dir/$top/"
       cp "$OAUTH_CLIENT" "$dist_dir/$top/google-oauth-client.json"
+      mkdir -p "$dist_dir/$top/Assets"
+      cp -a Assets/Sprites "$dist_dir/$top/Assets/"
       [ -f "$dist_dir/$top/MapEditor.App.exe" ] || die "windows-x64 app host missing"
       archive="$STAGE/archives/map-editor-${BUILD_ID}-windows-x64.zip"
       (cd "$dist_dir" && zip -q -r -X "$archive" "$top")
@@ -221,8 +236,9 @@ for rid in "${RIDS[@]}"; do
       assert_entry "$listing" "$top/MapEditor.App.deps.json"
       assert_entry "$listing" "$top/MapEditor.App.runtimeconfig.json"
       assert_single_oauth_client "$listing" "$top/google-oauth-client.json"
+      assert_graphics "$listing" "$top"
       assert_no_token_directory "$listing"
-      assert_no_godot_or_assets "$listing"
+      assert_no_godot "$listing"
       ;;
     osx-x64|osx-arm64)
       bundle="$dist_dir/$MAC_BUNDLE.app"
@@ -233,6 +249,8 @@ for rid in "${RIDS[@]}"; do
       mv "$bundle/Contents/MacOS/MapEditor.App.runtimeconfig.json" "$bundle/Contents/MacOS/$MAC_BUNDLE.runtimeconfig.json"
       sed "s/__CFBUNDLE_EXECUTABLE__/$MAC_BUNDLE/" "$INFO_PLIST_TEMPLATE" > "$bundle/Contents/Info.plist"
       cp "$OAUTH_CLIENT" "$bundle/Contents/MacOS/google-oauth-client.json"
+      mkdir -p "$bundle/Contents/MacOS/Assets"
+      cp -a Assets/Sprites "$bundle/Contents/MacOS/Assets/"
       [ -x "$bundle/Contents/MacOS/$MAC_BUNDLE" ] || die "$rid app host missing or not executable"
       archive="$STAGE/archives/${MAC_BUNDLE}-${BUILD_ID}-${rid}.app.zip"
       (cd "$dist_dir" && zip -q -r -X "$archive" "$MAC_BUNDLE.app")
@@ -243,12 +261,13 @@ for rid in "${RIDS[@]}"; do
       assert_entry "$listing" "$MAC_BUNDLE.app/Contents/MacOS/$MAC_BUNDLE.runtimeconfig.json"
       assert_entry "$listing" "$MAC_BUNDLE.app/Contents/Info.plist"
       assert_single_oauth_client "$listing" "$MAC_BUNDLE.app/Contents/MacOS/google-oauth-client.json"
+      assert_graphics "$listing" "$MAC_BUNDLE.app/Contents/MacOS"
       assert_no_token_directory "$listing"
       extract="$STAGE/inspect/$rid"
       mkdir -p "$extract"
       unzip -q -o "$archive" -d "$extract"
       [ -x "$extract/$MAC_BUNDLE.app/Contents/MacOS/$MAC_BUNDLE" ] || die "$rid app host lost executable mode inside the archive"
-      assert_no_godot_or_assets "$listing"
+      assert_no_godot "$listing"
       ;;
   esac
   echo "build-map-editor: inspected $archive"

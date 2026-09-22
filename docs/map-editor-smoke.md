@@ -29,7 +29,7 @@ git status --short
 
 Expected: Core 216 passed, Rendering 171 passed, App 395 passed, Godot 460 passed, and the
 same four suites green in the solution run; Release build 0 errors; `bash -n` clean;
-script tests 92/92; the publisher produces a new `build/map-editor/<BUILD_ID>` release
+script tests 97/97; the publisher produces a new `build/map-editor/<BUILD_ID>` release
 directory containing all four archives plus `BUILD-METADATA.txt`; both greps return empty
 (no Avalonia/App in Core/Rendering, no Godot in App); `git diff --check` clean;
 `git status --short` clean (`build/` is gitignored).
@@ -169,7 +169,9 @@ Cross-publish all four RIDs from one host and inspect the release directory
   with `Contents/Info.plist` (CFBundleExecutable `Goose2MapEditor`, id
   `com.goose2.mapeditor`) and `Contents/MacOS/Goose2MapEditor` executable (755) plus
   `Goose2MapEditor.deps.json`/`runtimeconfig.json`.
-- All four: no Godot engine files and no asset directory entries.
+- All four: no Godot engine files; `Assets/Sprites` beside the executable contains
+  `manifest.json`, `animation-manifest.json`, and `sheets/` with generated PNGs.
+  On first launch, select that bundled `Assets/Sprites` directory in the asset picker.
 
 ### Target-host launches (separate per-host entries)
 

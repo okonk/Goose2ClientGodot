@@ -113,6 +113,11 @@ setup() {
     mkdir -p "$ENV/repo/src/MapEditor.App/Packaging/macos"
     cp "$TEMPLATE" "$ENV/repo/src/MapEditor.App/Packaging/macos/Info.plist.template"
   fi
+  mkdir -p "$ENV/repo/Assets/Sprites/sheets" "$ENV/repo/Assets/Sprites/Bodies"
+  printf '{"tileSize":32,"sheets":{}}\n' > "$ENV/repo/Assets/Sprites/manifest.json"
+  printf '{"animations":{}}\n' > "$ENV/repo/Assets/Sprites/animation-manifest.json"
+  printf 'sheet-png' > "$ENV/repo/Assets/Sprites/sheets/1.png"
+  printf 'source-png' > "$ENV/repo/Assets/Sprites/Bodies/1.png"
   cat > "$ENV/oauth.json" <<'EOF'
 {
   "client": {
@@ -357,7 +362,7 @@ else
 fi
 check "no unsubstituted template placeholder" $rc
 
-echo "== 12. no Godot or asset lookup; archives contain neither =="
+echo "== 12. no Godot invocation or bundled Godot binaries =="
 setup
 run "$ENV" --skip-tests linux-x64
 rc=$?
@@ -368,10 +373,47 @@ tarball=$(ls "$ENV/repo/build/map-editor/$rels" 2>/dev/null | grep -- '\.tar\.gz
 listing=$(tar -tzf "$ENV/repo/build/map-editor/$rels/$tarball" 2>/dev/null)
 ! grep -qiE '(^|/)godot' <<<"$listing"
 check "archive has no godot entries" $?
-! grep -qiE '(^|/)assets(/|$)' <<<"$listing"
-check "archive has no asset directory entries" $?
 
-echo "== 13. refuses to overwrite an existing release directory =="
+echo "== 13. graphics are bundled with every executable =="
+setup
+run "$ENV" --skip-tests
+rc=$?
+check "release with graphics exits 0" $([ "$rc" -eq 0 ]; echo $?)
+rels="$(releases)"
+release="$ENV/repo/build/map-editor/$rels"
+tarball=$(ls "$release" | grep -- '\.tar\.gz$' || true)
+zipwin=$(ls "$release" | grep -- 'windows-x64\.zip$' || true)
+z64=$(ls "$release" | grep -- '-osx-x64\.app\.zip$' || true)
+zarm=$(ls "$release" | grep -- '-osx-arm64\.app\.zip$' || true)
+graphics_ok=0
+for entry in manifest.json animation-manifest.json sheets/1.png Bodies/1.png; do
+  tar -tzf "$release/$tarball" | grep -qxF "map-editor-linux-x64/Assets/Sprites/$entry" || graphics_ok=1
+  unzip -Z1 "$release/$zipwin" | grep -qxF "map-editor-windows-x64/Assets/Sprites/$entry" || graphics_ok=1
+  for z in "$z64" "$zarm"; do
+    unzip -Z1 "$release/$z" | grep -qxF "Goose2MapEditor.app/Contents/MacOS/Assets/Sprites/$entry" || graphics_ok=1
+  done
+done
+check "all four archives contain the complete sprite directory beside the host" $graphics_ok
+mkdir -p "$ENV/graphics-extract"
+tar -xzf "$release/$tarball" -C "$ENV/graphics-extract"
+cmp -s "$ENV/graphics-extract/map-editor-linux-x64/Assets/Sprites/sheets/1.png" "$ENV/repo/Assets/Sprites/sheets/1.png"
+check "archived graphics are byte-identical to the source" $?
+
+echo "== 14. missing generated graphics fails before publish =="
+setup
+rm "$ENV/repo/Assets/Sprites/manifest.json"
+run "$ENV" --skip-tests linux-x64
+rc=$?
+check "missing graphics exits nonzero" $([ "$rc" -ne 0 ]; echo $?)
+check "missing graphics publishes no release" $([ -z "$(releases)" ]; echo $?)
+if [ -f "$ENV/dotnet.log" ]; then
+  ! grep -q '^publish ' "$ENV/dotnet.log"
+else
+  rc=0
+fi
+check "missing graphics does not invoke publish" $rc
+
+echo "== 15. refuses to overwrite an existing release directory =="
 setup
 passed=1
 for attempt in 1 2 3 4 5; do
@@ -389,7 +431,7 @@ for attempt in 1 2 3 4 5; do
   sleep 1
 done
 check "existing release dir not overwritten" $passed
-echo "== 14. missing/invalid OAuth client JSON fails before any publish =="
+echo "== 16. missing/invalid OAuth client JSON fails before any publish =="
 for mode in unset missing relative web invalid; do
   setup
   if [ "$mode" = "web" ]; then
@@ -415,7 +457,7 @@ EOF
   check "failure names the env var ($mode)" $(grep -q 'GOOSE2_MAP_EDITOR_GOOGLE_OAUTH_CLIENT' "$ENV/stderr.log" 2>/dev/null; echo $?)
 done
 
-echo "== 15. valid OAuth client staged beside every executable, no token directory =="
+echo "== 17. valid OAuth client staged beside every executable, no token directory =="
 setup
 run "$ENV" --skip-tests
 rc=$?
