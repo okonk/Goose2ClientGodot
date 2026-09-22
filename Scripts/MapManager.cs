@@ -103,6 +103,7 @@ public partial class MapManager : Node2D
         pm.Listen<ChangeHeadingPacket>(OnChangeHeading);
         pm.Listen<UpdateCharacterPacket>(OnUpdateCharacter);
         pm.Listen<EraseCharacterPacket>(OnEraseCharacter);
+        pm.Listen<CharacterIconPacket>(OnCharacterIcon);
         pm.Listen<AttackPacket>(OnAttack);
         pm.Listen<VitalsPercentagePacket>(OnVitals);
         pm.Listen<WeaponSpeedPacket>(OnWeaponSpeed);
@@ -142,6 +143,7 @@ public partial class MapManager : Node2D
         pm.Remove<ChangeHeadingPacket>(OnChangeHeading);
         pm.Remove<UpdateCharacterPacket>(OnUpdateCharacter);
         pm.Remove<EraseCharacterPacket>(OnEraseCharacter);
+        pm.Remove<CharacterIconPacket>(OnCharacterIcon);
         pm.Remove<AttackPacket>(OnAttack);
         pm.Remove<VitalsPercentagePacket>(OnVitals);
         pm.Remove<WeaponSpeedPacket>(OnWeaponSpeed);
@@ -234,6 +236,14 @@ public partial class MapManager : Node2D
             GameManager.Instance?.SpellTargetManager?.OnCharacterErased(c);
             c.QueueFree();
         }
+    }
+
+    private void OnCharacterIcon(object packetObj)
+    {
+        var p = (CharacterIconPacket)packetObj;
+        var c = GetCharacter(p.LoginId);
+        if (c == null) return;
+        c.SetIcon(_cache.Get(p.Sheet, p.Graphic));
     }
 
     private void OnAttack(object packetObj)

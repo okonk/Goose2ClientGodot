@@ -238,6 +238,8 @@ namespace Goose2Client.Character
             ApplyInvisibility();
         }
 
+        public void SetIcon(Texture2D? texture) { }
+
         /// <summary>Set GM state from an AMA (AdminModeActivate) packet and recolor the name.</summary>
         public void SetGm(bool gm)
         {
