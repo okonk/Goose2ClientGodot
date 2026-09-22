@@ -38,7 +38,7 @@ namespace Goose2Client.Character
         public int BodyState { get; private set; } = 3;
 
         // Per-slot live sprite + the graphic id it was built from (needed for the height lookup).
-        private sealed class Slot { public AnimatedSprite2D Sprite; public CharacterSlot Kind; public int GraphicId; public int AnchorHeight; }
+        private sealed class Slot { public AnimatedSprite2D Sprite; public int GraphicId; public int AnchorHeight; }
         private readonly Dictionary<CharacterSlot, Slot> _slots = new();
         private static AnimationHeights _heights;
         private AppearanceData _appearance;
@@ -353,13 +353,13 @@ namespace Goose2Client.Character
 
             if (!_slots.TryGetValue(slot, out var s))
             {
-                s = new Slot { Kind = slot, Sprite = new AnimatedSprite2D
+                s = new Slot { Sprite = new AnimatedSprite2D
                 {
                     Name = slot.ToString(),
                     TextureFilter = CanvasItem.TextureFilterEnum.Nearest,
                 } };
                 AddChild(s.Sprite);
-                s.Sprite.FrameChanged += () => AlignSlotSprite(s);
+                s.Sprite.FrameChanged += () => AlignSlotSprite(slot, s);
                 _slots[slot] = s;
             }
             s.GraphicId = graphicId;
@@ -370,7 +370,7 @@ namespace Goose2Client.Character
             EnsureHeights();
             int h = _heights.GetHeight($"{HeightPrefix(slot)}-{graphicId}-idle-equip-down");
             s.AnchorHeight = h;
-            AlignSlotSprite(s);
+            AlignSlotSprite(slot, s);
             // Only dyed slots get the tint shader; untinted slots use the default canvas path so they
             // render byte-identically to pre-shader behaviour (no global color-management shift).
             if (tint.A > 0f)
@@ -390,7 +390,7 @@ namespace Goose2Client.Character
             if (_slots.Remove(slot, out var s)) s.Sprite.QueueFree();
         }
 
-        private static void AlignSlotSprite(Slot slot)
+        private static void AlignSlotSprite(CharacterSlot kind, Slot slot)
         {
             var sprite = slot.Sprite;
             var frames = sprite.SpriteFrames;
@@ -400,7 +400,7 @@ namespace Goose2Client.Character
             if (texture != null)
             {
                 var offset = CharacterAnchor.SpriteOffset(slot.AnchorHeight, texture.GetSize());
-                if (slot.Kind == CharacterSlot.Hair)
+                if (kind == CharacterSlot.Hair)
                     offset.Y += CharacterAnchor.MountedHairYOffset(slot.GraphicId, sprite.Animation, sprite.Frame);
                 sprite.Offset = offset;
             }
@@ -786,7 +786,7 @@ namespace Goose2Client.Character
                 // every step is what made high move-speed look jittery.
                 if (s.Sprite.Animation != clip || !s.Sprite.IsPlaying())
                     s.Sprite.Play(clip);
-                AlignSlotSprite(s);
+                AlignSlotSprite(slot, s);
             }
 
             // Overlays use resting-pose Height; still refresh after mount/appearance-driven PlayCurrent.
