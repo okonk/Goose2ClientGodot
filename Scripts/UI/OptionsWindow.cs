@@ -16,6 +16,7 @@ public partial class OptionsWindow : BaseWindow
     private CheckBox _nativeRender;
     private CheckBox _minimap;
     private HSlider _minimapOpacitySlider;
+    private bool _minimapOpacityDragging;
     private CheckBox _scaleAuto;
     private CheckBox _scaleManual;
     private HSlider _scaleSlider;
@@ -49,7 +50,11 @@ public partial class OptionsWindow : BaseWindow
         _minimap.Toggled += OnMinimapChanged;
 
         _minimapOpacitySlider = GetNode<HSlider>("Content/MinimapOpacitySlider");
-        _minimapOpacitySlider.Value = GameManager.Instance.CharacterSettings.GetOption<float>(Options.MinimapOpacity, 1f);
+        _minimapOpacitySlider.Value = Mathf.Clamp(
+            GameManager.Instance.CharacterSettings.GetOption<float>(Options.MinimapOpacity, 1f),
+            _minimapOpacitySlider.MinValue, _minimapOpacitySlider.MaxValue);
+        _minimapOpacitySlider.DragStarted += () => _minimapOpacityDragging = true;
+        _minimapOpacitySlider.DragEnded += OnMinimapOpacityDragEnded;
         _minimapOpacitySlider.ValueChanged += OnMinimapOpacityChanged;
 
         _initializing = true;
@@ -114,9 +119,17 @@ public partial class OptionsWindow : BaseWindow
     private void OnMinimapOpacityChanged(double v)
     {
         float o = (float)v;
-        GameManager.Instance.CharacterSettings.Options[Options.MinimapOpacity] = o;
-        GameManager.Instance.CharacterSettings.Save();
+        var cs = GameManager.Instance.CharacterSettings;
+        cs.Options[Options.MinimapOpacity] = o;
         GameManager.Instance.Hud?.Minimap?.SetOpacity(o);
+        if (!_minimapOpacityDragging)
+            cs.Save();
+    }
+
+    private void OnMinimapOpacityDragEnded(bool valueChanged)
+    {
+        _minimapOpacityDragging = false;
+        GameManager.Instance.CharacterSettings.Save();
     }
 
     private void OnScaleModeToggled(bool pressed)

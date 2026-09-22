@@ -44,7 +44,9 @@ public partial class MinimapControl : Control, IScalableWindow
         OffsetBottom = 28 + BasePixels;
         MouseFilter = MouseFilterEnum.Ignore;
         Visible = GameManager.Instance?.CharacterSettings.GetOption<bool>(Options.Minimap, true) ?? true;
-        SetOpacity(GameManager.Instance?.CharacterSettings.GetOption<float>(Options.MinimapOpacity, 1f) ?? 1f);
+        SetOpacity(Mathf.Clamp(
+            GameManager.Instance?.CharacterSettings.GetOption<float>(Options.MinimapOpacity, 1f) ?? 1f,
+            0.2f, 1f));
 
         _geom = UiScaleLayout.Snapshot(this);
         UiScaleApplier.Instance.RegisterWindow(this);
