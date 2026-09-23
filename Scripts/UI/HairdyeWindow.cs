@@ -24,6 +24,7 @@ public partial class HairdyeWindow : BaseWindow
     private Label _gValue;
     private Label _bValue;
     private Label _aValue;
+    private LineEdit _nameField;
     private Button _dyeButton;
 
     private int _r = CustomWindowMetrics.DefaultR;
@@ -68,8 +69,12 @@ public partial class HairdyeWindow : BaseWindow
         _bSlider.ValueChanged += v => { _b = (int)v; _bValue.Text = _b.ToString(); UpdateTint(); };
         _aSlider.ValueChanged += v => { _a = (int)v; _aValue.Text = _a.ToString(); UpdateTint(); };
 
+        _nameField = GetNode<LineEdit>("Content/NameField");
+        _nameField.TextChanged += OnNameTextChanged;
+
         _dyeButton = GetNode<Button>("Content/DyeButton");
         _dyeButton.Pressed += DyePressed;
+        RefreshDyeButton();
 
         ScaleRegister();
     }
@@ -216,8 +221,25 @@ public partial class HairdyeWindow : BaseWindow
         SyncHsl();
     }
 
+    private void OnNameTextChanged(string text)
+    {
+        var filtered = text.Replace(",", "");
+        if (filtered != text)
+        {
+            _nameField.Text = filtered;
+            return;
+        }
+        RefreshDyeButton();
+    }
+
+    private void RefreshDyeButton()
+    {
+        _dyeButton.Disabled = string.IsNullOrWhiteSpace(_nameField.Text);
+    }
+
     private void DyePressed()
     {
-        GameManager.Instance.NetworkClient.Command($"/hairdye accept {_r} {_g} {_b} {_a}");
+        var name = _nameField.Text.Trim();
+        GameManager.Instance.NetworkClient.Command($"/hairdye create {_r} {_g} {_b} {_a} {name}");
     }
 }
