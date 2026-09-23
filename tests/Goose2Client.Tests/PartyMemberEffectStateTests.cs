@@ -238,6 +238,51 @@ namespace Goose2Client.Tests
         }
 
         [Fact]
+        public void RosterCompaction_PreservesStateOfShiftedMembers()
+        {
+            var s = new PartyMemberEffectState();
+            SeedVisible(s, 0, 100);
+            SeedVisible(s, 1, 200);
+            SeedVisible(s, 2, 300);
+            Add(s, 100, 1, 0, 5000, 10000);
+            Add(s, 200, 2, 0, 5000, 10000);
+            Add(s, 300, 3, 0, 5000, 10000);
+
+            Assert.True(s.AssignSlot(0, 200, alreadyVisible: true));
+            Assert.True(s.AssignSlot(1, 300, alreadyVisible: true));
+            Assert.True(s.ClearSlot(2));
+
+            Assert.Equal(new[] { 2 }, s.GetEffects(200).Select(e => e.EffectId).ToArray());
+            Assert.Equal(new[] { 3 }, s.GetEffects(300).Select(e => e.EffectId).ToArray());
+            Assert.True(s.IsVisible(200));
+            Assert.True(s.IsVisible(300));
+
+            Assert.True(s.UpsertEffect(200, 4, 1, 2, 5000, 10000, "E4", 1000));
+            Assert.Equal(new[] { 2, 4 }, s.GetEffects(200).Select(e => e.EffectId).ToArray());
+        }
+
+        [Fact]
+        public void RosterCompaction_ClearsDepartedMemberState()
+        {
+            var s = new PartyMemberEffectState();
+            SeedVisible(s, 0, 100);
+            SeedVisible(s, 1, 200);
+            Add(s, 100, 1, 0, 5000, 10000);
+            Add(s, 200, 2, 0, 5000, 10000);
+
+            Assert.True(s.AssignSlot(0, 200, alreadyVisible: true));
+            Assert.True(s.ClearSlot(1));
+
+            Assert.Equal(new[] { 2 }, s.GetEffects(200).Select(e => e.EffectId).ToArray());
+            Assert.True(s.IsVisible(200));
+            Assert.True(s.UpsertEffect(200, 3, 1, 2, 5000, 10000, "E3", 1000));
+            Assert.Equal(new[] { 2, 3 }, s.GetEffects(200).Select(e => e.EffectId).ToArray());
+
+            Assert.Empty(s.GetEffects(100));
+            Assert.False(s.IsVisible(100));
+        }
+
+        [Fact]
         public void ClearSlot_RemovesSlotMappingAndMemberState()
         {
             var s = new PartyMemberEffectState();

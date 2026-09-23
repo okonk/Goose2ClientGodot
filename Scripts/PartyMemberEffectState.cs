@@ -39,10 +39,12 @@ public sealed class PartyMemberEffectState
             return true;
         }
 
-        if (oldId != -1)
+        // GUD roster compaction renumbers members into lower slots, so the old
+        // occupant of this slot may already be current in another slot.
+        _slotLoginIds[slot] = loginId;
+        if (oldId != -1 && !IsCurrentMember(oldId))
             _members.Remove(oldId);
 
-        _slotLoginIds[slot] = loginId;
         GetOrCreate(loginId).Visible = alreadyVisible;
         return true;
     }
@@ -55,7 +57,8 @@ public sealed class PartyMemberEffectState
         if (oldId == -1) return false;
 
         _slotLoginIds[slot] = -1;
-        _members.Remove(oldId);
+        if (!IsCurrentMember(oldId))
+            _members.Remove(oldId);
         return true;
     }
 
