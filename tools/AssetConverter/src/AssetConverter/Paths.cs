@@ -21,6 +21,7 @@ public static class Paths
 
     public static string SpriteBundleConfig => Env("SPRITE_BUNDLE_CONFIG",
         "/home/agent/workspace/illutiagooseserver/tools/SpriteBundle/sheets.json");
+    public static string CustomAssetsDir => Path.Combine(AssetConverterDataDir, "custom-assets");
     public static string AsperetaCompiledEnc => Path.Combine(AsperetaData, "compiled.enc");
 
     // Resolved relative to the build output (bin/<config>/net10.0) so it is CWD-independent.
@@ -29,14 +30,16 @@ public static class Paths
             ? v
             : DefaultItemTileSheets;
 
-    private static string DefaultItemTileSheets
+    private static string DefaultItemTileSheets => Path.Combine(AssetConverterDataDir, "item-tile-sheets.json");
+
+    private static string AssetConverterDataDir
     {
         get
         {
             for (var dir = new DirectoryInfo(AppContext.BaseDirectory); dir != null; dir = dir.Parent)
             {
                 if (dir.Name == "AssetConverter" && dir.Parent?.Name == "tools")
-                    return Path.Combine(dir.FullName, "data", "item-tile-sheets.json");
+                    return Path.Combine(dir.FullName, "data");
             }
             throw new InvalidOperationException(
                 $"could not locate tools/AssetConverter relative to {AppContext.BaseDirectory}");

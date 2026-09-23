@@ -12,6 +12,7 @@ public static class FrameManifestBuilder
     public static string Build(string dataDir, int[]? onlyFileNumbers = null)
     {
         var sheets = BuildIllutiaSheets(dataDir, onlyFileNumbers);
+        AddCustomAssets(sheets);
         var root = new { tileSize = 32, sheets };
         return JsonSerializer.Serialize(root, new JsonSerializerOptions { WriteIndented = false });
     }
@@ -33,8 +34,18 @@ public static class FrameManifestBuilder
             sheets[sheet.NewSheetNumber.ToString()] = frames;
         }
 
+        AddCustomAssets(sheets);
         var root = new { tileSize = 32, sheets };
         return JsonSerializer.Serialize(root, new JsonSerializerOptions { WriteIndented = false });
+    }
+
+    private static void AddCustomAssets(SortedDictionary<string, Dictionary<string, int[]>> sheets)
+    {
+        string key = CustomAssetSheet.SheetNumber.ToString();
+        if (!sheets.TryAdd(key, CustomAssetSheet.CreateFrames()))
+        {
+            throw new InvalidDataException($"Custom asset sheet {key} conflicts with a source sheet.");
+        }
     }
 
     private static SortedDictionary<string, Dictionary<string, int[]>> BuildIllutiaSheets(
