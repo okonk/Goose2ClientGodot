@@ -65,7 +65,7 @@ public partial class PartyMember : Control
             }
             var node = EffectScene.Instantiate<PartyEffect>();
             _effectRow.AddChild(node);
-            node.CustomMinimumSize = ScaledIconSize(factor);
+            node.Relayout(factor);
             _effectNodes[effect.EffectId] = node;
             node.Apply(effect);
         }
@@ -82,12 +82,8 @@ public partial class PartyMember : Control
 
     public void RelayoutEffects(float factor)
     {
-        var size = ScaledIconSize(factor);
         foreach (var node in _effectNodes.Values)
             if (GodotObject.IsInstanceValid(node))
-                node.CustomMinimumSize = size;
+                node.Relayout(factor);
     }
-
-    private static Vector2 ScaledIconSize(float factor)
-        => new(UiScale.ScaleSize(PartyEffect.IconSize.X, factor), UiScale.ScaleSize(PartyEffect.IconSize.Y, factor));
 }

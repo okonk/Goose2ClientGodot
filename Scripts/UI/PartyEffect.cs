@@ -66,6 +66,18 @@ namespace Goose2Client.UI
             Visible = false;
         }
 
+        public void Relayout(float factor)
+        {
+            // Offsets are coordinates: 0 must stay 0, so no min-1 floor here.
+            float right = factor == 1f ? IconSize.X : (float)MathF.Round(IconSize.X * factor, MidpointRounding.AwayFromZero);
+            float bottom = factor == 1f ? IconSize.Y : (float)MathF.Round(IconSize.Y * factor, MidpointRounding.AwayFromZero);
+            CustomMinimumSize = new Vector2(right, bottom);
+            _icon.OffsetRight = right;
+            _icon.OffsetBottom = bottom;
+            _sweep.OffsetRight = right;
+            _sweep.OffsetBottom = bottom;
+        }
+
         public override void _Process(double delta)
         {
             if (_effectName == null || _permanent)
