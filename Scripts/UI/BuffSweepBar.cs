@@ -22,6 +22,11 @@ namespace Goose2Client.UI
             QueueRedraw();
         }
 
+        internal static Color SelectSweepColor(double remainingSeconds, double dangerSeconds)
+            => dangerSeconds > 0 && remainingSeconds <= dangerSeconds
+                ? new Color(0.8f, 0.1f, 0.1f, 0.7f)
+                : new Color(0, 0, 0, 0.7f);
+
         public override void _Draw()
         {
             if (_progress <= 0f)
@@ -29,10 +34,7 @@ namespace Goose2Client.UI
 
             var size = GetSize();
             var barHeight = size.Y * _progress;
-            var color = _dangerSeconds > 0 && _remaining <= _dangerSeconds
-                ? new Color(0.8f, 0.1f, 0.1f, 0.7f)
-                : new Color(0, 0, 0, 0.7f);
-            DrawRect(new Rect2(0, size.Y - barHeight, size.X, barHeight), color);
+            DrawRect(new Rect2(0, size.Y - barHeight, size.X, barHeight), SelectSweepColor(_remaining, _dangerSeconds));
         }
     }
 }
