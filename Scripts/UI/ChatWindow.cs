@@ -72,7 +72,7 @@ public partial class ChatWindow : Control, IScalableWindow
         // Chat type colors
         _chatColors[ChatType.Chat] = GameColors.White;
         _chatColors[ChatType.Guild] = GameColors.Yellow;
-        _chatColors[ChatType.Group] = GameColors.Yellow;
+        _chatColors[ChatType.Group] = GameColors.Green;
         _chatColors[ChatType.Melee] = GameColors.Red;
         _chatColors[ChatType.Spells] = GameColors.Blue;
         _chatColors[ChatType.Tell] = GameColors.Blue;
