@@ -40,9 +40,13 @@ public partial class SpellTargetManager : Node
         // match against the configured actions on the raw event. While targeting, movement keys
         // (WASD) cycle the target alongside the arrow-key TargetUp/TargetDown bindings: up/left
         // step backward through targets, down/right step forward (Unity's "Targeting" map).
-        if (@event.IsActionPressed("TargetUp") || @event.IsActionPressed("MoveUp") || @event.IsActionPressed("MoveLeft"))
+        if (@event.IsActionPressed("TargetUp", allowEcho: true)
+            || @event.IsActionPressed("MoveUp", allowEcho: true)
+            || @event.IsActionPressed("MoveLeft", allowEcho: true))
             CycleTarget(searchDown: false);
-        else if (@event.IsActionPressed("TargetDown") || @event.IsActionPressed("MoveDown") || @event.IsActionPressed("MoveRight"))
+        else if (@event.IsActionPressed("TargetDown", allowEcho: true)
+            || @event.IsActionPressed("MoveDown", allowEcho: true)
+            || @event.IsActionPressed("MoveRight", allowEcho: true))
             CycleTarget(searchDown: true);
         else if (@event.IsActionPressed("ConfirmTarget")) ConfirmTarget();
         else if (IsHotkeyPressed(@event))
