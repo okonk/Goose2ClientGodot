@@ -1,24 +1,27 @@
 using Godot;
 using Goose2Client;
 using Goose2Client.Network.Packets;
+using System;
 using System.Collections.Generic;
 
 namespace Goose2Client.UI;
 
-/// <summary>Party/group roster — 8 member slots with vitals bars.</summary>
+/// <summary>Party/group roster — 10 member slots with vitals bars and buff icons.</summary>
 public partial class PartyWindow : Control, IScalableWindow
 {
-    public const int MaxMembers = 8;
+    public const int MaxMembers = 10;
 
     private static readonly PackedScene MemberScene = GD.Load<PackedScene>("res://Scenes/UI/PartyMember.tscn");
 
     private PartyMember[] _members;
+    private PartyMemberEffectState _effects;
     private bool _listenersRegistered;
     private List<UiScaleLayout.GeomRecord> _geom = null!;
 
     public override void _Ready()
     {
         _members = new PartyMember[MaxMembers];
+        _effects = new PartyMemberEffectState(MaxMembers);
         var memberList = GetNode<VBoxContainer>("MemberList");
 
         for (int i = 0; i < MaxMembers; i++)
@@ -28,10 +31,14 @@ public partial class PartyWindow : Control, IScalableWindow
             _members[i] = member;
         }
 
-        GameManager.Instance.PacketManager.Listen<GroupUpdatePacket>(OnGroupUpdate);
-        GameManager.Instance.PacketManager.Listen<VitalsPercentagePacket>(OnVitalsPercentage);
-        GameManager.Instance.PacketManager.Listen<EraseCharacterPacket>(OnEraseCharacter);
-        GameManager.Instance.PacketManager.Listen<MakeCharacterPacket>(OnMakeCharacter);
+        var pm = GameManager.Instance.PacketManager;
+        pm.Listen<GroupUpdatePacket>(OnGroupUpdate);
+        pm.Listen<VitalsPercentagePacket>(OnVitalsPercentage);
+        pm.Listen<EraseCharacterPacket>(OnEraseCharacter);
+        pm.Listen<MakeCharacterPacket>(OnMakeCharacter);
+        pm.Listen<PartyBuffAddPacket>(OnPartyBuffAdd);
+        pm.Listen<PartyBuffRemovePacket>(OnPartyBuffRemove);
+        pm.Listen<PartyBuffClearPacket>(OnPartyBuffClear);
         _listenersRegistered = true;
 
         var applier = UiScaleApplier.Instance;
@@ -46,41 +53,94 @@ public partial class PartyWindow : Control, IScalableWindow
         var applier = UiScaleApplier.Instance;
         UiScaleLayout.Apply(_geom, applier.Factor);
         foreach (var tile in _members)
+        {
             tile.CustomMinimumSize = PartyMemberMetrics.MinSize(applier.Factor);
+            tile.RelayoutEffects(applier.Factor);
+        }
     }
 
     public override void _ExitTree()
     {
         if (!_listenersRegistered) return;
-        GameManager.Instance.PacketManager.Remove<GroupUpdatePacket>(OnGroupUpdate);
-        GameManager.Instance.PacketManager.Remove<VitalsPercentagePacket>(OnVitalsPercentage);
-        GameManager.Instance.PacketManager.Remove<EraseCharacterPacket>(OnEraseCharacter);
-        GameManager.Instance.PacketManager.Remove<MakeCharacterPacket>(OnMakeCharacter);
+        var pm = GameManager.Instance.PacketManager;
+        pm.Remove<GroupUpdatePacket>(OnGroupUpdate);
+        pm.Remove<VitalsPercentagePacket>(OnVitalsPercentage);
+        pm.Remove<EraseCharacterPacket>(OnEraseCharacter);
+        pm.Remove<MakeCharacterPacket>(OnMakeCharacter);
+        pm.Remove<PartyBuffAddPacket>(OnPartyBuffAdd);
+        pm.Remove<PartyBuffRemovePacket>(OnPartyBuffRemove);
+        pm.Remove<PartyBuffClearPacket>(OnPartyBuffClear);
     }
 
-    private void OnGroupUpdate(object o)
-    {
-        var p = (GroupUpdatePacket)o;
-        if (p.LineNumber < 0 || p.LineNumber >= _members.Length) return;
-        _members[p.LineNumber].OnGroupUpdate(p);
-    }
-
+    private void OnGroupUpdate(object o) => ApplyGroupUpdate((GroupUpdatePacket)o);
     private void OnVitalsPercentage(object o)
     {
         var p = (VitalsPercentagePacket)o;
         UpdateMember(p.LoginId, p.HPPercentage, p.MPPercentage);
     }
+    private void OnEraseCharacter(object o) => ApplyEraseCharacter((EraseCharacterPacket)o);
+    private void OnMakeCharacter(object o) => ApplyMakeCharacter((MakeCharacterPacket)o);
+    private void OnPartyBuffAdd(object o) => ApplyPartyBuffAdd((PartyBuffAddPacket)o);
+    private void OnPartyBuffRemove(object o) => ApplyPartyBuffRemove((PartyBuffRemovePacket)o);
+    private void OnPartyBuffClear(object o) => ApplyPartyBuffClear((PartyBuffClearPacket)o);
 
-    private void OnEraseCharacter(object o)
+    internal void ApplyGroupUpdate(GroupUpdatePacket p)
     {
-        var p = (EraseCharacterPacket)o;
+        if (p.LineNumber < 0 || p.LineNumber >= MaxMembers) return;
+        if (p.LoginId == 0)
+            _effects.ClearSlot(p.LineNumber);
+        else
+            _effects.AssignSlot(p.LineNumber, p.LoginId,
+                GameManager.Instance.CurrentMapManager?.GetCharacter(p.LoginId) != null);
+        _members[p.LineNumber].OnGroupUpdate(p);
+        _members[p.LineNumber].ReconcileEffects(_effects.GetEffects(_members[p.LineNumber].PlayerId));
+    }
+
+    internal void ApplyMakeCharacter(MakeCharacterPacket p)
+    {
+        _effects.MarkVisible(p.LoginId);
+        UpdateMember(p.LoginId, p.HPPercent, 1);
+        ReconcileMember(p.LoginId);
+    }
+
+    internal void ApplyEraseCharacter(EraseCharacterPacket p)
+    {
+        _effects.Erase(p.LoginId);
+        ReconcileMember(p.LoginId);
         UpdateMember(p.LoginId, 0, 0);
     }
 
-    private void OnMakeCharacter(object o)
+    internal bool ApplyPartyBuffAdd(PartyBuffAddPacket p)
     {
-        var p = (MakeCharacterPacket)o;
-        UpdateMember(p.LoginId, p.HPPercent, 1);
+        if (!_effects.UpsertEffect(p.LoginId, p.EffectId, p.GraphicId, p.GraphicFile,
+                p.RemainingMs, p.TotalMs, p.Name, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()))
+            return false;
+        ReconcileMember(p.LoginId);
+        return true;
+    }
+
+    internal bool ApplyPartyBuffRemove(PartyBuffRemovePacket p)
+    {
+        if (!_effects.RemoveEffect(p.LoginId, p.EffectId)) return false;
+        ReconcileMember(p.LoginId);
+        return true;
+    }
+
+    internal bool ApplyPartyBuffClear(PartyBuffClearPacket p)
+    {
+        if (!_effects.ClearEffects(p.LoginId)) return false;
+        ReconcileMember(p.LoginId);
+        return true;
+    }
+
+    private void ReconcileMember(int loginId)
+    {
+        for (int i = 0; i < MaxMembers; i++)
+            if (_members[i].PlayerId == loginId)
+            {
+                _members[i].ReconcileEffects(_effects.GetEffects(loginId));
+                return;
+            }
     }
 
     private void UpdateMember(int id, float hp, float mp)

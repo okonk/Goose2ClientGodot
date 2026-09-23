@@ -238,6 +238,35 @@ namespace Goose2Client.Tests
         }
 
         [Fact]
+        public void ClearSlot_RemovesSlotMappingAndMemberState()
+        {
+            var s = new PartyMemberEffectState();
+            SeedVisible(s, 0, 100);
+            Add(s, 100, 1, 0, 5000, 10000);
+
+            Assert.True(s.ClearSlot(0));
+            Assert.False(s.ClearSlot(0));
+            Assert.False(s.ClearSlot(5));
+            Assert.Empty(s.GetEffects(100));
+            Assert.False(s.IsVisible(100));
+            Assert.False(s.UpsertEffect(100, 1, 1, 2, 5000, 10000, "E1", 0));
+        }
+
+        [Fact]
+        public void ClearSlot_AllowsReassignmentWithoutPhantomMember()
+        {
+            var s = new PartyMemberEffectState();
+            SeedVisible(s, 0, 100);
+            Assert.True(s.ClearSlot(0));
+
+            Assert.True(s.AssignSlot(0, 200));
+            Assert.False(s.IsVisible(100));
+            Assert.Empty(s.GetEffects(100));
+            Assert.True(s.MarkVisible(200));
+            Assert.True(s.UpsertEffect(200, 1, 1, 2, 5000, 10000, "E1", 0));
+        }
+
+        [Fact]
         public void ErasedPermanentEffect_IsAlsoBlocked()
         {
             var s = new PartyMemberEffectState();

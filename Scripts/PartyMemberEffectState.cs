@@ -47,6 +47,18 @@ public sealed class PartyMemberEffectState
         return true;
     }
 
+    public bool ClearSlot(int slot)
+    {
+        if (slot < 0 || slot >= _slotLoginIds.Length) return false;
+
+        int oldId = _slotLoginIds[slot];
+        if (oldId == -1) return false;
+
+        _slotLoginIds[slot] = -1;
+        _members.Remove(oldId);
+        return true;
+    }
+
     public bool MarkVisible(int loginId)
     {
         if (!IsCurrentMember(loginId)) return false;

@@ -98,6 +98,72 @@ internal static class UiScaleSelfTest
         gm.EnsureHud();
         await Frame();
 
+        // Party buffs: exercise the internal packet-application path at 1x before the
+        // baseline so live effect nodes are part of the round-trip geometry.
+        var party = gm.Hud.Party;
+        var memberList = party.GetNode<VBoxContainer>("MemberList");
+        Assert(memberList.GetChildCount() == PartyWindow.MaxMembers,
+            $"party rows {memberList.GetChildCount()} != {PartyWindow.MaxMembers}");
+        Assert(memberList.OffsetBottom == 509, $"member list base height {memberList.OffsetBottom} != 509");
+        Assert(!party.ApplyPartyBuffAdd(new PartyBuffAddPacket
+            { LoginId = 7999, EffectId = 1, GraphicId = 1, GraphicFile = 1, RemainingMs = 60000, TotalMs = 120000, Name = "E1" }),
+            "PBA for unknown member must be rejected");
+        party.ApplyGroupUpdate(new GroupUpdatePacket { LineNumber = 0, LoginId = 7001, Name = "Al", LevelClassName = "1 Warrior" });
+        Assert(!party.ApplyPartyBuffAdd(new PartyBuffAddPacket
+            { LoginId = 7001, EffectId = 1, GraphicId = 1, GraphicFile = 1, RemainingMs = 60000, TotalMs = 120000, Name = "E1" }),
+            "PBA before MKC must be rejected");
+        party.ApplyMakeCharacter(new MakeCharacterPacket { LoginId = 7001, HPPercent = 1 });
+        party.ApplyPartyBuffClear(new PartyBuffClearPacket { LoginId = 7001 });
+        for (int i = 1; i <= 6; i++)
+            Assert(party.ApplyPartyBuffAdd(new PartyBuffAddPacket
+                { LoginId = 7001, EffectId = i, GraphicId = i, GraphicFile = i, RemainingMs = 60000, TotalMs = 120000, Name = $"E{i}" }),
+                $"PBA {i} rejected");
+        await Frame();
+        var row0 = (PartyMember)memberList.GetChild(0);
+        var effRow = row0.GetNode<HBoxContainer>("Content/EffectRow");
+        Assert(effRow.GetChildCount() == 6, $"effect row children {effRow.GetChildCount()} != 6");
+        var e1 = (PartyEffect)effRow.GetChild(0);
+        Assert(e1.GetNode<TextureRect>("Icon") != null && e1.GetNode<BuffSweepBar>("Sweep") != null,
+            "effect node must expose Icon and Sweep");
+        Assert(e1.Size == new Vector2(16, 16), $"effect size 1x {e1.Size} != (16, 16)");
+        Assert(effRow.GetThemeConstant("separation") == 1,
+            $"effect separation 1x {effRow.GetThemeConstant("separation")} != 1");
+        Assert((float)(((Control)effRow.GetChild(1)).OffsetLeft - e1.OffsetRight) == 1f, "effect gap 1x != 1");
+        Assert(effRow.OffsetTop > row0.GetNode<TextureProgressBar>("Content/MpBar").OffsetBottom,
+            "effect row must begin below MP");
+        Assert(row0.Size.X == 87, $"party frame width {row0.Size.X} != 87");
+        var e6 = (PartyEffect)effRow.GetChild(5);
+        Assert(e6.OffsetRight > 87, $"sixth effect right {e6.OffsetRight} <= 87 (overflow expected)");
+        Assert(!effRow.ClipContents && !row0.GetNode<Control>("Content").ClipContents && !row0.ClipContents,
+            "effect overflow must not be clipped");
+        party.ApplyPartyBuffAdd(new PartyBuffAddPacket
+            { LoginId = 7001, EffectId = 1, GraphicId = 1, GraphicFile = 1, RemainingMs = 60000, TotalMs = 120000, Name = "E1" });
+        await Frame();
+        Assert(ReferenceEquals(effRow.GetChild(0), e1), "renewal must retain the same effect node");
+        Assert(effRow.GetChildCount() == 6, "renewal must not add a node");
+        Assert(party.ApplyPartyBuffRemove(new PartyBuffRemovePacket { LoginId = 7001, EffectId = 3 }),
+            "PBR for live effect must be accepted");
+        await Frame();
+        Assert(effRow.GetChildCount() == 5, $"effect count after PBR {effRow.GetChildCount()} != 5");
+        party.ApplyEraseCharacter(new EraseCharacterPacket { LoginId = 7001 });
+        await Frame();
+        Assert(effRow.GetChildCount() == 0, $"effect count after ERC {effRow.GetChildCount()} != 0");
+        Assert(!party.ApplyPartyBuffAdd(new PartyBuffAddPacket
+            { LoginId = 7001, EffectId = 9, GraphicId = 9, GraphicFile = 9, RemainingMs = 60000, TotalMs = 120000, Name = "E9" }),
+            "PBA after ERC must be rejected");
+        party.ApplyGroupUpdate(new GroupUpdatePacket { LineNumber = 0, LoginId = 0, Name = "", LevelClassName = "" });
+        await Frame();
+        Assert(!row0.GetNode<Control>("Content").Visible, "empty GUD slot must hide row content");
+        party.ApplyGroupUpdate(new GroupUpdatePacket { LineNumber = 0, LoginId = 7002, Name = "Bo", LevelClassName = "2 Mage" });
+        party.ApplyMakeCharacter(new MakeCharacterPacket { LoginId = 7002, HPPercent = 1 });
+        for (int i = 1; i <= 6; i++)
+            Assert(party.ApplyPartyBuffAdd(new PartyBuffAddPacket
+                { LoginId = 7002, EffectId = i, GraphicId = i, GraphicFile = i, RemainingMs = 60000, TotalMs = 120000, Name = $"E{i}" }),
+                $"PBA reseed {i} rejected");
+        await Frame();
+        Assert(effRow.GetChildCount() == 6, $"effect count after reseed {effRow.GetChildCount()} != 6");
+        GD.Print("[ui_scale_selftest] OK party buff packet path (GUD/MKC/PBC/PBA/renewal/PBR/ERC)");
+
         // Step 1: 1x no-op — Relayout at factor 1 must leave every registered root bit-identical.
         await Frame();
         var geo1 = new Dictionary<Control, Vector4>();
@@ -173,14 +239,20 @@ internal static class UiScaleSelfTest
         Assert(vendor.Position.Y >= 0f && vendor.Position.Y <= Mathf.Max(0f, canvas.Y - applier.ScaleSize(24f)),
             $"vendor y postcondition {vendor.Position}");
 
-        var memberList = gm.Hud.Party.GetNode<VBoxContainer>("MemberList");
-        Assert(memberList.GetChildCount() == 8, $"party tiles {memberList.GetChildCount()} != 8");
-        var sep = memberList.GetThemeConstant("separation");
+        var pList = gm.Hud.Party.GetNode<VBoxContainer>("MemberList");
+        Assert(pList.GetChildCount() == 10, $"party tiles {pList.GetChildCount()} != 10");
+        var sep = pList.GetThemeConstant("separation");
         Assert(sep == 2, $"party separation {sep} != 2");
-        var tile = (PartyMember)memberList.GetChild(0);
-        Assert(tile.CustomMinimumSize == new Vector2(174, 66), $"party tile min {tile.CustomMinimumSize} != (174, 66)");
+        var tile = (PartyMember)pList.GetChild(0);
+        Assert(tile.CustomMinimumSize == new Vector2(174, 100), $"party tile min {tile.CustomMinimumSize} != (174, 100)");
         var nameOffset = tile.GetNode<Label>("Content/NameText").OffsetBottom;
         Assert(nameOffset == 22, $"party name offset {nameOffset} != 22");
+        var effRow2 = tile.GetNode<HBoxContainer>("Content/EffectRow");
+        var e2 = (PartyEffect)effRow2.GetChild(0);
+        Assert(e2.Size == new Vector2(32, 32), $"effect size 2x {e2.Size} != (32, 32)");
+        Assert(effRow2.GetThemeConstant("separation") == 2,
+            $"effect separation 2x {effRow2.GetThemeConstant("separation")} != 2");
+        Assert((float)(((Control)effRow2.GetChild(1)).OffsetLeft - e2.OffsetRight) == 2f, "effect gap 2x != 2");
 
         var stamp = gm.GetNode<Label>("BuildStampOverlay/BuildIdLabel");
         var stampFont = stamp.GetThemeFontSize("font_size");
@@ -490,9 +562,15 @@ internal static class UiScaleSelfTest
             Assert(kv.Key.Position == kv.Value,
                 $"restore: {kv.Key.WindowName} pos {kv.Key.Position} != {kv.Value}");
         var tile1 = (PartyMember)gm.Hud.Party.GetNode<VBoxContainer>("MemberList").GetChild(0);
-        Assert(tile1.CustomMinimumSize == new Vector2(87, 33), $"party tile min {tile1.CustomMinimumSize} != (87, 33)");
+        Assert(tile1.CustomMinimumSize == new Vector2(87, 50), $"party tile min {tile1.CustomMinimumSize} != (87, 50)");
         var sep1 = gm.Hud.Party.GetNode<VBoxContainer>("MemberList").GetThemeConstant("separation");
         Assert(sep1 == 1, $"party separation {sep1} != 1");
+        Assert(gm.Hud.Party.GetNode<VBoxContainer>("MemberList").OffsetBottom == 509,
+            "member list base height must survive the round trip");
+        var effRow1 = tile1.GetNode<HBoxContainer>("Content/EffectRow");
+        var e1r = (PartyEffect)effRow1.GetChild(0);
+        Assert(e1r.Size == new Vector2(16, 16), $"effect size 1x restore {e1r.Size} != (16, 16)");
+        Assert((float)(((Control)effRow1.GetChild(1)).OffsetLeft - e1r.OffsetRight) == 1f, "effect gap 1x restore != 1");
         Assert(slot.CustomMinimumSize == new Vector2(32, 32), $"item slot min {slot.CustomMinimumSize} != (32, 32)");
         Assert(gm.Hud.Hotbar.GetNode<TextureRect>("Background") != null,
             "hotbar bg must stay a stretched TextureRect");
