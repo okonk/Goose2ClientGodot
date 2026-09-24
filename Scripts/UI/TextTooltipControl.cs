@@ -21,7 +21,7 @@ namespace Goose2Client.UI
 
         public override void _Process(double delta)
         {
-            if (_parent == null || !_parent.IsVisibleInTree())
+            if (_parent == null || !Godot.GodotObject.IsInstanceValid(_parent) || !_parent.IsVisibleInTree())
             {
                 Visible = false;
                 return;
