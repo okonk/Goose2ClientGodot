@@ -199,16 +199,15 @@ internal static class UiScaleSelfTest
 
         // Leg 0: login 1x baseline — the current scene stays Login the whole run.
         var login = (LoginScene)tree.CurrentScene;
-        var loginMargin = login.GetNode<MarginContainer>("MarginContainer");
-        var loginVBox = login.GetNode<VBoxContainer>("MarginContainer/VBox");
-        var nameInput = login.GetNode<LineEdit>("MarginContainer/VBox/NameInput");
-        Assert(loginMargin.Size == new Vector2(300, 200), $"login margin size {loginMargin.Size} != (300, 200)");
-        // Project-theme base is 10; a different value means the project theme stopped applying.
+        var loginCard = login.GetNode<PanelContainer>("LoginLayout/Center/LoginCard");
+        var loginVBox = login.GetNode<VBoxContainer>("LoginLayout/Center/LoginCard/CardPadding/VBox");
+        var nameInput = login.GetNode<LineEdit>("LoginLayout/Center/LoginCard/CardPadding/VBox/NameInput");
+        Assert(loginCard.CustomMinimumSize == new Vector2(340, 0), $"login card min {loginCard.CustomMinimumSize} != (340, 0)");
         var loginFont1 = nameInput.GetThemeFontSize("font_size");
         var loginSep1 = loginVBox.GetThemeConstant("separation");
-        Assert(loginFont1 == 10, $"login font base {loginFont1} != 10");
-        Assert(loginSep1 == 10, $"login separation {loginSep1} != 10");
-        GD.Print("[ui_scale_selftest] OK login 1x baseline: 300x200, font 10, separation 10");
+        Assert(loginFont1 == 12, $"login font base {loginFont1} != 12");
+        Assert(loginSep1 == 7, $"login separation {loginSep1} != 7");
+        GD.Print("[ui_scale_selftest] OK login 1x baseline: card min 340x0, font 12, separation 7");
 
         applier.Apply(2f, ApplyReason.UserCommit);
         await Frame();
@@ -312,12 +311,12 @@ internal static class UiScaleSelfTest
         GD.Print($"[ui_scale_selftest] OK 2x audit: theme=20, {fontChecked} font overrides, spell tooltip {expectedSpell}, 7 nine-patch bars");
 
         // Leg 1: login at 2x.
-        Assert(loginMargin.Size == new Vector2(600, 400), $"login margin size 2x {loginMargin.Size} != (600, 400)");
+        Assert(loginCard.CustomMinimumSize == new Vector2(680, 0), $"login card min 2x {loginCard.CustomMinimumSize} != (680, 0)");
         var loginFont2 = nameInput.GetThemeFontSize("font_size");
         var loginSep2 = loginVBox.GetThemeConstant("separation");
-        Assert(loginFont2 == 20, $"login font 2x {loginFont2} != 20");
-        Assert(loginSep2 == 20, $"login separation 2x {loginSep2} != 20");
-        GD.Print("[ui_scale_selftest] OK login 2x: 600x400, font 20, separation 20");
+        Assert(loginFont2 == 24, $"login font 2x {loginFont2} != 24");
+        Assert(loginSep2 == 14, $"login separation 2x {loginSep2} != 14");
+        GD.Print("[ui_scale_selftest] OK login 2x: card min 680x0, font 24, separation 14");
 
         // Step 2b: runtime spawn at 2x. WindowSettings is a class mutated in place — the
         // record is deep-copied into locals, and restore runs in finally before anything that can throw.
@@ -386,8 +385,8 @@ internal static class UiScaleSelfTest
         Assert(l19.Position == MultiWindowMetrics.LinePosition(19, 2f), $"line 19 at 2x {l19.Position} != {MultiWindowMetrics.LinePosition(19, 2f)}");
         var l0Font = l0.GetThemeFontSize("font_size");
         Assert(l0Font == 20, $"line 0 font {l0Font} != 20");
-        Assert(info.GetNode<TextureRect>("Background") != null,
-            "info bg must be a stretched TextureRect");
+        Assert(info.GetNode<Panel>("Background") != null,
+            "info bg must be the themed Panel");
         // Exact game packet spawn path (manager node parentage), pinned at 2x.
         {
             var infoMgr = new InfoWindowCreator();
@@ -401,9 +400,9 @@ internal static class UiScaleSelfTest
             questMgr.AddChild(wq);
             await Frame();
             Assert(wi.Size == new Vector2(504, 280), $"manager-spawned info size 2x {wi.Size} != (504,280)");
-            Assert(wi.GetNode<TextureRect>("Background") != null, "manager-spawned info bg must be a stretched TextureRect");
+            Assert(wi.GetNode<Panel>("Background") != null, "manager-spawned info bg must be the themed Panel");
             Assert(wq.Size == new Vector2(520, 582), $"manager-spawned quest size 2x {wq.Size} != (520,582)");
-            Assert(wq.GetNode<TextureRect>("Background") != null, "manager-spawned quest bg must be a stretched TextureRect");
+            Assert(wq.GetNode<Panel>("Background") != null, "manager-spawned quest bg must be the themed Panel");
             wi.QueueFree();
             wq.QueueFree();
             await Frame();
@@ -432,7 +431,7 @@ internal static class UiScaleSelfTest
         Assert(ol0.Position == OptionListMetrics.LinePosition(0, 2f, false, false), $"option-list line0 pos 2x {ol0.Position} != {OptionListMetrics.LinePosition(0, 2f, false, false)}");
         Assert(ol0.Size == OptionListMetrics.LineSize(2f, false), $"option-list line0 size 2x {ol0.Size} != {OptionListMetrics.LineSize(2f, false)}");
         Assert(!ol.GetNode<Button>("Content/Line4").Visible, "empty option-list line must be invisible");
-        Assert(ol.GetNode<TextureRect>("Background") != null, "option-list bg must be a TextureRect");
+        Assert(ol.GetNode<Panel>("Background") != null, "option-list bg must be the themed Panel");
         // A repopulated page shrinks to its populated lines; stale lines are cleared by MakeWindow.
         ol.OnMakeWindow(new MakeWindowPacket
         {
@@ -452,7 +451,7 @@ internal static class UiScaleSelfTest
         await Frame();
         Assert(l0.Position == new Vector2(6, 22), $"line 0 at 1x {l0.Position} != (6, 22)");
         Assert(l19.Position == new Vector2(6, 22 + 19 * 11.18f), $"line 19 at 1x {l19.Position} != (6, {22 + 19 * 11.18f})");
-        Assert(ol.Size == new Vector2(260, 290), $"option-list 2-line size 1x {ol.Size} != (260,290)");
+        Assert(ol.Size == new Vector2(260, 100), $"option-list 2-line size 1x {ol.Size} != (260,100)");
         Assert(ol0.Position == new Vector2(6, 22), $"option-list line0 pos 1x {ol0.Position} != (6,22)");
         Assert(gm.Hud.Hotbar.Position == WindowPlacement.HotbarDefault(canvas, gm.Hud.Hotbar.Size, 1f,
             DefaultWindowLayout.For("Hotbar"), gm.Hud.Hotbar.Size),
@@ -598,28 +597,28 @@ internal static class UiScaleSelfTest
         GD.Print("[ui_scale_selftest] OK 1x restore (idempotence: geometry + positions)");
 
         // Leg 2: login round trip — an explicit-override approach with a wrong base would not round-trip.
-        Assert(loginMargin.Size == new Vector2(300, 200), $"login margin size 1x {loginMargin.Size} != (300, 200)");
+        Assert(loginCard.CustomMinimumSize == new Vector2(340, 0), $"login card min 1x {loginCard.CustomMinimumSize} != (340, 0)");
         var loginFont3 = nameInput.GetThemeFontSize("font_size");
         var loginSep3 = loginVBox.GetThemeConstant("separation");
-        Assert(loginFont3 == 10, $"login font 1x {loginFont3} != 10");
-        Assert(loginSep3 == 10, $"login separation 1x {loginSep3} != 10");
-        GD.Print("[ui_scale_selftest] OK login 1x round trip: 300x200, font 10, separation 10");
+        Assert(loginFont3 == 12, $"login font 1x {loginFont3} != 12");
+        Assert(loginSep3 == 7, $"login separation 1x {loginSep3} != 7");
+        GD.Print("[ui_scale_selftest] OK login 1x round trip: card min 340x0, font 12, separation 7");
 
         // Leg 3: loading scene (SC-16) — instantiated directly; _Ready self-registers.
         var loading = GD.Load<PackedScene>("res://Scenes/LoadingMap.tscn").Instantiate<LoadingMapScene>();
         tree.Root.AddChild(loading);
         await Frame();
-        var status = loading.GetNode<Label>("StatusLabel");
-        var r1 = new Vector4(status.OffsetLeft, status.OffsetTop, status.OffsetRight, status.OffsetBottom);
-        Assert(r1 != default, $"loading label rect degenerate {r1}");
+        var panel = loading.GetNode<PanelContainer>("LoadingPanel");
+        var r1 = new Vector4(panel.OffsetLeft, panel.OffsetTop, panel.OffsetRight, panel.OffsetBottom);
+        Assert(r1 != default, $"loading panel rect degenerate {r1}");
         applier.Apply(2f, ApplyReason.UserCommit);
         await Frame();
-        var r2 = new Vector4(status.OffsetLeft, status.OffsetTop, status.OffsetRight, status.OffsetBottom);
-        Assert(r2 == new Vector4(r1.X * 2, r1.Y * 2, r1.Z * 2, r1.W * 2), $"loading label rect 2x {r2} != {r1} * 2");
+        var r2 = new Vector4(panel.OffsetLeft, panel.OffsetTop, panel.OffsetRight, panel.OffsetBottom);
+        Assert(r2 == new Vector4(r1.X * 2, r1.Y * 2, r1.Z * 2, r1.W * 2), $"loading panel rect 2x {r2} != {r1} * 2");
         applier.Apply(1f, ApplyReason.UserCommit);
         await Frame();
-        var r3 = new Vector4(status.OffsetLeft, status.OffsetTop, status.OffsetRight, status.OffsetBottom);
-        Assert(r3 == r1, $"loading label rect 1x {r3} != {r1}");
+        var r3 = new Vector4(panel.OffsetLeft, panel.OffsetTop, panel.OffsetRight, panel.OffsetBottom);
+        Assert(r3 == r1, $"loading panel rect 1x {r3} != {r1}");
         loading.QueueFree();
         await Frame();
         Assert(!ContainsRoot(loading), "loading registration not pruned after free");

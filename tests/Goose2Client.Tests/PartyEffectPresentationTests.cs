@@ -68,7 +68,7 @@ namespace Goose2Client.Tests
 
             Assert.Contains("res://Scripts/UI/PartyEffect.cs", scene);
             Assert.Contains("res://Scripts/UI/BuffSweepBar.cs", scene);
-            Assert.Contains("custom_minimum_size = Vector2(16, 16)", scene);
+            Assert.Contains("custom_minimum_size = Vector2(12, 12)", scene);
             Assert.Contains("node name=\"Icon\" type=\"TextureRect\"", scene);
             Assert.Contains("node name=\"Sweep\" type=\"Control\"", scene);
             Assert.DoesNotContain("Countdown", scene);

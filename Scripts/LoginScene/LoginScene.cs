@@ -31,6 +31,20 @@ public partial class LoginScene : Control, IScalableWindow
         _loginButton = GetNode<Button>("LoginLayout/Center/LoginCard/CardPadding/VBox/LoginButton");
         _statusLabel = GetNode<Label>("LoginLayout/Center/LoginCard/CardPadding/VBox/StatusLabel");
 
+        // Register the card's font overrides so they scale with the UI factor like every
+        // other window; the tscn values are the 1x bases.
+        var applier = UiScaleApplier.Instance;
+        const string vb = "LoginLayout/Center/LoginCard/CardPadding/VBox/";
+        applier.ApplyFontSize(GetNode<Label>(vb + "GameTitle"), 17);
+        applier.ApplyFontSize(GetNode<Label>(vb + "Subtitle"), 11);
+        applier.ApplyFontSize(GetNode<Label>(vb + "NameLabel"), 11);
+        applier.ApplyFontSize(_nameInput, 12);
+        applier.ApplyFontSize(GetNode<Label>(vb + "PasswordLabel"), 11);
+        applier.ApplyFontSize(_passwordInput, 12);
+        applier.ApplyFontSize(_loginButton, 12);
+        applier.ApplyFontSize(_statusLabel, 11);
+        applier.ApplyFontSize(GetNode<Label>(vb + "Footer"), 10);
+
         // 2. Autofill from credential store
         var (name, password) = LoginCredentialStore.Load();
         _nameInput.Text = name;
@@ -53,7 +67,6 @@ public partial class LoginScene : Control, IScalableWindow
         // Clear status label initially
         _statusLabel.Text = "";
 
-        var applier = UiScaleApplier.Instance;
         _geom = UiScaleLayout.Snapshot(this);
         applier.RegisterWindow(this);
         Relayout();
