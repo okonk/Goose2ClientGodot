@@ -1082,15 +1082,35 @@ offset_right = -4.0
 offset_bottom = -4.0
 theme_override_constants/separation = 2
 
-[node name="TabStrip" type="HFlowContainer" parent="Content"]
+[node name="TabRow" type="HBoxContainer" parent="Content"]
 layout_mode = 2
-theme_override_constants/h_separation = 2
-theme_override_constants/v_separation = 2
+theme_override_constants/separation = 2
 
-[node name="DragFiller" type="Control" parent="Content/TabStrip"]
+[node name="TabScroll" type="ScrollContainer" parent="Content/TabRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="Tabs" type="HBoxContainer" parent="Content/TabRow/TabScroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 2
+
+[node name="DragFiller" type="Control" parent="Content/TabRow/TabScroll/Tabs"]
 custom_minimum_size = Vector2(24, 18)
 layout_mode = 2
 size_flags_horizontal = 3
+
+[node name="ScrollLeft" type="Button" parent="Content/TabRow"]
+visible = false
+layout_mode = 2
+focus_mode = 0
+text = "<"
+
+[node name="ScrollRight" type="Button" parent="Content/TabRow"]
+visible = false
+layout_mode = 2
+focus_mode = 0
+text = ">"
 
 [node name="ChatLog" type="RichTextLabel" parent="Content"]
 layout_mode = 2
@@ -1104,7 +1124,7 @@ scroll_following = true
 layout_mode = 2
 ```
 
-(`Background` is an empty `TextureRect` on purpose: `BaseWindow.BuildChrome` replaces it with the themed `WindowPanel`, the same convention as `Scenes/UI/HairdyeWindow.tscn`.)
+(`Background` is an empty `TextureRect` on purpose: `BaseWindow.BuildChrome` replaces it with the themed `WindowPanel`, the same convention as `Scenes/UI/HairdyeWindow.tscn`. Scroll modes are set in code, not the tscn, so the enum values are explicit. `Tabs` has `size_flags_horizontal = 3` so the ScrollContainer stretches it to full width when tabs fit, which lets `DragFiller` take the empty space.)
 
 **Step 2: Rewrite `Scripts/UI/ChatWindow.cs`**
 
@@ -1127,11 +1147,15 @@ namespace Goose2Client.UI;
 public partial class ChatWindow : BaseWindow
 {
     private static readonly Vector2 MinSize = new(260, 110);
+    private const float TabScrollStep = 60f;
 
     private RichTextLabel _chatLog;
     private LineEdit _input;
-    private HFlowContainer _tabStrip;
+    private ScrollContainer _tabScroll;
+    private HBoxContainer _tabStrip;
     private Control _dragFiller;
+    private Button _scrollLeft;
+    private Button _scrollRight;
     private PopupMenu _tabMenu;
     private ChatLog _log;
     private bool _tabsDirty;
@@ -1155,14 +1179,25 @@ public partial class ChatWindow : BaseWindow
 
         _chatLog = GetNode<RichTextLabel>("Content/ChatLog");
         _input = GetNode<LineEdit>("Content/Input");
-        _tabStrip = GetNode<HFlowContainer>("Content/TabStrip");
-        _dragFiller = GetNode<Control>("Content/TabStrip/DragFiller");
+        _tabScroll = GetNode<ScrollContainer>("Content/TabRow/TabScroll");
+        _tabStrip = GetNode<HBoxContainer>("Content/TabRow/TabScroll/Tabs");
+        _dragFiller = GetNode<Control>("Content/TabRow/TabScroll/Tabs/DragFiller");
+        _scrollLeft = GetNode<Button>("Content/TabRow/ScrollLeft");
+        _scrollRight = GetNode<Button>("Content/TabRow/ScrollRight");
         MakeDragHandle(_dragFiller);
         _dragFiller.GuiInput += OnTabStripGuiInput;
 
+        _tabScroll.HorizontalScrollMode = ScrollContainer.ScrollMode.ShowNever;
+        _tabScroll.VerticalScrollMode = ScrollContainer.ScrollMode.Disabled;
+        var bar = _tabScroll.GetHScrollBar();
+        bar.Changed += UpdateScrollButtons;
+        bar.ValueChanged += _ => UpdateScrollButtons();
+        _scrollLeft.Pressed += () => ScrollTabs(-1);
+        _scrollRight.Pressed += () => ScrollTabs(1);
+
         _log = new ChatLog(ChatLog.ParseKinds(GameManager.Instance.CharacterSettings.ChatTabs));
         _log.TabsChanged += QueueRebuildTabs;
-        _log.ActiveChanged += RenderActive;
+        _log.ActiveChanged += OnActiveChanged;
         _log.ActiveLineAdded += AppendToView;
         BuildTabMenu();
         RebuildTabs();
@@ -1236,6 +1271,37 @@ public partial class ChatWindow : BaseWindow
     }
 
     public void AddChatLine(string message, ChatType chatType) => _log.Add(message, chatType);
+
+    private void OnActiveChanged()
+    {
+        RenderActive();
+        ScrollActiveTabIntoView();
+    }
+
+    // EnsureControlVisible needs the rebuilt tab row laid out, which happens next frame.
+    private async void ScrollActiveTabIntoView()
+    {
+        await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+        if (!IsInstanceValid(this)) return;
+        foreach (Node child in _tabStrip.GetChildren())
+            if (child is Button { ButtonPressed: true } active)
+                _tabScroll.EnsureControlVisible(active);
+    }
+
+    private void ScrollTabs(int direction)
+    {
+        _tabScroll.ScrollHorizontal += direction * UiScaleApplier.Instance.ScaleSize(TabScrollStep);
+    }
+
+    private void UpdateScrollButtons()
+    {
+        var bar = _tabScroll.GetHScrollBar();
+        bool overflow = bar.MaxValue > bar.Page;
+        _scrollLeft.Visible = overflow;
+        _scrollRight.Visible = overflow;
+        _scrollLeft.Disabled = bar.Value <= 0;
+        _scrollRight.Disabled = bar.Value >= bar.MaxValue - bar.Page;
+    }
 
     private void RenderActive()
     {
@@ -1418,7 +1484,9 @@ Expected: all PASS (baseline was 723; now 723 + new tests).
 - [ ] In Guild tab, type `hi` → sent as guild chat; in a tell tab → sent as tell; `/who` in any tab works normally.
 - [ ] Enter / `/` / guild / tell / R reply hotkeys still prefill as before; `ToggleChat` hides and the hidden state survives relog.
 - [ ] Options → reset window layout: chat returns to default size and position; tabs unchanged.
-- [ ] Open many tell tabs → strip wraps to a second row; drag filler still grabbable.
+- [ ] Open many tell tabs → row does not wrap or widen the window; `<` `>` appear at the right end, scroll the tabs, and disable at each end; they hide again once tabs fit (close tabs or widen the window).
+- [ ] With tabs overflowing, clicking a partly hidden tab or activating one via a new tell scrolls it into view; unread updates do not move the scroll position.
+- [ ] With tabs overflowing, scroll fully right → drag filler at the end still moves the window.
 
 **Step 5: Commit**
 

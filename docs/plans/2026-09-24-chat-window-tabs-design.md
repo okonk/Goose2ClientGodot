@@ -66,14 +66,23 @@ Scene (`Scenes/UI/ChatWindow.tscn`):
 ChatWindow (BaseWindow, WindowName="Chat", Resizable)
 ├─ Background   (themed WindowPanel, full rect; chat.png dropped)
 └─ Content      (VBoxContainer, full rect, small margin)
-   ├─ TabStrip  (HFlowContainer: tab buttons + expanding filler = drag handle; wraps to
-   │             a second row when tabs overflow; filler keeps a min width to grab)
+   ├─ TabRow    (HBox)
+   │  ├─ TabScroll (ScrollContainer, expand, h-scroll bar hidden, v-scroll off)
+   │  │  └─ Tabs   (HBox: tab buttons + expanding DragFiller, min width 24 = drag handle)
+   │  ├─ ScrollLeft  ("<", visible only when tabs overflow)
+   │  └─ ScrollRight (">", visible only when tabs overflow)
    ├─ ChatLog   (RichTextLabel, expand-fill)
    └─ Input     (LineEdit)
 ```
 
 - No `TitleBar` node → no title bar or close button; the `ToggleChat` hotkey shows/hides.
-- `MakeDragHandle` on the strip's filler only, so tab clicks select tabs.
+- `MakeDragHandle` on the filler only, so tab clicks select tabs. When tabs overflow, the
+  filler sits at the end of the scrolled row; scroll fully right to reach it (accepted).
+- Tabs never wrap. When they overflow, `<` `>` buttons appear at the row's right end and
+  scroll by ~60 logical px per click, disabled at each end. The strip scrolls the active tab
+  into view when the active tab changes (not on unread/new-tab changes, so manual scrolling
+  is not yanked back). The ScrollContainer has no min width, so many tabs never widen the
+  window.
 - Tabs are toggle `Button`s in a `ButtonGroup`, `FocusMode.None`; tell tabs carry a small ×.
   Unread tabs use a highlight theme variation.
 - Hover fade uses `BaseWindow`'s rect check (replaces the Panel MouseEntered/Exited hack)
