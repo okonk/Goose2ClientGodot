@@ -73,7 +73,7 @@ max_value = 1.0
 [node name="EffectRow" type="HBoxContainer" parent="Content"]
 layout_mode = 0
 offset_left = 0.0
-offset_top = 38.0
+offset_top = 34.0
 offset_right = 87.0
-offset_bottom = 50.0
+offset_bottom = 46.0
 theme_override_constants/separation = 1
