@@ -132,6 +132,8 @@ public partial class GameHud : Control
             Chat.FocusChat("/guild ");
         else if (@event.IsActionPressed("TellCommand"))
             Chat.FocusChat("/tell ");
+        else if (@event.IsActionPressed("RefreshPosition"))
+            GameManager.Instance.NetworkClient.Command("/refresh");
         else if (@event.IsActionPressed("ReplyCommand"))
             Chat.FocusChat(Chat.ReplyToName == null ? "/tell " : $"/tell {Chat.ReplyToName} ");
         else if (@event.IsActionPressed("EmoteHeart"))
@@ -158,8 +160,6 @@ public partial class GameHud : Control
             SendEmote(1082, 8);
         else if (@event.IsActionPressed("EmoteDollar"))
             SendEmote(1090, 10);
-        else if (@event.IsActionPressed("RefreshPosition"))
-            GameManager.Instance.NetworkClient.Command("/refresh");
     }
 
     // Animation/graphic id pairs from Unity PlayerController.cs:32-43.
