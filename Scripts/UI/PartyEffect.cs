@@ -5,7 +5,7 @@ namespace Goose2Client.UI
 {
     public partial class PartyEffect : Panel
     {
-        public static readonly Vector2 IconSize = new(16, 16);
+        public static readonly Vector2 IconSize = new(12, 12);
 
         private TextureRect _icon;
         private BuffSweepBar _sweep;

@@ -125,11 +125,11 @@ internal static class UiScaleSelfTest
         var e1 = (PartyEffect)effRow.GetChild(0);
         Assert(e1.GetNode<TextureRect>("Icon") != null && e1.GetNode<BuffSweepBar>("Sweep") != null,
             "effect node must expose Icon and Sweep");
-        Assert(e1.Size == new Vector2(16, 16), $"effect size 1x {e1.Size} != (16, 16)");
-        Assert(e1.GetNode<TextureRect>("Icon").Size == new Vector2(16, 16),
-            $"effect icon size 1x {e1.GetNode<TextureRect>("Icon").Size} != (16, 16)");
-        Assert(e1.GetNode<BuffSweepBar>("Sweep").Size == new Vector2(16, 16),
-            $"effect sweep size 1x {e1.GetNode<BuffSweepBar>("Sweep").Size} != (16, 16)");
+        Assert(e1.Size == new Vector2(12, 12), $"effect size 1x {e1.Size} != (12, 12)");
+        Assert(e1.GetNode<TextureRect>("Icon").Size == new Vector2(12, 12),
+            $"effect icon size 1x {e1.GetNode<TextureRect>("Icon").Size} != (12, 12)");
+        Assert(e1.GetNode<BuffSweepBar>("Sweep").Size == new Vector2(12, 12),
+            $"effect sweep size 1x {e1.GetNode<BuffSweepBar>("Sweep").Size} != (12, 12)");
         Assert(effRow.GetThemeConstant("separation") == 1,
             $"effect separation 1x {effRow.GetThemeConstant("separation")} != 1");
         Assert((float)(((Control)effRow.GetChild(1)).OffsetLeft - e1.OffsetRight) == 1f, "effect gap 1x != 1");
@@ -137,7 +137,7 @@ internal static class UiScaleSelfTest
             "effect row must begin below MP");
         Assert(row0.Size.X == 87, $"party frame width {row0.Size.X} != 87");
         var e6 = (PartyEffect)effRow.GetChild(5);
-        Assert(e6.OffsetRight > 87, $"sixth effect right {e6.OffsetRight} <= 87 (overflow expected)");
+        Assert(e6.OffsetRight <= 87, $"sixth effect right {e6.OffsetRight} > 87 (must fit)");
         Assert(!effRow.ClipContents && !row0.GetNode<Control>("Content").ClipContents && !row0.ClipContents,
             "effect overflow must not be clipped");
         party.ApplyPartyBuffAdd(new PartyBuffAddPacket
@@ -253,11 +253,11 @@ internal static class UiScaleSelfTest
         Assert(nameOffset == 22, $"party name offset {nameOffset} != 22");
         var effRow2 = tile.GetNode<HBoxContainer>("Content/EffectRow");
         var e2 = (PartyEffect)effRow2.GetChild(0);
-        Assert(e2.Size == new Vector2(32, 32), $"effect size 2x {e2.Size} != (32, 32)");
-        Assert(e2.GetNode<TextureRect>("Icon").Size == new Vector2(32, 32),
-            $"effect icon size 2x {e2.GetNode<TextureRect>("Icon").Size} != (32, 32)");
-        Assert(e2.GetNode<BuffSweepBar>("Sweep").Size == new Vector2(32, 32),
-            $"effect sweep size 2x {e2.GetNode<BuffSweepBar>("Sweep").Size} != (32, 32)");
+        Assert(e2.Size == new Vector2(24, 24), $"effect size 2x {e2.Size} != (24, 24)");
+        Assert(e2.GetNode<TextureRect>("Icon").Size == new Vector2(24, 24),
+            $"effect icon size 2x {e2.GetNode<TextureRect>("Icon").Size} != (24, 24)");
+        Assert(e2.GetNode<BuffSweepBar>("Sweep").Size == new Vector2(24, 24),
+            $"effect sweep size 2x {e2.GetNode<BuffSweepBar>("Sweep").Size} != (24, 24)");
         Assert(effRow2.GetThemeConstant("separation") == 2,
             $"effect separation 2x {effRow2.GetThemeConstant("separation")} != 2");
         Assert((float)(((Control)effRow2.GetChild(1)).OffsetLeft - e2.OffsetRight) == 2f, "effect gap 2x != 2");
@@ -577,11 +577,11 @@ internal static class UiScaleSelfTest
             "member list base height must survive the round trip");
         var effRow1 = tile1.GetNode<HBoxContainer>("Content/EffectRow");
         var e1r = (PartyEffect)effRow1.GetChild(0);
-        Assert(e1r.Size == new Vector2(16, 16), $"effect size 1x restore {e1r.Size} != (16, 16)");
-        Assert(e1r.GetNode<TextureRect>("Icon").Size == new Vector2(16, 16),
-            $"effect icon size 1x restore {e1r.GetNode<TextureRect>("Icon").Size} != (16, 16)");
-        Assert(e1r.GetNode<BuffSweepBar>("Sweep").Size == new Vector2(16, 16),
-            $"effect sweep size 1x restore {e1r.GetNode<BuffSweepBar>("Sweep").Size} != (16, 16)");
+        Assert(e1r.Size == new Vector2(12, 12), $"effect size 1x restore {e1r.Size} != (12, 12)");
+        Assert(e1r.GetNode<TextureRect>("Icon").Size == new Vector2(12, 12),
+            $"effect icon size 1x restore {e1r.GetNode<TextureRect>("Icon").Size} != (12, 12)");
+        Assert(e1r.GetNode<BuffSweepBar>("Sweep").Size == new Vector2(12, 12),
+            $"effect sweep size 1x restore {e1r.GetNode<BuffSweepBar>("Sweep").Size} != (12, 12)");
         Assert((float)(((Control)effRow1.GetChild(1)).OffsetLeft - e1r.OffsetRight) == 1f, "effect gap 1x restore != 1");
         Assert(slot.CustomMinimumSize == new Vector2(32, 32), $"item slot min {slot.CustomMinimumSize} != (32, 32)");
         Assert(gm.Hud.Hotbar.GetNode<TextureRect>("Background") != null,
