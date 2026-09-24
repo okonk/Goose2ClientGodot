@@ -10,6 +10,7 @@ public partial class SpellTargetManager : Node
     private SpellInfo _pendingSpell;
     private SpellTarget _reticle;
     private ulong _hotkeyConfirmFrame = ulong.MaxValue;
+    private readonly HoldConfirmTimer _holdConfirm = new();
     
     /// <summary>Whether the player is currently in targeting mode.</summary>
     public bool IsTargeting { get; private set; }
@@ -21,6 +22,28 @@ public partial class SpellTargetManager : Node
     public override void _Ready()
     {
         ProcessMode = ProcessModeEnum.Always;
+    }
+
+    // Holding the cast hotkey auto-confirms after HoldConfirmTimer's delay, so a single
+    // press-and-hold casts without a second keypress. A quick tap releases before the delay
+    // and leaves targeting up; a fresh press while targeting confirms immediately in _Input.
+    public override void _Process(double delta)
+    {
+        if (!IsTargeting) return;
+
+        string held = null;
+        for (int i = 0; i < 10; i++)
+        {
+            string action = i == 9 ? "Hotkey0" : $"Hotkey{i + 1}";
+            if (Input.IsActionPressed(action, exactMatch: true))
+            {
+                held = action;
+                break;
+            }
+        }
+
+        if (_holdConfirm.Tick(held, delta))
+            ConfirmTarget();
     }
 
     public override void _ExitTree()
@@ -139,12 +162,14 @@ public partial class SpellTargetManager : Node
     }
 
     // exactMatch: Shift+digit is the emote layer and must not cast.
+    // allowEcho: false — OS key-repeat must not confirm; holding the key is the
+    // hold-to-confirm path in _Process (echo would win with an OS-dependent delay).
     private static bool IsHotkeyPressed(InputEvent @event)
     {
         for (int i = 0; i < 10; i++)
         {
             string action = i == 9 ? "Hotkey0" : $"Hotkey{i + 1}";
-            if (@event.IsActionPressed(action, exactMatch: true)) return true;
+            if (@event.IsActionPressed(action, exactMatch: true, allowEcho: false)) return true;
         }
         return false;
     }
