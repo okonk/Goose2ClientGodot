@@ -66,7 +66,8 @@ Scene (`Scenes/UI/ChatWindow.tscn`):
 ChatWindow (BaseWindow, WindowName="Chat", Resizable)
 ├─ Background   (themed WindowPanel, full rect; chat.png dropped)
 └─ Content      (VBoxContainer, full rect, small margin)
-   ├─ TabStrip  (HBox: tab buttons + expanding filler = drag handle)
+   ├─ TabStrip  (HFlowContainer: tab buttons + expanding filler = drag handle; wraps to
+   │             a second row when tabs overflow; filler keeps a min width to grab)
    ├─ ChatLog   (RichTextLabel, expand-fill)
    └─ Input     (LineEdit)
 ```
@@ -75,7 +76,9 @@ ChatWindow (BaseWindow, WindowName="Chat", Resizable)
 - `MakeDragHandle` on the strip's filler only, so tab clicks select tabs.
 - Tabs are toggle `Button`s in a `ButtonGroup`, `FocusMode.None`; tell tabs carry a small ×.
   Unread tabs use a highlight theme variation.
-- Hover fade uses `BaseWindow`'s rect check (replaces the Panel MouseEntered/Exited hack).
+- Hover fade uses `BaseWindow`'s rect check (replaces the Panel MouseEntered/Exited hack)
+  via a new `protected virtual ApplyHoverOpacity(float)`; chat overrides it to fade only the
+  background so text stays fully opaque, as today.
 - `BaseWindow.Toggle` persists visibility, so hiding chat now survives relog (intended).
 
 **Resizing in `BaseWindow`** (`protected virtual bool Resizable => false`; chat overrides):
@@ -90,8 +93,9 @@ ChatWindow (BaseWindow, WindowName="Chat", Resizable)
 
 **Scaling a resizable window.** Root size = saved `ws.Size / ws.Factor × currentFactor`
 (tscn 500×208 when unsaved). Container children reflow; only font sizes, tab strip height and
-the min size scale. Children are marked with `UiScaleLayout.SkipMeta` so the snapshot does
-not own their offsets. Placement still uses `WindowPlacement.ResolveScaled` with the saved
+the min size scale. No `SkipMeta` is needed: `Content` is full-rect anchored, so the snapshot
+scales only its margin offsets, and container-managed children keep only min sizes and
+separations scaled. Resize handles are built before the snapshot so their thickness scales. Placement still uses `WindowPlacement.ResolveScaled` with the saved
 size. Default position (8, 507) on the 1280×720 design canvas is added to
 `DefaultWindowLayout`.
 
