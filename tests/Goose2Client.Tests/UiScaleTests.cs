@@ -9,13 +9,13 @@ public class UiScaleTests
     [Theory]
     [InlineData(0.4f, 1f)]
     [InlineData(0.9f, 1f)]
-    [InlineData(1.25f, 1.5f)]
-    [InlineData(1.7f, 1.5f)]
-    [InlineData(2.3f, 2.5f)]
+    [InlineData(1.25f, 1.25f)]
+    [InlineData(1.7f, 1.75f)]
+    [InlineData(2.3f, 2.25f)]
     [InlineData(3.4f, 3f)]
     [InlineData(4.2f, 3f)]
     [InlineData(-1f, 1f)]
-    public void NormalizeFactor_SnapsToHalfStepsAndClamps(float raw, float expected)
+    public void NormalizeFactor_SnapsToQuarterStepsAndClamps(float raw, float expected)
     {
         Assert.Equal(expected, UiScale.NormalizeFactor(raw));
     }

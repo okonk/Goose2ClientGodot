@@ -13,7 +13,7 @@ public class UiScale
 {
     public const float MinFactor = 1f;
     public const float MaxFactor = 3f;
-    public const float Step = 0.5f;
+    public const float Step = 0.25f;
 
     public float CurrentFactor { get; set; }
 
