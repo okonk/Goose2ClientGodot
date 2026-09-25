@@ -39,8 +39,7 @@ public static class AnimationBatchConverter
         string outRoot,
         Func<CompiledAnimation, bool>? only = null,
         bool includeEffects = false,
-        int[]? onlyEffectsFromSheets = null,
-        IReadOnlyList<CompiledSpriteFramesResource>? extraResources = null)
+        int[]? onlyEffectsFromSheets = null)
     {
         var warnings = new List<string>();
         var failures = new List<string>();
@@ -156,11 +155,7 @@ public static class AnimationBatchConverter
             }
         }
 
-        // 5b. Append any extra resources (e.g. Aspereta monsters) before metadata write
-        if (extraResources is not null)
-            allResources.AddRange(extraResources);
-
-        // 6. Merge and write metadata (only after all resources are built)
+        // 5b. Merge and write metadata (only after all resources are built)
         if (allResources.Any(r => r.Animations.Count > 0) || effectHeights.Count > 0)
         {
             try
@@ -174,7 +169,7 @@ public static class AnimationBatchConverter
             }
         }
 
-        // 7. Write the static appearance manifest sidecar
+        // 6. Write the static appearance manifest sidecar
         if (allResources.Any(r => r.Animations.Count > 0))
         {
             try

@@ -20,25 +20,6 @@ static int PublishIfChanged(string path, string content)
     return 1;
 }
 
-static Dictionary<int, AdfFile> LoadIllutiaAdfs(string dataDir, out int failed)
-{
-    var adfs = new Dictionary<int, AdfFile>();
-    failed = 0;
-    foreach (var file in Directory.EnumerateFiles(dataDir, "*.adf"))
-    {
-        try
-        {
-            var adf = new AdfFile(file);
-            adfs[adf.FileNumber] = adf;
-        }
-        catch
-        {
-            failed++;
-        }
-    }
-    return adfs;
-}
-
 static string ResolveAsperetaMappingPath(string? repoRoot = null)
 {
     var candidates = new List<string>
@@ -95,17 +76,31 @@ if (args.Length >= 1 && args[0] == "aspereta")
         Paths.AsperetaData, Path.Combine(repoRoot, "Assets", "Sprites", "sheets"));
     var maps = AsperetaMapConverter.Convert(
         Paths.AsperetaMaps, Path.Combine(repoRoot, "Assets", "Maps"), mapping);
-    var fx = AsperetaEffectsConverter.Convert(
-        AsperetaAnimationCatalog.Load(Paths.AsperetaData, Paths.AsperetaCompiledEnc), repoRoot);
+    var asp = AsperetaConversionPipeline.Convert(Paths.AsperetaData, Paths.AsperetaCompiledEnc, repoRoot);
+    WriteAsperetaManifests(repoRoot, asp);
 
     Console.WriteLine($"Aspereta sheets: {sheets.Succeeded} ok, {sheets.Failed} failed");
     Console.WriteLine($"Aspereta maps: {maps.Converted} converted, {maps.Failures.Count} failed, {maps.Warnings.Count} warnings");
-    Console.WriteLine($"Aspereta effects: {fx.EffectsWritten} written, {fx.Failed} failed, {fx.Diagnostics.Count} diagnostics");
+    Console.WriteLine($"Aspereta animations: {asp.ResourcesWritten} resources, {asp.EffectsWritten} effects, {asp.Failed} failed, {asp.Diagnostics.Count} diagnostics");
     foreach (var w in maps.Warnings) Console.WriteLine($"  WARN {w}");
-    foreach (var d in fx.Diagnostics) Console.WriteLine($"  ASPERETA {d}");
-    foreach (var f in sheets.Failures.Concat(maps.Failures).Concat(fx.Failures))
+    foreach (var d in asp.Diagnostics) Console.WriteLine($"  ASPERETA {d}");
+    foreach (var f in sheets.Failures.Concat(maps.Failures).Concat(asp.Failures))
         Console.WriteLine($"  FAIL {f}");
+    Console.WriteLine($"Manifest: {Path.Combine(repoRoot, "Assets", "Sprites", "manifest.json")}");
+    Console.WriteLine($"Animation manifest: {Path.Combine(repoRoot, "Assets", "Sprites", ManifestFileStore.AnimationFileName)}");
+    Console.WriteLine($"Appearance manifest: {Path.Combine(repoRoot, AppearanceManifestFileStore.RelativePath)}");
     return;
+}
+
+static void WriteAsperetaManifests(string repoRoot, AsperetaConversionResult asp)
+{
+    AppearanceManifestFileStore.Write(repoRoot,
+        AsperetaConversionPipeline.BuildCombinedAppearanceManifest(
+            Paths.IllutiaData, Paths.CompiledEnc, asp.Resources));
+    ManifestFileStore.WriteCombined(repoRoot,
+        () => FrameManifestBuilder.BuildCombined(Paths.IllutiaData, asp.Catalog),
+        () => AnimationManifestBuilder.BuildCombined(
+            Paths.IllutiaData, Paths.CompiledEnc, asp.Catalog, Paths.ItemTileSheets));
 }
 
 if (args.Length >= 1 && args[0] == "animations")
@@ -191,23 +186,10 @@ if (args.Length >= 1 && args[0] == "all")
     var sheets = BatchConverter.Convert(Paths.IllutiaData, sheetsDir);
     CustomAssetSheet.Write(Paths.CustomAssetsDir, sheetsDir);
 
-    // Aspereta animations (metadata via Convert; .tres written separately)
-    var aspCatalog = AsperetaAnimationCatalog.Load(Paths.AsperetaData, Paths.AsperetaCompiledEnc);
-    var aspBuild = AsperetaAnimationResourceBuilder.Build(aspCatalog);
-
     var animations = AnimationBatchConverter.Convert(
-        Paths.IllutiaData, Paths.CompiledEnc, repoRoot, includeEffects: true,
-        extraResources: aspBuild.Resources);
+        Paths.IllutiaData, Paths.CompiledEnc, repoRoot, includeEffects: true);
 
-    // Aspereta .tres files are not written by Convert's illutia loop — write them here
-    int aspWritten = 0;
-    foreach (var resource in aspBuild.Resources.Where(r => r.Animations.Count > 0))
-    {
-        string fullPath = Path.Combine(repoRoot, resource.RelativeOutputPath);
-        Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
-        File.WriteAllText(fullPath, SpriteFramesWriter.Build(resource.Animations));
-        aspWritten++;
-    }
+    var asp = AsperetaConversionPipeline.Convert(Paths.AsperetaData, Paths.AsperetaCompiledEnc, repoRoot);
 
     // Illutia maps
     var maps = MapCopyConverter.Convert(Paths.IllutiaMaps, mapsDir);
@@ -217,25 +199,17 @@ if (args.Length >= 1 && args[0] == "all")
     var mappingRows = AsperetaMapping.FromTsv(mappingPath);
     var aspMaps = AsperetaMapConverter.Convert(Paths.AsperetaMaps, mapsDir, mappingRows);
 
-    // Aspereta effects (after Illutia animation metadata so heights merge preserves it)
-    var fx = AsperetaEffectsConverter.Convert(aspCatalog, repoRoot);
-
-    // Combined frame + animation manifests
-    ManifestFileStore.WriteCombined(repoRoot,
-        () => FrameManifestBuilder.BuildCombined(Paths.IllutiaData, aspCatalog),
-        () => AnimationManifestBuilder.BuildCombined(
-            Paths.IllutiaData, Paths.CompiledEnc, aspCatalog, Paths.ItemTileSheets));
+    WriteAsperetaManifests(repoRoot, asp);
 
     Console.WriteLine($"Sheets: {sheets.Succeeded} ok, {sheets.Failed} failed");
     Console.WriteLine($"Animations: {animations.ResourcesWritten} character, {animations.EffectsWritten} effects, {animations.Failed} failed");
-    Console.WriteLine($"Aspereta animations: {aspWritten} written, {aspBuild.Diagnostics.Count} diagnostics");
-    foreach (var e in aspBuild.Diagnostics) Console.WriteLine($"  ASPERETA {e}");
+    Console.WriteLine($"Aspereta animations: {asp.ResourcesWritten} resources, {asp.EffectsWritten} effects, {asp.Failed} failed, {asp.Diagnostics.Count} diagnostics");
+    foreach (var e in asp.Diagnostics) Console.WriteLine($"  ASPERETA {e}");
     Console.WriteLine($"Maps: {maps.Copied} copied, {maps.Failures.Count} failed");
     Console.WriteLine($"Aspereta sheets: {aspBatch.Succeeded} ok, {aspBatch.Failed} failed");
     Console.WriteLine($"Aspereta maps: {aspMaps.Converted} converted, {aspMaps.Failures.Count} failed, {aspMaps.Warnings.Count} warnings");
-    Console.WriteLine($"Aspereta effects: {fx.EffectsWritten} written, {fx.Failed} failed, {fx.Diagnostics.Count} diagnostics");
     foreach (var w in aspMaps.Warnings) Console.WriteLine($"  WARN {w}");
-    foreach (var f in aspBatch.Failures.Concat(aspMaps.Failures).Concat(fx.Failures))
+    foreach (var f in aspBatch.Failures.Concat(aspMaps.Failures).Concat(asp.Failures))
         Console.WriteLine($"  FAIL {f}");
     Console.WriteLine($"Manifest: {Path.Combine(repoRoot, "Assets", "Sprites", "manifest.json")}");
     Console.WriteLine($"Animation manifest: {Path.Combine(repoRoot, "Assets", "Sprites", ManifestFileStore.AnimationFileName)}");
@@ -262,28 +236,6 @@ if (args.Length >= 2 && args[0] == "aspereta-body")
         return;
     }
 
-    var illutiaAdfs = LoadIllutiaAdfs(Paths.IllutiaData, out int illutiaSkipped);
-    if (illutiaAdfs.Count == 0)
-    {
-        Console.WriteLine($"Illutia sheets unreadable under {Paths.IllutiaData}; nothing written");
-        return;
-    }
-
-    var appearance = new List<CompiledSpriteFramesResource>();
-    foreach (var ca in new CompiledEnc(Paths.CompiledEnc).CompiledAnimations)
-    {
-        try
-        {
-            appearance.Add(CompiledAnimationBuilder.BuildCharacterResource(ca, illutiaAdfs));
-        }
-        catch
-        {
-            // Same per-resource tolerance as AnimationBatchConverter.Convert's build loop.
-            illutiaSkipped++;
-        }
-    }
-    appearance.AddRange(aspBuild.Resources);
-
     string resourcesDir = Path.Combine(repoRoot, "Assets", "Resources");
     var heights = AnimationMetadataWriter.MergeHeights(new[]
     {
@@ -304,8 +256,9 @@ if (args.Length >= 2 && args[0] == "aspereta-body")
             AnimationMetadataWriter.BuildHeightsText(heights)),
         (Path.Combine(resourcesDir, "AnimationToFirstFrame.txt"),
             AnimationMetadataWriter.BuildFirstFrameText(firstFrames)),
-        (Path.Combine(repoRoot, "Assets", "Sprites", "appearance-manifest.json"),
-            AppearanceManifestBuilder.Build(appearance)),
+        (Path.Combine(repoRoot, AppearanceManifestFileStore.RelativePath),
+            AsperetaConversionPipeline.BuildCombinedAppearanceManifest(
+                Paths.IllutiaData, Paths.CompiledEnc, aspBuild.Resources)),
         (Path.Combine(repoRoot, "Assets", "Sprites", ManifestFileStore.AnimationFileName),
             AnimationManifestBuilder.BuildCombined(
                 Paths.IllutiaData, Paths.CompiledEnc, aspCatalog, Paths.ItemTileSheets)),
@@ -315,7 +268,7 @@ if (args.Length >= 2 && args[0] == "aspereta-body")
     foreach (var (path, content) in outputs)
         written += PublishIfChanged(path, content);
 
-    Console.WriteLine($"Aspereta body {bodyId} -> output body {outputBodyId}: {written} file(s) written, {aspBuild.Resources.Count} Aspereta resources total, {illutiaSkipped} illutia resources skipped");
+    Console.WriteLine($"Aspereta body {bodyId} -> output body {outputBodyId}: {written} file(s) written, {aspBuild.Resources.Count} Aspereta resources total");
     foreach (var e in aspBuild.Diagnostics) Console.WriteLine($"  ASPERETA {e}");
     return;
 }
