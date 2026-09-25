@@ -87,6 +87,8 @@ internal static class UiScaleSelfTest
             return false;
         }
 
+        // Headless canvases are 64x64; the placement math assumes the 1280x720 design space.
+        tree.Root.Size = new Vector2I(1280, 720);
         var canvas = (Vector2I)tree.Root.GetVisibleRect().Size;
         GD.Print($"[ui_scale_selftest] canvas={canvas.X}x{canvas.Y}");
         Assert(canvas.X > 0 && canvas.Y > 0, $"degenerate headless canvas {canvas}");
@@ -222,8 +224,8 @@ internal static class UiScaleSelfTest
             Assert(actual == basePx, $"font base {c.GetPath()} {actual} != {basePx}");
             Assert(c.GetThemeFontSize(prop) == applier.ScaleSize(basePx), $"font {c.GetPath()} {c.GetThemeFontSize(prop)} != {applier.ScaleSize(basePx)}");
         }
-        CheckFont(gm.Hud.Chat.GetNode<RichTextLabel>("ChatLog"), new StringName("normal_font_size"), 12f);
-        CheckFont(gm.Hud.Chat.GetNode<LineEdit>("Input"), new StringName("font_size"), 12f);
+        CheckFont(gm.Hud.Chat.GetNode<RichTextLabel>("Content/ChatLog"), new StringName("normal_font_size"), 12f);
+        CheckFont(gm.Hud.Chat.GetNode<LineEdit>("Content/Input"), new StringName("font_size"), 12f);
         CheckFont(gm.Hud.Debug.GetNode<Label>("FpsText"), new StringName("font_size"), 12f);
         CheckFont(gm.Hud.Debug.GetNode<Label>("VersionText"), new StringName("font_size"), 12f);
         CheckFont(gm.Hud.Bank.GetNode<Label>("TitleBar/TitleLabel"), new StringName("font_size"), 9f);
@@ -233,8 +235,9 @@ internal static class UiScaleSelfTest
         Assert(gm.Hud.Vitals.Position == new Vector2(16, 16), $"vitals pos {gm.Hud.Vitals.Position} != (16, 16)");
         var slot = (ItemSlot)gm.Hud.Inventory.GetNode<GridContainer>("Content/SlotGrid").GetChild(0);
         Assert(slot.CustomMinimumSize == new Vector2(64, 64), $"item slot min {slot.CustomMinimumSize} != (64, 64)");
-        Assert(gm.Hud.Chat.OffsetTop == -426 && gm.Hud.Chat.OffsetBottom == -10,
-            $"chat offsets top={gm.Hud.Chat.OffsetTop} bottom={gm.Hud.Chat.OffsetBottom} != (-426, -10)");
+        Assert(gm.Hud.Chat.Size == new Vector2(1000, 416), $"chat size {gm.Hud.Chat.Size} != (1000, 416)");
+        Assert(gm.Hud.Chat.Position == new Vector2(16, canvas.Y - 426),
+            $"chat pos {gm.Hud.Chat.Position} != (16, {canvas.Y - 426})");
 
         var vendor = gm.Hud.Vendor;
         Assert(vendor.Position.X >= 0f && vendor.Position.X <= Mathf.Max(0f, canvas.X - vendor.Size.X),
