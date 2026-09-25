@@ -13,7 +13,9 @@ public partial class OptionsWindow : BaseWindow
 
     private CheckBox _targetFiltering;
     private CheckBox _showSpiritBar;
-    private CheckBox _nativeRender;
+    private HSlider _renderScaleSlider;
+    private Label _renderScaleValueLabel;
+    private bool _renderScaleDragging;
     private CheckBox _minimap;
     private HSlider _minimapOpacitySlider;
     private bool _minimapOpacityDragging;
@@ -41,9 +43,15 @@ public partial class OptionsWindow : BaseWindow
         _showSpiritBar.ButtonPressed = GameManager.Instance.CharacterSettings.GetOption<bool>(Options.ShowSpiritBar, true);
         _showSpiritBar.Toggled += OnShowSpiritBarChanged;
 
-        _nativeRender = GetNode<CheckBox>("Content/NativeRenderCheck");
-        _nativeRender.ButtonPressed = GameManager.Instance.CharacterSettings.GetOption<bool>(Options.RenderMode, false);
-        _nativeRender.Toggled += OnNativeRenderChanged;
+        _renderScaleSlider = GetNode<HSlider>("Content/RenderScaleSlider");
+        _renderScaleValueLabel = GetNode<Label>("Content/RenderScaleValueLabel");
+        _renderScaleSlider.Value = Mathf.Clamp(
+            GameManager.Instance.CharacterSettings.GetOption<int>(Options.RenderScale, 2),
+            (int)_renderScaleSlider.MinValue, (int)_renderScaleSlider.MaxValue);
+        _renderScaleValueLabel.Text = (int)_renderScaleSlider.Value + "×";
+        _renderScaleSlider.DragStarted += () => _renderScaleDragging = true;
+        _renderScaleSlider.DragEnded += OnRenderScaleDragEnded;
+        _renderScaleSlider.ValueChanged += OnRenderScaleValueChanged;
 
         _minimap = GetNode<CheckBox>("Content/MinimapCheck");
         _minimap.ButtonPressed = GameManager.Instance.CharacterSettings.GetOption<bool>(Options.Minimap, true);
@@ -102,11 +110,25 @@ public partial class OptionsWindow : BaseWindow
         GameManager.Instance.CharacterSettings.Options[Options.ShowSpiritBar] = pressed;
     }
 
-    private void OnNativeRenderChanged(bool pressed)
+    private void OnRenderScaleValueChanged(double v)
     {
-        GameManager.Instance.CharacterSettings.Options[Options.RenderMode] = pressed;
-        GameManager.Instance.CharacterSettings.Save();
-        GameManager.Instance.WorldViewport.ApplyMode(pressed ? WorldRenderMode.Native1x : WorldRenderMode.Integer2x);
+        int scale = (int)v;
+        _renderScaleValueLabel.Text = scale + "×";
+        GameManager.Instance.WorldViewport.ApplyMode(scale);
+        if (!_renderScaleDragging)
+        {
+            var cs = GameManager.Instance.CharacterSettings;
+            cs.Options[Options.RenderScale] = scale;
+            cs.Save();
+        }
+    }
+
+    private void OnRenderScaleDragEnded(bool valueChanged)
+    {
+        _renderScaleDragging = false;
+        var cs = GameManager.Instance.CharacterSettings;
+        cs.Options[Options.RenderScale] = (int)_renderScaleSlider.Value;
+        cs.Save();
     }
 
     private void OnMinimapChanged(bool pressed)

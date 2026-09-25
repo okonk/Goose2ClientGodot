@@ -15,56 +15,56 @@ namespace Goose2Client;
 public readonly record struct WorldViewportLayout(int Scale, Vector2I SubViewportSize, Vector2I DisplayOrigin, Vector2I DisplaySize);
 
 /// <summary>
-/// How the world sub-viewport is scaled relative to the root window.
-/// </summary>
-public enum WorldRenderMode
-{
-    /// <summary>Integer uniform scale ≥ 2, sub-viewport capped at <see cref="WorldViewportScale.Cap"/>.</summary>
-    Integer2x,
-    /// <summary>No scaling: sub-viewport and display fill the window 1:1.</summary>
-    Native1x,
-}
-
-/// <summary>
 /// Pure layout math for the capped world sub-viewport: picks an integer uniform display
 /// scale so the sub-viewport stays ≤ <see cref="Cap"/>, then computes the centered
 /// integer display rectangle. No engine API is used; inputs/outputs are integer values only.
 /// </summary>
 public static class WorldViewportScale
 {
-    /// <summary>Maximum sub-viewport resolution in <see cref="WorldRenderMode.Integer2x"/> mode.</summary>
+    /// <summary>Maximum sub-viewport resolution in scaled (minScale ≥ 2) modes.</summary>
     public static readonly Vector2I Cap = new(1280, 720);
+
+    /// <summary>Lowest selectable minimum display scale (1 = native 1:1, no scaling).</summary>
+    public static readonly int MinScale = 1;
+
+    /// <summary>Highest selectable minimum display scale.</summary>
+    public static readonly int MaxScale = 3;
 
     /// <summary>
     /// Computes the sub-viewport layout for a root window of the given size.
     /// </summary>
-    /// <param name="mode">Integer2x (capped, integer scale ≥ 2) or Native1x (1:1 fill).</param>
+    /// <param name="minScale">Minimum integer display scale in [MinScale, MaxScale]; 1 = native 1:1 fill, ≥ 2 = capped integer scale.</param>
     /// <param name="windowSize">Root window size in integer pixels.</param>
     /// <exception cref="ArgumentOutOfRangeException">
-    /// If either axis of <paramref name="windowSize"/> is &lt; 2.
+    /// If <paramref name="minScale"/> is outside [MinScale, MaxScale] or either axis of
+    /// <paramref name="windowSize"/> is &lt; 2.
     /// </exception>
     /// <remarks>
     /// Invariants:
     /// <list type="bullet">
     /// <item><see cref="WorldViewportLayout.DisplaySize"/> == SubViewportSize * Scale exactly (uniform integer scale).</item>
     /// <item>0 ≤ window − DisplaySize &lt; Scale per axis (gutter is sub-scale on each side, and the origin centers it).</item>
-    /// <item>Integer2x: Scale ≥ 2 and SubViewportSize ≤ Cap.</item>
+    /// <item>minScale ≥ 2: Scale ≥ minScale and SubViewportSize ≤ Cap.</item>
     /// </list>
     /// </remarks>
-    public static WorldViewportLayout Compute(WorldRenderMode mode, Vector2I windowSize)
+    public static WorldViewportLayout Compute(int minScale, Vector2I windowSize)
     {
+        if (minScale < MinScale || minScale > MaxScale)
+        {
+            throw new ArgumentOutOfRangeException(nameof(minScale), $"minScale must be in [{MinScale}, {MaxScale}], was {minScale}");
+        }
         if (windowSize.X < 2 || windowSize.Y < 2)
         {
             throw new ArgumentOutOfRangeException(nameof(windowSize), $"windowSize must be ≥ (2, 2) per axis, was {windowSize}");
         }
 
-        if (mode == WorldRenderMode.Native1x)
+        if (minScale == MinScale)
         {
             return new WorldViewportLayout(1, windowSize, new Vector2I(0, 0), windowSize);
         }
 
-        // Integer2x: scale just large enough (and ≥ 2) to fit the window within the cap.
-        int scale = 2;
+        // Scale just large enough (and ≥ minScale) to fit the window within the cap.
+        int scale = minScale;
         if (windowSize.X > Cap.X)
         {
             scale = Math.Max(scale, (windowSize.X + Cap.X - 1) / Cap.X);

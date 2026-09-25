@@ -93,15 +93,37 @@ offset_bottom = 80.0
 mouse_filter = 1
 text = "Show Spirit Bar"
 
-[node name="NativeRenderCheck" type="CheckBox" parent="Content"]
+[node name="RenderScaleLabel" type="Label" parent="Content"]
 layout_mode = 2
 anchors_preset = 0
 offset_left = 8.0
 offset_top = 84.0
+offset_right = 88.0
+offset_bottom = 108.0
+mouse_filter = 1
+text = "World Scale"
+
+[node name="RenderScaleSlider" type="HSlider" parent="Content"]
+layout_mode = 2
+anchors_preset = 0
+offset_left = 92.0
+offset_top = 84.0
+offset_right = 188.0
+offset_bottom = 108.0
+min_value = 1.0
+max_value = 3.0
+step = 1.0
+value = 2.0
+
+[node name="RenderScaleValueLabel" type="Label" parent="Content"]
+layout_mode = 2
+anchors_preset = 0
+offset_left = 192.0
+offset_top = 84.0
 offset_right = 232.0
 offset_bottom = 108.0
 mouse_filter = 1
-text = "Native 1× rendering"
+text = "2×"
 
 [node name="ScaleLabel" type="Label" parent="Content"]
 layout_mode = 2

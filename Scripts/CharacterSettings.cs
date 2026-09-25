@@ -121,7 +121,21 @@ namespace Goose2Client
             }
             WindowSettings ??= new();
             Options ??= new();
+            MigrateLegacyRenderMode();
             ChatTabs ??= new List<string> { "Guild", "Group" };
+        }
+
+        // Pre-slider setting: the bool "RenderMode" (true = Native1x) becomes the int
+        // "RenderScale" (1 = native, 2 = the old default). Values may be in-memory bools or
+        // JsonElements depending on how the dictionary was populated.
+        private void MigrateLegacyRenderMode()
+        {
+            if (!Options.Remove(Goose2Client.Options.RenderMode, out var old))
+                return;
+            if (Options.ContainsKey(Goose2Client.Options.RenderScale))
+                return;
+            bool native = old is bool b ? b : old is JsonElement je && je.ValueKind == JsonValueKind.True;
+            Options[Goose2Client.Options.RenderScale] = native ? 1 : 2;
         }
 
         /// <summary>Deserialize settings JSON with null-guards; never throws on partial/corrupt input.</summary>

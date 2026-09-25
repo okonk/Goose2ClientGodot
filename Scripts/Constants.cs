@@ -140,7 +140,9 @@ namespace Goose2Client
         public const string TargetFiltering = "TargetFiltering";
         public const string ShowSpiritBar = "ShowSpiritBar";
         public const string SpiritBarShown = "SpiritBarShown";
-        /// <summary>World render mode: <c>true</c> = Native1x, <c>false</c> (default) = Integer2x.</summary>
+        /// <summary>World render scale (1–3, default 2): minimum integer display scale; 1 = native 1:1 fill.</summary>
+        public const string RenderScale = "RenderScale";
+        /// <summary>Legacy bool setting (true = Native1x), migrated to <see cref="RenderScale"/> on load.</summary>
         public const string RenderMode = "RenderMode";
         public const string UiScaleMode = "UiScaleMode";
         public const string UiScaleValue = "UiScaleValue";

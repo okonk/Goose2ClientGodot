@@ -28,7 +28,7 @@ namespace Goose2Client
         private int _lastAppliedScale;
 
         /// <summary>Stored even with no map attached (applied on next <see cref="Attach"/>).</summary>
-        public WorldRenderMode Mode { get; private set; } = WorldRenderMode.Integer2x;
+        public int MinScale { get; private set; } = 2;
 
         // One-shot first-frame presentation deferred from <see cref="Attach"/>: the connected
         // handler (null = none pending) and the map whose first render it presents.
@@ -164,14 +164,15 @@ namespace Goose2Client
         }
 
         /// <summary>
-        /// Stores the mode and, if a map is attached, recomputes the layout from the current
-        /// root window size and applies it to the sub-viewport and display rect. Sole mutator of
-        /// <see cref="Current"/>.Size / <see cref="Layout"/> / the display rect. No-op (mode
-        /// stored) when no map is attached or the root size is not usable yet.
+        /// Stores the minimum scale and, if a map is attached, recomputes the layout from the
+        /// current root window size and applies it to the sub-viewport and display rect. Sole
+        /// mutator of <see cref="Current"/>.Size / <see cref="Layout"/> / the display rect.
+        /// No-op (minimum scale stored) when no map is attached or the root size is not usable
+        /// yet.
         /// </summary>
-        public void ApplyMode(WorldRenderMode mode)
+        public void ApplyMode(int minScale)
         {
-            Mode = mode;
+            MinScale = minScale;
             if (Current == null)
                 return;
 
@@ -179,7 +180,7 @@ namespace Goose2Client
             if (rootSize.X < 2 || rootSize.Y < 2)
                 return;
 
-            Layout = WorldViewportScale.Compute(mode, rootSize);
+            Layout = WorldViewportScale.Compute(minScale, rootSize);
             Current.Size = Layout.SubViewportSize;
             WorldTexture.Position = Layout.DisplayOrigin;
             WorldTexture.Size = Layout.DisplaySize;
@@ -196,14 +197,15 @@ namespace Goose2Client
         }
 
         /// <summary>
-        /// Applies the render mode from character settings (null-safe: pre-login → Integer2x,
-        /// the node default). Used only by <see cref="Attach"/>.
+        /// Applies the render scale from character settings (null-safe: pre-login → 2, the node
+        /// default). Used only by <see cref="Attach"/>.
         /// </summary>
         public void RefreshFromSettings()
         {
-            bool native = GameManager.Instance?.CharacterSettings != null
-                && GameManager.Instance.CharacterSettings.GetOption<bool>(Options.RenderMode, false) == true;
-            ApplyMode(native ? WorldRenderMode.Native1x : WorldRenderMode.Integer2x);
+            int minScale = GameManager.Instance?.CharacterSettings != null
+                ? GameManager.Instance.CharacterSettings.GetOption<int>(Options.RenderScale, 2)
+                : 2;
+            ApplyMode(minScale);
         }
 
         /// <summary>
@@ -296,7 +298,7 @@ namespace Goose2Client
             var rootSize = (Vector2I)GetTree().Root.GetVisibleRect().Size;
             if (rootSize.X < 2 || rootSize.Y < 2)
                 return; // ignore while the root has no usable size yet
-            ApplyMode(Mode);
+            ApplyMode(MinScale);
         }
     }
 }
