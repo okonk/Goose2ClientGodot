@@ -106,7 +106,7 @@ internal static class UiScaleSelfTest
         var memberList = party.GetNode<VBoxContainer>("MemberList");
         Assert(memberList.GetChildCount() == PartyWindow.MaxMembers,
             $"party rows {memberList.GetChildCount()} != {PartyWindow.MaxMembers}");
-        Assert(memberList.OffsetBottom == 509, $"member list base height {memberList.OffsetBottom} != 509");
+        Assert(memberList.OffsetBottom == 0, $"empty party must collapse, height {memberList.OffsetBottom} != 0");
         Assert(!party.ApplyPartyBuffAdd(new PartyBuffAddPacket
             { LoginId = 7999, EffectId = 1, GraphicId = 1, GraphicFile = 1, RemainingMs = 60000, TotalMs = 120000, Name = "E1" }),
             "PBA for unknown member must be rejected");
@@ -249,6 +249,7 @@ internal static class UiScaleSelfTest
         Assert(pList.GetChildCount() == 10, $"party tiles {pList.GetChildCount()} != 10");
         var sep = pList.GetThemeConstant("separation");
         Assert(sep == 2, $"party separation {sep} != 2");
+        Assert(pList.OffsetBottom == 100, $"party 1-member height 2x {pList.OffsetBottom} != 100");
         var tile = (PartyMember)pList.GetChild(0);
         Assert(tile.CustomMinimumSize == new Vector2(174, 100), $"party tile min {tile.CustomMinimumSize} != (174, 100)");
         var nameOffset = tile.GetNode<Label>("Content/NameText").OffsetBottom;
@@ -575,8 +576,8 @@ internal static class UiScaleSelfTest
         Assert(tile1.CustomMinimumSize == new Vector2(87, 50), $"party tile min {tile1.CustomMinimumSize} != (87, 50)");
         var sep1 = gm.Hud.Party.GetNode<VBoxContainer>("MemberList").GetThemeConstant("separation");
         Assert(sep1 == 1, $"party separation {sep1} != 1");
-        Assert(gm.Hud.Party.GetNode<VBoxContainer>("MemberList").OffsetBottom == 509,
-            "member list base height must survive the round trip");
+        Assert(gm.Hud.Party.GetNode<VBoxContainer>("MemberList").OffsetBottom == 50,
+            "party 1-member height must survive the round trip");
         var effRow1 = tile1.GetNode<HBoxContainer>("Content/EffectRow");
         var e1r = (PartyEffect)effRow1.GetChild(0);
         Assert(e1r.Size == new Vector2(12, 12), $"effect size 1x restore {e1r.Size} != (12, 12)");

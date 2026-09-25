@@ -79,6 +79,10 @@ public partial class GameHud : Control
         Custom = Add<CustomWindow>("res://Scenes/UI/CustomWindow.tscn");
         Hairdye = Add<HairdyeWindow>("res://Scenes/UI/HairdyeWindow.tscn");
 
+        // The fixed party window overlaps the default chat spot; the chat's tab row must
+        // win input there.
+        MoveChild(Chat, Party.GetIndex() + 1);
+
         // 5. Multi-window managers (plain Node subclasses, instantiable via new).
         QuestWindows = new QuestWindowManager();
         AddChild(QuestWindows);
