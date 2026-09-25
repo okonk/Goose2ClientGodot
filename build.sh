@@ -130,17 +130,17 @@ archive_platform() {
   local out
   case "$plat" in
     linux)
-      out="Goose2Client-$BUILD_ID-linux.tar.gz"
+      out="Goose2Client-linux-$BUILD_ID.tar.gz"
       # tar, not zip: preserves the executable bit on the binary.
       tar -czf "$STAGING_DIR/$out" -C "$STAGING_DIR/$plat" . || die "linux archive failed"
       ;;
     windows)
-      out="Goose2Client-$BUILD_ID-windows.zip"
+      out="Goose2Client-windows-$BUILD_ID.zip"
       (cd "$STAGING_DIR/$plat" && zip -qr "../$out" .) || die "windows archive failed"
       ;;
     macos)
       # macOS 27 rejects Godot's built-in DER entitlements; rcodesign replaces them.
-      out="Goose2Client-$BUILD_ID-macos.zip"
+      out="Goose2Client-macos-$BUILD_ID.zip"
       RCODESIGN="$RCODESIGN" bash ./sign-macos.sh "$STAGING_DIR/$plat/Goose2Client.zip" "$STAGING_DIR/$out" || die "macos signing failed"
       ;;
   esac
