@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Goose2Client.Character;
 
 namespace Goose2Client.Network.Packets
 {
@@ -37,7 +38,7 @@ namespace Goose2Client.Network.Packets
                 BodyState = p.GetInt32(),
             };
 
-            if (packet.BodyId < 100)
+            if (BodyClassification.IsLayered(packet.BodyId))
             {
                 packet.HairId = p.GetInt32();
                 packet.DisplayedEquipment = ParseEquippedItems(p);

@@ -41,10 +41,8 @@ namespace Goose2Client.Character
             // Unity substitutes Blank (invisible) when that motion's clip is absent.
             List<string> bases = motion switch
             {
-                "idle" => equipped ? new List<string> { "idle-equip", "idle", "idle-no-equip" }
-                                   : new List<string> { "idle-no-equip", "idle", "idle-equip" },
-                "walk" => equipped ? new List<string> { "walk-equip", "walk", "walk-no-equip" }
-                                   : new List<string> { "walk-no-equip", "walk", "walk-equip" },
+                "idle" => IdleWalkBases("idle", bodyState),
+                "walk" => IdleWalkBases("walk", bodyState),
                 // Attack-family only. No idle: shields without attack art hide for the swing.
                 "attack" => AttackCandidates(equipped, bodyState),
                 // Cast only — Hands never ship cast clips; ResolveClip blanks them (Unity Blank).
@@ -60,6 +58,30 @@ namespace Goose2Client.Character
             var result = new List<string>(bases.Count);
             foreach (var b in bases) result.Add($"{b}-{dir}");
             return result;
+        }
+
+        // Trailing -equip keeps old resources (no state-specific clips) resolving exactly as before.
+        private static List<string> IdleWalkBases(string motion, int bodyState)
+        {
+            var list = new List<string>(4);
+            switch (bodyState)
+            {
+                case 4: list.Add($"{motion}-1hand"); break;
+                case 5: list.Add($"{motion}-staff"); break;
+            }
+            if (bodyState == 3)
+            {
+                list.Add($"{motion}-no-equip");
+                list.Add(motion);
+                list.Add($"{motion}-equip");
+            }
+            else
+            {
+                list.Add($"{motion}-equip");
+                list.Add(motion);
+                list.Add($"{motion}-no-equip");
+            }
+            return list;
         }
 
         /// <summary>Attack-family clip bases only (no idle). Prefer the weapon variant, then

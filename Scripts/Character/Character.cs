@@ -321,10 +321,10 @@ namespace Goose2Client.Character
             int mountId  = Equip(eq, 6, out var em);
             IsMounted = mountId != 0;
 
-            // Unity renders only the Body slot for monster/morph bodies (>= 100): create-path
+            // Unity renders only the Body slot for non-layered bodies (monsters/morphs): create-path
             // Character.cs:70-84 skips the rest, update-path :147-158 destroys them. Zeroed ids
             // flow into ApplySlot below, which RemoveSlot()s each — covering the CHP update case.
-            if (bodyId >= 100)
+            if (!BodyClassification.IsLayered(bodyId))
             {
                 hairId = 0; faceId = 0; chestId = 0; helmId = 0; legsId = 0;
                 feetId = 0; shieldId = 0; weaponId = 0; mountId = 0;

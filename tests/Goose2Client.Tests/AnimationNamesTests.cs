@@ -29,8 +29,10 @@ public class AnimationNamesTests
     // First candidate = the clip a fully-featured slot (e.g. the Body) should prefer.
     [Theory]
     [InlineData("idle", 3, Direction.Down, "idle-no-equip-down")]
-    [InlineData("idle", 4, Direction.Down, "idle-equip-down")]
-    [InlineData("walk", 4, Direction.Left, "walk-equip-left")]
+    [InlineData("idle", 4, Direction.Down, "idle-1hand-down")]
+    [InlineData("walk", 4, Direction.Left, "walk-1hand-left")]
+    [InlineData("idle", 5, Direction.Down, "idle-staff-down")]
+    [InlineData("walk", 5, Direction.Left, "walk-staff-left")]
     [InlineData("walk", 3, Direction.Left, "walk-no-equip-left")]
     [InlineData("attack", 4, Direction.Down, "attack-1hand-down")]
     [InlineData("attack", 5, Direction.Up, "attack-staff-up")]
@@ -57,10 +59,11 @@ public class AnimationNamesTests
     [Fact]
     public void Candidates_fall_back_through_generic_for_weapon_slots()
     {
-        // Hands sheets only have idle-equip / walk-equip / attack-<type>. Equipped idle offers
-        // idle-equip first. Attack stays in the attack family only — no idle fallback (Unity Blank).
+        // Hands sheets only have idle-equip / walk-equip / attack-<type>. State-specific idle
+        // offers its variant first, then idle-equip. Attack stays in the attack family only —
+        // no idle fallback (Unity Blank).
         var idle = AnimationNames.Candidates("idle", 4, Direction.Down);
-        Assert.Equal("idle-equip-down", idle[0]);
+        Assert.Equal("idle-1hand-down", idle[0]);
 
         var atk = AnimationNames.Candidates("attack", 4, Direction.Down);
         Assert.Equal("attack-1hand-down", atk[0]);
@@ -86,6 +89,38 @@ public class AnimationNamesTests
         // Missing cast clip → ResolveClip blanks the slot (Unity Blank), not idle.
         Assert.Equal(new[] { "cast-down" }, AnimationNames.Candidates("cast", 4, Direction.Down));
         Assert.Equal(new[] { "cast-left" }, AnimationNames.Candidates("cast", 3, Direction.Left));
+    }
+
+    [Fact]
+    public void Candidates_idle_walk_state_specific_lists_prefer_state_clip_then_equip_generic_no_equip()
+    {
+        // Old body resources lack idle-1hand / idle-staff clips, so the trailing order must
+        // still resolve them to idle-equip exactly as before the state-specific prefix.
+        var idle4 = AnimationNames.Candidates("idle", 4, Direction.Down);
+        Assert.Equal(new[] { "idle-1hand-down", "idle-equip-down", "idle-down", "idle-no-equip-down" }, idle4);
+
+        var walk5 = AnimationNames.Candidates("walk", 5, Direction.Left);
+        Assert.Equal(new[] { "walk-staff-left", "walk-equip-left", "walk-left", "walk-no-equip-left" }, walk5);
+    }
+
+    [Fact]
+    public void Candidates_idle_walk_generic_equipped_states_keep_current_ordering()
+    {
+        Assert.Equal(new[] { "idle-equip-down", "idle-down", "idle-no-equip-down" },
+            AnimationNames.Candidates("idle", 6, Direction.Down));
+        Assert.Equal(new[] { "idle-equip-down", "idle-down", "idle-no-equip-down" },
+            AnimationNames.Candidates("idle", 7, Direction.Down));
+        Assert.Equal(new[] { "walk-equip-right", "walk-right", "walk-no-equip-right" },
+            AnimationNames.Candidates("walk", 6, Direction.Right));
+    }
+
+    [Fact]
+    public void Candidates_idle_walk_unarmed_keeps_current_ordering()
+    {
+        Assert.Equal(new[] { "idle-no-equip-down", "idle-down", "idle-equip-down" },
+            AnimationNames.Candidates("idle", 3, Direction.Down));
+        Assert.Equal(new[] { "walk-no-equip-left", "walk-left", "walk-equip-left" },
+            AnimationNames.Candidates("walk", 3, Direction.Left));
     }
 
     [Fact]
