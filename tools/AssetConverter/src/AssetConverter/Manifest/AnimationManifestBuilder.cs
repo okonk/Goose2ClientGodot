@@ -9,6 +9,9 @@ public static class AnimationManifestBuilder
 {
     private const int ManifestVersion = 1;
     private const int Fps = 8;
+    private const int EmoteIdMax = 999;
+    private const int SpellIdMin = 115000;
+    private const int SpellIdMax = 115999;
     private const string BodyCategory = "Body";
     private const string SpellsCategory = "Spells";
     private const string TilesCategory = "Tiles";
@@ -208,7 +211,7 @@ public static class AnimationManifestBuilder
             }
             var frames = ResolveFrames(anim, frameSheet);
             if (frames is null) return;
-            int id = AsperetaEffectsConverter.IsEffectId(sourceAnimId)
+            int id = IsEffectId(sourceAnimId)
                 ? AsperetaSheets.GraphicBase + sourceAnimId
                 : sourceAnimId;
             resolved[sourceAnimId] = (id, frames);
@@ -241,7 +244,7 @@ public static class AnimationManifestBuilder
         var spellSheets = new HashSet<int>();
         foreach (var (animId, _) in animDefs)
         {
-            if (!AsperetaEffectsConverter.IsEffectId(animId)) continue;
+            if (!IsEffectId(animId)) continue;
             TryImport(animId);
             if (resolved.TryGetValue(animId, out var r))
                 foreach (var (sheet, _) in r.Frames)
@@ -283,6 +286,10 @@ public static class AnimationManifestBuilder
 
         return (sheetEntries, animations, categories);
     }
+
+    // The manifest still uses the legacy emote/spell ranges; catalog-driven manifest membership lands separately.
+    private static bool IsEffectId(int animId) =>
+        animId <= EmoteIdMax || (animId >= SpellIdMin && animId <= SpellIdMax);
 
     private static List<(int Sheet, int Frame)>? ResolveFrames(Animation anim, Dictionary<int, int> frameSheet)
     {
