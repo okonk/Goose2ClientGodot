@@ -37,6 +37,19 @@ public partial class GameHud : Control
         return n;
     }
 
+    /// <summary>
+    /// Restores the movable display windows (Vitals/Party/Buffs — plain Controls, not
+    /// BaseWindow) to their default positions. Called after ResetWindowSettings has cleared
+    /// their saved entries, so Relayout's reposition finds nothing and falls back to the
+    /// design offsets; visibility is left untouched.
+    /// </summary>
+    public void ResetMovableWindowPositions()
+    {
+        Vitals.Relayout();
+        Party.Relayout();
+        Buffs.Relayout();
+    }
+
     public override void _Ready()
     {
         // 1. Fill the screen; ignore mouse so child windows handle their own input.

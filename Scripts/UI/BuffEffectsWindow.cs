@@ -33,6 +33,8 @@ namespace Goose2Client.UI
                 _slots[i] = slot;
             }
 
+            HudWindowDrag.Attach(this, "Buffs");
+
             GameManager.Instance.PacketManager.Listen<BuffBarPacket>(OnBuffBar);
             _listenersRegistered = true;
 
@@ -46,6 +48,7 @@ namespace Goose2Client.UI
         public void Relayout()
         {
             UiScaleLayout.Apply(_geom, UiScaleApplier.Instance.Factor);
+            HudWindowDrag.RepositionFromSaved(this, "Buffs");
         }
 
         public override void _ExitTree()

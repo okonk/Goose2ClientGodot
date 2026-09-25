@@ -31,6 +31,8 @@ public partial class PartyWindow : Control, IScalableWindow
             _members[i] = member;
         }
 
+        HudWindowDrag.Attach(this, "Party");
+
         var pm = GameManager.Instance.PacketManager;
         pm.Listen<GroupUpdatePacket>(OnGroupUpdate);
         pm.Listen<VitalsPercentagePacket>(OnVitalsPercentage);
@@ -58,6 +60,7 @@ public partial class PartyWindow : Control, IScalableWindow
             tile.RelayoutEffects(applier.Factor);
         }
         UpdateSize();
+        HudWindowDrag.RepositionFromSaved(this, "Party");
     }
 
     private void UpdateSize()

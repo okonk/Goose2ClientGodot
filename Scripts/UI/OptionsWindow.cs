@@ -218,6 +218,7 @@ public partial class OptionsWindow : BaseWindow
         GameManager.Instance.CharacterSettings.ResetWindowSettings();
         foreach (var w in GameManager.Instance.HudWindows())
             w.ResetToDefault();
+        GameManager.Instance.Hud.ResetMovableWindowPositions();
     }
 
     public override void Relayout()

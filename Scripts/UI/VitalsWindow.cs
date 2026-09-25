@@ -88,6 +88,8 @@ namespace Goose2Client.UI
             _levelText.MouseEntered += () => TooltipManager.Instance.ShowTextTooltip(_levelTooltip, _levelText);
             _levelText.MouseExited += () => TooltipManager.Instance.HideTextTooltip();
 
+            HudWindowDrag.Attach(this, "Vitals");
+
             GameManager.Instance.PacketManager.Listen<StatusInfoPacket>(OnStatusInfo);
 
             var applier = UiScaleApplier.Instance;
@@ -101,6 +103,7 @@ namespace Goose2Client.UI
         {
             UiScaleLayout.Apply(_geom, UiScaleApplier.Instance.Factor);
             _portrait.Relayout();
+            HudWindowDrag.RepositionFromSaved(this, "Vitals");
         }
 
         public override void _Process(double delta)
