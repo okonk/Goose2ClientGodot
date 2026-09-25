@@ -24,8 +24,26 @@ public static class FrameManifestBuilder
     public static string BuildCombined(string illutiaDataDir, string asperetaDataDir)
     {
         var sheets = BuildIllutiaSheets(illutiaDataDir, null);
+        AddAsperetaSheets(sheets, AsperetaSheets.Load(asperetaDataDir));
+        AddCustomAssets(sheets);
+        var root = new { tileSize = 32, sheets };
+        return JsonSerializer.Serialize(root, new JsonSerializerOptions { WriteIndented = false });
+    }
 
-        foreach (var (_, sheet) in AsperetaSheets.Load(asperetaDataDir))
+    public static string BuildCombined(string illutiaDataDir, AsperetaAnimationCatalog aspereta)
+    {
+        var sheets = BuildIllutiaSheets(illutiaDataDir, null);
+        AddAsperetaSheets(sheets, aspereta.Sheets);
+        AddCustomAssets(sheets);
+        var root = new { tileSize = 32, sheets };
+        return JsonSerializer.Serialize(root, new JsonSerializerOptions { WriteIndented = false });
+    }
+
+    private static void AddAsperetaSheets(
+        SortedDictionary<string, Dictionary<string, int[]>> sheets,
+        IReadOnlyDictionary<int, AsperetaSheet> aspereta)
+    {
+        foreach (var (_, sheet) in aspereta)
         {
             var frames = new Dictionary<string, int[]>(sheet.Adf.Frames.Count);
             foreach (var f in sheet.Adf.Frames)
@@ -33,10 +51,6 @@ public static class FrameManifestBuilder
                     new[] { f.X, f.Y, f.W, f.H };
             sheets[sheet.NewSheetNumber.ToString()] = frames;
         }
-
-        AddCustomAssets(sheets);
-        var root = new { tileSize = 32, sheets };
-        return JsonSerializer.Serialize(root, new JsonSerializerOptions { WriteIndented = false });
     }
 
     private static void AddCustomAssets(SortedDictionary<string, Dictionary<string, int[]>> sheets)

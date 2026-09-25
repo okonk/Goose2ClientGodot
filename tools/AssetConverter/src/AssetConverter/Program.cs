@@ -222,10 +222,9 @@ if (args.Length >= 1 && args[0] == "all")
 
     // Combined frame + animation manifests
     ManifestFileStore.WriteCombined(repoRoot,
-        () => FrameManifestBuilder.BuildCombined(Paths.IllutiaData, Paths.AsperetaData),
+        () => FrameManifestBuilder.BuildCombined(Paths.IllutiaData, aspCatalog),
         () => AnimationManifestBuilder.BuildCombined(
-            Paths.IllutiaData, Paths.CompiledEnc, Paths.AsperetaData, Paths.AsperetaCompiledEnc,
-            Paths.ItemTileSheets));
+            Paths.IllutiaData, Paths.CompiledEnc, aspCatalog, Paths.ItemTileSheets));
 
     Console.WriteLine($"Sheets: {sheets.Succeeded} ok, {sheets.Failed} failed");
     Console.WriteLine($"Animations: {animations.ResourcesWritten} character, {animations.EffectsWritten} effects, {animations.Failed} failed");
@@ -251,8 +250,8 @@ if (args.Length >= 2 && args[0] == "aspereta-body")
         ? Path.GetFullPath(args[2])
         : Path.GetFullPath(Path.Combine("..", ".."));
 
-    var aspBuild = AsperetaAnimationResourceBuilder.Build(
-        AsperetaAnimationCatalog.Load(Paths.AsperetaData, Paths.AsperetaCompiledEnc));
+    var aspCatalog = AsperetaAnimationCatalog.Load(Paths.AsperetaData, Paths.AsperetaCompiledEnc);
+    var aspBuild = AsperetaAnimationResourceBuilder.Build(aspCatalog);
 
     int outputBodyId = AsperetaSheets.BodyBase + bodyId;
     var target = aspBuild.Resources.FirstOrDefault(r => r.Id == outputBodyId && r.Animations.Count > 0);
@@ -309,8 +308,7 @@ if (args.Length >= 2 && args[0] == "aspereta-body")
             AppearanceManifestBuilder.Build(appearance)),
         (Path.Combine(repoRoot, "Assets", "Sprites", ManifestFileStore.AnimationFileName),
             AnimationManifestBuilder.BuildCombined(
-                Paths.IllutiaData, Paths.CompiledEnc, Paths.AsperetaData, Paths.AsperetaCompiledEnc,
-                Paths.ItemTileSheets)),
+                Paths.IllutiaData, Paths.CompiledEnc, aspCatalog, Paths.ItemTileSheets)),
     };
 
     int written = 0;

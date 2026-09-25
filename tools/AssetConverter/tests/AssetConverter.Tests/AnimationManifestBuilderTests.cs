@@ -1,6 +1,7 @@
 using System.Text.Json;
 using AssetConverter.Tests.Fixtures;
 using Goose2.AssetConverter.Adf;
+using Goose2.AssetConverter.Aspereta;
 using Goose2.AssetConverter.Manifest;
 
 namespace AssetConverter.Tests;
@@ -473,6 +474,18 @@ public class AnimationManifestBuilderTests
             .Select(c => c.GetProperty("name").GetString()).ToArray();
     }
 
+    private static (string Name, int? Id)[] CategoryPairs(JsonElement sheets, int sheet)
+    {
+        var categories = sheets.GetProperty(sheet.ToString()).GetProperty("categories");
+        var pairs = new List<(string Name, int? Id)>(categories.GetArrayLength());
+        foreach (var category in categories.EnumerateArray())
+        {
+            int? id = category.TryGetProperty("id", out var idElement) ? idElement.GetInt32() : null;
+            pairs.Add((category.GetProperty("name").GetString()!, id));
+        }
+        return pairs.ToArray();
+    }
+
     private static void WriteSheet(string root, int sheet) =>
         AnimationSourceFixture.WriteAdf(AnimationSourceFixture.DataDir(root), sheet, 3205, 4,
             (3205, new[] { 3205 }));
@@ -809,6 +822,360 @@ public class AnimationManifestBuilderTests
         finally
         {
             Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void BuildCombined_CategoriesCoverEveryCompiledTypeResourceAndState()
+    {
+        var root = AnimationSourceFixture.CreateDirectory();
+        try
+        {
+            WriteIllutia(root);
+            AnimationSourceFixture.WriteCompiledEnc(AnimationSourceFixture.CompiledEncPath(root),
+                (AnimationType.Body, 1, new[] { 115 }));
+
+            var aspData = AnimationSourceFixture.AsperetaDataDir(root);
+            AnimationSourceFixture.WriteAsperetaAdf(aspData, 0,
+                Array.Empty<(int, int, int, int, int)>(),
+                new[] { (100, new[] { 1000, 1001 }), (200, new[] { 2000, 2001 }), (300, new[] { 3000, 3001 }) });
+            AnimationSourceFixture.WriteAsperetaAdf(aspData, 1,
+                new[] { (1000, 0, 0, 24, 48), (1001, 24, 0, 24, 48) }, Array.Empty<(int, int[])>());
+            AnimationSourceFixture.WriteAsperetaAdf(aspData, 2,
+                new[] { (2000, 0, 0, 24, 48), (2001, 24, 0, 24, 48) }, Array.Empty<(int, int[])>());
+            AnimationSourceFixture.WriteAsperetaAdf(aspData, 3,
+                new[] { (3000, 0, 0, 24, 48), (3001, 24, 0, 24, 48) }, Array.Empty<(int, int[])>());
+
+            var body = new int[32];
+            body[0] = 100;
+            body[2] = 200;
+            body[18] = 300;
+            var hair = new int[32];
+            hair[1] = 100;
+            AnimationSourceFixture.WriteAsperetaCompiledEnc(AnimationSourceFixture.AsperetaCompiledEncPath(root),
+                (AnimationType.Body, 200, body),
+                (AnimationType.Hair, 300, hair));
+
+            using var doc = JsonDocument.Parse(BuildCombined(root));
+            var sheets = doc.RootElement.GetProperty("sheets");
+            Assert.Equal(new (string, int?)[] { ("Body", 10200), ("Hair", 10300) }, CategoryPairs(sheets, 20000));
+            Assert.Equal(new (string, int?)[] { ("Body", 10200) }, CategoryPairs(sheets, 20001));
+            Assert.Equal(new (string, int?)[] { ("Body", 10200) }, CategoryPairs(sheets, 20002));
+
+            var animations = doc.RootElement.GetProperty("animations").EnumerateArray()
+                .Select(a => a.GetProperty("id").GetInt32()).ToArray();
+            Assert.Contains(100, animations);
+            Assert.Contains(200, animations);
+            Assert.Contains(300, animations);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void BuildCombined_UsesDefinitionIntervalFpsAndEightForDirectFramesAndIllutia()
+    {
+        var root = AnimationSourceFixture.CreateDirectory();
+        try
+        {
+            WriteIllutia(root);
+            AnimationSourceFixture.WriteCompiledEnc(AnimationSourceFixture.CompiledEncPath(root),
+                (AnimationType.Body, 1, new[] { 115 }));
+
+            var aspData = AnimationSourceFixture.AsperetaDataDir(root);
+            AnimationSourceFixture.WriteAsperetaAdf(aspData, 0,
+                Array.Empty<(int, int, int, int, int)>(),
+                new[]
+                {
+                    (10, new[] { 1000, 1001 }, 3),
+                    (20, new[] { 1000, 1001 }, 5),
+                    (30, new[] { 1000, 1001 }, 0),
+                    (40, new[] { 1000, 1001 }, 10),
+                });
+            AnimationSourceFixture.WriteAsperetaAdf(aspData, 1,
+                new[] { (1000, 0, 0, 24, 48), (1001, 24, 0, 24, 48) }, Array.Empty<(int, int[])>());
+            AnimationSourceFixture.WriteAsperetaAdf(aspData, 2,
+                new[] { (4000, 0, 0, 24, 48) }, Array.Empty<(int, int[])>());
+
+            var indexes = new int[32];
+            indexes[0] = 4000;
+            AnimationSourceFixture.WriteAsperetaCompiledEnc(AnimationSourceFixture.AsperetaCompiledEncPath(root),
+                (AnimationType.Body, 200, indexes));
+
+            using var doc = JsonDocument.Parse(BuildCombined(root));
+            var animations = doc.RootElement.GetProperty("animations");
+            Assert.Equal(6, FindAnimation(animations, 700010).GetProperty("fps").GetInt32());
+            Assert.Equal(10, FindAnimation(animations, 700020).GetProperty("fps").GetInt32());
+            Assert.Equal(8, FindAnimation(animations, 700030).GetProperty("fps").GetInt32());
+            Assert.Equal(20, FindAnimation(animations, 700040).GetProperty("fps").GetInt32());
+            Assert.Equal(8, FindAnimation(animations, 4000).GetProperty("fps").GetInt32());
+            Assert.Equal(8, FindAnimation(animations, 3205).GetProperty("fps").GetInt32());
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void BuildCombined_EmitsEveryUnclaimedDefinition_IncludingFormerOutOfRangeIds()
+    {
+        var root = AnimationSourceFixture.CreateDirectory();
+        try
+        {
+            WriteIllutia(root);
+            AnimationSourceFixture.WriteCompiledEnc(AnimationSourceFixture.CompiledEncPath(root),
+                (AnimationType.Body, 1, new[] { 115 }));
+
+            var aspData = AnimationSourceFixture.AsperetaDataDir(root);
+            AnimationSourceFixture.WriteAsperetaAdf(aspData, 0,
+                Array.Empty<(int, int, int, int, int)>(),
+                new[]
+                {
+                    (500, new[] { 1000, 1001 }),
+                    (55228, new[] { 1001, 1002 }),
+                    (95170, new[] { 1002, 1003 }),
+                    (115500, new[] { 1003, 1004 }),
+                });
+            AnimationSourceFixture.WriteAsperetaAdf(aspData, 1,
+                new[]
+                {
+                    (1000, 0, 0, 24, 48), (1001, 24, 0, 24, 48),
+                    (1002, 48, 0, 24, 48), (1003, 72, 0, 24, 48), (1004, 96, 0, 24, 48),
+                }, Array.Empty<(int, int[])>());
+            AnimationSourceFixture.WriteAsperetaCompiledEnc(AnimationSourceFixture.AsperetaCompiledEncPath(root));
+
+            using var doc = JsonDocument.Parse(BuildCombined(root));
+            var animations = doc.RootElement.GetProperty("animations").EnumerateArray()
+                .Select(a => a.GetProperty("id").GetInt32()).ToArray();
+            Assert.Contains(700500, animations);
+            Assert.Contains(755228, animations);
+            Assert.Contains(795170, animations);
+            Assert.Contains(815500, animations);
+            Assert.Equal(new (string, int?)[] { ("Spells", null) },
+                CategoryPairs(doc.RootElement.GetProperty("sheets"), 20000));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void BuildCombined_ClaimedUnresolvedIds_DoNotReappearAsEffects()
+    {
+        var root = AnimationSourceFixture.CreateDirectory();
+        try
+        {
+            WriteIllutia(root);
+            AnimationSourceFixture.WriteCompiledEnc(AnimationSourceFixture.CompiledEncPath(root),
+                (AnimationType.Body, 1, new[] { 115 }));
+
+            var aspData = AnimationSourceFixture.AsperetaDataDir(root);
+            AnimationSourceFixture.WriteAsperetaAdf(aspData, 0,
+                Array.Empty<(int, int, int, int, int)>(),
+                new[] { (115500, new[] { 1000, 1001 }), (88888, new[] { 77777, 77778 }) });
+            AnimationSourceFixture.WriteAsperetaAdf(aspData, 1,
+                new[] { (1000, 0, 0, 24, 48), (1001, 24, 0, 24, 48) }, Array.Empty<(int, int[])>());
+
+            var body200 = new int[32];
+            body200[0] = 99999;
+            body200[1] = 115500;
+            var body201 = new int[32];
+            body201[0] = 88888;
+            AnimationSourceFixture.WriteAsperetaCompiledEnc(AnimationSourceFixture.AsperetaCompiledEncPath(root),
+                (AnimationType.Body, 200, body200),
+                (AnimationType.Body, 201, body201));
+
+            using var doc = JsonDocument.Parse(BuildCombined(root));
+            var animations = doc.RootElement.GetProperty("animations").EnumerateArray()
+                .Select(a => a.GetProperty("id").GetInt32()).ToArray();
+            Assert.Contains(115500, animations);
+            Assert.DoesNotContain(7115500, animations);
+            Assert.DoesNotContain(99999, animations);
+            Assert.DoesNotContain(799999, animations);
+            Assert.DoesNotContain(88888, animations);
+            Assert.DoesNotContain(788888, animations);
+            Assert.Equal(new (string, int?)[] { ("Body", 10200) },
+                CategoryPairs(doc.RootElement.GetProperty("sheets"), 20000));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void BuildCombined_SharedSourceReference_EmitsOneRecordWithAllOwningCategories()
+    {
+        var root = AnimationSourceFixture.CreateDirectory();
+        try
+        {
+            WriteIllutia(root);
+            AnimationSourceFixture.WriteCompiledEnc(AnimationSourceFixture.CompiledEncPath(root),
+                (AnimationType.Body, 1, new[] { 115 }));
+
+            var aspData = AnimationSourceFixture.AsperetaDataDir(root);
+            AnimationSourceFixture.WriteAsperetaAdf(aspData, 0,
+                Array.Empty<(int, int, int, int, int)>(),
+                new[] { (3000, new[] { 1000, 1001 }) });
+            AnimationSourceFixture.WriteAsperetaAdf(aspData, 1,
+                new[] { (1000, 0, 0, 24, 48), (1001, 24, 0, 24, 48) }, Array.Empty<(int, int[])>());
+
+            var body200 = new int[32];
+            body200[0] = 3000;
+            var body201 = new int[32];
+            body201[16] = 3000;
+            AnimationSourceFixture.WriteAsperetaCompiledEnc(AnimationSourceFixture.AsperetaCompiledEncPath(root),
+                (AnimationType.Body, 200, body200),
+                (AnimationType.Body, 201, body201));
+
+            using var doc = JsonDocument.Parse(BuildCombined(root));
+            var matches = doc.RootElement.GetProperty("animations").EnumerateArray()
+                .Count(a => a.GetProperty("id").GetInt32() == 3000);
+            Assert.Equal(1, matches);
+            Assert.Equal(20000, FindAnimation(doc.RootElement.GetProperty("animations"), 3000).GetProperty("ownerSheet").GetInt32());
+            Assert.Equal(new (string, int?)[] { ("Body", 10200), ("Body", 10201) },
+                CategoryPairs(doc.RootElement.GetProperty("sheets"), 20000));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void BuildCombined_ClaimedOnlySheet_HasNoSpells_UntouchedSheetIsTiles()
+    {
+        var root = AnimationSourceFixture.CreateDirectory();
+        try
+        {
+            WriteIllutia(root);
+            AnimationSourceFixture.WriteCompiledEnc(AnimationSourceFixture.CompiledEncPath(root),
+                (AnimationType.Body, 1, new[] { 115 }));
+
+            var aspData = AnimationSourceFixture.AsperetaDataDir(root);
+            AnimationSourceFixture.WriteAsperetaAdf(aspData, 0,
+                Array.Empty<(int, int, int, int, int)>(),
+                new[] { (3000, new[] { 1000, 1001 }) });
+            AnimationSourceFixture.WriteAsperetaAdf(aspData, 1,
+                new[] { (1000, 0, 0, 24, 48), (1001, 24, 0, 24, 48) }, Array.Empty<(int, int[])>());
+            AnimationSourceFixture.WriteAsperetaAdf(aspData, 2,
+                new[] { (9000, 0, 0, 24, 48) }, Array.Empty<(int, int[])>());
+
+            var indexes = new int[32];
+            indexes[0] = 3000;
+            AnimationSourceFixture.WriteAsperetaCompiledEnc(AnimationSourceFixture.AsperetaCompiledEncPath(root),
+                (AnimationType.Body, 200, indexes));
+
+            using var doc = JsonDocument.Parse(BuildCombined(root));
+            var sheets = doc.RootElement.GetProperty("sheets");
+            Assert.Equal(new (string, int?)[] { ("Body", 10200) }, CategoryPairs(sheets, 20000));
+            Assert.Equal(new (string, int?)[] { ("Tiles", null) }, CategoryPairs(sheets, 20001));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void BuildCombined_CatalogOverload_MatchesStringOverload_AndDoesNotMutateCatalog()
+    {
+        var root = AnimationSourceFixture.CreateDirectory();
+        try
+        {
+            WriteIllutia(root);
+            AnimationSourceFixture.WriteCompiledEnc(AnimationSourceFixture.CompiledEncPath(root),
+                (AnimationType.Body, 1, new[] { 115 }));
+
+            var aspData = AnimationSourceFixture.AsperetaDataDir(root);
+            AnimationSourceFixture.WriteAsperetaAdf(aspData, 0,
+                Array.Empty<(int, int, int, int, int)>(),
+                new[] { (500, new[] { 1000, 1001 }) });
+            AnimationSourceFixture.WriteAsperetaAdf(aspData, 1,
+                new[] { (1000, 0, 0, 24, 48), (1001, 24, 0, 24, 48) }, Array.Empty<(int, int[])>());
+
+            var indexes = new int[32];
+            indexes[0] = 500;
+            AnimationSourceFixture.WriteAsperetaCompiledEnc(AnimationSourceFixture.AsperetaCompiledEncPath(root),
+                (AnimationType.Body, 200, indexes));
+
+            var catalog = AsperetaAnimationCatalog.Load(
+                AnimationSourceFixture.AsperetaDataDir(root),
+                AnimationSourceFixture.AsperetaCompiledEncPath(root));
+            var resolvedBefore = catalog.Resolved.ToDictionary(r => r.Key, r => r.Value.Fps);
+            var unclaimedBefore = catalog.UnclaimedResolvedIds.ToArray();
+            var diagnosticsBefore = catalog.Diagnostics.ToArray();
+
+            var viaCatalog = AnimationManifestBuilder.BuildCombined(
+                AnimationSourceFixture.DataDir(root),
+                AnimationSourceFixture.CompiledEncPath(root),
+                catalog,
+                WriteItemTileSheets(root, null));
+            var againViaCatalog = AnimationManifestBuilder.BuildCombined(
+                AnimationSourceFixture.DataDir(root),
+                AnimationSourceFixture.CompiledEncPath(root),
+                catalog,
+                WriteItemTileSheets(root, null));
+
+            Assert.Equal(BuildCombined(root), viaCatalog);
+            Assert.Equal(viaCatalog, againViaCatalog);
+            Assert.Equal(resolvedBefore, catalog.Resolved.ToDictionary(r => r.Key, r => r.Value.Fps));
+            Assert.Equal(unclaimedBefore, catalog.UnclaimedResolvedIds.ToArray());
+            Assert.Equal(diagnosticsBefore, catalog.Diagnostics.ToArray());
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void BuildCombined_ReversedAsperetaFileOrder_ProducesByteIdenticalJson()
+    {
+        var rootA = AnimationSourceFixture.CreateDirectory();
+        var rootB = AnimationSourceFixture.CreateDirectory();
+        try
+        {
+            foreach (var root in new[] { rootA, rootB })
+            {
+                WriteIllutia(root);
+                AnimationSourceFixture.WriteCompiledEnc(AnimationSourceFixture.CompiledEncPath(root),
+                    (AnimationType.Body, 1, new[] { 115 }));
+            }
+
+            var filesA = new (int Number, (int Index, int X, int Y, int W, int H)[] Frames, (int Id, int[] FrameIds)[] Anims)[]
+            {
+                (0, Array.Empty<(int, int, int, int, int)>(), new[] { (500, new[] { 1000, 2000 }) }),
+                (1, new[] { (1000, 0, 0, 24, 48) }, Array.Empty<(int, int[])>()),
+                (2, new[] { (2000, 0, 0, 24, 48) }, Array.Empty<(int, int[])>()),
+            };
+            var aspDataA = AnimationSourceFixture.AsperetaDataDir(rootA);
+            var aspDataB = AnimationSourceFixture.AsperetaDataDir(rootB);
+            foreach (var (number, frames, anims) in filesA)
+                AnimationSourceFixture.WriteAsperetaAdf(aspDataA, number, frames, anims);
+            foreach (var (number, frames, anims) in filesA.Reverse())
+                AnimationSourceFixture.WriteAsperetaAdf(aspDataB, number, frames, anims);
+            AnimationSourceFixture.WriteAsperetaCompiledEnc(AnimationSourceFixture.AsperetaCompiledEncPath(rootA));
+            AnimationSourceFixture.WriteAsperetaCompiledEnc(AnimationSourceFixture.AsperetaCompiledEncPath(rootB));
+
+            Assert.Equal(BuildCombined(rootA), BuildCombined(rootB));
+
+            using var doc = JsonDocument.Parse(BuildCombined(rootA));
+            var animation = FindAnimation(doc.RootElement.GetProperty("animations"), 700500);
+            var frameArray = animation.GetProperty("frames");
+            Assert.Equal(20000, frameArray[0][0].GetInt32());
+            Assert.Equal(701000, frameArray[0][1].GetInt32());
+            Assert.Equal(20001, frameArray[1][0].GetInt32());
+            Assert.Equal(702000, frameArray[1][1].GetInt32());
+        }
+        finally
+        {
+            Directory.Delete(rootA, recursive: true);
+            Directory.Delete(rootB, recursive: true);
         }
     }
 }

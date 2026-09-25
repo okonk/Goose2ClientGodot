@@ -9,10 +9,6 @@ public static class AnimationManifestBuilder
 {
     private const int ManifestVersion = 1;
     private const int Fps = 8;
-    private const int EmoteIdMax = 999;
-    private const int SpellIdMin = 115000;
-    private const int SpellIdMax = 115999;
-    private const string BodyCategory = "Body";
     private const string SpellsCategory = "Spells";
     private const string TilesCategory = "Tiles";
     private const string ItemTilesCategory = "ItemTiles";
@@ -41,12 +37,22 @@ public static class AnimationManifestBuilder
         string asperetaDataDir,
         string asperetaCompiledEncPath,
         string itemTileSheetsPath)
+        => BuildCombined(
+            illutiaDataDir, illutiaCompiledEncPath,
+            AsperetaAnimationCatalog.Load(asperetaDataDir, asperetaCompiledEncPath),
+            itemTileSheetsPath);
+
+    public static string BuildCombined(
+        string illutiaDataDir,
+        string illutiaCompiledEncPath,
+        AsperetaAnimationCatalog aspereta,
+        string itemTileSheetsPath)
     {
         var itemSheets = LoadItemTileSheets(itemTileSheetsPath);
         var illutiaCategories = CollectSheetCategories(new CompiledEnc(illutiaCompiledEncPath));
         var (illutiaSheets, illutiaAnimations, illutiaAnimated) = CollectSheets(illutiaDataDir);
         var (asperetaSheets, asperetaAnimations, asperetaCategories) =
-            LoadAspereta(asperetaDataDir, asperetaCompiledEncPath);
+            CollectAspereta(aspereta);
 
         var sheets = new SortedDictionary<int, AnimationManifestSheet>(illutiaSheets);
         foreach (var (number, sheet) in asperetaSheets)
@@ -174,141 +180,59 @@ public static class AnimationManifestBuilder
     private static (SortedDictionary<int, AnimationManifestSheet> Sheets,
         List<AnimationManifestAnimation> Animations,
         Dictionary<int, List<(string Name, int? Id)>> Categories)
-        LoadAspereta(string asperetaDataDir, string asperetaCompiledEncPath)
+        CollectAspereta(AsperetaAnimationCatalog catalog)
     {
-        var aspereta = AsperetaSheets.Load(asperetaDataDir);
-
-        var frameSheet = new Dictionary<int, int>();
-        foreach (var (_, sheet) in aspereta)
-            foreach (var frame in sheet.Adf.Frames)
-            {
-                if (frameSheet.TryGetValue(frame.Index, out var existing) && existing != sheet.NewSheetNumber)
-                    throw new InvalidOperationException(
-                        $"ambiguous Aspereta source frame {frame.Index} on sheets {existing} and {sheet.NewSheetNumber}");
-                frameSheet[frame.Index] = sheet.NewSheetNumber;
-            }
-
-        var animDefs = new Dictionary<int, Animation>();
-        foreach (var path in NumericAdfPaths(asperetaDataDir))
-        {
-            AdfFile adf;
-            try { adf = AsperetaAdf.Load(path); }
-            catch { continue; }
-            if (adf.Type != AdfType.Graphic || adf.Animations is null) continue;
-            foreach (var (animId, anim) in adf.Animations)
-                animDefs[animId] = anim;
-        }
-
-        var resolved = new Dictionary<int, (int Id, List<(int Sheet, int Frame)> Frames)>();
-        void TryImport(int sourceAnimId)
-        {
-            if (resolved.ContainsKey(sourceAnimId)) return;
-            if (!animDefs.TryGetValue(sourceAnimId, out var anim))
-            {
-                if (frameSheet.TryGetValue(sourceAnimId, out var sheet))
-                    resolved[sourceAnimId] = (sourceAnimId, new List<(int, int)> { (sheet, sourceAnimId) });
-                return;
-            }
-            var frames = ResolveFrames(anim, frameSheet);
-            if (frames is null) return;
-            int id = IsEffectId(sourceAnimId)
-                ? AsperetaSheets.GraphicBase + sourceAnimId
-                : sourceAnimId;
-            resolved[sourceAnimId] = (id, frames);
-        }
-
-        var bodySheets = new Dictionary<int, HashSet<int>>();
-        foreach (var entry in AsperetaCompiledEnc.Load(asperetaCompiledEncPath))
-        {
-            if (entry.Type != AnimationType.Body || entry.Id < 100) continue;
-            var reached = new HashSet<int>();
-            for (int facing = 0; facing < 4; facing++)
-            {
-                foreach (var slot in new[] { entry.Walk(facing), entry.Attack(facing) })
-                {
-                    if (slot == 0) continue;
-                    TryImport(slot);
-                    if (resolved.TryGetValue(slot, out var r))
-                        foreach (var (sheet, _) in r.Frames)
-                            reached.Add(sheet);
-                }
-            }
-            foreach (var sheet in reached)
-            {
-                if (!bodySheets.TryGetValue(sheet, out var bodies))
-                    bodySheets[sheet] = bodies = new HashSet<int>();
-                bodies.Add(entry.Id);
-            }
-        }
-
-        var spellSheets = new HashSet<int>();
-        foreach (var (animId, _) in animDefs)
-        {
-            if (!IsEffectId(animId)) continue;
-            TryImport(animId);
-            if (resolved.TryGetValue(animId, out var r))
-                foreach (var (sheet, _) in r.Frames)
-                    spellSheets.Add(sheet);
-        }
-
         var animations = new List<AnimationManifestAnimation>();
-        foreach (var (_, r) in resolved)
+        var typeCategories = new Dictionary<int, HashSet<(string Name, int? Id)>>();
+        var unclaimedSheets = new HashSet<int>();
+
+        foreach (var (sourceId, resolution) in catalog.Resolved)
         {
-            var frames = new List<int[]>(r.Frames.Count);
-            foreach (var (sheet, frame) in r.Frames)
-                frames.Add(new[] { sheet, AsperetaSheets.GraphicBase + frame });
+            bool claimed = catalog.ClaimedIds.Contains(sourceId);
+            var frames = new List<int[]>(resolution.Frames.Count);
+            foreach (var frame in resolution.Frames)
+                frames.Add(new[] { frame.Sheet, AsperetaSheets.GraphicBase + frame.Frame.Index });
             animations.Add(new AnimationManifestAnimation
             {
-                OwnerSheet = r.Frames[0].Sheet,
-                Id = r.Id,
-                Fps = Fps,
+                OwnerSheet = frames[0][0],
+                Id = claimed ? sourceId : AsperetaSheets.GraphicBase + sourceId,
+                Fps = resolution.Fps,
                 Frames = frames,
             });
+            if (!claimed)
+                foreach (var frame in resolution.Frames)
+                    unclaimedSheets.Add(frame.Sheet);
+        }
+
+        foreach (var slot in catalog.CompiledSlots)
+        {
+            if (slot.Resolution is null) continue;
+            foreach (var frame in slot.Resolution.Frames)
+            {
+                if (!typeCategories.TryGetValue(frame.Sheet, out var set))
+                    typeCategories[frame.Sheet] = set = new HashSet<(string, int?)>();
+                set.Add((slot.Type.ToString(), AsperetaSheets.BodyBase + slot.ResourceId));
+            }
         }
 
         var categories = new Dictionary<int, List<(string Name, int? Id)>>();
         var sheetEntries = new SortedDictionary<int, AnimationManifestSheet>();
-        foreach (var (_, sheet) in aspereta)
+        foreach (var (_, sheet) in catalog.Sheets)
         {
             int number = sheet.NewSheetNumber;
             sheetEntries[number] = new AnimationManifestSheet();
 
             var list = new List<(string Name, int? Id)>();
-            if (bodySheets.TryGetValue(number, out var bodies))
-                foreach (var body in bodies)
-                    list.Add((BodyCategory, AsperetaSheets.BodyBase + body));
-            bool hasBody = list.Count > 0;
-            bool hasSpell = spellSheets.Contains(number);
-            if (hasSpell) list.Add((SpellsCategory, null));
-            if (!hasBody && !hasSpell) list.Add((TilesCategory, null));
+            if (typeCategories.TryGetValue(number, out var set))
+                list.AddRange(set);
+            if (unclaimedSheets.Contains(number))
+                list.Add((SpellsCategory, null));
+            if (list.Count == 0)
+                list.Add((TilesCategory, null));
             categories[number] = list;
         }
 
         return (sheetEntries, animations, categories);
-    }
-
-    // The manifest still uses the legacy emote/spell ranges; catalog-driven manifest membership lands separately.
-    private static bool IsEffectId(int animId) =>
-        animId <= EmoteIdMax || (animId >= SpellIdMin && animId <= SpellIdMax);
-
-    private static List<(int Sheet, int Frame)>? ResolveFrames(Animation anim, Dictionary<int, int> frameSheet)
-    {
-        IReadOnlyList<int> fids;
-        if (anim.SourceFrameIds is { Count: > 0 })
-            fids = anim.SourceFrameIds;
-        else if (anim.Frames.Count > 0)
-            fids = anim.Frames.Select(f => f.Index).ToList();
-        else
-            return null;
-
-        var result = new List<(int, int)>(fids.Count);
-        foreach (var fid in fids)
-        {
-            if (!frameSheet.TryGetValue(fid, out var sheet))
-                return null;
-            result.Add((sheet, fid));
-        }
-        return result;
     }
 
     private static List<string> NumericAdfPaths(string dataDir)
