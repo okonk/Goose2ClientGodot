@@ -82,6 +82,13 @@ public static class AnimationSourceFixture
         string dataDir, int fileNumber,
         (int Index, int X, int Y, int W, int H)[] frames,
         (int Id, int[] FrameIds)[] animations)
+        => WriteAsperetaAdf(dataDir, fileNumber, frames,
+            animations.Select(a => (a.Id, a.FrameIds, 0)).ToArray());
+
+    public static void WriteAsperetaAdf(
+        string dataDir, int fileNumber,
+        (int Index, int X, int Y, int W, int H)[] frames,
+        (int Id, int[] FrameIds, int Interval)[] animations)
     {
         Directory.CreateDirectory(dataDir);
         using var writer = new BinaryWriter(File.Create(Path.Combine(dataDir, $"{fileNumber}.adf")));
@@ -98,13 +105,13 @@ public static class AnimationSourceFixture
             writer.Write(w);
             writer.Write(h);
         }
-        foreach (var (id, frameIds) in animations)
+        foreach (var (id, frameIds, interval) in animations)
         {
             writer.Write(id);
             writer.Write((byte)frameIds.Length);
             foreach (var frameId in frameIds)
                 writer.Write(frameId);
-            writer.Write((byte)0);
+            writer.Write((byte)interval);
         }
         writer.Write(0);
         writer.Write(new byte[] { 0, 0 });
@@ -130,15 +137,32 @@ public static class AnimationSourceFixture
 
     public static void WriteAsperetaCompiledEnc(
         string path, params (AnimationType Type, int Id, int[] Indexes)[] records)
+        => WriteAsperetaCompiledEncRaw(path, records.Select(r => (AsperetaRawType(r.Type), r.Id, r.Indexes)).ToArray());
+
+    public static void WriteAsperetaCompiledEncRaw(
+        string path, params (int RawType, int Id, int[] Indexes)[] records)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         using var writer = new BinaryWriter(File.Create(path));
-        foreach (var (type, id, indexes) in records)
+        foreach (var (rawType, id, indexes) in records)
         {
-            writer.Write((short)((int)type + 1));
+            writer.Write((short)rawType);
             writer.Write(id);
             for (int i = 0; i < 32; i++)
                 writer.Write(i < indexes.Length ? indexes[i] : 0);
         }
     }
+
+    // Aspereta has no Eyes slot: raw 1-7 are Body, Hair, Hand, Chest, Helm, Legs, Feet.
+    private static int AsperetaRawType(AnimationType type) => type switch
+    {
+        AnimationType.Body => 1,
+        AnimationType.Hair => 2,
+        AnimationType.Hand => 3,
+        AnimationType.Chest => 4,
+        AnimationType.Helm => 5,
+        AnimationType.Legs => 6,
+        AnimationType.Feet => 7,
+        _ => throw new ArgumentOutOfRangeException(nameof(type), type, "Not an Aspereta type"),
+    };
 }

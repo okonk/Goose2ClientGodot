@@ -125,6 +125,9 @@ public class Animation
     /// </summary>
     public List<int>? SourceFrameIds { get; set; }
 
+    // Encoded interval byte from the ADF record; null when the ADF carries no timing (Illutia).
+    public int? Interval { get; set; }
+
     public Animation(int id)
     {
         this.Id = id;

@@ -8,8 +8,17 @@ namespace Goose2.AssetConverter.Aspereta;
 /// </summary>
 public sealed record AsperetaCompiledAnimation(AnimationType Type, int Id, int[] Indexes)
 {
-    public int Walk(int facing) => Indexes[facing * 4];
-    public int Attack(int facing) => Indexes[16 + facing * 4];
+    public int Walk(int facing) => Walk(facing, 1);
+    public int Walk(int facing, int state) => Indexes[Slot(facing, state)];
+    public int Attack(int facing) => Attack(facing, 1);
+    public int Attack(int facing, int state) => Indexes[16 + Slot(facing, state)];
+
+    private static int Slot(int facing, int state)
+    {
+        if (facing is < 0 or > 3) throw new ArgumentOutOfRangeException(nameof(facing));
+        if (state is < 1 or > 4) throw new ArgumentOutOfRangeException(nameof(state));
+        return facing * 4 + state - 1;
+    }
 }
 
 /// <summary>Loads Aspereta's compact <c>compiled.enc</c> (type, id, 32 indexes per entry).</summary>
@@ -21,14 +30,24 @@ public static class AsperetaCompiledEnc
         using var reader = new BinaryReader(File.OpenRead(path));
         while (reader.BaseStream.Position < reader.BaseStream.Length)
         {
-            int rawType = reader.ReadInt16() - 1;
+            int rawType = reader.ReadInt16();
             int id = reader.ReadInt32();
             var indexes = new int[32];
             for (int i = 0; i < 32; i++)
                 indexes[i] = reader.ReadInt32();
 
-            // Aspereta lacks Eyes (Illutia slot 2); Body is the only type we rely on here.
-            AnimationType type = rawType == 0 ? AnimationType.Body : (AnimationType)rawType;
+            // Aspereta has no Eyes slot: raw 1-7 are Body, Hair, Hand, Chest, Helm, Legs, Feet.
+            AnimationType type = rawType switch
+            {
+                1 => AnimationType.Body,
+                2 => AnimationType.Hair,
+                3 => AnimationType.Hand,
+                4 => AnimationType.Chest,
+                5 => AnimationType.Helm,
+                6 => AnimationType.Legs,
+                7 => AnimationType.Feet,
+                _ => throw new InvalidDataException($"Unknown Aspereta compiled type {rawType}"),
+            };
             result.Add(new AsperetaCompiledAnimation(type, id, indexes));
         }
         return result;

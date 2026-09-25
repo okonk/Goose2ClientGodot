@@ -35,6 +35,7 @@ public static class AsperetaAdf
             int id = reader.ReadInt32() - offset;
             byte n = DecodeByte(reader.ReadByte(), offset);
 
+            // n == 1 marks a frame record; animation records always carry >= 2 frame ids.
             if (n == 1)
             {
                 int x = reader.ReadInt32() - offset;
@@ -48,7 +49,7 @@ public static class AsperetaAdf
                 var animation = new Animation(id);
                 var frameIds = new int[n];
                 for (int f = 0; f < n; f++) frameIds[f] = reader.ReadInt32() - offset;
-                DecodeByte(reader.ReadByte(), offset); // interval — unused, must still consume
+                animation.Interval = DecodeByte(reader.ReadByte(), offset);
                 animation.SourceFrameIds = frameIds.ToList();
                 pendingAnimations.Add((animation, frameIds));
                 result.Animations[id] = animation;

@@ -1,5 +1,6 @@
 using Goose2.AssetConverter;
 using Goose2.AssetConverter.Adf;
+using AssetConverter.Tests.Fixtures;
 using Xunit;
 
 namespace AssetConverter.Tests;
@@ -7,6 +8,41 @@ namespace AssetConverter.Tests;
 public class AsperetaAdfTests
 {
     private static string Adf(int n) => Path.Combine(Paths.AsperetaData, $"{n}.adf");
+
+    [Fact]
+    public void Animation_EncodedInterval_SurvivesParsing()
+    {
+        var root = AnimationSourceFixture.CreateDirectory();
+        var dataDir = AnimationSourceFixture.AsperetaDataDir(root);
+        AnimationSourceFixture.WriteAsperetaAdf(dataDir, 1,
+            new[] { (1200, 0, 0, 24, 48), (1201, 24, 0, 24, 48) },
+            new[] { (500, new[] { 1200, 1201 }, 3), (501, new[] { 1201, 1200 }, 5) });
+
+        var adf = AsperetaAdf.Load(Path.Combine(dataDir, "1.adf"));
+
+        Assert.Equal(3, adf.Animations[500].Interval);
+        Assert.Equal(5, adf.Animations[501].Interval);
+    }
+
+    [Fact]
+    public void Animation_DefaultFixtureInterval_IsZero()
+    {
+        var root = AnimationSourceFixture.CreateDirectory();
+        var dataDir = AnimationSourceFixture.AsperetaDataDir(root);
+        AnimationSourceFixture.WriteAsperetaAdf(dataDir, 1,
+            new[] { (1200, 0, 0, 24, 48), (1201, 24, 0, 24, 48) },
+            new[] { (500, new[] { 1200, 1201 }) });
+
+        var adf = AsperetaAdf.Load(Path.Combine(dataDir, "1.adf"));
+
+        Assert.Equal(0, adf.Animations[500].Interval);
+    }
+
+    [Fact]
+    public void IllutiaAnimation_HasNoSourceInterval()
+    {
+        Assert.Null(new Animation(1).Interval);
+    }
 
     [Fact]
     public void Sheet1_Bodies_HasExpectedFrames()
