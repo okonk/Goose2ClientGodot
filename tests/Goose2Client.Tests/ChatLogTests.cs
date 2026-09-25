@@ -76,12 +76,21 @@ public class ChatLogTests
     }
 
     [Fact]
-    public void Add_TellToEcho_TellTabShowsYou_AllKeepsPrefix()
+    public void Add_TellToEcho_TellTabShowsSelfName_AllKeepsPrefix()
+    {
+        var log = NewLog();
+        log.SelfName = "Hayden";
+        log.Add("[tell to] Bob: hey", ChatType.Tell);
+        Assert.Equal(ChatLog.Format("Hayden: hey", ChatType.Tell), TellTab(log, "Bob").Lines[0]);
+        Assert.Equal(ChatLog.Format("[tell to] Bob: hey", ChatType.Tell), Tab(log, ChatTabKind.All).Lines[0]);
+    }
+
+    [Fact]
+    public void Add_TellToEcho_NoSelfName_FallsBackToYou()
     {
         var log = NewLog();
         log.Add("[tell to] Bob: hey", ChatType.Tell);
         Assert.Equal(ChatLog.Format("You: hey", ChatType.Tell), TellTab(log, "Bob").Lines[0]);
-        Assert.Equal(ChatLog.Format("[tell to] Bob: hey", ChatType.Tell), Tab(log, ChatTabKind.All).Lines[0]);
     }
 
     [Fact]

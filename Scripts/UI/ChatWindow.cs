@@ -67,6 +67,10 @@ public partial class ChatWindow : BaseWindow
         _log.TabsChanged += QueueRebuildTabs;
         _log.ActiveChanged += OnActiveChanged;
         _log.ActiveLineAdded += AppendToView;
+        var localPlayer = GameManager.Instance.CurrentMapManager?.LocalPlayer;
+        if (localPlayer != null && !string.IsNullOrEmpty(localPlayer.CharacterName))
+            _log.SelfName = localPlayer.CharacterName;
+        GameManager.Instance.CharacterUpdated += OnCharacterUpdated;
         BuildTabMenu();
         RebuildTabs();
 
@@ -106,6 +110,7 @@ public partial class ChatWindow : BaseWindow
 
     public override void _ExitTree()
     {
+        GameManager.Instance.CharacterUpdated -= OnCharacterUpdated;
         if (!_listenersRegistered) return;
         GameManager.Instance.PacketManager.Remove<ChatPacket>(OnChat);
         GameManager.Instance.PacketManager.Remove<HashMessagePacket>(OnHashMessage);
@@ -136,6 +141,12 @@ public partial class ChatWindow : BaseWindow
         var p = (TellPacket)o;
         ReplyToName = p.Name;
         _log.Add($"[tell from] {p.Name}: {p.Message}", ChatType.Tell, p.Name);
+    }
+
+    private void OnCharacterUpdated(Character.Character c)
+    {
+        if (!c.IsLocalPlayer || string.IsNullOrEmpty(c.CharacterName)) return;
+        _log.SelfName = c.CharacterName;
     }
 
     public void AddChatLine(string message, ChatType chatType) => _log.Add(message, chatType);

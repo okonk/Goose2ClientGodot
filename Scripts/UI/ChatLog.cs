@@ -47,6 +47,10 @@ public sealed class ChatLog
 
     private readonly List<ChatTab> _tabs = new();
 
+    // Local player's display name for outgoing tell echoes; null until the character is
+    // attached, in which case echoes fall back to "You".
+    public string SelfName { get; set; }
+
     public event Action TabsChanged;
     public event Action ActiveChanged;
     public event Action<string> ActiveLineAdded;
@@ -99,15 +103,16 @@ public sealed class ChatLog
     }
 
     // The tell tab is a 1:1 conversation: drop the [tell from]/[tell to] prefix and show the
-    // sender. Outgoing echoes were sent by the player, so they are labeled "You".
-    private static string TellTabText(string message)
+    // sender. Outgoing echoes were sent by the player, so they are labeled with the player name.
+    private string TellTabText(string message)
     {
         if (message.StartsWith(TellFromPrefix, StringComparison.Ordinal))
             return message.Substring(TellFromPrefix.Length);
         if (message.StartsWith(TellToPrefix, StringComparison.Ordinal))
         {
             int colon = message.IndexOf(": ", TellToPrefix.Length, StringComparison.Ordinal);
-            return colon > TellToPrefix.Length ? "You: " + message.Substring(colon + 2) : message;
+            string self = string.IsNullOrEmpty(SelfName) ? "You" : SelfName;
+            return colon > TellToPrefix.Length ? self + ": " + message.Substring(colon + 2) : message;
         }
         return message;
     }
