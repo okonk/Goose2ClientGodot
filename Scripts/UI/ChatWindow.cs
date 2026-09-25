@@ -15,6 +15,7 @@ public partial class ChatWindow : BaseWindow
 {
     private static readonly Vector2 MinSize = new(260, 110);
     private const float TabScrollStep = 60f;
+    private static readonly Texture2D CloseIcon = GD.Load<Texture2D>("res://Assets/UI/window-close.svg");
 
     private RichTextLabel _chatLog;
     private LineEdit _input;
@@ -219,17 +220,33 @@ public partial class ChatWindow : BaseWindow
                 button.AddThemeColorOverride("font_color", GameColors.Yellow);
             button.Pressed += () => _log.Activate(tab);
             button.GuiInput += OnTabStripGuiInput;
+            if (tab.Kind == ChatTabKind.Tell)
+            {
+                button.Icon = CloseIcon;
+                button.IconAlignment = HorizontalAlignment.Right;
+                button.GuiInput += e => OnTellCloseInput(button, tab, e);
+            }
             _tabStrip.AddChild(button);
             _tabStrip.MoveChild(button, index++);
-
-            if (tab.Kind != ChatTabKind.Tell) continue;
-            var close = new Button { Text = "×", Flat = true, FocusMode = FocusModeEnum.None };
-            close.Pressed += () => _log.Close(tab);
-            _tabStrip.AddChild(close);
-            _tabStrip.MoveChild(close, index++);
         }
 
         _input.PlaceholderText = _log.ChannelName;
+    }
+
+    // The × renders inside the tab (IconAlignment.End); only the icon's hit column closes it,
+    // and AcceptEvent keeps the press from also toggling the tab. The icon draws at native
+    // texture size at the stylebox's right content margin, so the column is derived from those.
+    private void OnTellCloseInput(Button tab, ChatTab tabData, InputEvent e)
+    {
+        if (e is not InputEventMouseButton { ButtonIndex: MouseButton.Left, Pressed: true } mb)
+            return;
+        float marginRight = tab.GetThemeStylebox("normal").ContentMarginRight;
+        float iconW = CloseIcon.GetSize().X;
+        float pad = UiScaleApplier.Instance.ScaleSize(4f);
+        if (mb.Position.X < tab.Size.X - marginRight - iconW - pad)
+            return;
+        _log.Close(tabData);
+        AcceptEvent();
     }
 
     private void BuildTabMenu()
