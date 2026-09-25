@@ -22,7 +22,7 @@ public record AsperetaEffectsResult(
 /// <para>
 /// Aspereta stores those defs with frame indexes that live on other graphic sheets;
 /// this converter resolves the cross-sheet references (same approach as
-/// <see cref="AsperetaMonsterConverter"/>).
+/// <see cref="AsperetaAnimationCatalog"/>).
 /// </para>
 /// </remarks>
 public static class AsperetaEffectsConverter

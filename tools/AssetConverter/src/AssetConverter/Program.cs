@@ -190,24 +190,22 @@ if (args.Length >= 1 && args[0] == "all")
     var sheets = BatchConverter.Convert(Paths.IllutiaData, sheetsDir);
     CustomAssetSheet.Write(Paths.CustomAssetsDir, sheetsDir);
 
-    // Aspereta monsters (metadata via Convert; .tres written separately)
-    var aspSheetsInfo = AsperetaSheets.Load(Paths.AsperetaData);
-    var monsterResources = AsperetaMonsterConverter.BuildResources(
-        AsperetaCompiledEnc.Load(Paths.AsperetaCompiledEnc),
-        aspSheetsInfo, out var monsterErrors);
+    // Aspereta animations (metadata via Convert; .tres written separately)
+    var aspBuild = AsperetaAnimationResourceBuilder.Build(
+        AsperetaAnimationCatalog.Load(Paths.AsperetaData, Paths.AsperetaCompiledEnc));
 
     var animations = AnimationBatchConverter.Convert(
         Paths.IllutiaData, Paths.CompiledEnc, repoRoot, includeEffects: true,
-        extraResources: monsterResources);
+        extraResources: aspBuild.Resources);
 
-    // Monster .tres files are not written by Convert's illutia loop — write them here
-    int monstersWritten = 0;
-    foreach (var resource in monsterResources.Where(r => r.Animations.Count > 0))
+    // Aspereta .tres files are not written by Convert's illutia loop — write them here
+    int aspWritten = 0;
+    foreach (var resource in aspBuild.Resources.Where(r => r.Animations.Count > 0))
     {
         string fullPath = Path.Combine(repoRoot, resource.RelativeOutputPath);
         Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
         File.WriteAllText(fullPath, SpriteFramesWriter.Build(resource.Animations));
-        monstersWritten++;
+        aspWritten++;
     }
 
     // Illutia maps
@@ -231,8 +229,8 @@ if (args.Length >= 1 && args[0] == "all")
 
     Console.WriteLine($"Sheets: {sheets.Succeeded} ok, {sheets.Failed} failed");
     Console.WriteLine($"Animations: {animations.ResourcesWritten} character, {animations.EffectsWritten} effects, {animations.Failed} failed");
-    Console.WriteLine($"Aspereta monsters: {monstersWritten} written, {monsterErrors.Count} errors");
-    foreach (var e in monsterErrors) Console.WriteLine($"  MONSTER {e}");
+    Console.WriteLine($"Aspereta animations: {aspWritten} written, {aspBuild.Diagnostics.Count} diagnostics");
+    foreach (var e in aspBuild.Diagnostics) Console.WriteLine($"  ASPERETA {e}");
     Console.WriteLine($"Maps: {maps.Copied} copied, {maps.Failures.Count} failed");
     Console.WriteLine($"Aspereta sheets: {aspBatch.Succeeded} ok, {aspBatch.Failed} failed");
     Console.WriteLine($"Aspereta maps: {aspMaps.Converted} converted, {aspMaps.Failures.Count} failed, {aspMaps.Warnings.Count} warnings");
@@ -253,16 +251,15 @@ if (args.Length >= 2 && args[0] == "aspereta-body")
         ? Path.GetFullPath(args[2])
         : Path.GetFullPath(Path.Combine("..", ".."));
 
-    var monsters = AsperetaMonsterConverter.BuildResources(
-        AsperetaCompiledEnc.Load(Paths.AsperetaCompiledEnc),
-        AsperetaSheets.Load(Paths.AsperetaData), out var monsterErrors);
+    var aspBuild = AsperetaAnimationResourceBuilder.Build(
+        AsperetaAnimationCatalog.Load(Paths.AsperetaData, Paths.AsperetaCompiledEnc));
 
     int outputBodyId = AsperetaSheets.BodyBase + bodyId;
-    var target = monsters.FirstOrDefault(m => m.Id == outputBodyId && m.Animations.Count > 0);
+    var target = aspBuild.Resources.FirstOrDefault(r => r.Id == outputBodyId && r.Animations.Count > 0);
     if (target is null)
     {
         Console.WriteLine($"Aspereta body {bodyId}: no resource for output body {outputBodyId}; nothing written");
-        foreach (var e in monsterErrors) Console.WriteLine($"  MONSTER {e}");
+        foreach (var e in aspBuild.Diagnostics) Console.WriteLine($"  ASPERETA {e}");
         return;
     }
 
@@ -286,7 +283,7 @@ if (args.Length >= 2 && args[0] == "aspereta-body")
             illutiaSkipped++;
         }
     }
-    appearance.AddRange(monsters);
+    appearance.AddRange(aspBuild.Resources);
 
     string resourcesDir = Path.Combine(repoRoot, "Assets", "Resources");
     var heights = AnimationMetadataWriter.MergeHeights(new[]
@@ -320,8 +317,8 @@ if (args.Length >= 2 && args[0] == "aspereta-body")
     foreach (var (path, content) in outputs)
         written += PublishIfChanged(path, content);
 
-    Console.WriteLine($"Aspereta body {bodyId} -> output body {outputBodyId}: {written} file(s) written, {monsters.Count} monster resources total, {illutiaSkipped} illutia resources skipped");
-    foreach (var e in monsterErrors) Console.WriteLine($"  MONSTER {e}");
+    Console.WriteLine($"Aspereta body {bodyId} -> output body {outputBodyId}: {written} file(s) written, {aspBuild.Resources.Count} Aspereta resources total, {illutiaSkipped} illutia resources skipped");
+    foreach (var e in aspBuild.Diagnostics) Console.WriteLine($"  ASPERETA {e}");
     return;
 }
 
