@@ -29,6 +29,7 @@ public sealed class ChatLog
 
     // Server echo for outgoing tells (illutiagooseserver TellCommand): "[tell to] <Name>: <text>".
     private const string TellToPrefix = "[tell to] ";
+    private const string TellFromPrefix = "[tell from] ";
 
     public static readonly ChatTabKind[] OptionalKinds =
         { ChatTabKind.Guild, ChatTabKind.Group, ChatTabKind.Chat, ChatTabKind.System };
@@ -94,7 +95,21 @@ public sealed class ChatLog
         Append(_tabs[0], line);
         var target = Route(message, type, tellName);
         if (target != null)
-            Append(target, line);
+            Append(target, type == ChatType.Tell ? Format(TellTabText(message), type) : line);
+    }
+
+    // The tell tab is a 1:1 conversation: drop the [tell from]/[tell to] prefix and show the
+    // sender. Outgoing echoes were sent by the player, so they are labeled "You".
+    private static string TellTabText(string message)
+    {
+        if (message.StartsWith(TellFromPrefix, StringComparison.Ordinal))
+            return message.Substring(TellFromPrefix.Length);
+        if (message.StartsWith(TellToPrefix, StringComparison.Ordinal))
+        {
+            int colon = message.IndexOf(": ", TellToPrefix.Length, StringComparison.Ordinal);
+            return colon > TellToPrefix.Length ? "You: " + message.Substring(colon + 2) : message;
+        }
+        return message;
     }
 
     public void Activate(ChatTab tab)

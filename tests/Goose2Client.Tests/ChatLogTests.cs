@@ -67,6 +67,34 @@ public class ChatLogTests
     }
 
     [Fact]
+    public void Add_IncomingTell_TellTabShowsSenderNameOnly_AllKeepsPrefix()
+    {
+        var log = NewLog();
+        log.Add("[tell from] Bob: hi", ChatType.Tell, "Bob");
+        Assert.Equal(ChatLog.Format("Bob: hi", ChatType.Tell), TellTab(log, "Bob").Lines[0]);
+        Assert.Equal(ChatLog.Format("[tell from] Bob: hi", ChatType.Tell), Tab(log, ChatTabKind.All).Lines[0]);
+    }
+
+    [Fact]
+    public void Add_TellToEcho_TellTabShowsYou_AllKeepsPrefix()
+    {
+        var log = NewLog();
+        log.Add("[tell to] Bob: hey", ChatType.Tell);
+        Assert.Equal(ChatLog.Format("You: hey", ChatType.Tell), TellTab(log, "Bob").Lines[0]);
+        Assert.Equal(ChatLog.Format("[tell to] Bob: hey", ChatType.Tell), Tab(log, ChatTabKind.All).Lines[0]);
+    }
+
+    [Fact]
+    public void Add_UnprefixedTell_TellTabShowsMessageAsIs()
+    {
+        var log = NewLog();
+        log.Add("[tell to] Bob: hey", ChatType.Tell);
+        log.Activate(TellTab(log, "Bob"));
+        log.Add("Bob is not online.", ChatType.Tell);
+        Assert.Equal(ChatLog.Format("Bob is not online.", ChatType.Tell), TellTab(log, "Bob").Lines[1]);
+    }
+
+    [Fact]
     public void Add_TellToEcho_RoutesToRecipientTab()
     {
         var log = NewLog();
