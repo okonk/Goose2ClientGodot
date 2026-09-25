@@ -26,6 +26,7 @@ public partial class PartyMember : Control
         _mpBar = GetNode<TextureProgressBar>("Content/MpBar");
         _content = GetNode<Control>("Content");
         _content.Visible = false;
+        Visible = false;
         _effectRow = GetNode<HBoxContainer>("Content/EffectRow");
     }
 
@@ -33,6 +34,7 @@ public partial class PartyMember : Control
     {
         PlayerId = packet.LoginId;
         _content.Visible = PlayerId != 0;
+        Visible = PlayerId != 0;
 
         if (PlayerId == 0) return;
 

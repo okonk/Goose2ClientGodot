@@ -19,7 +19,7 @@ public static class WindowPlacement
     // Windows closer than ¼ of the canvas to either edge are edge-parked; the band is the middle 50%.
     private const float MiddleBandEdgeFraction = 0.25f;
 
-    // ChatWindow (plain root, bottom-left) spans x 8..508 at 1× and scales with the factor;
+    // ChatWindow (bottom-left) spans x 8..508 at 1× and scales with the factor;
     // 520 = 508 + the 12px design gap, i.e. the hotbar's authored 1× x.
     private const float ChatClearanceX = 520f;
 

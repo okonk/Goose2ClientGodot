@@ -124,6 +124,14 @@ public class WindowPlacementTests
     }
 
     [Fact]
+    public void ChatDefault_StaysBottomLeftOn1080()
+    {
+        var size = new Vector2(500, 208);
+        var pos = WindowPlacement.ResolveScaled(DefaultWindowLayout.For("Chat"), size, 1f, C720, size, 1f, C1080);
+        Assert.Equal(new Vector2(8, 1080 - 208 - 5), pos);
+    }
+
+    [Fact]
     public void Clamp_WindowTallerThanCanvas_TitleBarStaysInside()
     {
         // Synthetic 300x500 window (no current window is this large) at the 640x360 min canvas.

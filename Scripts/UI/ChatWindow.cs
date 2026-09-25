@@ -1,43 +1,78 @@
 using Godot;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Goose2Client;
 using Goose2Client.Network.Packets;
 
 namespace Goose2Client.UI;
 
 /// <summary>
-/// Chat window — plain Control panel with hover alpha, chat log, and input line.
-/// Not a BaseWindow (no title bar). GameHud routes focus actions here via FocusChat().
+/// Chat window: tabbed log (<see cref="ChatLog"/>) plus input line. Dragged by the tab strip's
+/// empty space and resizable from any edge. GameHud routes focus actions here via FocusChat().
 /// </summary>
-public partial class ChatWindow : Control, IScalableWindow
+public partial class ChatWindow : BaseWindow
 {
+    private static readonly Vector2 MinSize = new(260, 110);
+    private const float TabScrollStep = 60f;
+    private static readonly Texture2D CloseIcon = GD.Load<Texture2D>("res://Assets/UI/window-close.svg");
+
     private RichTextLabel _chatLog;
     private LineEdit _input;
-    private Panel _panel;
+    private ScrollContainer _tabScroll;
+    private HBoxContainer _tabStrip;
+    private Control _dragFiller;
+    private Button _scrollLeft;
+    private Button _scrollRight;
+    private PopupMenu _tabMenu;
+    private ChatLog _log;
+    private bool _tabsDirty;
 
     private bool _listenersRegistered;
-    private List<UiScaleLayout.GeomRecord> _geom = null!;
+
+    protected override bool Resizable => true;
+    protected override Vector2 MinResizeSize => MinSize;
 
     public bool Typing => _input.HasFocus();
     public string ReplyToName { get; private set; }
 
     private readonly Dictionary<string, string> _aliases = new();
     private readonly Dictionary<string, Action<string, string>> _commandHandlers = new();
-    private readonly Dictionary<ChatType, Color> _chatColors = new();
     private readonly List<string> _inputHistory = new();
     private int _historyIndex = 0;
 
     public override void _Ready()
     {
-        _chatLog = GetNode<RichTextLabel>("ChatLog");
-        _chatLog.BbcodeEnabled = true;
-        _chatLog.ScrollFollowing = true;
+        base._Ready();
 
-        _input = GetNode<LineEdit>("Input");
-        _panel = GetNode<Panel>("Panel");
+        _chatLog = GetNode<RichTextLabel>("Content/ChatLog");
+        _input = GetNode<LineEdit>("Content/Input");
+        _tabScroll = GetNode<ScrollContainer>("Content/TabRow/TabScroll");
+        _tabStrip = GetNode<HBoxContainer>("Content/TabRow/TabScroll/Tabs");
+        _dragFiller = GetNode<Control>("Content/TabRow/TabScroll/Tabs/DragFiller");
+        _scrollLeft = GetNode<Button>("Content/TabRow/ScrollLeft");
+        _scrollRight = GetNode<Button>("Content/TabRow/ScrollRight");
+        MakeDragHandle(_dragFiller);
+        _dragFiller.GuiInput += OnTabStripGuiInput;
 
-        SetAlpha(0.7f);
+        _tabScroll.HorizontalScrollMode = ScrollContainer.ScrollMode.ShowNever;
+        _tabScroll.VerticalScrollMode = ScrollContainer.ScrollMode.Disabled;
+        var bar = _tabScroll.GetHScrollBar();
+        bar.Changed += UpdateScrollButtons;
+        bar.ValueChanged += _ => UpdateScrollButtons();
+        _scrollLeft.Pressed += () => ScrollTabs(-1);
+        _scrollRight.Pressed += () => ScrollTabs(1);
+
+        _log = new ChatLog(ChatLog.ParseKinds(GameManager.Instance.CharacterSettings.ChatTabs));
+        _log.TabsChanged += QueueRebuildTabs;
+        _log.ActiveChanged += OnActiveChanged;
+        _log.ActiveLineAdded += AppendToView;
+        var localPlayer = GameManager.Instance.CurrentMapManager?.LocalPlayer;
+        if (localPlayer != null && !string.IsNullOrEmpty(localPlayer.CharacterName))
+            _log.SelfName = localPlayer.CharacterName;
+        GameManager.Instance.CharacterUpdated += OnCharacterUpdated;
+        BuildTabMenu();
+        RebuildTabs();
 
         // Register packet listeners
         GameManager.Instance.PacketManager.Listen<ChatPacket>(OnChat);
@@ -49,11 +84,6 @@ public partial class ChatWindow : Control, IScalableWindow
         // Input signals
         _input.TextSubmitted += OnTextSubmitted;
         _input.GuiInput += OnInputGuiInput;
-
-        // Hover alpha — listen on the Panel (the visual background) rather than the root
-        // Control, which is covered by its children and never receives mouse_enter/exit.
-        _panel.MouseEntered += () => SetAlpha(1f);
-        _panel.MouseExited += () => SetAlpha(0.7f);
 
         // Populate aliases (lowercase keys)
         _aliases["/t"] = "/tell";
@@ -69,31 +99,18 @@ public partial class ChatWindow : Control, IScalableWindow
         _commandHandlers["/quit"] = OnQuitCommand;
         _commandHandlers["/hairdye"] = OnHairdyeCommand;
 
-        // Chat type colors
-        _chatColors[ChatType.Chat] = GameColors.White;
-        _chatColors[ChatType.Guild] = GameColors.Yellow;
-        _chatColors[ChatType.Group] = GameColors.Green;
-        _chatColors[ChatType.Melee] = GameColors.Red;
-        _chatColors[ChatType.Spells] = GameColors.Blue;
-        _chatColors[ChatType.Tell] = GameColors.Blue;
-        _chatColors[ChatType.Server] = GameColors.Green;
-
         var applier = UiScaleApplier.Instance;
         applier.ApplyFontSize(_chatLog, 12, new StringName("normal_font_size"));
         applier.ApplyFontSize(_input, 12);
-        _geom = UiScaleLayout.Snapshot(this);
-        applier.RegisterWindow(this);
-        Relayout();
-        TreeExited += () => applier.UnregisterWindow(this);
+        ScaleRegister();
     }
 
-    public void Relayout()
-    {
-        UiScaleLayout.Apply(_geom, UiScaleApplier.Instance.Factor);
-    }
+    // Fade only the frame: the log text stays fully readable when the cursor is elsewhere.
+    protected override void ApplyHoverOpacity(float alpha) => Background.Modulate = new Color(1, 1, 1, alpha);
 
     public override void _ExitTree()
     {
+        GameManager.Instance.CharacterUpdated -= OnCharacterUpdated;
         if (!_listenersRegistered) return;
         GameManager.Instance.PacketManager.Remove<ChatPacket>(OnChat);
         GameManager.Instance.PacketManager.Remove<HashMessagePacket>(OnHashMessage);
@@ -123,19 +140,156 @@ public partial class ChatWindow : Control, IScalableWindow
     {
         var p = (TellPacket)o;
         ReplyToName = p.Name;
-        AddChatLine($"[tell from] {p.Name}: {p.Message}", ChatType.Tell);
+        _log.Add($"[tell from] {p.Name}: {p.Message}", ChatType.Tell, p.Name);
     }
 
-    public void AddChatLine(string message, ChatType chatType)
+    private void OnCharacterUpdated(Character.Character c)
     {
-        message = message.Replace("[", "[lb]").Replace('`', '\u2665');
-        var color = _chatColors.TryGetValue(chatType, out var c) ? c : GameColors.White;
-        _chatLog.AppendText($"[color=#{color.ToHtml(false)}]{message}[/color]\n");
+        if (!c.IsLocalPlayer || string.IsNullOrEmpty(c.CharacterName)) return;
+        _log.SelfName = c.CharacterName;
+    }
+
+    public void AddChatLine(string message, ChatType chatType) => _log.Add(message, chatType);
+
+    private void OnActiveChanged()
+    {
+        RenderActive();
+        ScrollActiveTabIntoView();
+    }
+
+    // EnsureControlVisible needs the rebuilt tab row laid out, which happens next frame.
+    private async void ScrollActiveTabIntoView()
+    {
+        await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+        if (!IsInstanceValid(this)) return;
+        foreach (Node child in _tabStrip.GetChildren())
+            if (child is Button { ButtonPressed: true } active)
+                _tabScroll.EnsureControlVisible(active);
+    }
+
+    private void ScrollTabs(int direction)
+    {
+        _tabScroll.ScrollHorizontal += direction * UiScaleApplier.Instance.ScaleSize(TabScrollStep);
+    }
+
+    private void UpdateScrollButtons()
+    {
+        var bar = _tabScroll.GetHScrollBar();
+        bool overflow = bar.MaxValue > bar.Page;
+        _scrollLeft.Visible = overflow;
+        _scrollRight.Visible = overflow;
+        _scrollLeft.Disabled = bar.Value <= 0;
+        _scrollRight.Disabled = bar.Value >= bar.MaxValue - bar.Page;
+    }
+
+    private void RenderActive()
+    {
+        _chatLog.Clear();
+        foreach (var line in _log.Active.Lines)
+            _chatLog.AppendText(line + "\n");
+    }
+
+    private void AppendToView(string line)
+    {
+        _chatLog.AppendText(line + "\n");
+        // +1: the trailing "\n" leaves an empty last paragraph.
+        while (_chatLog.GetParagraphCount() > ChatLog.MaxLines + 1)
+            _chatLog.RemoveParagraph(0);
+    }
+
+    // Deferred: a tab button's Pressed handler triggers the rebuild that frees that button.
+    private void QueueRebuildTabs()
+    {
+        if (_tabsDirty) return;
+        _tabsDirty = true;
+        Callable.From(RebuildTabs).CallDeferred();
+    }
+
+    private void RebuildTabs()
+    {
+        _tabsDirty = false;
+        foreach (Node child in _tabStrip.GetChildren())
+        {
+            if (child == _dragFiller) continue;
+            _tabStrip.RemoveChild(child);
+            child.QueueFree();
+        }
+
+        var group = new ButtonGroup();
+        int index = 0;
+        foreach (var tab in _log.Tabs)
+        {
+            var button = new Button
+            {
+                Text = tab.Label,
+                ToggleMode = true,
+                ButtonGroup = group,
+                ButtonPressed = tab == _log.Active,
+                FocusMode = FocusModeEnum.None
+            };
+            if (tab.Unread)
+                button.AddThemeColorOverride("font_color", GameColors.Yellow);
+            button.Pressed += () => _log.Activate(tab);
+            button.GuiInput += OnTabStripGuiInput;
+            if (tab.Kind == ChatTabKind.Tell)
+            {
+                button.Icon = CloseIcon;
+                button.IconAlignment = HorizontalAlignment.Right;
+                button.GuiInput += e => OnTellCloseInput(button, tab, e);
+            }
+            _tabStrip.AddChild(button);
+            _tabStrip.MoveChild(button, index++);
+        }
+
+        _input.PlaceholderText = _log.ChannelName;
+    }
+
+    // The × renders inside the tab (IconAlignment.End); only the icon's hit column closes it,
+    // and AcceptEvent keeps the press from also toggling the tab. The icon draws at native
+    // texture size at the stylebox's right content margin, so the column is derived from those.
+    private void OnTellCloseInput(Button tab, ChatTab tabData, InputEvent e)
+    {
+        if (e is not InputEventMouseButton { ButtonIndex: MouseButton.Left, Pressed: true } mb)
+            return;
+        float marginRight = tab.GetThemeStylebox("normal").ContentMarginRight;
+        float iconW = CloseIcon.GetSize().X;
+        float pad = UiScaleApplier.Instance.ScaleSize(4f);
+        if (mb.Position.X < tab.Size.X - marginRight - iconW - pad)
+            return;
+        _log.Close(tabData);
+        AcceptEvent();
+    }
+
+    private void BuildTabMenu()
+    {
+        _tabMenu = new PopupMenu();
+        foreach (var kind in ChatLog.OptionalKinds)
+            _tabMenu.AddCheckItem(kind.ToString(), (int)kind);
+        _tabMenu.IdPressed += OnTabMenuIdPressed;
+        AddChild(_tabMenu);
+    }
+
+    private void OnTabStripGuiInput(InputEvent @event)
+    {
+        if (@event is not InputEventMouseButton { ButtonIndex: MouseButton.Right, Pressed: true })
+            return;
+        foreach (var kind in ChatLog.OptionalKinds)
+            _tabMenu.SetItemChecked(_tabMenu.GetItemIndex((int)kind), _log.IsEnabled(kind));
+        _tabMenu.Position = (Vector2I)GetViewport().GetMousePosition();
+        _tabMenu.Popup();
+        AcceptEvent();
+    }
+
+    private void OnTabMenuIdPressed(long id)
+    {
+        var kind = (ChatTabKind)id;
+        _log.SetEnabled(kind, !_log.IsEnabled(kind));
+        GameManager.Instance.CharacterSettings.SetChatTabs(_log.EnabledKinds.Select(k => k.ToString()));
     }
 
     private void OnTextSubmitted(string text)
     {
-        var result = ChatCommandParser.Parse(text, _aliases, _commandHandlers.Keys);
+        var result = ChatCommandParser.Parse(_log.ApplyChannel(text), _aliases, _commandHandlers.Keys);
 
         switch (result.Kind)
         {
@@ -173,8 +327,6 @@ public partial class ChatWindow : Control, IScalableWindow
     /// <summary>
     /// Called by GameHud to focus the chat input with an optional prefix.
     /// </summary>
-    public void Toggle() => Visible = !Visible;
-
     public void FocusChat(string prefill)
     {
         _input.Text = prefill;
@@ -228,11 +380,6 @@ public partial class ChatWindow : Control, IScalableWindow
             _input.Text = "";
             _historyIndex = _inputHistory.Count;
         }
-    }
-
-    private void SetAlpha(float a)
-    {
-        _panel.Modulate = new Color(1, 1, 1, a);
     }
 
     private void OnQuitCommand(string command, string arguments)

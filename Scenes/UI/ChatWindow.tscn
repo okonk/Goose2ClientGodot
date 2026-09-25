@@ -1,8 +1,7 @@
-[gd_scene load_steps=5 format=3]
+[gd_scene load_steps=4 format=3]
 
 [ext_resource type="Script" path="res://Scripts/UI/ChatWindow.cs" id="1_chat"]
 [ext_resource type="Theme" path="res://Assets/UI/GameTheme.tres" id="theme"]
-[ext_resource type="Texture2D" path="res://Assets/UI/chat.png" id="bg_tex"]
 
 [sub_resource type="StyleBoxEmpty" id="chat_log_transparent"]
 
@@ -10,47 +9,65 @@
 script = ExtResource("1_chat")
 theme = ExtResource("theme")
 layout_mode = 3
-anchor_left = 0.0
-anchor_top = 1.0
-anchor_right = 0.0
+offset_right = 500.0
+offset_bottom = 208.0
+WindowName = "Chat"
+
+[node name="Background" type="TextureRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = 8.0
-offset_top = -213.0
-offset_right = 508.0
-offset_bottom = -5.0
-grow_horizontal = 0
-grow_vertical = 0
-
-[node name="Panel" type="Panel" parent="."]
-layout_mode = 0
-offset_left = 0.0
-offset_top = 0.0
-offset_right = 500.0
-offset_bottom = 208.0
-
-[node name="Background" type="TextureRect" parent="Panel"]
-layout_mode = 0
-offset_left = 0.0
-offset_top = 0.0
-offset_right = 500.0
-offset_bottom = 208.0
-texture = ExtResource("bg_tex")
 mouse_filter = 2
 
-[node name="ChatLog" type="RichTextLabel" parent="."]
-layout_mode = 0
+[node name="Content" type="VBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 4.0
+offset_top = 4.0
+offset_right = -4.0
+offset_bottom = -4.0
+theme_override_constants/separation = 2
+
+[node name="TabRow" type="HBoxContainer" parent="Content"]
+layout_mode = 2
+theme_override_constants/separation = 2
+
+[node name="TabScroll" type="ScrollContainer" parent="Content/TabRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="Tabs" type="HBoxContainer" parent="Content/TabRow/TabScroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 2
+
+[node name="DragFiller" type="Control" parent="Content/TabRow/TabScroll/Tabs"]
+custom_minimum_size = Vector2(24, 18)
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="ScrollLeft" type="Button" parent="Content/TabRow"]
+visible = false
+layout_mode = 2
+focus_mode = 0
+text = "<"
+
+[node name="ScrollRight" type="Button" parent="Content/TabRow"]
+visible = false
+layout_mode = 2
+focus_mode = 0
+text = ">"
+
+[node name="ChatLog" type="RichTextLabel" parent="Content"]
+layout_mode = 2
+size_flags_vertical = 3
 mouse_filter = 2
 theme_override_styles/normal = SubResource("chat_log_transparent")
 bbcode_enabled = true
 scroll_following = true
-offset_left = 4.0
-offset_top = 19.0
-offset_right = 496.0
-offset_bottom = 186.0
 
-[node name="Input" type="LineEdit" parent="."]
-layout_mode = 0
-offset_left = 4.0
-offset_top = 187.0
-offset_right = 496.0
-offset_bottom = 207.0
+[node name="Input" type="LineEdit" parent="Content"]
+layout_mode = 2

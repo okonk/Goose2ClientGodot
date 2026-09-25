@@ -55,6 +55,8 @@ namespace Goose2Client
 
         public string MountName;
 
+        public List<string> ChatTabs;
+
         private readonly string characterName;
 
         public CharacterSettings() { }
@@ -103,6 +105,7 @@ namespace Goose2Client
             this.WindowSettings = deserialized.WindowSettings;
             this.Options = deserialized.Options;
             this.MountName = deserialized.MountName;
+            this.ChatTabs = deserialized.ChatTabs;
 
             return true;
         }
@@ -118,6 +121,7 @@ namespace Goose2Client
             }
             WindowSettings ??= new();
             Options ??= new();
+            ChatTabs ??= new List<string> { "Guild", "Group" };
         }
 
         /// <summary>Deserialize settings JSON with null-guards; never throws on partial/corrupt input.</summary>
@@ -195,6 +199,12 @@ namespace Goose2Client
         public void ResetWindowSettings()
         {
             WindowSettings = new();
+            Save();
+        }
+
+        public void SetChatTabs(IEnumerable<string> tabs)
+        {
+            ChatTabs = new List<string>(tabs);
             Save();
         }
 

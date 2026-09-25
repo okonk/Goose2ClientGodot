@@ -57,6 +57,22 @@ public partial class PartyWindow : Control, IScalableWindow
             tile.CustomMinimumSize = PartyMemberMetrics.MinSize(applier.Factor);
             tile.RelayoutEffects(applier.Factor);
         }
+        UpdateSize();
+    }
+
+    private void UpdateSize()
+    {
+        int count = 0;
+        foreach (var m in _members)
+            if (m.Visible) count++;
+        var factor = UiScaleApplier.Instance.Factor;
+        int w = UiScale.ScaleSize(PartyMemberMetrics.FrameWidthPx, factor);
+        int row = PartyMemberMetrics.MinSize(factor).Y;
+        int sep = UiScale.ScaleSize(1f, factor);
+        int h = count == 0 ? 0 : count * row + (count - 1) * sep;
+        var list = GetNode<VBoxContainer>("MemberList");
+        list.Size = new Vector2(w, h);
+        Size = new Vector2(w, h);
     }
 
     public override void _ExitTree()
@@ -94,6 +110,7 @@ public partial class PartyWindow : Control, IScalableWindow
                 GameManager.Instance.CurrentMapManager?.GetCharacter(p.LoginId) != null);
         _members[p.LineNumber].OnGroupUpdate(p);
         _members[p.LineNumber].ReconcileEffects(_effects.GetEffects(_members[p.LineNumber].PlayerId));
+        UpdateSize();
     }
 
     internal void ApplyMakeCharacter(MakeCharacterPacket p)

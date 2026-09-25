@@ -327,6 +327,51 @@ namespace Goose2Client.Tests
             }
         }
 
+        [Fact]
+        public void ChatTabs_MissingField_DefaultsToGuildAndGroup()
+        {
+            var cs = CharacterSettings.FromJson("{}");
+            Assert.Equal(new List<string> { "Guild", "Group" }, cs.ChatTabs);
+        }
+
+        [Fact]
+        public void SetChatTabs_PersistsAcrossReload()
+        {
+            var dir = Path.Combine(Path.GetTempPath(), "gs2-" + Path.GetRandomFileName());
+            Directory.CreateDirectory(dir);
+            try
+            {
+                var cs = new TempCharacterSettings(dir);
+                cs.SetChatTabs(new[] { "Group", "System" });
+
+                var reloaded = new TempCharacterSettings(dir);
+                Assert.True(reloaded.Load());
+                Assert.Equal(new List<string> { "Group", "System" }, reloaded.ChatTabs);
+            }
+            finally
+            {
+                Directory.Delete(dir, true);
+            }
+        }
+
+        [Fact]
+        public void ResetWindowSettings_KeepsChatTabs()
+        {
+            var dir = Path.Combine(Path.GetTempPath(), "gs2-" + Path.GetRandomFileName());
+            Directory.CreateDirectory(dir);
+            try
+            {
+                var cs = new TempCharacterSettings(dir);
+                cs.SetChatTabs(new[] { "Chat" });
+                cs.ResetWindowSettings();
+                Assert.Equal(new List<string> { "Chat" }, cs.ChatTabs);
+            }
+            finally
+            {
+                Directory.Delete(dir, true);
+            }
+        }
+
         private sealed class TempCharacterSettings : CharacterSettings
         {
             private readonly string _path;
