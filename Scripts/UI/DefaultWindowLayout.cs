@@ -20,6 +20,7 @@ public static class DefaultWindowLayout
         ["Bank"]      = new Vector2(300, 200),
         ["CombineBag"]= new Vector2(540, 220),
         ["Options"]   = new Vector2(460, 260),
+        ["Chat"]      = new Vector2(8, 507),
     };
 
     /// <summary>
