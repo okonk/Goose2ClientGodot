@@ -47,6 +47,26 @@ public class WindowResizeTests
     }
 
     [Fact]
+    public void Apply_MinLargerThanCanvas_DoesNotThrow()
+    {
+        var bigMin = new Vector2(1400, 800);
+        Assert.Equal(new Rect2(100, 100, 1180, 200), WindowResize.Apply(Start, ResizeEdge.Right, new Vector2(2000, 0), bigMin, Canvas));
+        Assert.Equal(new Rect2(0, 100, 500, 200), WindowResize.Apply(Start, ResizeEdge.Left, new Vector2(200, 0), bigMin, Canvas));
+    }
+
+    [Fact]
+    public void Apply_LeftBeyondCanvas_ClampsToZero()
+    {
+        Assert.Equal(new Rect2(0, 100, 500, 200), WindowResize.Apply(Start, ResizeEdge.Left, new Vector2(-200, 0), Min, Canvas));
+    }
+
+    [Fact]
+    public void Apply_RightBeyondCanvas_ClampsToCanvas()
+    {
+        Assert.Equal(new Rect2(100, 100, 1180, 200), WindowResize.Apply(Start, ResizeEdge.Right, new Vector2(2000, 0), Min, Canvas));
+    }
+
+    [Fact]
     public void ScaledSize_RescalesSavedSizeByFactorRatio()
     {
         Assert.Equal(new Vector2(800, 400), WindowResize.ScaledSize(new Vector2(600, 300), 1.5f, 2f, Min, Canvas));

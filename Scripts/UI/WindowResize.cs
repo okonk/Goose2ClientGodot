@@ -12,13 +12,13 @@ public static class WindowResize
     {
         float left = start.Position.X, top = start.Position.Y, right = start.End.X, bottom = start.End.Y;
         if (edge.HasFlag(ResizeEdge.Left))
-            left = Mathf.Clamp(left + delta.X, 0f, right - minSize.X);
+            left = Mathf.Clamp(left + delta.X, 0f, Mathf.Max(0f, right - minSize.X));
         if (edge.HasFlag(ResizeEdge.Right))
-            right = Mathf.Clamp(right + delta.X, left + minSize.X, canvas.X);
+            right = Mathf.Clamp(right + delta.X, Mathf.Min(left + minSize.X, canvas.X), canvas.X);
         if (edge.HasFlag(ResizeEdge.Top))
-            top = Mathf.Clamp(top + delta.Y, 0f, bottom - minSize.Y);
+            top = Mathf.Clamp(top + delta.Y, 0f, Mathf.Max(0f, bottom - minSize.Y));
         if (edge.HasFlag(ResizeEdge.Bottom))
-            bottom = Mathf.Clamp(bottom + delta.Y, top + minSize.Y, canvas.Y);
+            bottom = Mathf.Clamp(bottom + delta.Y, Mathf.Min(top + minSize.Y, canvas.Y), canvas.Y);
         return new Rect2(left, top, right - left, bottom - top);
     }
 
