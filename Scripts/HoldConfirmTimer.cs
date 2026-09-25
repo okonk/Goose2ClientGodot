@@ -2,7 +2,7 @@ namespace Goose2Client
 {
     public sealed class HoldConfirmTimer
     {
-        public const double DefaultDelaySeconds = 0.25;
+        public const double DefaultDelaySeconds = 0.3;
 
         private readonly double _delaySeconds;
         private string _action;

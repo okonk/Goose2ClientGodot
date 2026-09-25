@@ -336,7 +336,7 @@ public partial class HotbarWindow : BaseWindow, IWindow
         base._Process(delta); // window hover opacity — must not be skipped
 
         _repeatTimer += (float)delta;
-        bool repeatTick = _repeatTimer >= 0.1f;
+        bool repeatTick = _repeatTimer >= 0.25f;
         if (repeatTick) _repeatTimer = 0;
 
         // Guard against typing in input fields
