@@ -87,6 +87,22 @@ public class ChatLogTests
     }
 
     [Fact]
+    public void Add_TellToWithEmptyName_DoesNotOpenTellTab()
+    {
+        var log = NewLog();
+        log.Add("[tell to] : hi", ChatType.Tell);
+        Assert.Single(log.Tabs);
+    }
+
+    [Fact]
+    public void Add_TellToPrefixOnly_DoesNotOpenTellTab()
+    {
+        var log = NewLog();
+        log.Add("[tell to] ", ChatType.Tell);
+        Assert.Single(log.Tabs);
+    }
+
+    [Fact]
     public void Add_UnprefixedTell_GoesToActiveTellTab()
     {
         var log = NewLog();
@@ -185,6 +201,17 @@ public class ChatLogTests
         log.SetEnabled(ChatTabKind.Group, true);
 
         Assert.Equal(new[] { "All", "Guild", "Group", "System", "Bob" }, log.Tabs.Select(t => t.Label));
+    }
+
+    [Fact]
+    public void SetEnabled_InsertsAfterEnabledKindsOnly_WhenEarlierKindDisabled()
+    {
+        var log = NewLog(ChatTabKind.Guild);
+        log.Add("[tell to] Bob: hey", ChatType.Tell);
+
+        log.SetEnabled(ChatTabKind.Chat, true);
+
+        Assert.Equal(new[] { "All", "Guild", "Chat", "Bob" }, log.Tabs.Select(t => t.Label));
     }
 
     [Fact]
