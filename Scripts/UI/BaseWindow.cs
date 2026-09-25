@@ -25,6 +25,15 @@ public partial class BaseWindow : Control, IScalableWindow
 
     private const float HoverOpacity = 1f;
     private const float UnhoveredOpacity = 0.7f;
+    private const float ResizeEdgeThickness = 5f;
+    private const float ResizeCornerSize = 10f;
+
+    private ResizeEdge _resizeEdge;
+    private Rect2 _preResizeRect;
+    private Vector2 _resizeStartMouse;
+
+    protected virtual bool Resizable => false;
+    protected virtual Vector2 MinResizeSize => Vector2.Zero;
 
     protected Label TitleLabel { get; private set; }
     protected Control Content { get; private set; }
@@ -52,6 +61,8 @@ public partial class BaseWindow : Control, IScalableWindow
     public virtual void ResetToDefault()
     {
         Visible = DefaultVisible;
+        if (Resizable)
+            Size = ResizableSize();
         RepositionFromSaved();
     }
 
@@ -93,7 +104,7 @@ public partial class BaseWindow : Control, IScalableWindow
         // topmost control under the cursor, so moving onto a slot (Panel,
         // MouseFilter.Stop) fires mouse_exited on THIS window and would fade it
         // to 70% even though the cursor is still on the window.
-        Modulate = new Color(1, 1, 1, UnhoveredOpacity);
+        ApplyHoverOpacity(UnhoveredOpacity);
 
         // Close button
         if (_closeButton != null)
@@ -105,6 +116,9 @@ public partial class BaseWindow : Control, IScalableWindow
         // order follows tree order; last child = drawn on top = picked first.
         if (_titleBar != null)
             MoveChild(_titleBar, GetChildCount() - 1);
+
+        if (Resizable)
+            BuildResizeHandles();
 
         _chromeReady = true;
 
@@ -277,6 +291,97 @@ public partial class BaseWindow : Control, IScalableWindow
     public virtual void Relayout()
     {
         UiScaleLayout.Apply(_geom, UiScaleApplier.Instance.Factor);
+        if (Resizable)
+            Size = ResizableSize();
+    }
+
+    protected virtual void ApplyHoverOpacity(float alpha) => Modulate = new Color(1, 1, 1, alpha);
+
+    private void BuildResizeHandles()
+    {
+        AddResizeHandle(ResizeEdge.Left, CursorShape.Hsize);
+        AddResizeHandle(ResizeEdge.Right, CursorShape.Hsize);
+        AddResizeHandle(ResizeEdge.Top, CursorShape.Vsize);
+        AddResizeHandle(ResizeEdge.Bottom, CursorShape.Vsize);
+        AddResizeHandle(ResizeEdge.Top | ResizeEdge.Left, CursorShape.Fdiagsize);
+        AddResizeHandle(ResizeEdge.Bottom | ResizeEdge.Right, CursorShape.Fdiagsize);
+        AddResizeHandle(ResizeEdge.Top | ResizeEdge.Right, CursorShape.Bdiagsize);
+        AddResizeHandle(ResizeEdge.Bottom | ResizeEdge.Left, CursorShape.Bdiagsize);
+    }
+
+    private void AddResizeHandle(ResizeEdge edge, CursorShape cursor)
+    {
+        bool left = edge.HasFlag(ResizeEdge.Left), right = edge.HasFlag(ResizeEdge.Right);
+        bool top = edge.HasFlag(ResizeEdge.Top), bottom = edge.HasFlag(ResizeEdge.Bottom);
+        float span = (left || right) && (top || bottom) ? ResizeCornerSize : ResizeEdgeThickness;
+
+        var handle = new Control { Name = $"Resize{edge}", MouseFilter = MouseFilterEnum.Stop, MouseDefaultCursorShape = cursor };
+        handle.AnchorLeft = right ? 1f : 0f;
+        handle.AnchorRight = left ? 0f : 1f;
+        handle.AnchorTop = bottom ? 1f : 0f;
+        handle.AnchorBottom = top ? 0f : 1f;
+        handle.OffsetLeft = left ? 0f : right ? -span : ResizeCornerSize;
+        handle.OffsetRight = left ? span : right ? 0f : -ResizeCornerSize;
+        handle.OffsetTop = top ? 0f : bottom ? -span : ResizeCornerSize;
+        handle.OffsetBottom = top ? span : bottom ? 0f : -ResizeCornerSize;
+        handle.GuiInput += e => OnResizeHandleGuiInput(e, edge);
+        AddChild(handle);
+    }
+
+    private void OnResizeHandleGuiInput(InputEvent @event, ResizeEdge edge)
+    {
+        if (@event is InputEventMouseButton { ButtonIndex: MouseButton.Left } mb)
+        {
+            if (mb.Pressed)
+            {
+                _dragCancelled = false;
+                _resizeEdge = edge;
+                _preResizeRect = new Rect2(Position, Size);
+                _resizeStartMouse = GetGlobalMousePosition();
+            }
+            else if (_resizeEdge != ResizeEdge.None)
+            {
+                EndResize();
+            }
+        }
+        else if (@event is InputEventMouseMotion && _resizeEdge != ResizeEdge.None)
+        {
+            if (!Input.IsMouseButtonPressed(MouseButton.Left))
+            {
+                EndResize();
+                return;
+            }
+            var rect = WindowResize.Apply(_preResizeRect, _resizeEdge, GetGlobalMousePosition() - _resizeStartMouse,
+                MinResizeSize * UiScaleApplier.Instance.Factor, GetTree().Root.GetVisibleRect().Size);
+            Position = rect.Position;
+            Size = rect.Size;
+        }
+    }
+
+    private void EndResize()
+    {
+        _resizeEdge = ResizeEdge.None;
+        if (_dragCancelled)
+            _dragCancelled = false;
+        else
+            SavePlacement();
+    }
+
+    private Vector2 ResizableSize()
+    {
+        var factor = UiScaleApplier.Instance.Factor;
+        var ws = GameManager.Instance?.CharacterSettings?.GetWindowSettings(WindowName);
+        bool saved = ws != null && ws.Placed && ws.Size != default;
+        return WindowResize.ScaledSize(saved ? ws.Size : _tscnSize, saved ? ws.Factor : 1f, factor,
+            MinResizeSize * factor, GetTree().Root.GetVisibleRect().Size);
+    }
+
+    private void SavePlacement()
+    {
+        if (WindowName == null) return;
+        // Live Visible, not null: a fresh WindowSettings entry defaults to Visible=false,
+        // and a null here would persist that and hide the window on next login.
+        GameManager.Instance.CharacterSettings.SetWindowSetting(WindowName, Position, Size, UiScaleApplier.Instance != null ? UiScaleApplier.Instance.Factor : 1f, Visible, (Vector2I)GetTree().Root.GetVisibleRect().Size);
     }
 
     public void RepositionFromSaved()
@@ -332,10 +437,7 @@ public partial class BaseWindow : Control, IScalableWindow
                 _dragging = false;
                 if (_dragCancelled)
                     _dragCancelled = false;
-                else if (WindowName != null)
-                    // Live Visible, not null: a fresh WindowSettings entry defaults to Visible=false,
-                    // and a null here would persist that and hide the window on next login.
-                    GameManager.Instance.CharacterSettings.SetWindowSetting(WindowName, Position, Size, UiScaleApplier.Instance != null ? UiScaleApplier.Instance.Factor : 1f, Visible, (Vector2I)GetTree().Root.GetVisibleRect().Size);
+                else SavePlacement();
             }
         }
         else if (@event is InputEventMouseMotion motion && _dragging)
@@ -345,8 +447,7 @@ public partial class BaseWindow : Control, IScalableWindow
                 _dragging = false;
                 if (_dragCancelled)
                     _dragCancelled = false;
-                else if (WindowName != null)
-                    GameManager.Instance.CharacterSettings.SetWindowSetting(WindowName, Position, Size, UiScaleApplier.Instance != null ? UiScaleApplier.Instance.Factor : 1f, Visible, (Vector2I)GetTree().Root.GetVisibleRect().Size);
+                else SavePlacement();
                 return;
             }
             Position += motion.Relative;
@@ -355,6 +456,14 @@ public partial class BaseWindow : Control, IScalableWindow
 
     public void CancelDrag()
     {
+        if (_resizeEdge != ResizeEdge.None)
+        {
+            _resizeEdge = ResizeEdge.None;
+            _dragCancelled = true;
+            Position = _preResizeRect.Position;
+            Size = _preResizeRect.Size;
+            return;
+        }
         if (!_dragging) return;
         _dragging = false;
         _dragCancelled = true;
@@ -367,7 +476,7 @@ public partial class BaseWindow : Control, IScalableWindow
         if (inside != _hovered)
         {
             _hovered = inside;
-            Modulate = new Color(1, 1, 1, inside ? HoverOpacity : UnhoveredOpacity);
+            ApplyHoverOpacity(inside ? HoverOpacity : UnhoveredOpacity);
         }
     }
 
