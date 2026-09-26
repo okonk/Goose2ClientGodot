@@ -30,5 +30,6 @@ namespace Goose2Client
         Bank = 26,
         OptionList = 27,
         Custom = 28,
+        LogViewer = 29,
     }
 }

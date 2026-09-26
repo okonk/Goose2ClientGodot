@@ -1,6 +1,8 @@
 using System;
 using Godot;
+using Goose2Client;
 using Goose2Client.Logs;
+using Goose2Client.Network.Packets;
 
 namespace Goose2Client.UI;
 
@@ -20,7 +22,9 @@ public partial class LogViewerWindow : BaseWindow
         "Communication", "Sessions/Security", "Social", "Items/Economy", "GM Actions", "Other/Retired"
     };
 
-    private readonly LogViewerState _state = new(DateTime.UtcNow);
+    private readonly LogViewerWindowLogic _logic = new(DateTime.UtcNow);
+    private LogViewerState _state => _logic.State;
+    private bool _listenersRegistered;
     private OptionButton _preset;
     private LineEdit _customStart;
     private LineEdit _customEnd;
@@ -44,9 +48,13 @@ public partial class LogViewerWindow : BaseWindow
     private Button _quickMap;
     private PopupMenu _typesPopup = new();
 
-    public LogViewerState State => _state;
+    public LogViewerState State => _logic.State;
 
-    public LogQuerySender? QuerySender { get; set; }
+    public LogQuerySender? QuerySender
+    {
+        get => _logic.QuerySender;
+        set => _logic.QuerySender = value;
+    }
 
     public override void _Ready()
     {
@@ -115,6 +123,25 @@ public partial class LogViewerWindow : BaseWindow
         _quickRelated.Pressed += () => ApplyQuick(LogQuickActionTarget.Related);
         _quickMap.Pressed += OnQuickMapPressed;
 
+        var network = GameManager.Instance.NetworkClient;
+        network.Disconnected += OnDisconnected;
+        network.SocketError += OnSocketError;
+        var packets = GameManager.Instance.PacketManager;
+        packets.Listen<MakeWindowPacket>(OnMakeWindow);
+        packets.Listen<EndWindowPacket>(OnEndWindow);
+        packets.Listen<CloseWindowPacket>(OnCloseWindow);
+        packets.Listen<LogTypeMetadataPacket>(OnLmt);
+        packets.Listen<LogMapMetadataPacket>(OnLmm);
+        packets.Listen<LogDefaultsMetadataPacket>(OnLmd);
+        packets.Listen<LogResultBeginPacket>(OnLrb);
+        packets.Listen<LogResultDataPacket>(OnLrd);
+        packets.Listen<LogResultFinishPacket>(OnLrf);
+        packets.Listen<LogResultErrorPacket>(OnLrx);
+        _listenersRegistered = true;
+
+        QuerySender = GameManager.Instance.NetworkClient.TryLogQuery;
+        _logic.BindCloseSender(id => GameManager.Instance.NetworkClient.WindowButtonClick(WindowButtons.Close, id, 0));
+
         LogFilterValidator.ApplyPreset(_state.Draft, DateTime.UtcNow);
         SyncControlsFromDraft();
         RenderAll();
@@ -124,10 +151,120 @@ public partial class LogViewerWindow : BaseWindow
 
     protected override void OnClosePressed()
     {
-        _state.OnClose();
+        _logic.Close();
         SyncControlsFromDraft();
-        base.OnClosePressed();
+        Visible = _logic.IsVisible;
         RenderAll();
+        _logic.SendClose();
+        base.OnClosePressed();
+    }
+
+    public override void _ExitTree()
+    {
+        if (!_listenersRegistered) return;
+        var network = GameManager.Instance.NetworkClient;
+        network.Disconnected -= OnDisconnected;
+        network.SocketError -= OnSocketError;
+        var packets = GameManager.Instance.PacketManager;
+        packets.Remove<MakeWindowPacket>(OnMakeWindow);
+        packets.Remove<EndWindowPacket>(OnEndWindow);
+        packets.Remove<CloseWindowPacket>(OnCloseWindow);
+        packets.Remove<LogTypeMetadataPacket>(OnLmt);
+        packets.Remove<LogMapMetadataPacket>(OnLmm);
+        packets.Remove<LogDefaultsMetadataPacket>(OnLmd);
+        packets.Remove<LogResultBeginPacket>(OnLrb);
+        packets.Remove<LogResultDataPacket>(OnLrd);
+        packets.Remove<LogResultFinishPacket>(OnLrf);
+        packets.Remove<LogResultErrorPacket>(OnLrx);
+        _listenersRegistered = false;
+        _logic.OnTeardown();
+    }
+
+    private void OnMakeWindow(object o)
+    {
+        if (_logic.OnMakeWindow((MakeWindowPacket)o))
+        {
+            SyncControlsFromDraft();
+            Visible = _logic.IsVisible;
+            RenderAll();
+        }
+    }
+
+    private void OnEndWindow(object o)
+    {
+        if (_logic.OnEndWindow((EndWindowPacket)o))
+        {
+            Visible = _logic.IsVisible;
+            RenderAll();
+        }
+    }
+
+    private void OnCloseWindow(object o)
+    {
+        if (_logic.OnCloseWindow((CloseWindowPacket)o))
+        {
+            SyncControlsFromDraft();
+            Visible = _logic.IsVisible;
+            RenderAll();
+        }
+    }
+
+    private void OnDisconnected()
+    {
+        _logic.OnDisconnected();
+        SyncControlsFromDraft();
+        Visible = _logic.IsVisible;
+        RenderAll();
+    }
+
+    private void OnSocketError(Exception error)
+    {
+        _logic.OnSocketError();
+        SyncControlsFromDraft();
+        Visible = _logic.IsVisible;
+        RenderAll();
+    }
+
+    private void OnLmt(object o)
+    {
+        if (_logic.FeedLmt((LogTypeMetadata)o))
+            RenderAll();
+    }
+
+    private void OnLmm(object o)
+    {
+        if (_logic.FeedLmm((LogMapMetadata)o))
+            RenderAll();
+    }
+
+    private void OnLmd(object o)
+    {
+        if (_logic.FeedLmd((LogDefaultsMetadata)o))
+            RenderAll();
+    }
+
+    private void OnLrb(object o)
+    {
+        if (_logic.FeedLrb((LogResultBegin)o))
+            RenderAll();
+    }
+
+    private void OnLrd(object o)
+    {
+        if (_logic.FeedLrd((LogResultData)o))
+            RenderAll();
+    }
+
+    private void OnLrf(object o)
+    {
+        if (_logic.FeedLrf((LogResultFinish)o))
+            RenderAll();
+    }
+
+    private void OnLrx(object o)
+    {
+        if (_logic.FeedLrx((LogResultError)o))
+            RenderAll();
     }
 
     private void OnPresetSelected(int index)
@@ -152,34 +289,20 @@ public partial class LogViewerWindow : BaseWindow
 
     private void OnSearch()
     {
-        if (_state.Search() is LogQuerySubmission submission)
-            SendQuery(submission);
+        _logic.Search();
         RenderAll();
     }
 
     private void OnPreviousPressed()
     {
-        if (_state.Previous() is LogQuerySubmission submission)
-            SendQuery(submission);
+        _logic.Previous();
         RenderAll();
     }
 
     private void OnNextPressed()
     {
-        if (_state.Next() is LogQuerySubmission submission)
-            SendQuery(submission);
+        _logic.Next();
         RenderAll();
-    }
-
-    private void SendQuery(LogQuerySubmission submission)
-    {
-        if (QuerySender is not { } sender)
-        {
-            _state.CancelActiveRequest(null);
-            return;
-        }
-        if (!sender(submission, out string error))
-            _state.CancelActiveRequest(error);
     }
 
     private void SyncControlsFromDraft()
@@ -377,5 +500,124 @@ public partial class LogViewerWindow : BaseWindow
         _quickPrimary.Visible = LogViewerState.PrimaryQuickFilterAvailable(_state, row);
         _quickRelated.Visible = LogViewerState.RelatedQuickFilterAvailable(_state, row);
         _quickMap.Visible = MapQuickFilterAvailable(row);
+    }
+}
+
+internal sealed class LogViewerWindowLogic
+{
+    private readonly LogViewerState _state;
+    private Action<int>? _closeSent;
+    private int _closeWindowId;
+
+    public LogViewerState State => _state;
+    public LogQuerySender? QuerySender { get; set; }
+    public bool IsVisible { get; private set; }
+
+    public LogViewerWindowLogic(DateTime utcNow) => _state = new LogViewerState(utcNow);
+
+    public void BindCloseSender(Action<int> closeSent) => _closeSent = closeSent;
+
+    public bool OnMakeWindow(MakeWindowPacket packet)
+    {
+        if (packet.WindowFrame != WindowFrames.LogViewer)
+            return false;
+        _state.OnWindowReplacement(packet.WindowId);
+        LogFilterValidator.ApplyPreset(_state.Draft, DateTime.UtcNow);
+        IsVisible = false;
+        return true;
+    }
+
+    public bool OnEndWindow(EndWindowPacket packet)
+    {
+        if (packet.WindowId != _state.WindowId)
+            return false;
+        IsVisible = true;
+        return true;
+    }
+
+    public bool OnCloseWindow(CloseWindowPacket packet)
+    {
+        if (packet.WindowId != _state.WindowId)
+            return false;
+        _state.OnClose();
+        IsVisible = false;
+        return true;
+    }
+
+    public void OnDisconnected()
+    {
+        _state.OnDisconnected();
+        IsVisible = false;
+    }
+
+    public void OnSocketError()
+    {
+        _state.OnSocketError();
+        IsVisible = false;
+    }
+
+    public void OnTeardown()
+    {
+        _state.OnTeardown();
+        IsVisible = false;
+    }
+
+    public void Close()
+    {
+        _closeWindowId = _state.WindowId;
+        _state.OnClose();
+        IsVisible = false;
+    }
+
+    public void SendClose()
+    {
+        int windowId = _closeWindowId;
+        _closeWindowId = 0;
+        if (windowId == 0)
+            return;
+        _closeSent?.Invoke(windowId);
+    }
+
+    public bool FeedLmt(LogTypeMetadata packet) => _state.FeedLmt(packet);
+    public bool FeedLmm(LogMapMetadata packet) => _state.FeedLmm(packet);
+    public bool FeedLmd(LogDefaultsMetadata packet) => _state.FeedLmd(packet);
+    public bool FeedLrb(LogResultBegin packet) => _state.FeedLrb(packet);
+    public bool FeedLrd(LogResultData packet) => _state.FeedLrd(packet);
+    public bool FeedLrf(LogResultFinish packet) => _state.FeedLrf(packet);
+    public bool FeedLrx(LogResultError packet) => _state.FeedLrx(packet);
+
+    public bool Search()
+    {
+        if (_state.Search() is not LogQuerySubmission submission)
+            return false;
+        SendQuery(submission);
+        return true;
+    }
+
+    public bool Next()
+    {
+        if (_state.Next() is not LogQuerySubmission submission)
+            return false;
+        SendQuery(submission);
+        return true;
+    }
+
+    public bool Previous()
+    {
+        if (_state.Previous() is not LogQuerySubmission submission)
+            return false;
+        SendQuery(submission);
+        return true;
+    }
+
+    private void SendQuery(LogQuerySubmission submission)
+    {
+        if (QuerySender is not { } sender)
+        {
+            _state.CancelActiveRequest(null);
+            return;
+        }
+        if (!sender(submission, out string error))
+            _state.CancelActiveRequest(error);
     }
 }

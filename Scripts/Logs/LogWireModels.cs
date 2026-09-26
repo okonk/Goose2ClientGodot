@@ -89,9 +89,9 @@ namespace Goose2Client.Logs
         IReadOnlyList<int> TypeIds,
         string Text);
 
-    public sealed class LogQuerySubmission
+    public abstract record LogQuerySubmission
     {
-        public sealed record Fresh
+        public sealed record Fresh : LogQuerySubmission
         {
             public int WindowId { get; }
             public int RequestId { get; }
@@ -109,7 +109,7 @@ namespace Goose2Client.Logs
             }
         }
 
-        public sealed record Page
+        public sealed record Page : LogQuerySubmission
         {
             public int WindowId { get; }
             public int RequestId { get; }
