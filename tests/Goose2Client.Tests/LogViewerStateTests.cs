@@ -454,12 +454,20 @@ namespace Goose2Client.Tests
             Assert.False(lrfIgnored.FeedLrf(LogPacketParsing.ParseLrf($"LRF{Window},9,0,{Token1},{Token2},x")));
             Assert.True(lrfIgnored.IsActive);
             Assert.Equal("Loading…", lrfIgnored.StatusText);
+            Assert.True(lrfIgnored.FeedLrb(Lrb(1)));
+            Assert.True(lrfIgnored.FeedLrd(Lrd(1, 0, 0, 1, B64(MinimalRow(1)))));
+            Assert.True(lrfIgnored.FeedLrf(Lrf(1, false, Token1, "")));
+            Assert.Single(lrfIgnored.Rows);
 
             var lrxIgnored = Open();
             lrxIgnored.Search();
             Assert.False(lrxIgnored.FeedLrx(LogPacketParsing.ParseLrx($"LRX{Window},9,QUJD,x")));
             Assert.True(lrxIgnored.IsActive);
             Assert.Equal("Loading…", lrxIgnored.StatusText);
+            Assert.True(lrxIgnored.FeedLrb(Lrb(1)));
+            Assert.True(lrxIgnored.FeedLrd(Lrd(1, 0, 0, 1, B64(MinimalRow(1)))));
+            Assert.True(lrxIgnored.FeedLrf(Lrf(1, false, Token1, "")));
+            Assert.Single(lrxIgnored.Rows);
         }
 
         [Fact]

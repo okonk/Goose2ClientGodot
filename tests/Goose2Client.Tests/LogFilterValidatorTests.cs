@@ -194,6 +194,15 @@ namespace Goose2Client.Tests
             Assert.False(extremeResult.Success);
             Assert.Equal("range exceeds 31 days", extremeResult.Error);
 
+            var positiveStart = new LogFilterDraft
+            {
+                Preset = LogFilterPreset.Previous24Hours,
+                DefaultStartUnixMs = long.MaxValue - 86_400_000L,
+                DefaultEndUnixMs = long.MaxValue
+            };
+            var positiveStartResult = LogFilterValidator.Validate(positiveStart, meta);
+            Assert.True(positiveStartResult.Success, positiveStartResult.Error);
+
             var negativeStart = new LogFilterDraft
             {
                 Preset = LogFilterPreset.Previous24Hours,
