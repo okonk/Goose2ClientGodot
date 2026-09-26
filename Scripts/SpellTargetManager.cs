@@ -10,40 +10,36 @@ public partial class SpellTargetManager : Node
     private SpellInfo _pendingSpell;
     private SpellTarget _reticle;
     private ulong _hotkeyConfirmFrame = ulong.MaxValue;
-    private readonly HoldConfirmTimer _holdConfirm = new();
-    
+    private readonly HoldCastGate _holdGate = new();
+
     /// <summary>Whether the player is currently in targeting mode.</summary>
     public bool IsTargeting { get; private set; }
-    
+
     // A hotkey press that confirmed a cast must not re-fire the hotbar's _Process poll on the
     // same frame (IsTargeting is already false by then, so its guard no longer applies).
     public bool HotkeyConfirmThisFrame => Engine.GetProcessFrames() == _hotkeyConfirmFrame;
+
+    // True while the hotkey that hold-cast is still down: the hotbar's held-key repeat then keeps
+    // casting on the remembered target rather than reopening targeting behind the player's back.
+    private bool IsHoldRepeating =>
+        !IsTargeting && _holdGate.IsRepeating && IsHotkeyHeld(_holdGate.Action);
     
     public override void _Ready()
     {
         ProcessMode = ProcessModeEnum.Always;
     }
 
-    // Holding the cast hotkey auto-confirms after HoldConfirmTimer's delay, so a single
-    // press-and-hold casts without a second keypress. A quick tap releases before the delay
-    // and leaves targeting up; a fresh press while targeting confirms immediately in _Input.
+    // Holding the cast hotkey auto-confirms after HoldCastGate's delay, so a single press-and-hold
+    // casts without a second keypress. A quick tap releases before the delay and leaves targeting
+    // up; a fresh press while targeting confirms immediately in _Input.
+    //
+    // The gate is advanced on every frame, targeting or not: it has to observe the release that
+    // ends a press, otherwise hold time left over from one press would confirm the next press's
+    // targeting session on its first frame and pin that hotkey to its previous target for good.
     public override void _Process(double delta)
     {
-        if (!IsTargeting) return;
-
-        string held = null;
-        for (int i = 0; i < 10; i++)
-        {
-            string action = i == 9 ? "Hotkey0" : $"Hotkey{i + 1}";
-            if (Input.IsActionPressed(action, exactMatch: true))
-            {
-                held = action;
-                break;
-            }
-        }
-
-        if (_holdConfirm.Tick(held, delta))
-            ConfirmTarget();
+        if (!_holdGate.Update(HeldHotkeyAction(), delta)) return;
+        if (IsTargeting) CastOnTarget();
     }
 
     public override void _ExitTree()
@@ -98,19 +94,45 @@ public partial class SpellTargetManager : Node
         GetViewport().GuiReleaseFocus();
         var mm = GameManager.Instance.CurrentMapManager;
         if (mm == null) { ExitTargeting(); return; }
+        if (!IsUsableTarget(_target, info.TargetType))
+            _target = mm.LocalPlayer;
+        PositionReticle();
+    }
+
+    /// <summary>
+    /// Casts again on the remembered target for a hotkey still held down after its hold cast.
+    /// Returns false when no such press is down, so the caller leaves targeting closed instead of
+    /// reopening the reticle for a key the player is already holding.
+    /// </summary>
+    public bool RepeatHoldCast(SpellInfo info)
+    {
+        if (!IsHoldRepeating) return false;
+
+        var mm = GameManager.Instance.CurrentMapManager;
+        if (mm == null) return false;
+        if (!IsUsableTarget(_target, info.TargetType))
+            _target = mm.LocalPlayer;
+        if (_target == null) return false;
+
+        GameManager.Instance.SpellCooldownManager.Cast(info.SlotNumber, info.Cooldown);
+        GameManager.Instance.NetworkClient.CastSpell(info.SlotNumber, _target.LoginId);
+        return true;
+    }
+
+    // A remembered target survives only while it is the same live character on this map, passes the
+    // spell's target-type filter, and sits inside the view range.
+    private bool IsUsableTarget(Character.Character target, SpellTargetType spellTargetType)
+    {
+        var mm = GameManager.Instance.CurrentMapManager;
+        if (mm == null || target == null || !GodotObject.IsInstanceValid(target)) return false;
+        if (mm.GetCharacter(target.LoginId) != target) return false;
+        if (FilterRejects(target, spellTargetType)) return false;
+        if (target.IsHiddenFromViewer) return false;
+
         var viewRange = GetViewRange();
         var player = mm.LocalPlayer;
-        if (_target == null
-            || !GodotObject.IsInstanceValid(_target)
-            || mm.GetCharacter(_target.LoginId) != _target
-            || FilterRejects(_target)
-            || _target.IsHiddenFromViewer
-            || System.Math.Abs(_target.X - player.X) > viewRange.X
-            || System.Math.Abs(_target.Y - player.Y) > viewRange.Y)
-        {
-            _target = player;
-        }
-        PositionReticle();
+        return System.Math.Abs(target.X - player.X) <= viewRange.X
+            && System.Math.Abs(target.Y - player.Y) <= viewRange.Y;
     }
     
     private Vector2I GetViewRange()
@@ -127,15 +149,15 @@ public partial class SpellTargetManager : Node
     /// target to be discarded and replaced with the local player. The local player itself is
     /// never rejected — it is always a valid target.
     /// </summary>
-    private bool FilterRejects(Character.Character target)
+    private bool FilterRejects(Character.Character target, SpellTargetType spellTargetType)
     {
         if (target.IsLocalPlayer) return false;
         var filteringEnabled = GameManager.Instance.CharacterSettings.GetOption<bool>(Options.TargetFiltering, true);
         if (!filteringEnabled) return false;
         var playerSide = target.CharacterType is CharacterType.Player or CharacterType.Pet;
-        if (_pendingSpell.TargetType == SpellTargetType.Player) return !playerSide;
-        if (_pendingSpell.TargetType == SpellTargetType.NPC) return playerSide;
-        if (_pendingSpell.TargetType == SpellTargetType.NPCPlayer) return playerSide && !CurrentMapFlags.Value.PvPEnabled;
+        if (spellTargetType == SpellTargetType.Player) return !playerSide;
+        if (spellTargetType == SpellTargetType.NPC) return playerSide;
+        if (spellTargetType == SpellTargetType.NPCPlayer) return playerSide && !CurrentMapFlags.Value.PvPEnabled;
         return false;
     }
     
@@ -161,16 +183,32 @@ public partial class SpellTargetManager : Node
         if (IsTargeting) PositionReticle();
     }
 
+    private string HeldHotkeyAction()
+    {
+        // Keep tracking the press already in progress so a second hotkey held down mid-press cannot
+        // restart the hold; otherwise the lowest hotkey down wins.
+        var action = _holdGate.Action;
+        if (action != null && IsHotkeyHeld(action)) return action;
+
+        for (int i = 0; i < 10; i++)
+        {
+            var candidate = HotkeyAction(i);
+            if (IsHotkeyHeld(candidate)) return candidate;
+        }
+        return null;
+    }
+
+    private static string HotkeyAction(int index) => index == 9 ? "Hotkey0" : $"Hotkey{index + 1}";
+
     // exactMatch: Shift+digit is the emote layer and must not cast.
-    // allowEcho: false — OS key-repeat must not confirm; holding the key is the
-    // hold-to-confirm path in _Process (echo would win with an OS-dependent delay).
+    private static bool IsHotkeyHeld(string action) => Input.IsActionPressed(action, exactMatch: true);
+
+    // allowEcho: false — OS key-repeat must not confirm; holding the key is the hold-to-cast path
+    // in _Process (echo would win with an OS-dependent delay).
     private static bool IsHotkeyPressed(InputEvent @event)
     {
         for (int i = 0; i < 10; i++)
-        {
-            string action = i == 9 ? "Hotkey0" : $"Hotkey{i + 1}";
-            if (@event.IsActionPressed(action, exactMatch: true, allowEcho: false)) return true;
-        }
+            if (@event.IsActionPressed(HotkeyAction(i), exactMatch: true, allowEcho: false)) return true;
         return false;
     }
     
@@ -235,7 +273,15 @@ public partial class SpellTargetManager : Node
         _reticle.ResizeTarget(_target.Height);
     }
     
+    // A confirm the player asked for (Enter, or a fresh hotkey press) ends the hold: the key has to
+    // come up before it can hold-cast again. A hold-confirm deliberately leaves the press repeating.
     private void ConfirmTarget()
+    {
+        _holdGate.Spend();
+        CastOnTarget();
+    }
+
+    private void CastOnTarget()
     {
         if (_target != null && _pendingSpell != null)
         {
@@ -244,9 +290,12 @@ public partial class SpellTargetManager : Node
         }
         ExitTargeting();
     }
-    
+
     private void CancelTarget()
     {
+        // Cancel must stick while the key stays down — otherwise the held key would reopen
+        // targeting (or start recasting) a moment later.
+        _holdGate.Spend();
         ExitTargeting();
     }
     

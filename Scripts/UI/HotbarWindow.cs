@@ -93,7 +93,7 @@ public partial class HotbarWindow : BaseWindow, IWindow
                 grid.AddChild(slot);
                 slot.SlotNumber = i;
                 slot.Window = this;
-                slot.OnUseSlot = UseSlot;
+                slot.OnUseSlot = slotIndex => UseSlot(slotIndex);
                 slot.OnSaveSlots = SaveSlotsDelayed;
                 LoadSlot(slot, settings[p * SlotsPerPage + i]);
                 slots[i] = slot;
@@ -275,7 +275,7 @@ public partial class HotbarWindow : BaseWindow, IWindow
         }
     }
 
-    private void UseSlot(int slotNumber)
+    private void UseSlot(int slotNumber, bool heldRepeat = false)
     {
         if (GameManager.Instance.IsTargeting) return;
 
@@ -285,7 +285,7 @@ public partial class HotbarWindow : BaseWindow, IWindow
         if (slot.ItemStats != null)
             InventoryWindow?.UseItem(slot.ItemStats);
         else if (slot.SpellInfo != null)
-            SpellbookWindow?.UseSpell(slot.SpellInfo);
+            SpellbookWindow?.UseSpell(slot.SpellInfo, heldRepeat);
     }
 
     public void ToggleMount()
@@ -358,8 +358,10 @@ public partial class HotbarWindow : BaseWindow, IWindow
             else if (repeatTick && Input.IsActionPressed(action, exactMatch: true))
             {
                 var repeatSlot = _pages[_pageIndex].Slots[i];
+                // heldRepeat: a spell that needs a target only repeats for the press that already
+                // hold-cast — a repeat must never reopen targeting on its own.
                 if (repeatSlot.SpellInfo != null)
-                    UseSlot(i);
+                    UseSlot(i, heldRepeat: true);
             }
         }
     }

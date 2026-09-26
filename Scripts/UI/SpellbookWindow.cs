@@ -57,7 +57,7 @@ public partial class SpellbookWindow : BaseWindow, IWindow
                 grid.AddChild(slot);
                 slot.SlotNumber = p * SlotsPerPage + j;
                 slot.Window = this;
-                slot.OnDoubleClick = UseSpell;
+                slot.OnDoubleClick = info => UseSpell(info);
                 slot.OnRightClick = info => GameManager.Instance.NetworkClient.RequestSpellInfo(info.SlotNumber);
                 slot.OnMoveSpell = MoveSpell;
                 slots[j] = slot;
@@ -111,7 +111,7 @@ public partial class SpellbookWindow : BaseWindow, IWindow
             slot.SetSpell(SpellInfo.FromPacket(p));
     }
 
-    public void UseSpell(SpellInfo info)
+    public void UseSpell(SpellInfo info, bool heldRepeat = false)
     {
         var lp = GameManager.Instance.CurrentMapManager?.LocalPlayer;
         if (!CurrentMapFlags.Value.SpellsEnabled && lp?.IsGM != true)
@@ -128,11 +128,20 @@ public partial class SpellbookWindow : BaseWindow, IWindow
             GameManager.Instance.NetworkClient.CastSpell(
                 info.SlotNumber,
                 lp?.LoginId ?? GameManager.Instance.CurrentMapManager?.MyLoginId ?? 0);
+            return;
         }
-        else
+
+        var targetManager = GameManager.Instance.SpellTargetManager;
+
+        // heldRepeat: the key is still down from the press that hold-cast, so cast on the remembered
+        // target again instead of reopening targeting for a key the player never released.
+        if (heldRepeat)
         {
-            GameManager.Instance.SpellTargetManager?.Cast(info);
+            targetManager?.RepeatHoldCast(info);
+            return;
         }
+
+        targetManager?.Cast(info);
     }
 
     public void OnBackClicked()
