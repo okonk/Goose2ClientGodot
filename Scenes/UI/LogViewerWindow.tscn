@@ -198,49 +198,49 @@ size_flags_horizontal = 3
 size_flags_stretch_ratio = 42
 mouse_filter = 2
 
-[node name="DetailsText" type="TextEdit" parent="Content/DetailsPanel"]
+[node name="DetailsText" type="TextEdit" parent="Content/Split/DetailsPanel"]
 layout_mode = 2
 size_flags_vertical = 3
 editable = false
 
-[node name="DetailsActions" type="HBoxContainer" parent="Content/DetailsPanel"]
+[node name="DetailsActions" type="HBoxContainer" parent="Content/Split/DetailsPanel"]
 layout_mode = 2
 mouse_filter = 2
 theme_override_constants/separation = 8
 
-[node name="PreviousButton" type="Button" parent="Content/DetailsPanel/DetailsActions"]
+[node name="PreviousButton" type="Button" parent="Content/Split/DetailsPanel/DetailsActions"]
 layout_mode = 2
 text = "Previous"
 
-[node name="NextButton" type="Button" parent="Content/DetailsPanel/DetailsActions"]
+[node name="NextButton" type="Button" parent="Content/Split/DetailsPanel/DetailsActions"]
 layout_mode = 2
 text = "Next"
 
-[node name="CopyButton" type="Button" parent="Content/DetailsPanel/DetailsActions"]
+[node name="CopyButton" type="Button" parent="Content/Split/DetailsPanel/DetailsActions"]
 layout_mode = 2
 text = "Copy"
 
-[node name="QuickActions" type="HBoxContainer" parent="Content/DetailsPanel"]
+[node name="QuickActions" type="HBoxContainer" parent="Content/Split/DetailsPanel"]
 layout_mode = 2
 mouse_filter = 2
 theme_override_constants/separation = 8
 
-[node name="QuickTypeButton" type="Button" parent="Content/DetailsPanel/QuickActions"]
+[node name="QuickTypeButton" type="Button" parent="Content/Split/DetailsPanel/QuickActions"]
 layout_mode = 2
 visible = false
 text = "Type"
 
-[node name="QuickPrimaryButton" type="Button" parent="Content/DetailsPanel/QuickActions"]
+[node name="QuickPrimaryButton" type="Button" parent="Content/Split/DetailsPanel/QuickActions"]
 layout_mode = 2
 visible = false
 text = "Primary"
 
-[node name="QuickRelatedButton" type="Button" parent="Content/DetailsPanel/QuickActions"]
+[node name="QuickRelatedButton" type="Button" parent="Content/Split/DetailsPanel/QuickActions"]
 layout_mode = 2
 visible = false
 text = "Related"
 
-[node name="QuickMapButton" type="Button" parent="Content/DetailsPanel/QuickActions"]
+[node name="QuickMapButton" type="Button" parent="Content/Split/DetailsPanel/QuickActions"]
 layout_mode = 2
 visible = false
 text = "Map"

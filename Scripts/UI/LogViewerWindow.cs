@@ -67,14 +67,14 @@ public partial class LogViewerWindow : BaseWindow
         _status = GetNode<Label>("Content/ActionRow/StatusLabel");
         _applied = GetNode<Label>("Content/ActionRow/AppliedFilterLabel");
         _tree = GetNode<Tree>("Content/Split/ResultsPanel/ResultsTree");
-        _details = GetNode<TextEdit>("Content/DetailsPanel/DetailsText");
-        _previous = GetNode<Button>("Content/DetailsPanel/DetailsActions/PreviousButton");
-        _next = GetNode<Button>("Content/DetailsPanel/DetailsActions/NextButton");
-        _copy = GetNode<Button>("Content/DetailsPanel/DetailsActions/CopyButton");
-        _quickType = GetNode<Button>("Content/DetailsPanel/QuickActions/QuickTypeButton");
-        _quickPrimary = GetNode<Button>("Content/DetailsPanel/QuickActions/QuickPrimaryButton");
-        _quickRelated = GetNode<Button>("Content/DetailsPanel/QuickActions/QuickRelatedButton");
-        _quickMap = GetNode<Button>("Content/DetailsPanel/QuickActions/QuickMapButton");
+        _details = GetNode<TextEdit>("Content/Split/DetailsPanel/DetailsText");
+        _previous = GetNode<Button>("Content/Split/DetailsPanel/DetailsActions/PreviousButton");
+        _next = GetNode<Button>("Content/Split/DetailsPanel/DetailsActions/NextButton");
+        _copy = GetNode<Button>("Content/Split/DetailsPanel/DetailsActions/CopyButton");
+        _quickType = GetNode<Button>("Content/Split/DetailsPanel/QuickActions/QuickTypeButton");
+        _quickPrimary = GetNode<Button>("Content/Split/DetailsPanel/QuickActions/QuickPrimaryButton");
+        _quickRelated = GetNode<Button>("Content/Split/DetailsPanel/QuickActions/QuickRelatedButton");
+        _quickMap = GetNode<Button>("Content/Split/DetailsPanel/QuickActions/QuickMapButton");
 
         for (int i = 0; i < PresetLabels.Length; i++)
             _preset.AddItem(PresetLabels[i]);
@@ -125,6 +125,7 @@ public partial class LogViewerWindow : BaseWindow
     protected override void OnClosePressed()
     {
         _state.OnClose();
+        SyncControlsFromDraft();
         base.OnClosePressed();
         RenderAll();
     }
@@ -173,7 +174,10 @@ public partial class LogViewerWindow : BaseWindow
     private void SendQuery(LogQuerySubmission submission)
     {
         if (QuerySender is not { } sender)
+        {
+            _state.CancelActiveRequest(null);
             return;
+        }
         if (!sender(submission, out string error))
             _state.CancelActiveRequest(error);
     }
@@ -263,7 +267,11 @@ public partial class LogViewerWindow : BaseWindow
         Variant metadata = _suggestions.GetItemMetadata(index);
         if (metadata.VariantType != Variant.Type.Int)
             return;
-        _map.Text = "#" + metadata.As<int>();
+        string mapText = "#" + metadata.As<int>();
+        _state.Draft.MapText = mapText;
+        _map.Text = mapText;
+        RenderSuggestions();
+        RenderStatus();
     }
 
     private void OnTreeItemSelected()
@@ -303,6 +311,7 @@ public partial class LogViewerWindow : BaseWindow
             return;
         _state.Draft.MapText = "#" + row.Map.Id;
         _map.Text = _state.Draft.MapText;
+        RenderSuggestions();
         RenderStatus();
     }
 
@@ -327,7 +336,7 @@ public partial class LogViewerWindow : BaseWindow
         _status.Text = _state.DirtyStatusText ?? _state.StatusText;
         _applied.Text = _state.AppliedFilterDescription;
         _search.Disabled = _state.IsActive;
-        _previous.Disabled = _state.HistoryIndex <= 0;
+        _previous.Disabled = _state.HistoryIndex <= 0 || _state.IsActive;
         _next.Disabled = _state.NextToken == null || _state.IsActive;
     }
 

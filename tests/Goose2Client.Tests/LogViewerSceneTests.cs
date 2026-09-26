@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using Goose2Client.UI;
 using Xunit;
@@ -91,8 +92,31 @@ public class LogViewerSceneTests
     {
         var source = WindowSource();
         Assert.Contains("GetItemMetadata(index)", source);
-        Assert.Contains("\"#\" + metadata.As<int>()", source);
+        Assert.Contains("_state.Draft.MapText = mapText", source);
+        Assert.Contains("_map.Text = mapText", source);
         Assert.DoesNotContain("GetItemText(index)", source);
+    }
+
+    [Fact]
+    public void EveryParentPath_ResolvesToAPreviouslyDeclaredNode()
+    {
+        var declared = new HashSet<string> { "." };
+        var lines = Scene().Split('\n');
+        int nodes = 0;
+        for (int i = 0; i < lines.Length; i++)
+        {
+            string line = lines[i];
+            if (!line.StartsWith("[node name=\""))
+                continue;
+            nodes++;
+            int nameEnd = line.IndexOf("\" type=", StringComparison.Ordinal);
+            string name = line.Substring(12, nameEnd - 12);
+            int parentStart = line.IndexOf("parent=\"", StringComparison.Ordinal);
+            string parent = parentStart < 0 ? "." : line.Substring(parentStart + 8, line.IndexOf('"', parentStart + 8) - parentStart - 8);
+            Assert.True(declared.Contains(parent), $"line {i + 1}: parent '{parent}' not declared");
+            declared.Add(parent == "." ? name : parent + "/" + name);
+        }
+        Assert.True(nodes >= 30);
     }
 
     [Fact]
@@ -100,6 +124,9 @@ public class LogViewerSceneTests
     {
         var s = Scene();
         Assert.Contains("node name=\"DetailsText\" type=\"TextEdit\"", s);
+        Assert.Contains("[node name=\"DetailsText\" type=\"TextEdit\" parent=\"Content/Split/DetailsPanel\"]", s);
+        Assert.Contains("[node name=\"CopyButton\" type=\"Button\" parent=\"Content/Split/DetailsPanel/DetailsActions\"]", s);
+        Assert.Contains("[node name=\"QuickMapButton\" type=\"Button\" parent=\"Content/Split/DetailsPanel/QuickActions\"]", s);
         Assert.Contains("editable = false", s);
         Assert.Contains("node name=\"CopyButton\" type=\"Button\"", s);
         Assert.Contains("text = \"Copy\"", s);
