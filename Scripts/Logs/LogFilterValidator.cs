@@ -15,8 +15,6 @@ namespace Goose2Client.Logs
 
         private const int ParticipantMaxUtf8Bytes = 64;
         private const int TextMaxUtf8Bytes = 4096;
-        private static readonly TimeSpan MaxSpan = TimeSpan.FromDays(31);
-        private static readonly TimeSpan MaxTextSpan = TimeSpan.FromDays(7);
         private const long MaxSpanMs = 31L * 86_400_000L;
         private const long MaxTextSpanMs = 7L * 86_400_000L;
         private static readonly string[] CustomFormats = { "yyyy-MM-dd HH:mm:ss" };
@@ -88,10 +86,12 @@ namespace Goose2Client.Logs
                 end = new DateTimeOffset(endUtc).ToUnixTimeMilliseconds();
                 if (end <= start)
                     return LogFilterValidationResult.Fail("start must be before end");
-                TimeSpan span = endUtc - startUtc;
-                if (span > MaxSpan)
+                // Span is measured in UTC milliseconds: parsed values are local wall time, and a wall-clock
+                // difference shifts by the DST offset when a transition falls inside the range.
+                long spanMs = end - start;
+                if (spanMs > MaxSpanMs)
                     return LogFilterValidationResult.Fail("range exceeds 31 days");
-                if (draft.Text.Length > 0 && span > MaxTextSpan)
+                if (draft.Text.Length > 0 && spanMs > MaxTextSpanMs)
                     return LogFilterValidationResult.Fail("text search range exceeds 7 days");
             }
             else
