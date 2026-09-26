@@ -11,6 +11,7 @@ namespace Goose2Client.Logs
     public sealed class LogViewerState
     {
         public const string FreshnessNotice = "Recent entries may be delayed by up to ten minutes.";
+        public const string DirtyNotice = "Filters edited — Search to apply.";
         private const string ProtocolError = "Protocol failure.";
 
         private enum ActiveKind
@@ -34,6 +35,7 @@ namespace Goose2Client.Logs
         private string? _nextToken;
         private ActiveKind _activeKind = ActiveKind.None;
         private string? _activeToken;
+        private LogNavigationIntent _activeIntent;
         private int _activeRequestId;
         private int _nextRequestId = 1;
         private bool _hasCommittedPage;
@@ -56,24 +58,22 @@ namespace Goose2Client.Logs
         public string? NextToken => _nextToken;
         public bool IsActive => _activeKind != ActiveKind.None;
         public bool IsReady => _metadata.Complete;
-        public bool IsDirty
+        public bool IsDirty => _appliedFilter != null && _lastSnapshot != null && IsDirtyDrafts();
+        public string? DirtyStatusText => IsDirty ? DirtyNotice : null;
+
+        private bool IsDirtyDrafts()
         {
-            get
-            {
-                if (_appliedFilter == null || _lastSnapshot == null)
-                    return false;
-                LogFilterValidationResult validation = LogFilterValidator.Validate(_draft, _metadata);
-                if (!validation.Success || validation.Snapshot == null)
-                    return true;
-                LogFreshFilterSnapshot current = validation.Snapshot;
-                LogFreshFilterSnapshot applied = _lastSnapshot;
-                return current.StartUnixMs != applied.StartUnixMs
-                    || current.EndUnixMs != applied.EndUnixMs
-                    || current.Participant != applied.Participant
-                    || current.MapId != applied.MapId
-                    || !TypesEqual(current.TypeIds, applied.TypeIds)
-                    || current.Text != applied.Text;
-            }
+            LogFilterValidationResult validation = LogFilterValidator.Validate(_draft, _metadata);
+            if (!validation.Success || validation.Snapshot == null)
+                return true;
+            LogFreshFilterSnapshot current = validation.Snapshot;
+            LogFreshFilterSnapshot applied = _lastSnapshot!;
+            return current.StartUnixMs != applied.StartUnixMs
+                || current.EndUnixMs != applied.EndUnixMs
+                || current.Participant != applied.Participant
+                || current.MapId != applied.MapId
+                || !TypesEqual(current.TypeIds, applied.TypeIds)
+                || current.Text != applied.Text;
         }
 
         private static bool TypesEqual(IReadOnlyList<int> a, IReadOnlyList<int> b)
@@ -142,28 +142,8 @@ namespace Goose2Client.Logs
 
         public void OnWindowReplacement(int windowId)
         {
+            ResetSession();
             _metadata = new LogMetadataState(windowId);
-            _assembler = new LogResponseAssembler();
-            _draft.Preset = LogFilterPreset.Previous24Hours;
-            _draft.StartText = "";
-            _draft.EndText = "";
-            _draft.Participant = "";
-            _draft.MapText = "";
-            _draft.SelectedTypeIds = new List<int>();
-            _draft.Text = "";
-            _rows = Array.Empty<LogRow>();
-            _selectionIndex = -1;
-            _hasCommittedPage = false;
-            _history.Clear();
-            _historyIndex = -1;
-            _currentToken = null;
-            _nextToken = null;
-            _appliedFilter = null;
-            _lastSnapshot = null;
-            _errorMessage = null;
-            _activeKind = ActiveKind.None;
-            _activeToken = null;
-            _activeRequestId = 0;
             _nextRequestId = 1;
         }
 
@@ -175,6 +155,14 @@ namespace Goose2Client.Logs
         private void ResetSession()
         {
             _assembler = new LogResponseAssembler();
+            _metadata = new LogMetadataState(0);
+            _draft.Preset = LogFilterPreset.Previous24Hours;
+            _draft.StartText = "";
+            _draft.EndText = "";
+            _draft.Participant = "";
+            _draft.MapText = "";
+            _draft.SelectedTypeIds = new List<int>();
+            _draft.Text = "";
             _rows = Array.Empty<LogRow>();
             _selectionIndex = -1;
             _hasCommittedPage = false;
@@ -233,6 +221,7 @@ namespace Goose2Client.Logs
             _assembler = new LogResponseAssembler();
             _activeKind = ActiveKind.Page;
             _activeToken = token;
+            _activeIntent = intent;
             _activeRequestId = _nextRequestId;
             _nextRequestId = _nextRequestId == int.MaxValue ? 1 : _nextRequestId + 1;
             _errorMessage = null;
@@ -306,7 +295,11 @@ namespace Goose2Client.Logs
             if (packet == null || !IsActive)
                 return false;
             if (packet.WindowId != _metadata.WindowId || packet.RequestId != _activeRequestId)
+            {
+                if (_assembler.HasStage)
+                    FailProtocol();
                 return false;
+            }
             if (!packet.IsValid)
                 return FailProtocol();
             _errorMessage = packet.SafeMessage;
@@ -349,7 +342,11 @@ namespace Goose2Client.Logs
             _rows = result.Rows;
             _selectionIndex = -1;
             _hasCommittedPage = true;
-            if (_historyIndex + 1 < _history.Count && _history[_historyIndex + 1] == result.CurrentToken)
+            if (_activeIntent == LogNavigationIntent.Previous)
+            {
+                _historyIndex--;
+            }
+            else if (_historyIndex + 1 < _history.Count && _history[_historyIndex + 1] == result.CurrentToken)
             {
                 _historyIndex++;
             }

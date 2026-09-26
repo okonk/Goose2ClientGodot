@@ -93,7 +93,7 @@ namespace Goose2Client.Logs
                         return LogFilterValidationResult.Fail("participant id must be a positive integer");
                     participant = "#" + participantId;
                 }
-                else if (participant.Length < 2 || participant[0] == ' ' || participant[participant.Length - 1] == ' ' || participant.IndexOf(' ') >= 0)
+                else if (participant[0] == ' ' || participant[participant.Length - 1] == ' ' || participant.IndexOf(' ') >= 0)
                 {
                     return LogFilterValidationResult.Fail("participant is invalid");
                 }

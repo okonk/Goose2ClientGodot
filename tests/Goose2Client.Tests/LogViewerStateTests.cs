@@ -14,6 +14,7 @@ namespace Goose2Client.Tests
         private const string Token1 = "AAECAwQFBgcICQoLDA0ODw";
         private const string Token2 = "BBECAwQFBgcICQoLDA0ODw";
         private const string Token3 = "CCECAwQFBgcICQoLDA0ODw";
+        private const string Token4 = "DDECAwQFBgcICQoLDA0ODw";
         private static readonly DateTime Clock = new(2026, 9, 26, 12, 0, 0, 0, DateTimeKind.Utc);
         private const long ClockMs = 1790424000000L;
 
@@ -445,6 +446,189 @@ namespace Goose2Client.Tests
             Assert.Equal("#3", s.Draft.MapText);
             s.ApplyQuickAction(LogQuickActionTarget.Related, relatedPlayer);
             Assert.Equal("#8", s.Draft.Participant);
+        }
+
+        [Fact]
+        public void PreviousCommitMovesToStoredTokenWithoutMutatingHistory()
+        {
+            var s = Open();
+            s.Search();
+            DeliverFreshPage(s, 1, MinimalRow(1), Token1, Token2, more: true);
+            s.Next();
+            s.FeedLrb(Lrb(2));
+            s.FeedLrd(Lrd(2, 0, 0, 1, B64(MinimalRow(2))));
+            s.FeedLrf(Lrf(2, true, Token2, Token3));
+            Assert.Equal(new[] { Token1, Token2 }, s.History.ToArray());
+            Assert.Equal(1, s.HistoryIndex);
+
+            var previous = Assert.IsType<LogQuerySubmission.Page>(s.Previous());
+            Assert.Equal(Token1, previous.PageToken);
+            s.FeedLrb(Lrb(previous.RequestId));
+            s.FeedLrd(Lrd(previous.RequestId, 0, 0, 1, B64(MinimalRow(9))));
+            s.FeedLrf(Lrf(previous.RequestId, true, Token1, Token2));
+            Assert.Equal(new[] { Token1, Token2 }, s.History.ToArray());
+            Assert.Equal(0, s.HistoryIndex);
+            Assert.Equal(SingleRow(9), s.Rows[0]);
+            Assert.Equal("Showing 1 rows (up to 50), page 1", s.StatusText);
+            Assert.Equal(Token2, s.NextToken);
+        }
+
+        [Fact]
+        public void NextCommitTruncatesDifferingForwardHistory()
+        {
+            var s = Open();
+            s.Search();
+            DeliverFreshPage(s, 1, MinimalRow(1), Token1, Token2, more: true);
+            s.Next();
+            s.FeedLrb(Lrb(2));
+            s.FeedLrd(Lrd(2, 0, 0, 1, B64(MinimalRow(2))));
+            s.FeedLrf(Lrf(2, true, Token2, Token3));
+            s.Next();
+            s.FeedLrb(Lrb(3));
+            s.FeedLrd(Lrd(3, 0, 0, 1, B64(MinimalRow(3))));
+            s.FeedLrf(Lrf(3, true, Token3, Token4));
+            Assert.Equal(new[] { Token1, Token2, Token3 }, s.History.ToArray());
+            Assert.Equal(2, s.HistoryIndex);
+
+            s.Previous();
+            s.FeedLrb(Lrb(4));
+            s.FeedLrd(Lrd(4, 0, 0, 1, B64(MinimalRow(2))));
+            s.FeedLrf(Lrf(4, true, Token2, Token4));
+            Assert.Equal(1, s.HistoryIndex);
+
+            var next = Assert.IsType<LogQuerySubmission.Page>(s.Next());
+            Assert.Equal(Token4, next.PageToken);
+            s.FeedLrb(Lrb(next.RequestId));
+            s.FeedLrd(Lrd(next.RequestId, 0, 0, 1, B64(MinimalRow(4))));
+            s.FeedLrf(Lrf(next.RequestId, false, Token4, ""));
+            Assert.Equal(new[] { Token1, Token2, Token4 }, s.History.ToArray());
+            Assert.Equal(2, s.HistoryIndex);
+        }
+
+        [Fact]
+        public void NextCommitReusesExistingForwardEntryWithoutDuplicate()
+        {
+            var s = Open();
+            s.Search();
+            DeliverFreshPage(s, 1, MinimalRow(1), Token1, Token2, more: true);
+            s.Next();
+            s.FeedLrb(Lrb(2));
+            s.FeedLrd(Lrd(2, 0, 0, 1, B64(MinimalRow(2))));
+            s.FeedLrf(Lrf(2, true, Token2, Token3));
+            Assert.Equal(new[] { Token1, Token2 }, s.History.ToArray());
+            Assert.Equal(1, s.HistoryIndex);
+
+            var previous = Assert.IsType<LogQuerySubmission.Page>(s.Previous());
+            Assert.Equal(Token1, previous.PageToken);
+            s.FeedLrb(Lrb(previous.RequestId));
+            s.FeedLrd(Lrd(previous.RequestId, 0, 0, 1, B64(MinimalRow(1))));
+            s.FeedLrf(Lrf(previous.RequestId, true, Token1, Token2));
+            Assert.Equal(0, s.HistoryIndex);
+
+            var next = Assert.IsType<LogQuerySubmission.Page>(s.Next());
+            Assert.Equal(Token2, next.PageToken);
+            s.FeedLrb(Lrb(next.RequestId));
+            s.FeedLrd(Lrd(next.RequestId, 0, 0, 1, B64(MinimalRow(2))));
+            s.FeedLrf(Lrf(next.RequestId, true, Token2, Token3));
+            Assert.Equal(new[] { Token1, Token2 }, s.History.ToArray());
+            Assert.Equal(1, s.HistoryIndex);
+        }
+
+        [Fact]
+        public void NonmatchingLrxMidStageAbortsTerminally()
+        {
+            var s = Open();
+            s.Search();
+            s.FeedLrb(Lrb(1));
+            s.FeedLrd(Lrd(1, 0, 0, 1, B64(MinimalRow(1))));
+            Assert.False(s.FeedLrx(Lrx(9, "stale")));
+            Assert.False(s.IsActive);
+            Assert.Equal("Protocol failure.", s.StatusText);
+            Assert.False(s.FeedLrf(Lrf(1, false, Token1, "")));
+            Assert.Empty(s.Rows);
+            Assert.Empty(s.History);
+
+            var noStage = Open();
+            noStage.Search();
+            DeliverFreshPage(noStage, 1, MinimalRow(1), Token1);
+            Assert.False(noStage.FeedLrx(Lrx(9, "stale")));
+            Assert.Single(noStage.Rows);
+            Assert.Equal("Showing 1 rows (up to 50), page 1", noStage.StatusText);
+        }
+
+        [Fact]
+        public void OversizeResponsePreservesOldPageAndShowsProtocolFailure()
+        {
+            var s = Open();
+            s.Search();
+            DeliverFreshPage(s, 1, MinimalRow(1), Token1);
+            Assert.Single(s.Rows);
+
+            s.Search();
+            s.FeedLrb(Lrb(2));
+            for (int i = 0; i < 340; i++)
+                Assert.True(s.FeedLrd(Lrd(2, 0, i, 342, new string('A', 12288))));
+            Assert.True(s.FeedLrd(Lrd(2, 0, 340, 342, new string('A', 10349))));
+            Assert.False(s.FeedLrd(Lrd(2, 0, 341, 342, "A")));
+            Assert.Single(s.Rows);
+            Assert.Equal(SingleRow(1), s.Rows[0]);
+            Assert.Equal("Protocol failure.", s.StatusText);
+            Assert.False(s.IsActive);
+            Assert.False(s.FeedLrf(Lrf(2, false, Token2, "")));
+            Assert.Equal(new[] { Token1 }, s.History.ToArray());
+            Assert.Equal(0, s.HistoryIndex);
+        }
+
+        [Fact]
+        public void LifecycleResetsClearMetadataAndDrafts()
+        {
+            var s = Open();
+            s.Search();
+            DeliverFreshPage(s, 1, MinimalRow(1), Token1);
+            s.Draft.Participant = "Edited";
+            s.Draft.Text = "fire";
+            Assert.True(s.Metadata.Complete);
+
+            s.OnClose();
+            Assert.False(s.Metadata.Complete);
+            Assert.Empty(s.Metadata.Types);
+            Assert.Empty(s.Metadata.Maps);
+            Assert.Equal(LogFilterPreset.Previous24Hours, s.Draft.Preset);
+            Assert.Equal("", s.Draft.Participant);
+            Assert.Equal("", s.Draft.MapText);
+            Assert.Equal("", s.Draft.Text);
+            Assert.Empty(s.Draft.SelectedTypeIds);
+            Assert.Empty(s.Rows);
+            Assert.Empty(s.History);
+            Assert.Null(s.AppliedFilter);
+
+            var disconnected = Open();
+            disconnected.OnDisconnected();
+            Assert.False(disconnected.Metadata.Complete);
+            Assert.Equal("", disconnected.Draft.Participant);
+
+            var errored = Open();
+            errored.OnSocketError();
+            Assert.False(errored.Metadata.Complete);
+            Assert.Empty(errored.Metadata.Maps);
+
+            var tornDown = Open();
+            tornDown.OnTeardown();
+            Assert.False(tornDown.Metadata.Complete);
+            Assert.Empty(tornDown.Rows);
+            Assert.Empty(tornDown.History);
+        }
+
+        [Fact]
+        public void DirtyDraftsShowExactDirtyNotice()
+        {
+            Assert.Equal("Filters edited — Search to apply.", LogViewerState.DirtyNotice);
+            var s = Open();
+            s.Search();
+            DeliverFreshPage(s, 1, MinimalRow(1), Token1);
+            Assert.Null(s.DirtyStatusText);
+            s.Draft.Text = "edited";
+            Assert.Equal("Filters edited — Search to apply.", s.DirtyStatusText);
         }
 
         [Fact]

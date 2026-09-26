@@ -216,7 +216,7 @@ namespace Goose2Client.Tests
         public void Participant_AcceptsEmptyNameAndPositiveIdOnly()
         {
             var meta = MetadataWithDefaults();
-            foreach (string valid in new[] { "", "Player", "#1", "#2147483647" })
+            foreach (string valid in new[] { "", "Z", "Player", "#1", "#2147483647" })
             {
                 var draft = Draft();
                 draft.Participant = valid;
