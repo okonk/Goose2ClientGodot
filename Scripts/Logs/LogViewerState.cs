@@ -290,6 +290,18 @@ namespace Goose2Client.Logs
             return true;
         }
 
+        public void CancelActiveRequest(string? error)
+        {
+            if (!IsActive)
+                return;
+            _assembler.Abort();
+            _activeKind = ActiveKind.None;
+            _activeToken = null;
+            _activeRequestId = 0;
+            if (error != null)
+                _errorMessage = error;
+        }
+
         public bool FeedLrx(LogResultError packet)
         {
             if (packet == null || !IsActive)

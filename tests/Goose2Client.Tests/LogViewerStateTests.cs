@@ -196,6 +196,50 @@ namespace Goose2Client.Tests
         }
 
         [Fact]
+        public void CancelledActiveRequest_RollsBackToIdleWithSafeError()
+        {
+            var s = Open();
+            var submission = s.Search();
+            Assert.NotNull(submission);
+            Assert.True(s.IsActive);
+            s.CancelActiveRequest("query rejected");
+            Assert.False(s.IsActive);
+            Assert.Equal("query rejected", s.StatusText);
+            Assert.Null(s.NextToken);
+            Assert.Empty(s.History);
+        }
+
+        [Fact]
+        public void CancelledActiveRequest_KeepsCommittedRowsAndHistoryIntact()
+        {
+            var s = Open();
+            s.Search();
+            DeliverFreshPage(s, 1, MinimalRow(99), Token1, Token2, more: true);
+            Assert.Single(s.Rows);
+            Assert.Equal(new[] { Token1 }, s.History.ToArray());
+            Assert.NotNull(s.Next());
+            Assert.True(s.IsActive);
+            s.CancelActiveRequest("query rejected");
+            Assert.False(s.IsActive);
+            Assert.Single(s.Rows);
+            Assert.Equal(SingleRow(99), s.Rows[0]);
+            Assert.Equal(0, s.HistoryIndex);
+            Assert.Equal(new[] { Token1 }, s.History.ToArray());
+            Assert.Equal("query rejected", s.StatusText);
+            Assert.NotNull(s.Next());
+        }
+
+        [Fact]
+        public void AcceptedSender_LeavesRequestActive()
+        {
+            var s = Open();
+            var submission = s.Search();
+            Assert.NotNull(submission);
+            Assert.True(s.IsActive);
+            Assert.Equal("Loading…", s.StatusText);
+        }
+
+        [Fact]
         public void ForwardHistoryIsReusedWhenItAlreadyMatches()
         {
             var s = Open();

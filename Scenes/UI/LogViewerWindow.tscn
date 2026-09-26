@@ -191,7 +191,6 @@ mouse_filter = 2
 layout_mode = 2
 size_flags_vertical = 3
 columns = 6
-columns_unsorted = true
 
 [node name="DetailsPanel" type="VBoxContainer" parent="Content/Split"]
 layout_mode = 2

@@ -143,4 +143,6 @@ namespace Goose2Client.Logs
         public static LogQueryFormatResult Ok(string packet) => new(true, packet, null);
         public static LogQueryFormatResult Fail(string error) => new(false, null, error);
     }
+
+    public delegate bool LogQuerySender(LogQuerySubmission submission, out string error);
 }

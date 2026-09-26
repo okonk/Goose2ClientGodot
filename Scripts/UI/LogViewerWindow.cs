@@ -20,11 +20,6 @@ public partial class LogViewerWindow : BaseWindow
         "Communication", "Sessions/Security", "Social", "Items/Economy", "GM Actions", "Other/Retired"
     };
 
-    private static readonly string[] ColumnHeaders =
-    {
-        "UTC", "Event type", "Primary", "Related", "Map", "Summary"
-    };
-
     private readonly LogViewerState _state = new(DateTime.UtcNow);
     private OptionButton _preset;
     private LineEdit _customStart;
@@ -51,7 +46,7 @@ public partial class LogViewerWindow : BaseWindow
 
     public LogViewerState State => _state;
 
-    public Action<LogQuerySubmission>? QuerySender { get; set; }
+    public LogQuerySender? QuerySender { get; set; }
 
     public override void _Ready()
     {
@@ -85,9 +80,9 @@ public partial class LogViewerWindow : BaseWindow
             _preset.AddItem(PresetLabels[i]);
 
         _tree.Columns = 6;
-        for (int i = 0; i < ColumnHeaders.Length; i++)
+        for (int i = 0; i < LogViewerLayout.ColumnHeaders.Length; i++)
         {
-            _tree.SetColumnTitle(i, ColumnHeaders[i]);
+            _tree.SetColumnTitle(i, LogViewerLayout.ColumnHeaders[i]);
             _tree.SetColumnCustomMinimumWidth(i, (int)LogViewerLayout.ColumnMinimums[i]);
             _tree.SetColumnExpandRatio(i, (int)Math.Round(LogViewerLayout.ColumnExpandRatios[i] * 10f));
         }
@@ -176,7 +171,12 @@ public partial class LogViewerWindow : BaseWindow
     }
 
     private void SendQuery(LogQuerySubmission submission)
-        => QuerySender?.Invoke(submission);
+    {
+        if (QuerySender is not { } sender)
+            return;
+        if (!sender(submission, out string error))
+            _state.CancelActiveRequest(error);
+    }
 
     private void SyncControlsFromDraft()
     {
@@ -263,7 +263,7 @@ public partial class LogViewerWindow : BaseWindow
         Variant metadata = _suggestions.GetItemMetadata(index);
         if (metadata.VariantType != Variant.Type.Int)
             return;
-        _map.Text = _suggestions.GetItemText(index);
+        _map.Text = "#" + metadata.As<int>();
     }
 
     private void OnTreeItemSelected()

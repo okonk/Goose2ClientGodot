@@ -17,6 +17,8 @@ public static class LogViewerLayout
 
     public static float FilterAreaHeight => Margin + FreshnessRowHeight + FilterRowHeight * 4 + SuggestionMaxHeight;
 
+    public static readonly string[] ColumnHeaders = { "UTC", "Event type", "Primary", "Related", "Map", "Summary" };
+
     public static readonly float[] ColumnMinimums = { 150f, 100f, 90f, 90f, 80f, 50f };
     public static readonly float[] ColumnExpandRatios = { 1.0f, 1.2f, 1.0f, 1.0f, 1.0f, 1.6f };
 

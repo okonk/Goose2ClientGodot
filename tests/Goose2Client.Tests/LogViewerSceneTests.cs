@@ -18,6 +18,8 @@ public class LogViewerSceneTests
 
     private static string Scene() => File.ReadAllText(Path.Combine(RepositoryRoot(), "Scenes/UI/LogViewerWindow.tscn"));
 
+    private static string WindowSource() => File.ReadAllText(Path.Combine(RepositoryRoot(), "Scripts/UI/LogViewerWindow.cs"));
+
     [Fact]
     public void Root_UsesStandardChromeAndDesignSize()
     {
@@ -66,8 +68,31 @@ public class LogViewerSceneTests
         var s = Scene();
         Assert.Contains("node name=\"ResultsTree\" type=\"Tree\"", s);
         Assert.Contains("columns = 6", s);
-        Assert.Contains("columns_unsorted = true", s);
-        Assert.DoesNotContain("columns_unsorted = false", s);
+        Assert.DoesNotContain("columns_unsorted", s);
+        foreach (string line in s.Split('\n'))
+        {
+            if (line.StartsWith("[node name="))
+                Assert.DoesNotContain("Sort", line);
+        }
+        Assert.Equal(new[] { "UTC", "Event type", "Primary", "Related", "Map", "Summary" }, LogViewerLayout.ColumnHeaders);
+    }
+
+    [Fact]
+    public void QuerySeam_RollsBackRejectedSubmissions()
+    {
+        var source = WindowSource();
+        Assert.Contains("LogQuerySender? QuerySender", source);
+        Assert.Contains("sender(submission, out string error)", source);
+        Assert.Contains("_state.CancelActiveRequest(error)", source);
+    }
+
+    [Fact]
+    public void SuggestionSelection_ReadsMapIdFromMetadata()
+    {
+        var source = WindowSource();
+        Assert.Contains("GetItemMetadata(index)", source);
+        Assert.Contains("\"#\" + metadata.As<int>()", source);
+        Assert.DoesNotContain("GetItemText(index)", source);
     }
 
     [Fact]
