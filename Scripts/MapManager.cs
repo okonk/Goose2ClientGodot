@@ -297,22 +297,36 @@ public partial class MapManager : Node2D
     /// <summary>World-space click. `worldPos` is in map pixels (see WorldViewport.WindowToWorld).</summary>
     public void HandleWorldClick(MouseButton button, Vector2 worldPos)
     {
-        if (GameManager.Instance.IsTargeting) return;   // spell targeting suppresses world clicks
-        Character.Character hit = null;
-        foreach (var child in _characterRoot.GetChildren())
+        if (GameManager.Instance.IsTargeting)
         {
-            if (child is not Character.Character c || !GodotObject.IsInstanceValid(c)) continue;
-            if (c.ContainsPoint(worldPos)) hit = c;   // later children draw on top → last match is topmost
+            // Spell targeting suppresses world clicks; a left click on a character casts at it.
+            // Hidden characters are skipped in the hit test: ContainsPoint is purely geometric, so an
+            // invisible character would otherwise stand in front of the visible one being clicked and
+            // silently swallow the cast.
+            if (button == MouseButton.Left)
+            {
+                var hit = CharacterAt(worldPos, skipHidden: true);
+                if (hit != null)
+                {
+                    // The cast ends targeting, so a double-click's second click would otherwise send
+                    // an LC; the dedup absorbs it.
+                    _lastLcTile = new Vector2I(hit.X, hit.Y);
+                    _lastLcMsec = Time.GetTicksMsec();
+                    GameManager.Instance.SpellTargetManager?.CastOnClickedTarget(hit);
+                }
+            }
+            return;
         }
+        var clicked = CharacterAt(worldPos);
         int tx, ty;
-        if (hit != null) { tx = hit.X; ty = hit.Y; }
+        if (clicked != null) { tx = clicked.X; ty = clicked.Y; }
         else { (tx, ty) = MapCoords.WorldToTile(worldPos); }
         if (button == MouseButton.Left)
         {
             // The server drops the NPC's prior quest window on a re-click without telling the
             // client, so a second LC would leave a dead window behind.
             var questWindows = GameManager.Instance.Hud?.QuestWindows;
-            if (hit != null && questWindows != null && questWindows.HasWindowForNpc(hit.LoginId))
+            if (clicked != null && questWindows != null && questWindows.HasWindowForNpc(clicked.LoginId))
                 return;
             ulong now = Time.GetTicksMsec();
             var tile = new Vector2I(tx, ty);
@@ -324,6 +338,20 @@ public partial class MapManager : Node2D
         }
         else
             GameManager.Instance.NetworkClient.RightClick(tx, ty);
+    }
+
+    // Topmost character whose body sprite covers the point: later children draw on top, so the last
+    // match wins. Hit-testing does not consult the spell's target-type filter — see CastOnClickedTarget.
+    private Character.Character? CharacterAt(Vector2 worldPos, bool skipHidden = false)
+    {
+        Character.Character? hit = null;
+        foreach (var child in _characterRoot.GetChildren())
+        {
+            if (child is not Character.Character c || !GodotObject.IsInstanceValid(c)) continue;
+            if (skipHidden && c.IsHiddenFromViewer) continue;
+            if (c.ContainsPoint(worldPos)) hit = c;
+        }
+        return hit;
     }
 
     private void CenterCameraOn(int x, int y)

@@ -100,6 +100,27 @@ public partial class SpellTargetManager : Node
     }
 
     /// <summary>
+    /// Targets a character the player left-clicked in the world and casts the pending spell at it.
+    /// </summary>
+    /// <remarks>
+    /// Deliberately unfiltered: the clicked character becomes the target whatever its type, so a
+    /// player-target spell can be lined up on an NPC and rejected by the server instead of the client
+    /// silently ignoring the click.
+    /// </remarks>
+    public void CastOnClickedTarget(Character.Character c)
+    {
+        if (!IsTargeting) return;
+        if (c == null || !GodotObject.IsInstanceValid(c) || c.IsHiddenFromViewer) return;
+        if (GameManager.Instance.CurrentMapManager?.GetCharacter(c.LoginId) != c) return;
+
+        _target = c;
+        // A click confirms without a hotkey to suppress the hotbar's own poll this frame, so a hotkey
+        // held in the same frame would otherwise cast on its own remembered target as well.
+        _hotkeyConfirmFrame = Engine.GetProcessFrames();
+        ConfirmTarget();
+    }
+
+    /// <summary>
     /// Casts again on the remembered target for a hotkey still held down after its hold cast.
     /// Returns false when no such press is down, so the caller leaves targeting closed instead of
     /// reopening the reticle for a key the player is already holding.
@@ -283,10 +304,14 @@ public partial class SpellTargetManager : Node
 
     private void CastOnTarget()
     {
-        if (_target != null && _pendingSpell != null)
+        // Nulled before the send so a second confirm arriving before targeting tears down cannot
+        // re-send the spell the first one already cast.
+        var spell = _pendingSpell;
+        _pendingSpell = null;
+        if (_target != null && spell != null)
         {
-            GameManager.Instance.SpellCooldownManager.Cast(_pendingSpell.SlotNumber, _pendingSpell.Cooldown);
-            GameManager.Instance.NetworkClient.CastSpell(_pendingSpell.SlotNumber, _target.LoginId);
+            GameManager.Instance.SpellCooldownManager.Cast(spell.SlotNumber, spell.Cooldown);
+            GameManager.Instance.NetworkClient.CastSpell(spell.SlotNumber, _target.LoginId);
         }
         ExitTargeting();
     }
