@@ -27,8 +27,24 @@ namespace Goose2Client
         public event System.Action<float> ScaleChanged;
         private int _lastAppliedScale;
 
-        /// <summary>Stored even with no map attached (applied on next <see cref="Attach"/>).</summary>
-        public int MinScale { get; private set; } = 2;
+        /// <summary>Requested scale factor, stored even with no map attached (applied on next <see cref="Attach"/>).</summary>
+        public int Factor { get; private set; } = 2;
+
+        /// <summary>
+        /// Scale the world actually renders at: <see cref="Factor"/> unless the window is too large
+        /// to draw at it, in which case the budget lifts it. Valid before a map attaches, so the
+        /// Options window can label the setting without one.
+        /// </summary>
+        public int ResolvedScale
+        {
+            get
+            {
+                var rootSize = (Vector2I)GetTree().Root.GetVisibleRect().Size;
+                return rootSize.X < 2 || rootSize.Y < 2
+                    ? Factor
+                    : WorldViewportScale.Compute(Factor, rootSize).Scale;
+            }
+        }
 
         // One-shot first-frame presentation deferred from <see cref="Attach"/>: the connected
         // handler (null = none pending) and the map whose first render it presents.
@@ -164,15 +180,14 @@ namespace Goose2Client
         }
 
         /// <summary>
-        /// Stores the minimum scale and, if a map is attached, recomputes the layout from the
-        /// current root window size and applies it to the sub-viewport and display rect. Sole
+        /// Stores the requested scale factor and, if a map is attached, recomputes the layout from
+        /// the current root window size and applies it to the sub-viewport and display rect. Sole
         /// mutator of <see cref="Current"/>.Size / <see cref="Layout"/> / the display rect.
-        /// No-op (minimum scale stored) when no map is attached or the root size is not usable
-        /// yet.
+        /// No-op (factor stored) when no map is attached or the root size is not usable yet.
         /// </summary>
-        public void ApplyMode(int minScale)
+        public void ApplyMode(int factor)
         {
-            MinScale = minScale;
+            Factor = factor;
             if (Current == null)
                 return;
 
@@ -180,7 +195,7 @@ namespace Goose2Client
             if (rootSize.X < 2 || rootSize.Y < 2)
                 return;
 
-            Layout = WorldViewportScale.Compute(minScale, rootSize);
+            Layout = WorldViewportScale.Compute(factor, rootSize);
             Current.Size = Layout.SubViewportSize;
             WorldTexture.Position = Layout.DisplayOrigin;
             WorldTexture.Size = Layout.DisplaySize;
@@ -202,10 +217,10 @@ namespace Goose2Client
         /// </summary>
         public void RefreshFromSettings()
         {
-            int minScale = GameManager.Instance?.CharacterSettings != null
+            int factor = GameManager.Instance?.CharacterSettings != null
                 ? GameManager.Instance.CharacterSettings.GetOption<int>(Options.RenderScale, 2)
                 : 2;
-            ApplyMode(minScale);
+            ApplyMode(factor);
         }
 
         /// <summary>
@@ -298,7 +313,7 @@ namespace Goose2Client
             var rootSize = (Vector2I)GetTree().Root.GetVisibleRect().Size;
             if (rootSize.X < 2 || rootSize.Y < 2)
                 return; // ignore while the root has no usable size yet
-            ApplyMode(MinScale);
+            ApplyMode(Factor);
         }
     }
 }

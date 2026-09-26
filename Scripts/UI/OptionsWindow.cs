@@ -53,6 +53,14 @@ public partial class OptionsWindow : BaseWindow
         _renderScaleSlider.DragEnded += OnRenderScaleDragEnded;
         _renderScaleSlider.ValueChanged += OnRenderScaleValueChanged;
 
+        var viewport = GameManager.Instance.WorldViewport;
+        if (viewport != null)
+        {
+            viewport.ScaleChanged += _ => RefreshRenderScaleLabel();
+            viewport.GetWindow().SizeChanged += RefreshRenderScaleLabel;
+        }
+        RefreshRenderScaleLabel();
+
         _minimap = GetNode<CheckBox>("Content/MinimapCheck");
         _minimap.ButtonPressed = GameManager.Instance.CharacterSettings.GetOption<bool>(Options.Minimap, true);
         _minimap.Toggled += OnMinimapChanged;
@@ -113,8 +121,8 @@ public partial class OptionsWindow : BaseWindow
     private void OnRenderScaleValueChanged(double v)
     {
         int scale = (int)v;
-        _renderScaleValueLabel.Text = scale + "×";
         GameManager.Instance.WorldViewport.ApplyMode(scale);
+        RefreshRenderScaleLabel();
         if (!_renderScaleDragging)
         {
             var cs = GameManager.Instance.CharacterSettings;
@@ -123,9 +131,23 @@ public partial class OptionsWindow : BaseWindow
         }
     }
 
+    // Reports the scale the world actually renders at, not the requested one: a request the
+    // window is too large for is lifted, and a label echoing the request would then name a zoom
+    // the user is not looking at (a 2x request renders 3x at 3840x2160).
+    private void RefreshRenderScaleLabel()
+    {
+        int requested = (int)_renderScaleSlider.Value;
+        var viewport = GameManager.Instance.WorldViewport;
+        int resolved = viewport != null ? viewport.ResolvedScale : requested;
+        _renderScaleValueLabel.Text = resolved == requested
+            ? requested + "×"
+            : requested + "× → " + resolved + "×";
+    }
+
     private void OnRenderScaleDragEnded(bool valueChanged)
     {
         _renderScaleDragging = false;
+        RefreshRenderScaleLabel();
         var cs = GameManager.Instance.CharacterSettings;
         cs.Options[Options.RenderScale] = (int)_renderScaleSlider.Value;
         cs.Save();
@@ -247,6 +269,7 @@ public partial class OptionsWindow : BaseWindow
     {
         base.Relayout();
         RefreshScaleLabel();
+        RefreshRenderScaleLabel();
     }
 
     public void ToggleWindow()
