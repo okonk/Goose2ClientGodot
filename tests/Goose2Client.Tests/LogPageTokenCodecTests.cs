@@ -7,8 +7,8 @@ namespace Goose2Client.Network.Tests
     {
         [Theory]
         [InlineData("AAAAAAAAAAAAAAAAAAAAAA")]
-        [InlineData("0123456789abcdefghijkl")]
-        [InlineData("a-_B0123456789abcdefgh")]
+        [InlineData("0123456789abcdefghijkQ")]
+        [InlineData("a-_B0123456789abcdefgA")]
         public void AcceptsCanonical22CharUnpaddedTokens(string token)
         {
             Assert.Equal(22, token.Length);
@@ -44,6 +44,29 @@ namespace Goose2Client.Network.Tests
         {
             Assert.False(LogPageTokenCodec.IsCanonical(token));
             Assert.False(LogPageTokenCodec.TryDecode(token, out _));
+        }
+
+        [Theory]
+        [InlineData("AAAAAAAAAAAAAAAAAAAAAB")]
+        [InlineData("AAAAAAAAAAAAAAAAAAAAAP")]
+        [InlineData("AAAAAAAAAAAAAAAAAAAAA_")]
+        [InlineData("AAECAwQFBgcICQoLDA0ODx")]
+        public void RejectsNoncanonicalFinalCharacter(string token)
+        {
+            Assert.Equal(22, token.Length);
+            Assert.False(LogPageTokenCodec.IsCanonical(token));
+            Assert.False(LogPageTokenCodec.TryDecode(token, out _));
+        }
+
+        [Fact]
+        public void AcceptsCanonicalTokensWithLowValueFinalCharacter()
+        {
+            Assert.True(LogPageTokenCodec.IsCanonical("AAAAAAAAAAAAAAAAAAAAAA"));
+            Assert.True(LogPageTokenCodec.IsCanonical("AAAAAAAAAAAAAAAAAAAAAQ"));
+            Assert.True(LogPageTokenCodec.TryDecode("AAAAAAAAAAAAAAAAAAAAAQ", out byte[] bytes));
+            var expected = new byte[16];
+            expected[15] = 1;
+            Assert.Equal(expected, bytes);
         }
 
         [Fact]

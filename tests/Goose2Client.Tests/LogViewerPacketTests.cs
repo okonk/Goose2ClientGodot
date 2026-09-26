@@ -9,7 +9,7 @@ namespace Goose2Client.Network.Packets.Tests
 {
     public class LogViewerPacketTests
     {
-        private const string Token = "aaaaaaaaaaaaaaaaaaaaaa";
+        private const string Token = "AAECAwQFBgcICQoLDA0ODw";
 
         private static T Parse<T>(PacketHandler handler, string packet)
             where T : class
@@ -158,8 +158,8 @@ namespace Goose2Client.Network.Packets.Tests
         public void Lrf_RejectsMalformedTokenShape()
         {
             Assert.False(Parse<LogResultFinish>(new LogResultFinishPacket(), "LRF5,3,0,short,").IsValid);
-            Assert.False(Parse<LogResultFinish>(new LogResultFinishPacket(), "LRF5,3,0," + Token.Replace('a', '+') + ",").IsValid);
-            Assert.False(Parse<LogResultFinish>(new LogResultFinishPacket(), "LRF5,3,0," + Token.Replace('a', '=') + ",").IsValid);
+            Assert.False(Parse<LogResultFinish>(new LogResultFinishPacket(), "LRF5,3,0," + Token.Replace('w', '+') + ",").IsValid);
+            Assert.False(Parse<LogResultFinish>(new LogResultFinishPacket(), "LRF5,3,0," + Token.Replace('w', '=') + ",").IsValid);
         }
 
         [Fact]
@@ -236,6 +236,19 @@ namespace Goose2Client.Network.Packets.Tests
             Assert.Equal(long.MinValue, extremes.StartUnixMs);
             Assert.Equal(long.MaxValue, extremes.EndUnixMs);
             Assert.False(Parse<LogDefaultsMetadata>(new LogDefaultsMetadataPacket(), "LMD5,9223372036854775809,9223372036854775810").IsValid);
+        }
+
+        [Fact]
+        public void Lmd_NumericFields_AreBareSignedDecimals()
+        {
+            Assert.False(Parse<LogDefaultsMetadata>(new LogDefaultsMetadataPacket(), "LMD5, 100,200").IsValid);
+            Assert.False(Parse<LogDefaultsMetadata>(new LogDefaultsMetadataPacket(), "LMD5,+100,200").IsValid);
+            Assert.False(Parse<LogDefaultsMetadata>(new LogDefaultsMetadataPacket(), "LMD5,100, 200").IsValid);
+            Assert.False(Parse<LogDefaultsMetadata>(new LogDefaultsMetadataPacket(), "LMD5,-,200").IsValid);
+            var negative = Parse<LogDefaultsMetadata>(new LogDefaultsMetadataPacket(), "LMD5,-100,200");
+            Assert.True(negative.IsValid);
+            Assert.Equal(-100L, negative.StartUnixMs);
+            Assert.Equal(200L, negative.EndUnixMs);
         }
 
         [Fact]

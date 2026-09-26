@@ -31,10 +31,42 @@ namespace Goose2Client.Network.Packets
         }
 
         public static bool TryParseInt32(string text, out int value)
-            => int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out value);
+        {
+            if (!TryParseStrictSigned(text, out long parsed))
+            {
+                value = 0;
+                return false;
+            }
+            if (parsed < int.MinValue || parsed > int.MaxValue)
+            {
+                value = 0;
+                return false;
+            }
+            value = (int)parsed;
+            return true;
+        }
 
         public static bool TryParseInt64(string text, out long value)
-            => long.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out value);
+            => TryParseStrictSigned(text, out value);
+
+        private static bool TryParseStrictSigned(string text, out long value)
+        {
+            value = 0;
+            if (string.IsNullOrEmpty(text))
+                return false;
+            int start = 0;
+            if (text[0] == '-')
+                start = 1;
+            if (start >= text.Length)
+                return false;
+            for (int i = start; i < text.Length; i++)
+            {
+                char c = text[i];
+                if (c < '0' || c > '9')
+                    return false;
+            }
+            return long.TryParse(text, NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out value);
+        }
 
         public static bool IsValidSegment(string segment)
         {

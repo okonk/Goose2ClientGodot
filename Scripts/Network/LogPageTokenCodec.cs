@@ -20,6 +20,9 @@ namespace Goose2Client.Network
                 if (!ok)
                     return false;
             }
+            // 16 bytes occupy 128 of the 132 bits carried by 22 chars; the final 4 bits must be zero
+            if (Value(token[TokenLength - 1]) % 16 != 0)
+                return false;
             return true;
         }
 

@@ -9,7 +9,7 @@ namespace Goose2Client.Network.Packets.Tests
 {
     public class LogQueryPacketTests
     {
-        private const string Token = "aaaaaaaaaaaaaaaaaaaaaa";
+        private const string Token = "AAECAwQFBgcICQoLDA0ODw";
 
         private static LogFreshFilterSnapshot Filter(long start, long end, string participant, int mapId, IReadOnlyList<int> typeIds, string text)
             => new LogFreshFilterSnapshot(start, end, participant, mapId, typeIds, text);
@@ -193,7 +193,7 @@ namespace Goose2Client.Network.Packets.Tests
             Assert.Null(shortToken.Packet);
             Assert.False(string.IsNullOrEmpty(shortToken.Error));
 
-            var plusToken = LogQueryPacket.Format(LogQuerySubmission.CreatePage(1, 1, Token.Replace('a', '+'), LogNavigationIntent.Previous));
+            var plusToken = LogQueryPacket.Format(LogQuerySubmission.CreatePage(1, 1, Token.Replace('w', '+'), LogNavigationIntent.Previous));
             Assert.False(plusToken.Success);
             Assert.Null(plusToken.Packet);
 
