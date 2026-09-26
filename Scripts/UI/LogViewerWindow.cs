@@ -245,26 +245,26 @@ public partial class LogViewerWindow : BaseWindow
 
     private void OnLrb(object o)
     {
-        if (_logic.FeedLrb((LogResultBegin)o))
-            RenderAll();
+        _logic.FeedLrb((LogResultBegin)o);
+        RenderAll();
     }
 
     private void OnLrd(object o)
     {
-        if (_logic.FeedLrd((LogResultData)o))
-            RenderAll();
+        _logic.FeedLrd((LogResultData)o);
+        RenderAll();
     }
 
     private void OnLrf(object o)
     {
-        if (_logic.FeedLrf((LogResultFinish)o))
-            RenderAll();
+        _logic.FeedLrf((LogResultFinish)o);
+        RenderAll();
     }
 
     private void OnLrx(object o)
     {
-        if (_logic.FeedLrx((LogResultError)o))
-            RenderAll();
+        _logic.FeedLrx((LogResultError)o);
+        RenderAll();
     }
 
     private void OnPresetSelected(int index)
@@ -458,7 +458,7 @@ public partial class LogViewerWindow : BaseWindow
     {
         _status.Text = _state.DirtyStatusText ?? _state.StatusText;
         _applied.Text = _state.AppliedFilterDescription;
-        _search.Disabled = _state.IsActive;
+        _search.Disabled = _state.IsActive || !_state.IsReady;
         _previous.Disabled = _state.HistoryIndex <= 0 || _state.IsActive;
         _next.Disabled = _state.NextToken == null || _state.IsActive;
     }

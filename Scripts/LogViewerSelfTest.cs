@@ -41,11 +41,18 @@ internal static class LogViewerSelfTest
     {
         public readonly List<LogQuerySubmission> Submissions = new();
         public readonly List<string> Packets = new();
+        public bool Accept { get; set; } = true;
+        public string Error { get; set; } = "";
 
         public LogQuerySender Delegate => (LogQuerySubmission submission, out string error) =>
         {
             Submissions.Add(submission);
             Packets.Add(Format(submission));
+            if (!Accept)
+            {
+                error = Error;
+                return false;
+            }
             error = "";
             return true;
         };
@@ -188,6 +195,7 @@ internal static class LogViewerSelfTest
             "LMM 44 must round-trip the delimiter/Unicode name");
 
         Assert(status.Text == "Waiting for log metadata…", $"status before LMD {status.Text}");
+        Assert(search.Disabled, "search must be disabled before LMD");
         int subsBefore = cap.Submissions.Count;
         search.EmitSignal("pressed");
         await Frame();
@@ -371,6 +379,7 @@ internal static class LogViewerSelfTest
         {
             Assert(!state.IsActive, $"{name}: request must be inactive");
             Assert(state.StatusText == "Protocol failure.", $"{name}: status {state.StatusText}");
+            Assert(status.Text == "Protocol failure.", $"{name}: label {status.Text}");
             Assert(state.Rows.Count == 2 && state.Rows[0].RowId == 101, $"{name}: committed rows must be untouched");
         }
 
@@ -462,6 +471,20 @@ internal static class LogViewerSelfTest
         Assert(state.Rows.Count == 2, "LRX must not touch committed rows");
         Assert(chatLog.Text == chatBefore, "chat must not be mutated by LRX");
         GD.Print("[log_viewer_selftest] OK LRX inline error without chat mutation");
+
+        cap.Accept = false;
+        cap.Error = "safe error text";
+        search.EmitSignal("pressed");
+        await Frame();
+        Assert(cap.Submissions.Count == subsBefore + 13, "rejected search must still be captured");
+        Assert(!state.IsActive, "rejected search must roll back the active request");
+        Assert(state.StatusText == "safe error text", $"rejected search status {state.StatusText}");
+        Assert(status.Text == "safe error text", "rejected search must render the safe error inline");
+        Assert(state.Rows.Count == 2 && state.Rows[0].RowId == 101, "rejected search must keep committed rows");
+        Assert(state.History.Count == 1 && state.History[0] == T1 && state.HistoryIndex == 0, "rejected search must keep history");
+        cap.Accept = true;
+        cap.Error = "";
+        GD.Print("[log_viewer_selftest] OK sender rejection rolls back with safe error");
 
         string appliedBefore = applied.Text;
         var appliedFilterBefore = state.AppliedFilter;
