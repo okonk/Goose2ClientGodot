@@ -219,6 +219,8 @@ namespace Goose2Client
                 _ = UiScaleSelfTest.Run(this);
             if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "+selftest=character_icon") >= 0)
                 _ = CharacterIconSelfTest.Run(this);
+            if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "+selftest=log_viewer") >= 0)
+                _ = LogViewerSelfTest.Run(this);
         }
 
         public void HandlePacket(string packet)
