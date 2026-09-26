@@ -202,6 +202,28 @@ namespace Goose2Client.Tests
         }
 
         [Fact]
+        public void SupportedUtcBoundariesRenderInIsoFormat()
+        {
+            long min = DateTimeOffset.MinValue.ToUnixTimeMilliseconds();
+            long max = DateTimeOffset.MaxValue.ToUnixTimeMilliseconds();
+            Assert.Equal(-62135596800000L, min);
+            Assert.Equal(253402300799999L, max);
+            foreach (var (value, table, iso) in new[]
+            {
+                (min, "0001-01-01 00:00:00.000", "0001-01-01T00:00:00.000Z"),
+                (max, "9999-12-31 23:59:59.999", "9999-12-31T23:59:59.999Z")
+            })
+            {
+                var row = new LogRow(
+                    1, value, 5L, true, "L", "G", LogOtherIdKind.Unused,
+                    new LogRowEntity("P", LogEntityKind.Player, 1L, "N", true), null, null,
+                    new LogRowRaw(1, true, 2, true, 3, true, 4, true, 5, true), "s", "t");
+                Assert.Equal(table, LogDetailsFormatter.TableColumns(row)[0]);
+                Assert.Equal("UTC: " + iso, LogDetailsFormatter.Format(row).Split('\n')[1]);
+            }
+        }
+
+        [Fact]
         public void DetailsAndClipboardShareTheFormatterAndDoNotMutate()
         {
             var row = FullRow();

@@ -232,22 +232,37 @@ namespace Goose2Client.Tests
         }
 
         [Fact]
-        public void NoncanonicalBase64PaddingBitsAbortIrreversibly()
+        public void NoncanonicalBase64OfValidJsonAbortsAtBase64Stage()
         {
+            string json = MinimalRow(1);
+            string canonical = B64(json);
+            if (!canonical.EndsWith("=", StringComparison.Ordinal))
+            {
+                json = MinimalRow(1).Replace("\"originalText\":\"t\"", "\"originalText\":\"tt\"");
+                canonical = B64(json);
+            }
+            int dataChar = canonical.EndsWith("==", StringComparison.Ordinal) ? canonical.Length - 3 : canonical.Length - 2;
+            string noncanonical = canonical.Substring(0, dataChar) + (char)(canonical[dataChar] + 1) + canonical.Substring(dataChar + 1);
+            Assert.Equal(canonical, Convert.ToBase64String(Convert.FromBase64String(noncanonical)));
+
             var a = new LogResponseAssembler();
+            int mid = noncanonical.Length / 2;
             Assert.True(a.FeedLrb(Lrb()));
-            Assert.True(a.FeedLrd(Lrd(0, 0, 2, "AA")));
-            Assert.False(a.FeedLrd(Lrd(0, 1, 2, "==")));
+            Assert.True(a.FeedLrd(Lrd(0, 0, 2, noncanonical.Substring(0, mid))));
+            Assert.False(a.FeedLrd(Lrd(0, 1, 2, noncanonical.Substring(mid))));
             Assert.True(a.Aborted);
             Assert.False(a.HasStage);
             Assert.Null(a.Result);
-            Assert.False(a.FeedLrd(Lrd(0, 0, 1, "AQ==")));
             Assert.False(a.FeedLrf(Lrf(false, "AAECAwQFBgcICQoLDA0ODw", "")));
 
-            var single = new LogResponseAssembler();
-            Assert.True(single.FeedLrb(Lrb()));
-            Assert.False(single.FeedLrd(Lrd(0, 0, 1, "AA==")));
-            Assert.True(single.Aborted);
+            var b = new LogResponseAssembler();
+            var chunks = Split(canonical);
+            Assert.True(b.FeedLrb(Lrb()));
+            for (int i = 0; i < chunks.Count; i++)
+                Assert.True(b.FeedLrd(Lrd(0, i, chunks.Count, chunks[i])));
+            Assert.True(b.FeedLrf(Lrf(false, "AAECAwQFBgcICQoLDA0ODw", "")));
+            Assert.NotNull(b.Result);
+            Assert.Single(b.Result.Rows);
         }
 
         [Fact]

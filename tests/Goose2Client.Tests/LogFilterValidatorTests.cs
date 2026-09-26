@@ -181,6 +181,54 @@ namespace Goose2Client.Tests
         }
 
         [Fact]
+        public void ExactDefaultSpanIsOverflowSafe()
+        {
+            var meta = MetadataWithDefaults();
+            var extreme = new LogFilterDraft
+            {
+                Preset = LogFilterPreset.Previous24Hours,
+                DefaultStartUnixMs = long.MinValue,
+                DefaultEndUnixMs = long.MaxValue
+            };
+            var extremeResult = LogFilterValidator.Validate(extreme, meta);
+            Assert.False(extremeResult.Success);
+            Assert.Equal("range exceeds 31 days", extremeResult.Error);
+
+            var negativeStart = new LogFilterDraft
+            {
+                Preset = LogFilterPreset.Previous24Hours,
+                DefaultStartUnixMs = long.MinValue,
+                DefaultEndUnixMs = 1
+            };
+            Assert.False(LogFilterValidator.Validate(negativeStart, meta).Success);
+
+            var day = new LogFilterDraft
+            {
+                Preset = LogFilterPreset.Previous24Hours,
+                DefaultStartUnixMs = 1700000000123L,
+                DefaultEndUnixMs = 1700000000123L + 86_400_000L
+            };
+            Assert.True(LogFilterValidator.Validate(day, meta).Success);
+
+            var over31 = new LogFilterDraft
+            {
+                Preset = LogFilterPreset.Previous24Hours,
+                DefaultStartUnixMs = 0L,
+                DefaultEndUnixMs = 31L * 86_400_000L + 1
+            };
+            Assert.False(LogFilterValidator.Validate(over31, meta).Success);
+
+            var over7Text = new LogFilterDraft
+            {
+                Preset = LogFilterPreset.Previous24Hours,
+                DefaultStartUnixMs = 0L,
+                DefaultEndUnixMs = 7L * 86_400_000L + 1,
+                Text = "fire"
+            };
+            Assert.False(LogFilterValidator.Validate(over7Text, meta).Success);
+        }
+
+        [Fact]
         public void Presets_UseExactFixedClockBoundaries()
         {
             var draft = new LogFilterDraft { Preset = LogFilterPreset.Previous24Hours };

@@ -382,6 +382,18 @@ namespace Goose2Client.Tests
         }
 
         [Fact]
+        public void AppliedFilterDescriptionRendersOutOfRangeUtcAsRawDecimal()
+        {
+            var s = new LogViewerState(Clock);
+            s.OnWindowReplacement(Window);
+            s.FeedLmd(LogPacketParsing.ParseLmd($"LMD{Window},{long.MinValue},{long.MinValue + 86_400_000L}"));
+            Assert.Equal(long.MinValue.ToString(), s.Draft.StartText);
+            s.Search();
+            DeliverFreshPage(s, 1, MinimalRow(1), Token1);
+            Assert.Equal(long.MinValue + " → " + (long.MinValue + 86_400_000L), s.AppliedFilterDescription);
+        }
+
+        [Fact]
         public void MalformedMatchingIdentityAbortsEvenWithoutAStage()
         {
             var s = Open();
@@ -407,6 +419,47 @@ namespace Goose2Client.Tests
             Assert.True(ignored.FeedLrd(Lrd(1, 0, 0, 1, B64(MinimalRow(1)))));
             Assert.True(ignored.FeedLrf(Lrf(1, false, Token1, "")));
             Assert.Single(ignored.Rows);
+
+            var lrdAbort = Open();
+            lrdAbort.Search();
+            Assert.False(lrdAbort.FeedLrd(LogPacketParsing.ParseLrd($"LRD{Window},1,0,0,1,QUJD,x")));
+            Assert.False(lrdAbort.IsActive);
+            Assert.Equal("Protocol failure.", lrdAbort.StatusText);
+            Assert.Empty(lrdAbort.Rows);
+
+            var lrfAbort = Open();
+            lrfAbort.Search();
+            Assert.False(lrfAbort.FeedLrf(LogPacketParsing.ParseLrf($"LRF{Window},1,0,{Token1},{Token2},x")));
+            Assert.False(lrfAbort.IsActive);
+            Assert.Equal("Protocol failure.", lrfAbort.StatusText);
+
+            var lrxAbort = Open();
+            lrxAbort.Search();
+            Assert.False(lrxAbort.FeedLrx(LogPacketParsing.ParseLrx($"LRX{Window},1,QUJD,x")));
+            Assert.False(lrxAbort.IsActive);
+            Assert.Equal("Protocol failure.", lrxAbort.StatusText);
+
+            var lrdIgnored = Open();
+            lrdIgnored.Search();
+            Assert.False(lrdIgnored.FeedLrd(LogPacketParsing.ParseLrd($"LRD{Window},9,0,0,1,QUJD,x")));
+            Assert.True(lrdIgnored.IsActive);
+            Assert.Equal("Loading…", lrdIgnored.StatusText);
+            Assert.True(lrdIgnored.FeedLrb(Lrb(1)));
+            Assert.True(lrdIgnored.FeedLrd(Lrd(1, 0, 0, 1, B64(MinimalRow(1)))));
+            Assert.True(lrdIgnored.FeedLrf(Lrf(1, false, Token1, "")));
+            Assert.Single(lrdIgnored.Rows);
+
+            var lrfIgnored = Open();
+            lrfIgnored.Search();
+            Assert.False(lrfIgnored.FeedLrf(LogPacketParsing.ParseLrf($"LRF{Window},9,0,{Token1},{Token2},x")));
+            Assert.True(lrfIgnored.IsActive);
+            Assert.Equal("Loading…", lrfIgnored.StatusText);
+
+            var lrxIgnored = Open();
+            lrxIgnored.Search();
+            Assert.False(lrxIgnored.FeedLrx(LogPacketParsing.ParseLrx($"LRX{Window},9,QUJD,x")));
+            Assert.True(lrxIgnored.IsActive);
+            Assert.Equal("Loading…", lrxIgnored.StatusText);
         }
 
         [Fact]

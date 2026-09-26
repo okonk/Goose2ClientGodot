@@ -71,6 +71,9 @@ namespace Goose2Client.Logs
                 end = exactEnd;
                 if (end <= start)
                     return LogFilterValidationResult.Fail("start must be before end");
+                long maxSpanEnd = start > 0 ? long.MaxValue - start : long.MaxValue + start;
+                if (end > maxSpanEnd)
+                    return LogFilterValidationResult.Fail("range exceeds 31 days");
                 long spanMs = end - start;
                 if (spanMs > MaxSpanMs)
                     return LogFilterValidationResult.Fail("range exceeds 31 days");
