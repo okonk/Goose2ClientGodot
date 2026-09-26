@@ -4,6 +4,7 @@ using System.Text;
 using System.Threading;
 using Godot;
 using Goose2Client.Diagnostics;
+using Goose2Client.Logs;
 using Goose2Client.Network.Packets;
 
 namespace Goose2Client.Network
@@ -277,6 +278,22 @@ namespace Goose2Client.Network
         public void WindowButtonClick(WindowButtons button, int windowId, int npcId, int unknownId1 = 0, int unknownId2 = 0)
         {
             Send($"WBC{(int)button},{windowId},{npcId},{unknownId1},{unknownId2}");
+        }
+
+        public bool TryLogQuery(LogQuerySubmission submission, out string error)
+        {
+            // UI validation restricts type ids to LMT-delivered types, so the count is bounded upstream.
+            LogQueryFormatResult result = submission is LogQuerySubmission.Fresh fresh
+                ? LogQueryPacket.Format(fresh, int.MaxValue)
+                : LogQueryPacket.Format((LogQuerySubmission.Page)submission);
+            if (!result.Success || result.Packet == null)
+            {
+                error = result.Error ?? "query is invalid";
+                return false;
+            }
+            error = "";
+            Send(result.Packet);
+            return true;
         }
 
         public void CustomWindowSlots(int lookSlot, int statsSlot)

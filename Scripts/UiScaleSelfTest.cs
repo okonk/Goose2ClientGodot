@@ -100,6 +100,16 @@ internal static class UiScaleSelfTest
         gm.EnsureHud();
         await Frame();
 
+        // The hidden log viewer is a registered root like every other window; the walk
+        // below covers it, and these explicit legs pin its scale round trip.
+        var logViewer = gm.Hud.LogViewer;
+        Assert(ContainsRoot(logViewer), "hidden log viewer must be in the scale audit");
+        Assert(!logViewer.Visible, "log viewer must start hidden");
+        var logViewerTitle = logViewer.GetNode<Control>("TitleBar");
+        var logViewerTitle1 = logViewerTitle.OffsetBottom;
+        Assert(logViewerTitle1 == 24, $"log viewer title bar 1x {logViewerTitle1} != 24");
+        Assert(logViewer.Size == new Vector2(1000, 620), $"log viewer size 1x {logViewer.Size}");
+
         // Party buffs: exercise the internal packet-application path at 1x before the
         // baseline so live effect nodes are part of the round-trip geometry.
         var party = gm.Hud.Party;
@@ -233,6 +243,8 @@ internal static class UiScaleSelfTest
 
         Assert(gm.Hud.Vitals.Size == new Vector2(366, 110), $"vitals size {gm.Hud.Vitals.Size} != (366, 110)");
         Assert(gm.Hud.Vitals.Position == new Vector2(16, 16), $"vitals pos {gm.Hud.Vitals.Position} != (16, 16)");
+        Assert(logViewerTitle.OffsetBottom == logViewerTitle1 * 2, $"log viewer title bar 2x {logViewerTitle.OffsetBottom} != {logViewerTitle1 * 2}");
+        Assert(logViewer.GetNode<Tree>("Content/Split/ResultsPanel/ResultsTree").Columns == 6, "log viewer tree must keep six columns at 2x");
         var slot = (ItemSlot)gm.Hud.Inventory.GetNode<GridContainer>("Content/SlotGrid").GetChild(0);
         Assert(slot.CustomMinimumSize == new Vector2(64, 64), $"item slot min {slot.CustomMinimumSize} != (64, 64)");
         Assert(gm.Hud.Chat.Size == new Vector2(1000, 416), $"chat size {gm.Hud.Chat.Size} != (1000, 416)");
@@ -589,6 +601,8 @@ internal static class UiScaleSelfTest
         Assert(slot.CustomMinimumSize == new Vector2(32, 32), $"item slot min {slot.CustomMinimumSize} != (32, 32)");
         Assert(gm.Hud.Hotbar.GetNode<TextureRect>("Background") != null,
             "hotbar bg must stay a stretched TextureRect");
+        Assert(logViewerTitle.OffsetBottom == logViewerTitle1, $"log viewer title bar 1x restore {logViewerTitle.OffsetBottom} != {logViewerTitle1}");
+        Assert(logViewer.Size == new Vector2(1000, 620), $"log viewer size 1x restore {logViewer.Size}");
         tm.ShowSpellTooltip(new SpellInfo { Name = "Selftest" }, gm.Hud);
         await Frame();
         await Frame();

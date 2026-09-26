@@ -1,0 +1,247 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://Scripts/UI/LogViewerWindow.cs" id="1_lv"]
+[ext_resource type="Theme" path="res://Assets/UI/GameTheme.tres" id="2_theme"]
+
+[node name="LogViewerWindow" type="Control"]
+script = ExtResource("1_lv")
+theme = ExtResource("2_theme")
+layout_mode = 3
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 1000.0
+offset_bottom = 620.0
+WindowName = "LogViewer"
+
+[node name="Background" type="TextureRect" parent="."]
+layout_mode = 2
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+
+[node name="TitleBar" type="Control" parent="."]
+layout_mode = 2
+anchors_preset = 10
+anchor_right = 1.0
+offset_bottom = 24.0
+mouse_filter = 0
+
+[node name="TitleLabel" type="Label" parent="TitleBar"]
+layout_mode = 2
+anchors_preset = 10
+anchor_right = 1.0
+offset_left = 4.0
+offset_top = 2.0
+offset_right = -20.0
+offset_bottom = 22.0
+mouse_filter = 2
+text = "Log Viewer"
+clip_text = true
+
+[node name="CloseButton" type="Button" parent="TitleBar"]
+layout_mode = 2
+anchors_preset = 6
+anchor_bottom = 1.0
+offset_left = -18.0
+offset_top = 2.0
+offset_right = -2.0
+offset_bottom = 22.0
+flat = true
+
+[node name="Content" type="Control" parent="."]
+layout_mode = 2
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = 24.0
+mouse_filter = 1
+
+[node name="FreshnessLabel" type="Label" parent="Content"]
+layout_mode = 2
+anchor_right = 1.0
+offset_left = 8.0
+offset_top = 8.0
+offset_right = -8.0
+offset_bottom = 24.0
+mouse_filter = 2
+text = "Recent entries may be delayed by up to ten minutes."
+clip_text = true
+
+[node name="PresetRow" type="HBoxContainer" parent="Content"]
+layout_mode = 2
+anchor_right = 1.0
+offset_left = 8.0
+offset_top = 24.0
+offset_right = -8.0
+offset_bottom = 48.0
+mouse_filter = 2
+theme_override_constants/separation = 8
+
+[node name="PresetOptionButton" type="OptionButton" parent="Content/PresetRow"]
+layout_mode = 2
+custom_minimum_size_x = 150.0
+
+[node name="CustomStartField" type="LineEdit" parent="Content/PresetRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+editable = false
+placeholder_text = "2025-01-01 00:00:00"
+
+[node name="CustomEndField" type="LineEdit" parent="Content/PresetRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+editable = false
+placeholder_text = "2025-01-02 00:00:00"
+
+[node name="ParticipantRow" type="HBoxContainer" parent="Content"]
+layout_mode = 2
+anchor_right = 1.0
+offset_left = 8.0
+offset_top = 48.0
+offset_right = -8.0
+offset_bottom = 72.0
+mouse_filter = 2
+theme_override_constants/separation = 8
+
+[node name="ParticipantField" type="LineEdit" parent="Content/ParticipantRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+placeholder_text = "Participant name or #id"
+
+[node name="TypesButton" type="Button" parent="Content/ParticipantRow"]
+layout_mode = 2
+text = "Types"
+
+[node name="MapRow" type="HBoxContainer" parent="Content"]
+layout_mode = 2
+anchor_right = 1.0
+offset_left = 8.0
+offset_top = 72.0
+offset_right = -8.0
+offset_bottom = 96.0
+mouse_filter = 2
+theme_override_constants/separation = 8
+
+[node name="MapField" type="LineEdit" parent="Content/MapRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+placeholder_text = "Map name or #id"
+
+[node name="TextField" type="LineEdit" parent="Content/MapRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+placeholder_text = "Literal text"
+
+[node name="MapSuggestions" type="ItemList" parent="Content"]
+layout_mode = 2
+anchor_right = 1.0
+offset_left = 8.0
+offset_top = 96.0
+offset_right = -8.0
+offset_bottom = 192.0
+
+[node name="ActionRow" type="HBoxContainer" parent="Content"]
+layout_mode = 2
+anchor_right = 1.0
+offset_left = 8.0
+offset_top = 192.0
+offset_right = -8.0
+offset_bottom = 216.0
+mouse_filter = 2
+theme_override_constants/separation = 8
+
+[node name="SearchButton" type="Button" parent="Content/ActionRow"]
+layout_mode = 2
+text = "Search"
+
+[node name="ClearButton" type="Button" parent="Content/ActionRow"]
+layout_mode = 2
+text = "Clear"
+
+[node name="StatusLabel" type="Label" parent="Content/ActionRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
+clip_text = true
+
+[node name="AppliedFilterLabel" type="Label" parent="Content/ActionRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
+clip_text = true
+
+[node name="Split" type="HBoxContainer" parent="Content"]
+layout_mode = 2
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 8.0
+offset_top = 216.0
+offset_right = -8.0
+offset_bottom = -8.0
+mouse_filter = 2
+
+[node name="ResultsPanel" type="VBoxContainer" parent="Content/Split"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_stretch_ratio = 58
+mouse_filter = 2
+
+[node name="ResultsTree" type="Tree" parent="Content/Split/ResultsPanel"]
+layout_mode = 2
+size_flags_vertical = 3
+columns = 6
+column_titles_visible = true
+
+[node name="DetailsPanel" type="VBoxContainer" parent="Content/Split"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_stretch_ratio = 42
+mouse_filter = 2
+
+[node name="DetailsText" type="TextEdit" parent="Content/Split/DetailsPanel"]
+layout_mode = 2
+size_flags_vertical = 3
+editable = false
+
+[node name="DetailsActions" type="HBoxContainer" parent="Content/Split/DetailsPanel"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 8
+
+[node name="PreviousButton" type="Button" parent="Content/Split/DetailsPanel/DetailsActions"]
+layout_mode = 2
+text = "Previous"
+
+[node name="NextButton" type="Button" parent="Content/Split/DetailsPanel/DetailsActions"]
+layout_mode = 2
+text = "Next"
+
+[node name="CopyButton" type="Button" parent="Content/Split/DetailsPanel/DetailsActions"]
+layout_mode = 2
+text = "Copy"
+
+[node name="QuickActions" type="HBoxContainer" parent="Content/Split/DetailsPanel"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 8
+
+[node name="QuickTypeButton" type="Button" parent="Content/Split/DetailsPanel/QuickActions"]
+layout_mode = 2
+visible = false
+text = "Type"
+
+[node name="QuickPrimaryButton" type="Button" parent="Content/Split/DetailsPanel/QuickActions"]
+layout_mode = 2
+visible = false
+text = "Primary"
+
+[node name="QuickRelatedButton" type="Button" parent="Content/Split/DetailsPanel/QuickActions"]
+layout_mode = 2
+visible = false
+text = "Related"
+
+[node name="QuickMapButton" type="Button" parent="Content/Split/DetailsPanel/QuickActions"]
+layout_mode = 2
+visible = false
+text = "Map"
