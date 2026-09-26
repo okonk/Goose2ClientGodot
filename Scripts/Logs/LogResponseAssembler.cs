@@ -168,6 +168,9 @@ namespace Goose2Client.Logs
             {
                 return false;
             }
+            // .NET accepts noncanonical padding-bit spellings; the wire format is the canonical encoding of the bytes.
+            if (Convert.ToBase64String(bytes) != aggregate)
+                return false;
             if (bytes.Length == 0 || bytes.Length > MaxDecodedRowBytes)
                 return false;
             if (!LogRowJsonParser.TryParse(bytes, out LogRow? row))

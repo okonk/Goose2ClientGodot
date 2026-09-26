@@ -203,4 +203,3 @@ namespace Goose2Client.Network.Packets.Tests
         }
     }
 }
-

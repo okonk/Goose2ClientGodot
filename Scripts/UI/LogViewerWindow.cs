@@ -100,8 +100,8 @@ public partial class LogViewerWindow : BaseWindow
         AddChild(_typesPopup);
 
         _preset.ItemSelected += i => OnPresetSelected((int)i);
-        _customStart.TextChanged += v => { _state.Draft.StartText = v; RenderStatus(); };
-        _customEnd.TextChanged += v => { _state.Draft.EndText = v; RenderStatus(); };
+        _customStart.TextChanged += v => { ClearExactDefaults(); _state.Draft.StartText = v; RenderStatus(); };
+        _customEnd.TextChanged += v => { ClearExactDefaults(); _state.Draft.EndText = v; RenderStatus(); };
         _participant.TextChanged += v => { _state.Draft.Participant = v; RenderStatus(); };
         _map.TextChanged += v => { _state.Draft.MapText = v; RenderSuggestions(); RenderStatus(); };
         _text.TextChanged += v => { _state.Draft.Text = v; RenderStatus(); };
@@ -240,7 +240,11 @@ public partial class LogViewerWindow : BaseWindow
     private void OnLmd(object o)
     {
         if (_logic.FeedLmd((LogDefaultsMetadata)o))
+        {
+            _customStart.Text = _state.Draft.StartText;
+            _customEnd.Text = _state.Draft.EndText;
             RenderAll();
+        }
     }
 
     private void OnLrb(object o)
@@ -275,6 +279,11 @@ public partial class LogViewerWindow : BaseWindow
         draft.Preset = (LogFilterPreset)index;
         if (draft.Preset != LogFilterPreset.Custom)
             LogFilterValidator.ApplyPreset(draft, DateTime.UtcNow);
+        else
+        {
+            draft.DefaultStartUnixMs = null;
+            draft.DefaultEndUnixMs = null;
+        }
         _customStart.Editable = draft.Preset == LogFilterPreset.Custom;
         _customEnd.Editable = draft.Preset == LogFilterPreset.Custom;
         RenderStatus();
@@ -320,6 +329,12 @@ public partial class LogViewerWindow : BaseWindow
         RenderSuggestions();
     }
 
+    private void ClearExactDefaults()
+    {
+        _state.Draft.DefaultStartUnixMs = null;
+        _state.Draft.DefaultEndUnixMs = null;
+    }
+
     private void OpenTypesPopup()
     {
         _typesPopup.Clear();
@@ -342,6 +357,7 @@ public partial class LogViewerWindow : BaseWindow
                 }
                 _typesPopup.AddItem(type.Label, nextId);
                 _typesPopup.SetItemMetadata(nextId, Variant.From(type.TypeId));
+                _typesPopup.SetItemAsCheckable(nextId, true);
                 _typesPopup.SetItemChecked(nextId, _state.Draft.SelectedTypeIds.Contains(type.TypeId));
                 nextId++;
             }

@@ -18,6 +18,8 @@ namespace Goose2Client.Logs
         public LogFilterPreset Preset { get; set; } = LogFilterPreset.Previous24Hours;
         public long StartUnixMs { get; set; }
         public long EndUnixMs { get; set; }
+        public long? DefaultStartUnixMs { get; set; }
+        public long? DefaultEndUnixMs { get; set; }
         public string StartText { get; set; } = "";
         public string EndText { get; set; } = "";
         public string Participant { get; set; } = "";
@@ -32,6 +34,8 @@ namespace Goose2Client.Logs
                 Preset = Preset,
                 StartUnixMs = StartUnixMs,
                 EndUnixMs = EndUnixMs,
+                DefaultStartUnixMs = DefaultStartUnixMs,
+                DefaultEndUnixMs = DefaultEndUnixMs,
                 StartText = StartText,
                 EndText = EndText,
                 Participant = Participant,
@@ -99,12 +103,9 @@ namespace Goose2Client.Logs
             {
                 if (_types[i].TypeId == packet.TypeId)
                 {
-                    if (_types[i].Group != packet.Group || _types[i].Label != packet.Label)
-                    {
-                        Malformed = true;
-                        _types.Clear();
-                        Types = _types;
-                    }
+                    Malformed = true;
+                    _types.Clear();
+                    Types = _types;
                     return false;
                 }
             }
@@ -128,12 +129,9 @@ namespace Goose2Client.Logs
             {
                 if (_maps[i].MapId == packet.MapId)
                 {
-                    if (_maps[i].MapName != packet.MapName)
-                    {
-                        Malformed = true;
-                        _maps.Clear();
-                        Maps = _maps;
-                    }
+                    Malformed = true;
+                    _maps.Clear();
+                    Maps = _maps;
                     return false;
                 }
             }

@@ -137,8 +137,15 @@ namespace Goose2Client.Logs
             }
         }
 
+        private static readonly long MinUtcMs = DateTimeOffset.MinValue.ToUnixTimeMilliseconds();
+        private static readonly long MaxUtcMs = DateTimeOffset.MaxValue.ToUnixTimeMilliseconds();
+
         private static string FormatUtc(long unixMs)
-            => DateTimeOffset.FromUnixTimeMilliseconds(unixMs).ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
+        {
+            if (unixMs < MinUtcMs || unixMs > MaxUtcMs)
+                return unixMs.ToString(CultureInfo.InvariantCulture);
+            return DateTimeOffset.FromUnixTimeMilliseconds(unixMs).ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
+        }
 
         public void OnWindowReplacement(int windowId)
         {
@@ -159,6 +166,8 @@ namespace Goose2Client.Logs
             _draft.Preset = LogFilterPreset.Previous24Hours;
             _draft.StartText = "";
             _draft.EndText = "";
+            _draft.DefaultStartUnixMs = null;
+            _draft.DefaultEndUnixMs = null;
             _draft.Participant = "";
             _draft.MapText = "";
             _draft.SelectedTypeIds = new List<int>();
@@ -180,7 +189,20 @@ namespace Goose2Client.Logs
 
         public bool FeedLmt(LogTypeMetadata packet) => _metadata.FeedLmt(packet);
         public bool FeedLmm(LogMapMetadata packet) => _metadata.FeedLmm(packet);
-        public bool FeedLmd(LogDefaultsMetadata packet) => _metadata.FeedLmd(packet);
+        public bool FeedLmd(LogDefaultsMetadata packet)
+        {
+            bool completed = _metadata.FeedLmd(packet);
+            if (completed)
+            {
+                _draft.StartUnixMs = _metadata.DefaultStartUnixMs;
+                _draft.EndUnixMs = _metadata.DefaultEndUnixMs;
+                _draft.DefaultStartUnixMs = _metadata.DefaultStartUnixMs;
+                _draft.DefaultEndUnixMs = _metadata.DefaultEndUnixMs;
+                _draft.StartText = FormatUtc(_metadata.DefaultStartUnixMs);
+                _draft.EndText = FormatUtc(_metadata.DefaultEndUnixMs);
+            }
+            return completed;
+        }
 
         public object? Search()
         {

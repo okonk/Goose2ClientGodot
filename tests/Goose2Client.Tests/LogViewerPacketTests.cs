@@ -138,6 +138,66 @@ namespace Goose2Client.Network.Packets.Tests
         }
 
         [Fact]
+        public void WrongFieldCountPreservesRecoverableIdentityAndWireLength()
+        {
+            string lrb = "LRB5,1,extra";
+            var b = Parse<LogResultBegin>(new LogResultBeginPacket(), lrb);
+            Assert.False(b.IsValid);
+            Assert.Equal(5, b.WindowId);
+            Assert.Equal(1, b.RequestId);
+            Assert.Equal(lrb.Length, b.WireLength);
+
+            string lrd = "LRD5,2,0,0,1,QUJD,x";
+            var d = Parse<LogResultData>(new LogResultDataPacket(), lrd);
+            Assert.False(d.IsValid);
+            Assert.Equal(5, d.WindowId);
+            Assert.Equal(2, d.RequestId);
+            Assert.Equal(0, d.RowOrdinal);
+            Assert.Equal(0, d.ChunkIndex);
+            Assert.Equal(0, d.ChunkCount);
+            Assert.Equal("", d.Segment);
+            Assert.Equal(lrd.Length, d.WireLength);
+
+            string lrf = "LRF5,3,0," + Token + "," + Token + ",x";
+            var f = Parse<LogResultFinish>(new LogResultFinishPacket(), lrf);
+            Assert.False(f.IsValid);
+            Assert.Equal(5, f.WindowId);
+            Assert.Equal(3, f.RequestId);
+            Assert.False(f.HasMore);
+            Assert.Equal("", f.CurrentPageToken);
+            Assert.Equal("", f.NextPageToken);
+            Assert.Equal(lrf.Length, f.WireLength);
+
+            string lrx = "LRX5,4,QUJD,x";
+            var x = Parse<LogResultError>(new LogResultErrorPacket(), lrx);
+            Assert.False(x.IsValid);
+            Assert.Equal(5, x.WindowId);
+            Assert.Equal(4, x.RequestId);
+            Assert.Equal("", x.SafeMessage);
+            Assert.Equal(lrx.Length, x.WireLength);
+
+            var missingRequest = Parse<LogResultBegin>(new LogResultBeginPacket(), "LRB5");
+            Assert.False(missingRequest.IsValid);
+            Assert.Equal(5, missingRequest.WindowId);
+            Assert.Equal(0, missingRequest.RequestId);
+
+            var invalidWindow = Parse<LogResultBegin>(new LogResultBeginPacket(), "LRB0,1,extra");
+            Assert.False(invalidWindow.IsValid);
+            Assert.Equal(0, invalidWindow.WindowId);
+            Assert.Equal(1, invalidWindow.RequestId);
+
+            var missingWindow = Parse<LogResultBegin>(new LogResultBeginPacket(), "LRB,1,extra");
+            Assert.False(missingWindow.IsValid);
+            Assert.Equal(0, missingWindow.WindowId);
+            Assert.Equal(1, missingWindow.RequestId);
+
+            var negativeRequest = Parse<LogResultFinish>(new LogResultFinishPacket(), "LRF5,-1,0," + Token + ",x");
+            Assert.False(negativeRequest.IsValid);
+            Assert.Equal(5, negativeRequest.WindowId);
+            Assert.Equal(0, negativeRequest.RequestId);
+        }
+
+        [Fact]
         public void Lrf_CurrentTokenIsRequired()
         {
             Assert.False(Parse<LogResultFinish>(new LogResultFinishPacket(), "LRF5,3,0,,").IsValid);

@@ -342,6 +342,74 @@ namespace Goose2Client.Tests
         }
 
         [Fact]
+        public void FirstUneditedSearchUsesExactLmdMilliseconds()
+        {
+            var s = new LogViewerState(Clock);
+            s.OnWindowReplacement(Window);
+            s.FeedLmt(LogPacketParsing.ParseLmt($"LMT{Window},12,Q29tbXVuaWNhdGlvbg==,Q2hhdA=="));
+            s.FeedLmm(LogPacketParsing.ParseLmm($"LMM{Window},3,SG9tZQ=="));
+            s.FeedLmd(LogPacketParsing.ParseLmd($"LMD{Window},1700000000123,1700086400456"));
+            Assert.Equal(1700000000123L, s.Draft.DefaultStartUnixMs);
+            Assert.Equal(1700086400456L, s.Draft.DefaultEndUnixMs);
+            Assert.Equal(1700000000123L, s.Draft.StartUnixMs);
+            Assert.Equal(1700086400456L, s.Draft.EndUnixMs);
+            var fresh = Assert.IsType<LogQuerySubmission.Fresh>(s.Search());
+            Assert.Equal(1700000000123L, fresh.Filter.StartUnixMs);
+            Assert.Equal(1700086400456L, fresh.Filter.EndUnixMs);
+
+            var reapplied = new LogViewerState(Clock);
+            reapplied.OnWindowReplacement(Window);
+            reapplied.FeedLmt(LogPacketParsing.ParseLmt($"LMT{Window},12,Q29tbXVuaWNhdGlvbg==,Q2hhdA=="));
+            reapplied.FeedLmd(LogPacketParsing.ParseLmd($"LMD{Window},1700000000123,1700086400456"));
+            LogFilterValidator.ApplyPreset(reapplied.Draft, Clock);
+            Assert.Null(reapplied.Draft.DefaultStartUnixMs);
+            Assert.Null(reapplied.Draft.DefaultEndUnixMs);
+            var preset = Assert.IsType<LogQuerySubmission.Fresh>(reapplied.Search());
+            Assert.Equal(ClockMs - 24L * 3600_000L, preset.Filter.StartUnixMs);
+            Assert.Equal(ClockMs, preset.Filter.EndUnixMs);
+
+            var replaced = new LogViewerState(Clock);
+            replaced.OnWindowReplacement(Window);
+            replaced.FeedLmd(LogPacketParsing.ParseLmd($"LMD{Window},1700000000123,1700086400456"));
+            replaced.OnWindowReplacement(9);
+            Assert.Null(replaced.Draft.DefaultStartUnixMs);
+            replaced.FeedLmd(LogPacketParsing.ParseLmd("LMD9,555,666"));
+            Assert.Equal(555L, replaced.Draft.DefaultStartUnixMs);
+            Assert.Equal(666L, replaced.Draft.DefaultEndUnixMs);
+            var second = Assert.IsType<LogQuerySubmission.Fresh>(replaced.Search());
+            Assert.Equal(555L, second.Filter.StartUnixMs);
+            Assert.Equal(666L, second.Filter.EndUnixMs);
+        }
+
+        [Fact]
+        public void MalformedMatchingIdentityAbortsEvenWithoutAStage()
+        {
+            var s = Open();
+            s.Search();
+            string malformed = $"LRB{Window},1,extra";
+            Assert.False(s.FeedLrb(LogPacketParsing.ParseLrb(malformed)));
+            Assert.False(s.IsActive);
+            Assert.Equal("Protocol failure.", s.StatusText);
+            Assert.Empty(s.Rows);
+            Assert.Empty(s.History);
+            Assert.False(s.FeedLrb(Lrb(1)));
+            Assert.False(s.FeedLrd(Lrd(1, 0, 0, 1, B64(MinimalRow(1)))));
+            Assert.False(s.FeedLrf(Lrf(1, false, Token1, "")));
+            Assert.Empty(s.Rows);
+            Assert.Empty(s.History);
+
+            var ignored = Open();
+            ignored.Search();
+            Assert.False(ignored.FeedLrb(LogPacketParsing.ParseLrb($"LRB{Window},9,extra")));
+            Assert.True(ignored.IsActive);
+            Assert.Equal("Loading…", ignored.StatusText);
+            Assert.True(ignored.FeedLrb(Lrb(1)));
+            Assert.True(ignored.FeedLrd(Lrd(1, 0, 0, 1, B64(MinimalRow(1)))));
+            Assert.True(ignored.FeedLrf(Lrf(1, false, Token1, "")));
+            Assert.Single(ignored.Rows);
+        }
+
+        [Fact]
         public void LifecycleBoundariesClearEverything()
         {
             var s = Open();

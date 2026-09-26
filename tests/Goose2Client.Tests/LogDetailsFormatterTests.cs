@@ -182,6 +182,26 @@ namespace Goose2Client.Tests
         }
 
         [Fact]
+        public void OutOfRangeUtcMillisecondsRenderAsRawDecimalWithoutThrowing()
+        {
+            long min = DateTimeOffset.MinValue.ToUnixTimeMilliseconds();
+            long max = DateTimeOffset.MaxValue.ToUnixTimeMilliseconds();
+            foreach (long value in new[] { long.MinValue, long.MaxValue, min - 1, max + 1 })
+            {
+                var row = new LogRow(
+                    1, value, 5L, true, "L", "G", LogOtherIdKind.Unused,
+                    new LogRowEntity("P", LogEntityKind.Player, 1L, "N", true), null, null,
+                    new LogRowRaw(1, true, 2, true, 3, true, 4, true, 5, true), "s", "t");
+                string raw = value.ToString(CultureInfo.InvariantCulture);
+                Assert.Equal(raw, LogDetailsFormatter.TableColumns(row)[0]);
+                Assert.Equal("UTC: " + raw, LogDetailsFormatter.Format(row).Split('\n')[1]);
+                Assert.Equal("UTC: " + raw, LogDetailsFormatter.FormatClipboard(row).Split('\n')[1]);
+            }
+            Assert.Equal("2023-11-14 22:13:20.123", LogDetailsFormatter.TableColumns(FullRow())[0]);
+            Assert.Equal("UTC: 2023-11-14T22:13:20.123Z", LogDetailsFormatter.Format(FullRow()).Split('\n')[1]);
+        }
+
+        [Fact]
         public void DetailsAndClipboardShareTheFormatterAndDoNotMutate()
         {
             var row = FullRow();

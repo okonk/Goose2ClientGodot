@@ -136,11 +136,30 @@ namespace Goose2Client.Network.Packets
             return new LogDefaultsMetadata(true, windowId, 0, wireLength, start, end);
         }
 
+        private static (int WindowId, int RequestId) RecoverIdentity(string? packet, string prefix)
+        {
+            if (packet == null)
+                return (0, 0);
+            if (!packet.StartsWith(prefix, StringComparison.Ordinal))
+                return (0, 0);
+            string[] parts = packet.Split(',');
+            int windowId = 0;
+            if (parts.Length >= 1 && TryParseWindowId(parts[0], prefix, out int parsedWindow))
+                windowId = parsedWindow;
+            int requestId = 0;
+            if (parts.Length >= 2 && TryParseInt32(parts[1], out int parsedRequest) && parsedRequest > 0)
+                requestId = parsedRequest;
+            return (windowId, requestId);
+        }
+
         public static LogResultBegin ParseLrb(string packet)
         {
             int wireLength = packet?.Length ?? 0;
             if (packet == null || !TrySplit(packet, "LRB", 2, out string[] f))
-                return new LogResultBegin(false, 0, 0, wireLength);
+            {
+                var identity = RecoverIdentity(packet, "LRB");
+                return new LogResultBegin(false, identity.WindowId, identity.RequestId, wireLength);
+            }
             int windowId = 0;
             if (TryParseWindowId(f[0], "LRB", out int parsedWindow))
                 windowId = parsedWindow;
@@ -155,7 +174,10 @@ namespace Goose2Client.Network.Packets
         {
             int wireLength = packet?.Length ?? 0;
             if (packet == null || !TrySplit(packet, "LRD", 6, out string[] f))
-                return new LogResultData(false, 0, 0, wireLength, 0, 0, 0, "");
+            {
+                var identity = RecoverIdentity(packet, "LRD");
+                return new LogResultData(false, identity.WindowId, identity.RequestId, wireLength, 0, 0, 0, "");
+            }
             int windowId = 0;
             if (TryParseWindowId(f[0], "LRD", out int parsedWindow))
                 windowId = parsedWindow;
@@ -179,7 +201,10 @@ namespace Goose2Client.Network.Packets
         {
             int wireLength = packet?.Length ?? 0;
             if (packet == null || !TrySplit(packet, "LRF", 5, out string[] f))
-                return new LogResultFinish(false, 0, 0, wireLength, false, "", "");
+            {
+                var identity = RecoverIdentity(packet, "LRF");
+                return new LogResultFinish(false, identity.WindowId, identity.RequestId, wireLength, false, "", "");
+            }
             int windowId = 0;
             if (TryParseWindowId(f[0], "LRF", out int parsedWindow))
                 windowId = parsedWindow;
@@ -208,7 +233,10 @@ namespace Goose2Client.Network.Packets
         {
             int wireLength = packet?.Length ?? 0;
             if (packet == null || !TrySplit(packet, "LRX", 3, out string[] f))
-                return new LogResultError(false, 0, 0, wireLength, "");
+            {
+                var identity = RecoverIdentity(packet, "LRX");
+                return new LogResultError(false, identity.WindowId, identity.RequestId, wireLength, "");
+            }
             int windowId = 0;
             if (TryParseWindowId(f[0], "LRX", out int parsedWindow))
                 windowId = parsedWindow;

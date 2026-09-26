@@ -69,6 +69,7 @@ public class LogViewerSceneTests
         var s = Scene();
         Assert.Contains("node name=\"ResultsTree\" type=\"Tree\"", s);
         Assert.Contains("columns = 6", s);
+        Assert.Contains("column_titles_visible = true", s);
         Assert.DoesNotContain("columns_unsorted", s);
         foreach (string line in s.Split('\n'))
         {

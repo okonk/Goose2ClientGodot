@@ -232,6 +232,25 @@ namespace Goose2Client.Tests
         }
 
         [Fact]
+        public void NoncanonicalBase64PaddingBitsAbortIrreversibly()
+        {
+            var a = new LogResponseAssembler();
+            Assert.True(a.FeedLrb(Lrb()));
+            Assert.True(a.FeedLrd(Lrd(0, 0, 2, "AA")));
+            Assert.False(a.FeedLrd(Lrd(0, 1, 2, "==")));
+            Assert.True(a.Aborted);
+            Assert.False(a.HasStage);
+            Assert.Null(a.Result);
+            Assert.False(a.FeedLrd(Lrd(0, 0, 1, "AQ==")));
+            Assert.False(a.FeedLrf(Lrf(false, "AAECAwQFBgcICQoLDA0ODw", "")));
+
+            var single = new LogResponseAssembler();
+            Assert.True(single.FeedLrb(Lrb()));
+            Assert.False(single.FeedLrd(Lrd(0, 0, 1, "AA==")));
+            Assert.True(single.Aborted);
+        }
+
+        [Fact]
         public void MalformedSegmentBase64Utf8JsonShapeEnumOrNumberAborts()
         {
             var badSegment = new LogResponseAssembler();

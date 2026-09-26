@@ -16,8 +16,8 @@ internal static class LogViewerSelfTest
     private const string T1 = "AAECAwQFBgcICQoLDA0ODw";
     private const string T2 = "BBECAwQFBgcICQoLDA0ODw";
     private const string T3 = "CCECAwQFBgcICQoLDA0ODw";
-    private const long DefaultStart = 1700000000000L;
-    private const long DefaultEnd = 1700086400000L;
+    private const long DefaultStart = 1700000000123L;
+    private const long DefaultEnd = 1700086400456L;
 
     public static async System.Threading.Tasks.Task Run(GameManager gm)
     {
@@ -147,6 +147,7 @@ internal static class LogViewerSelfTest
         var quickMap = viewer.GetNode<Button>("Content/Split/DetailsPanel/QuickActions/QuickMapButton");
         var titleBar = viewer.GetNode<Control>("TitleBar");
         Assert(resultsTree.Columns == 6, $"tree columns {resultsTree.Columns} != 6");
+        Assert(resultsTree.ColumnTitlesVisible, "tree column titles must be visible");
         for (int i = 0; i < LogViewerLayout.ColumnHeaders.Length; i++)
             Assert(resultsTree.GetColumnTitle(i) == LogViewerLayout.ColumnHeaders[i],
                 $"tree column {i} title {resultsTree.GetColumnTitle(i)}");
@@ -206,6 +207,12 @@ internal static class LogViewerSelfTest
         Assert(state.IsReady, "metadata must be complete after LMD");
         Assert(state.Metadata.DefaultStartUnixMs == DefaultStart && state.Metadata.DefaultEndUnixMs == DefaultEnd,
             "LMD defaults must be stored");
+        Assert(state.Draft.DefaultStartUnixMs == DefaultStart && state.Draft.DefaultEndUnixMs == DefaultEnd,
+            "draft must carry the exact LMD default milliseconds");
+        Assert(state.Draft.StartUnixMs == DefaultStart && state.Draft.EndUnixMs == DefaultEnd,
+            "draft committed range must be the exact LMD milliseconds");
+        Assert(customStart.Text == "2023-11-14 22:13:20", $"custom start display {customStart.Text}");
+        Assert(customEnd.Text == "2023-11-15 22:13:20", $"custom end display {customEnd.Text}");
         Assert(!search.Disabled, "search must be enabled after LMD");
         Assert(preset.Selected == 1, $"preset {preset.Selected} != Previous 24 hours");
         Assert(!customStart.Editable && !customEnd.Editable, "custom fields must be locked for presets");
@@ -230,7 +237,7 @@ internal static class LogViewerSelfTest
 
         var draftStart = state.Draft.StartUnixMs;
         var draftEnd = state.Draft.EndUnixMs;
-        Assert(draftEnd > draftStart, "draft preset range must be valid");
+        Assert(draftStart == DefaultStart && draftEnd == DefaultEnd, "draft range must be the exact LMD milliseconds");
         Type(participant, "#1234");
         Type(map, "#3");
         Type(text, "hello");
@@ -240,13 +247,14 @@ internal static class LogViewerSelfTest
         Assert(cap.Submissions.Count == subsBefore + 1, $"fresh search must capture exactly one submission ({cap.Submissions.Count - subsBefore})");
         var fresh = (LogQuerySubmission.Fresh)cap.Submissions[^1];
         Assert(fresh.WindowId == Window && fresh.RequestId == 1, "fresh submission window/request");
-        Assert(fresh.Filter.StartUnixMs == draftStart && fresh.Filter.EndUnixMs == draftEnd, "fresh filter range must match the draft preset");
+        Assert(fresh.Filter.StartUnixMs == DefaultStart && fresh.Filter.EndUnixMs == DefaultEnd,
+            "fresh filter range must be the exact LMD milliseconds");
         Assert(fresh.Filter.Participant == "#1234" && fresh.Filter.MapId == 3 && fresh.Filter.Text == "hello",
             "fresh filter participant/map/text");
         Assert(fresh.Filter.TypeIds.Count == 1 && fresh.Filter.TypeIds[0] == 12, "fresh filter type ids");
         string freshWire = cap.Packets[^1];
         Assert(freshWire.Split(',').Length == 9, $"fresh LQS must have nine fields: {freshWire}");
-        Assert(freshWire == $"LQS{Window},1,F,{draftStart},{draftEnd},{B64("#1234")},3,12,{B64("hello")}",
+        Assert(freshWire == $"LQS{Window},1,F,{DefaultStart},{DefaultEnd},{B64("#1234")},3,12,{B64("hello")}",
             $"fresh LQS wire {freshWire}");
         Assert(state.IsActive, "fresh search must be active");
         Assert(search.Disabled, "search must be disabled during an active request");
@@ -325,6 +333,36 @@ internal static class LogViewerSelfTest
         Assert(quickType.Visible && !quickPrimary.Visible && quickRelated.Visible && !quickMap.Visible,
             "row 2 quick-action visibility");
         GD.Print("[log_viewer_selftest] OK fresh search + chunked commit + details");
+
+        int popupSubsBefore = cap.Submissions.Count;
+        typesButton.EmitSignal("pressed");
+        await Frame();
+        var typesPopup = viewer.GetNode<PopupMenu>("TypesPopup");
+        Assert(typesPopup.ItemCount == 6, $"types popup must list three headers and three entries, found {typesPopup.ItemCount}");
+        int[] eventIndexes = { 1, 3, 5 };
+        bool[] expectedChecked = { true, false, false };
+        for (int i = 0; i < eventIndexes.Length; i++)
+        {
+            int idx = eventIndexes[i];
+            Assert(typesPopup.IsItemCheckable(idx), $"type entry {idx} must be checkable");
+            Assert(!typesPopup.IsItemDisabled(idx), $"type entry {idx} must be enabled");
+            Assert(typesPopup.IsItemChecked(idx) == expectedChecked[i], $"type entry {idx} checked state must match the draft");
+        }
+        Assert(typesPopup.IsItemDisabled(0) && !typesPopup.IsItemCheckable(0), "group header must stay disabled and not checkable");
+        typesPopup.EmitSignal("id_pressed", 3);
+        await Frame();
+        Assert(typesPopup.IsItemChecked(3), "toggled type entry must show checked");
+        Assert(state.Draft.SelectedTypeIds.Contains(7) && state.Draft.SelectedTypeIds.Contains(12),
+            "toggling a type entry must update the draft selection");
+        Assert(cap.Submissions.Count == popupSubsBefore, "toggling a type entry must not publish a query");
+        typesPopup.EmitSignal("id_pressed", 3);
+        await Frame();
+        Assert(!typesPopup.IsItemChecked(3), "second toggle must uncheck the entry");
+        Assert(state.Draft.SelectedTypeIds.Count == 1 && state.Draft.SelectedTypeIds[0] == 12,
+            "toggling back must restore the draft selection");
+        Assert(!state.IsDirty, "toggling back must leave the draft clean against the applied filter");
+        Assert(cap.Submissions.Count == popupSubsBefore, "toggling must never publish a query");
+        GD.Print("[log_viewer_selftest] OK type popup entries are checkable and toggle without querying");
 
         next.EmitSignal("pressed");
         await Frame();

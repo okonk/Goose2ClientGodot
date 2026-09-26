@@ -49,11 +49,22 @@ namespace Goose2Client.Logs
             };
         }
 
+        private static readonly long MinUtcMs = DateTimeOffset.MinValue.ToUnixTimeMilliseconds();
+        private static readonly long MaxUtcMs = DateTimeOffset.MaxValue.ToUnixTimeMilliseconds();
+
         private static string FormatTableUtc(long unixMs)
-            => DateTimeOffset.FromUnixTimeMilliseconds(unixMs).ToString("yyyy-MM-dd HH:mm:ss.fff", CultureInfo.InvariantCulture);
+        {
+            if (unixMs < MinUtcMs || unixMs > MaxUtcMs)
+                return unixMs.ToString(CultureInfo.InvariantCulture);
+            return DateTimeOffset.FromUnixTimeMilliseconds(unixMs).ToString("yyyy-MM-dd HH:mm:ss.fff", CultureInfo.InvariantCulture);
+        }
 
         private static string FormatIsoUtc(long unixMs)
-            => DateTimeOffset.FromUnixTimeMilliseconds(unixMs).ToString("yyyy-MM-ddTHH:mm:ss.fffZ", CultureInfo.InvariantCulture);
+        {
+            if (unixMs < MinUtcMs || unixMs > MaxUtcMs)
+                return unixMs.ToString(CultureInfo.InvariantCulture);
+            return DateTimeOffset.FromUnixTimeMilliseconds(unixMs).ToString("yyyy-MM-ddTHH:mm:ss.fffZ", CultureInfo.InvariantCulture);
+        }
 
         private static string Value(LogRow row, int key)
         {

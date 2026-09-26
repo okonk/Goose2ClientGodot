@@ -111,12 +111,87 @@ namespace Goose2Client.Tests
         }
 
         [Fact]
+        public void Metadata_IdenticalDuplicateIsStickyMalformedToo()
+        {
+            var m = new LogMetadataState(5);
+            Assert.True(m.FeedLmt(Lmt(12, "Communication", "Chat")));
+            Assert.False(m.FeedLmt(Lmt(12, "Communication", "Chat")));
+            Assert.True(m.Malformed);
+            Assert.Empty(m.Types);
+            Assert.False(m.FeedLmd(Lmd(1, 2)));
+            Assert.False(m.Complete);
+
+            var maps = new LogMetadataState(5);
+            Assert.True(maps.FeedLmm(Lmm(3, "Home")));
+            Assert.False(maps.FeedLmm(Lmm(3, "Home")));
+            Assert.True(maps.Malformed);
+            Assert.Empty(maps.Maps);
+            Assert.False(maps.FeedLmd(Lmd(1, 2)));
+            Assert.False(maps.Complete);
+        }
+
+        [Fact]
+        public void Validate_PrefersExactLmdMillisecondsOverTextParsing()
+        {
+            var meta = MetadataWithDefaults();
+            var draft = new LogFilterDraft
+            {
+                Preset = LogFilterPreset.Previous24Hours,
+                StartUnixMs = 1,
+                EndUnixMs = 2,
+                StartText = "2026-09-01 10:00:00",
+                EndText = "2026-09-02 10:00:00",
+                DefaultStartUnixMs = 1700000000123L,
+                DefaultEndUnixMs = 1700086400456L
+            };
+            var result = LogFilterValidator.Validate(draft, meta);
+            Assert.True(result.Success, result.Error);
+            Assert.Equal(1700000000123L, result.Snapshot.StartUnixMs);
+            Assert.Equal(1700086400456L, result.Snapshot.EndUnixMs);
+
+            draft.DefaultStartUnixMs = 1700086400456L;
+            Assert.False(LogFilterValidator.Validate(draft, meta).Success);
+            draft.DefaultStartUnixMs = 1700000000123L;
+            draft.DefaultEndUnixMs = 1700000000123L;
+            Assert.False(LogFilterValidator.Validate(draft, meta).Success);
+
+            var wide = new LogFilterDraft
+            {
+                Preset = LogFilterPreset.Previous24Hours,
+                DefaultStartUnixMs = 0L,
+                DefaultEndUnixMs = 32L * 86_400_000L
+            };
+            Assert.False(LogFilterValidator.Validate(wide, meta).Success);
+
+            var wideText = new LogFilterDraft
+            {
+                Preset = LogFilterPreset.Previous24Hours,
+                DefaultStartUnixMs = 0L,
+                DefaultEndUnixMs = 8L * 86_400_000L,
+                Text = "fire"
+            };
+            Assert.False(LogFilterValidator.Validate(wideText, meta).Success);
+
+            draft.DefaultStartUnixMs = null;
+            draft.DefaultEndUnixMs = null;
+            draft.Preset = LogFilterPreset.Custom;
+            var fromText = LogFilterValidator.Validate(draft, meta);
+            Assert.True(fromText.Success, fromText.Error);
+            Assert.Equal(new DateTimeOffset(2026, 9, 1, 10, 0, 0, TimeSpan.Zero).ToUnixTimeMilliseconds(), fromText.Snapshot.StartUnixMs);
+        }
+
+        [Fact]
         public void Presets_UseExactFixedClockBoundaries()
         {
             var draft = new LogFilterDraft { Preset = LogFilterPreset.Previous24Hours };
             LogFilterValidator.ApplyPreset(draft, Clock);
             Assert.Equal(ClockMs - 24L * 3600_000L, draft.StartUnixMs);
             Assert.Equal(ClockMs, draft.EndUnixMs);
+            draft.DefaultStartUnixMs = 1700000000123L;
+            draft.DefaultEndUnixMs = 1700086400456L;
+            LogFilterValidator.ApplyPreset(draft, Clock);
+            Assert.Null(draft.DefaultStartUnixMs);
+            Assert.Null(draft.DefaultEndUnixMs);
             LogFilterValidator.ApplyPreset(draft, Clock.AddSeconds(10));
             Assert.Equal(ClockMs + 10_000L - 24L * 3600_000L, draft.StartUnixMs);
             Assert.Equal(ClockMs + 10_000L, draft.EndUnixMs);
@@ -312,6 +387,8 @@ namespace Goose2Client.Tests
                 Preset = LogFilterPreset.Previous7Days,
                 StartUnixMs = 1,
                 EndUnixMs = 2,
+                DefaultStartUnixMs = 1700000000123L,
+                DefaultEndUnixMs = 1700086400456L,
                 Participant = "Player",
                 MapText = "Home (#3)",
                 SelectedTypeIds = new List<int> { 7, 12 },
@@ -321,6 +398,8 @@ namespace Goose2Client.Tests
             Assert.Equal(LogFilterPreset.Previous24Hours, draft.Preset);
             Assert.Equal(ClockMs, draft.EndUnixMs);
             Assert.Equal(ClockMs - 24L * 3600_000L, draft.StartUnixMs);
+            Assert.Null(draft.DefaultStartUnixMs);
+            Assert.Null(draft.DefaultEndUnixMs);
             Assert.Equal("", draft.Participant);
             Assert.Equal("", draft.MapText);
             Assert.Empty(draft.SelectedTypeIds);

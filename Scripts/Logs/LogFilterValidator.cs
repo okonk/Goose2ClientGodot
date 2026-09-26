@@ -17,6 +17,8 @@ namespace Goose2Client.Logs
         private const int TextMaxUtf8Bytes = 4096;
         private static readonly TimeSpan MaxSpan = TimeSpan.FromDays(31);
         private static readonly TimeSpan MaxTextSpan = TimeSpan.FromDays(7);
+        private const long MaxSpanMs = 31L * 86_400_000L;
+        private const long MaxTextSpanMs = 7L * 86_400_000L;
         private static readonly string[] CustomFormats = { "yyyy-MM-dd HH:mm:ss" };
 
         public static bool IsKnownGroup(string group)
@@ -41,6 +43,8 @@ namespace Goose2Client.Logs
             });
             draft.StartUnixMs = start;
             draft.EndUnixMs = end;
+            draft.DefaultStartUnixMs = null;
+            draft.DefaultEndUnixMs = null;
         }
 
         public static void Clear(LogFilterDraft draft, DateTime utcNow)
@@ -61,7 +65,19 @@ namespace Goose2Client.Logs
                 return LogFilterValidationResult.Fail("draft is missing");
             long start;
             long end;
-            if (draft.Preset == LogFilterPreset.Custom)
+            if (draft.DefaultStartUnixMs is long exactStart && draft.DefaultEndUnixMs is long exactEnd)
+            {
+                start = exactStart;
+                end = exactEnd;
+                if (end <= start)
+                    return LogFilterValidationResult.Fail("start must be before end");
+                long spanMs = end - start;
+                if (spanMs > MaxSpanMs)
+                    return LogFilterValidationResult.Fail("range exceeds 31 days");
+                if (draft.Text.Length > 0 && spanMs > MaxTextSpanMs)
+                    return LogFilterValidationResult.Fail("text search range exceeds 7 days");
+            }
+            else if (draft.Preset == LogFilterPreset.Custom)
             {
                 if (!DateTime.TryParseExact(draft.StartText, CustomFormats, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal | DateTimeStyles.NoCurrentDateDefault, out DateTime startUtc)
                     || !DateTime.TryParseExact(draft.EndText, CustomFormats, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal | DateTimeStyles.NoCurrentDateDefault, out DateTime endUtc))
