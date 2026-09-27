@@ -42,7 +42,7 @@ public class ChatCommandParserTests
         var input = new string('x', 250);
         var result = ChatCommandParser.Parse(input, _aliases, _handlerKeys);
         Assert.Equal(ChatActionKind.ChatMessage, result.Kind);
-        Assert.Equal(200, result.Text.Length);
+        Assert.Equal(200, result.Text!.Length);
     }
 
     [Fact]

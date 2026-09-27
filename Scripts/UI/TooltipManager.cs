@@ -15,12 +15,12 @@ namespace Goose2Client.UI
     /// </summary>
     public partial class TooltipManager : Control, IScalableWindow
     {
-        public static TooltipManager Instance { get; private set; }
+        public static TooltipManager Instance { get; private set; } = null!;
 
-        private ItemTooltipControl _itemTooltip;
-        private SpellTooltipControl _spellTooltip;
-        private TextTooltipControl _textTooltip;
-        private MapItemTooltipControl _mapItemTooltip;
+        private ItemTooltipControl _itemTooltip = null!;
+        private SpellTooltipControl _spellTooltip = null!;
+        private TextTooltipControl _textTooltip = null!;
+        private MapItemTooltipControl _mapItemTooltip = null!;
 
         private List<UiScaleLayout.GeomRecord> _geom = null!;
 
@@ -34,7 +34,7 @@ namespace Goose2Client.UI
             _mapItemTooltip = GetNode<MapItemTooltipControl>("MapItemTooltip");
 
             // The four dynamic tooltip nodes carry ui_scale_skip meta (Tooltips.tscn); the snapshot excludes them.
-            var applier = UiScaleApplier.Instance;
+            var applier = UiScaleApplier.Instance!;
             _geom = UiScaleLayout.Snapshot(this);
             applier.RegisterWindow(this);
             Relayout();
@@ -43,7 +43,7 @@ namespace Goose2Client.UI
 
         public void Relayout()
         {
-            UiScaleLayout.Apply(_geom, UiScaleApplier.Instance.Factor);
+            UiScaleLayout.Apply(_geom, UiScaleApplier.Instance!.Factor);
         }
 
         public void ShowItemTooltip(ItemStats stats, Control parent)

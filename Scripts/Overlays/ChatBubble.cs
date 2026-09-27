@@ -4,13 +4,13 @@ namespace Goose2Client.Overlays
 {
     public partial class ChatBubble : WorldOverlay, IBridgedText
     {
-        private Panel _background;
-        private Label _label;
+        private Panel? _background;
+        private Label? _label;
         private Vector2 _bgScreen;
-        private string _message;
+        private string? _message;
         private float _worldScale = 1f;
 
-        public Character.Character AnchorOwner { get; set; }
+        public Character.Character AnchorOwner { get; set; } = null!;
 
         public Vector2 LocalOffsetWorld { get; set; }
 

@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics.CodeAnalysis;
 using System.Text;
 
 namespace Goose2Client.Network
@@ -7,7 +8,7 @@ namespace Goose2Client.Network
     {
         private static readonly UTF8Encoding StrictUtf8 = new(false, true);
 
-        public static bool TryEncode(string text, int maxUtf8Bytes, out string? base64)
+        public static bool TryEncode(string text, int maxUtf8Bytes, [NotNullWhen(true)] out string? base64)
         {
             base64 = null;
             if (text == null || maxUtf8Bytes < 0)
@@ -27,7 +28,7 @@ namespace Goose2Client.Network
             return true;
         }
 
-        public static bool TryDecode(string? base64, out string? text)
+        public static bool TryDecode(string? base64, [NotNullWhen(true)] out string? text)
         {
             text = null;
             if (base64 == null)

@@ -26,8 +26,8 @@ namespace Goose2Client.Network.Packets
     {
         public int LoginId { get; set; }
         public BattleTextType BattleTextType { get; set; }
-        public string Text { get; set; }
-        public string Name { get; set; }
+        public string Text { get; set; } = null!;
+        public string Name { get; set; } = null!;
 
         public override string Prefix { get; } = "BT";
 

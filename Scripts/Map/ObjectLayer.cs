@@ -13,9 +13,9 @@ namespace Goose2Client.Map;
 /// per-cell with sibling character nodes the way individual Sprite2Ds can.)</summary>
 public partial class ObjectLayer : Node2D
 {
-    private MapDocument _map;
+    private MapDocument _map = null!;
     private int _layer;
-    private SpriteCache _cache;
+    private SpriteCache _cache = null!;
     private readonly Dictionary<(int X, int Y), Sprite2D> _sprites = new();
 
     public void Setup(MapDocument map, int layer, SpriteCache cache)

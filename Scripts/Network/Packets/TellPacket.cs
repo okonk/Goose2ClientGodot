@@ -5,11 +5,11 @@ namespace Goose2Client.Network.Packets
 {
     class TellPacket : PacketHandler
     {
-        public string Name { get; set; }
+        public string Name { get; set; } = null!;
 
         public bool IsAfk { get; set; }
 
-        public string Message { get; set; }
+        public string Message { get; set; } = null!;
 
         public override string Prefix { get; } = "&";
 

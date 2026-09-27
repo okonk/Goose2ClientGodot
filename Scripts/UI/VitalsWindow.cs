@@ -14,14 +14,14 @@ namespace Goose2Client.UI
     /// </summary>
     public partial class VitalsWindow : Control, IScalableWindow
     {
-        private TextureProgressBar _hpBar;
-        private TextureProgressBar _mpBar;
-        private TextureProgressBar _spBar;
-        private Label _hpText;
-        private Label _mpText;
-        private Label _spText;
-        private Label _levelText;
-        private Control _spOutline;
+        private TextureProgressBar _hpBar = null!;
+        private TextureProgressBar _mpBar = null!;
+        private TextureProgressBar _spBar = null!;
+        private Label _hpText = null!;
+        private Label _mpText = null!;
+        private Label _spText = null!;
+        private Label _levelText = null!;
+        private Control _spOutline = null!;
 
         private string _hpTooltip = "";
         private string _mpTooltip = "";
@@ -33,12 +33,12 @@ namespace Goose2Client.UI
         private long _lastMaxSp;
 
         private List<UiScaleLayout.GeomRecord> _geom = null!;
-        private VitalsCharacterDisplay _portrait;
+        private VitalsCharacterDisplay _portrait = null!;
 
         private const double FillTweenSeconds = 0.25;
-        private Tween _hpTween;
-        private Tween _mpTween;
-        private Tween _spTween;
+        private Tween? _hpTween;
+        private Tween? _mpTween;
+        private Tween? _spTween;
         private bool _barsSeeded;
 
         public override void _Ready()
@@ -92,7 +92,7 @@ namespace Goose2Client.UI
 
             GameManager.Instance.PacketManager.Listen<StatusInfoPacket>(OnStatusInfo);
 
-            var applier = UiScaleApplier.Instance;
+            var applier = UiScaleApplier.Instance!;
             _geom = UiScaleLayout.Snapshot(this);
             applier.RegisterWindow(this);
             Relayout();
@@ -101,7 +101,7 @@ namespace Goose2Client.UI
 
         public void Relayout()
         {
-            UiScaleLayout.Apply(_geom, UiScaleApplier.Instance.Factor);
+            UiScaleLayout.Apply(_geom, UiScaleApplier.Instance!.Factor);
             _portrait.Relayout();
             HudWindowDrag.RepositionFromSaved(this, "Vitals");
         }
@@ -128,7 +128,7 @@ namespace Goose2Client.UI
 
         // A status packet can land every frame during combat, so each bar keeps a single
         // tween that is restarted rather than stacked.
-        private void FillTo(TextureProgressBar bar, ref Tween tween, double target)
+        private void FillTo(TextureProgressBar bar, ref Tween? tween, double target)
         {
             if (tween != null && tween.IsValid())
                 tween.Kill();

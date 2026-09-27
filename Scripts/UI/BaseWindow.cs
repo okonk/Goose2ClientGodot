@@ -10,10 +10,10 @@ namespace Goose2Client.UI;
 /// </summary>
 public partial class BaseWindow : Control, IScalableWindow
 {
-    [Export] public string WindowName { get; set; }
+    [Export] public string WindowName { get; set; } = null!;
 
-    private Control _titleBar;
-    private Button _closeButton;
+    private Control _titleBar = null!;
+    private Button _closeButton = null!;
     private bool _dragging;
     private Vector2 _preDragPosition;
     private bool _dragCancelled;
@@ -35,15 +35,15 @@ public partial class BaseWindow : Control, IScalableWindow
     protected virtual bool Resizable => false;
     protected virtual Vector2 MinResizeSize => Vector2.Zero;
 
-    protected Label TitleLabel { get; private set; }
-    protected Control Content { get; private set; }
-    protected Control Background { get; private set; }
+    protected Label TitleLabel { get; private set; } = null!;
+    protected Control Content { get; private set; } = null!;
+    protected Control Background { get; private set; } = null!;
 
     private static readonly Texture2D CloseIcon = GD.Load<Texture2D>("res://Assets/UI/window-close.svg");
-    private static BaseWindow _activeWindow;
+    private static BaseWindow? _activeWindow;
 
-    private Panel _panelBg;
-    private Panel _titleBarBg;
+    private Panel _panelBg = null!;
+    private Panel _titleBarBg = null!;
     private bool _chromeReady;
 
     /// <summary>Windows whose Background art is a shaped sprite rather than a rectangular
@@ -206,8 +206,8 @@ public partial class BaseWindow : Control, IScalableWindow
             return;
         }
 
-        if (GodotObject.IsInstanceValid(_activeWindow))
-            _activeWindow.SetChromeActive(false);
+        if (GodotObject.IsInstanceValid(_activeWindow!))
+            _activeWindow!.SetChromeActive(false);
 
         _activeWindow = this;
         SetChromeActive(true);
@@ -281,7 +281,7 @@ public partial class BaseWindow : Control, IScalableWindow
         if (_scaleRegistered) return;
         _scaleRegistered = true;
         _geom = UiScaleLayout.Snapshot(this);
-        var applier = UiScaleApplier.Instance;
+        var applier = UiScaleApplier.Instance!;
         applier.RegisterWindow(this);
         Relayout();
         RepositionFromSaved();
@@ -290,7 +290,7 @@ public partial class BaseWindow : Control, IScalableWindow
 
     public virtual void Relayout()
     {
-        UiScaleLayout.Apply(_geom, UiScaleApplier.Instance.Factor);
+        UiScaleLayout.Apply(_geom, UiScaleApplier.Instance!.Factor);
         if (Resizable)
             Size = ResizableSize();
     }
@@ -352,7 +352,7 @@ public partial class BaseWindow : Control, IScalableWindow
                 return;
             }
             var rect = WindowResize.Apply(_preResizeRect, _resizeEdge, GetGlobalMousePosition() - _resizeStartMouse,
-                MinResizeSize * UiScaleApplier.Instance.Factor, GetTree().Root.GetVisibleRect().Size);
+                MinResizeSize * UiScaleApplier.Instance!.Factor, GetTree().Root.GetVisibleRect().Size);
             Position = rect.Position;
             Size = rect.Size;
         }
@@ -369,10 +369,10 @@ public partial class BaseWindow : Control, IScalableWindow
 
     private Vector2 ResizableSize()
     {
-        var factor = UiScaleApplier.Instance.Factor;
+        var factor = UiScaleApplier.Instance!.Factor;
         var ws = GameManager.Instance?.CharacterSettings?.GetWindowSettings(WindowName);
         bool saved = ws != null && ws.Placed && ws.Size != default;
-        return WindowResize.ScaledSize(saved ? ws.Size : _tscnSize, saved ? ws.Factor : 1f, factor,
+        return WindowResize.ScaledSize(saved ? ws!.Size : _tscnSize, saved ? ws!.Factor : 1f, factor,
             MinResizeSize * factor, GetTree().Root.GetVisibleRect().Size);
     }
 
@@ -403,12 +403,12 @@ public partial class BaseWindow : Control, IScalableWindow
             Position = WindowPlacement.Center(canvas, Size);
             return;
         }
-        var pos = placed || legacy ? ws.Position : DefaultWindowLayout.For(WindowName); // (c) unplaced non-dialog → default layout
+        var pos = placed || legacy ? ws!.Position : DefaultWindowLayout.For(WindowName); // (c) unplaced non-dialog → default layout
         var savedCanvas = ws != null && ws.CanvasSize != default ? ws.CanvasSize : WindowPlacement.LegacyCanvas;
-        var savedSize = placed && ws.Size == default ? (DefaultWindowLayout.LegacySize(WindowName) ?? _tscnSize)   // defensive: Placed is written with Size
-            : (!placed ? (DefaultWindowLayout.LegacySize(WindowName) ?? _tscnSize) : ws.Size);
-        var savedFactor = placed && ws.Factor > 0f ? ws.Factor : 1f;   // defensive: Placed is written with Factor
-        var applier = UiScaleApplier.Instance;
+        var savedSize = placed && ws!.Size == default ? (DefaultWindowLayout.LegacySize(WindowName) ?? _tscnSize)   // defensive: Placed is written with Size
+            : (!placed ? (DefaultWindowLayout.LegacySize(WindowName) ?? _tscnSize) : ws!.Size);
+        var savedFactor = placed && ws!.Factor > 0f ? ws!.Factor : 1f;   // defensive: Placed is written with Factor
+        var applier = UiScaleApplier.Instance!;
         Position = WindowPlacement.ResolveScaled(pos, savedSize, savedFactor, savedCanvas, Size,
             applier != null ? applier.Factor : 1f, canvas,
             applier != null ? applier.ScaleSize(24f) : WindowPlacement.TitleBarHeight);

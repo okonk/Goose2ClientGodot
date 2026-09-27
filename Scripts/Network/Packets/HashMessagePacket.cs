@@ -5,7 +5,7 @@ namespace Goose2Client.Network.Packets
 {
     class HashMessagePacket : PacketHandler
     {
-        public string Message { get; set; }
+        public string Message { get; set; } = null!;
 
         public override string Prefix { get; } = "#";
 

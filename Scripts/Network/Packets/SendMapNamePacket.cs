@@ -5,7 +5,7 @@ namespace Goose2Client.Network.Packets
 {
     class SendMapNamePacket : PacketHandler
     {
-        public string MapName { get; set; }
+        public string MapName { get; set; } = null!;
 
         public override string Prefix { get; } = "SMN";
 

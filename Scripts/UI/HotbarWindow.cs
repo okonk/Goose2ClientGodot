@@ -19,21 +19,21 @@ public partial class HotbarWindow : BaseWindow, IWindow
 
     private static readonly PackedScene SlotScene = GD.Load<PackedScene>("res://Scenes/UI/HotbarSlot.tscn");
 
-    private HotbarPage[] _pages;
+    private HotbarPage[] _pages = null!;
     private int _pageIndex;
-    private Button _backButton;
-    private Button _nextButton;
-    private TextureProgressBar _xpBar;
-    private Label _xpText;
+    private Button _backButton = null!;
+    private Button _nextButton = null!;
+    private TextureProgressBar _xpBar = null!;
+    private Label _xpText = null!;
     private string _xpTooltip = "";
     private bool _mounted;
     private readonly Dictionary<int, string> _mountSlots = new();
     private float _repeatTimer;
-    private Timer _saveTimer;
+    private Timer _saveTimer = null!;
     private bool _listenersRegistered;
 
-    public InventoryWindow InventoryWindow { get; set; }
-    public SpellbookWindow SpellbookWindow { get; set; }
+    public InventoryWindow? InventoryWindow { get; set; }
+    public SpellbookWindow? SpellbookWindow { get; set; }
 
     public int WindowId => (int)WindowFrame;
     public WindowFrames WindowFrame => WindowFrames.Hotbar;

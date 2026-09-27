@@ -7,7 +7,7 @@ namespace Goose2Client.Network.Packets
     {
         public ChatType ChatType { get; set; }
 
-        public string Message { get; set; }
+        public string Message { get; set; } = null!;
 
         public override string Prefix { get; } = "$";
 

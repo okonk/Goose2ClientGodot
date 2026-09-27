@@ -10,7 +10,7 @@ namespace Goose2Client
         public const double DefaultDelaySeconds = 0.3;
 
         private readonly double _delaySeconds;
-        private string _action;
+        private string? _action;
         private double _heldSeconds;
         private bool _repeating;
         private bool _spent;
@@ -18,13 +18,13 @@ namespace Goose2Client
         public HoldCastGate(double delaySeconds = DefaultDelaySeconds) => _delaySeconds = delaySeconds;
 
         /// <summary>Hotkey action of the tracked press, or null when no hotkey is down.</summary>
-        public string Action => _action;
+        public string? Action => _action;
 
         /// <summary>This press already hold-cast and keeps casting until the key is released.</summary>
         public bool IsRepeating => _action != null && _repeating;
 
         /// <summary>Advances the tracked press; true exactly once per press, when the delay elapses.</summary>
-        public bool Update(string heldAction, double delta)
+        public bool Update(string? heldAction, double delta)
         {
             if (heldAction != _action)
             {

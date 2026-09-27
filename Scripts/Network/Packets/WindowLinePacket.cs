@@ -9,7 +9,7 @@ namespace Goose2Client.Network.Packets
 
         public int LineNumber { get; set; }
 
-        public string Text { get; set; }
+        public string Text { get; set; } = null!;
 
         public int StackSize { get; set; }
 

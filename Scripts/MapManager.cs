@@ -11,22 +11,22 @@ namespace Goose2Client;
 /// runs the Camera2D, and handles TileUpdate / MapObject / EraseObject / SetYourPosition.</summary>
 public partial class MapManager : Node2D
 {
-    private MapDocument _map;
-    private SpriteCache _cache;
-    private MapTileCatalog _tileCatalog;
+    private MapDocument _map = null!;
+    private SpriteCache _cache = null!;
+    private MapTileCatalog _tileCatalog = null!;
     private readonly MapLayer[] _layers = new MapLayer[5];   // TileMapLayer bands; [2] is null (see _objectLayer)
-    private ObjectLayer _objectLayer;   // layer 2 ("Objects 1") as per-object Y-sortable sprites
-    private Node2D _objects;     // dropped-item container
-    private Camera2D _camera;
+    private ObjectLayer _objectLayer = null!;   // layer 2 ("Objects 1") as per-object Y-sortable sprites
+    private Node2D _objects = null!;     // dropped-item container
+    private Camera2D _camera = null!;
     private readonly System.Collections.Generic.Dictionary<int, MapItem> _mapObjects = new();
     private int _myLoginId = -1;
     private readonly System.Collections.Generic.Dictionary<int, Character.Character> _characters = new();
-    private Image _minimapImage;
-    private ImageTexture _minimapTexture;
+    private Image _minimapImage = null!;
+    private ImageTexture _minimapTexture = null!;
     private readonly System.Collections.Generic.Dictionary<(int, int), Color?> _tileColorMemo = new();
     private readonly System.Collections.Generic.Dictionary<int, Image> _sheetImages = new();
-    private Node2D _characterRoot;
-    private Character.Character _localPlayer;
+    private Node2D _characterRoot = null!;
+    private Character.Character? _localPlayer;
     private bool _listenersRegistered;
 
     // A fast double-click sends two LCs before the first MKW lands; the server treats the
@@ -42,10 +42,10 @@ public partial class MapManager : Node2D
     public int MyLoginId => _myLoginId;
 
     /// <summary>Look up a character node by login ID.</summary>
-    public Character.Character GetCharacter(int loginId) => _characters.TryGetValue(loginId, out var c) ? c : null;
+    public Character.Character? GetCharacter(int loginId) => _characters.TryGetValue(loginId, out var c) ? c : null;
 
     /// <summary>The local player's character node (if alive).</summary>
-    public Character.Character LocalPlayer => GetCharacter(_myLoginId);
+    public Character.Character? LocalPlayer => GetCharacter(_myLoginId);
 
     public System.Collections.Generic.IEnumerable<Character.Character> Characters => _characters.Values;
 
@@ -63,14 +63,15 @@ public partial class MapManager : Node2D
 
     public override void _Ready()
     {
-        _map = GameManager.Instance.CurrentMap;
+        var map = GameManager.Instance.CurrentMap;
         _cache = new SpriteCache();
         _tileCatalog = new MapTileCatalog(_cache);
         _objects = GetNode<Node2D>("Objects");
         _characterRoot = GetNode<Node2D>("Characters");
         _camera = GetNode<Camera2D>("Camera2D");
 
-        if (_map == null) { GD.PushError("MapManager: CurrentMap is null"); return; }
+        if (map == null) { GD.PushError("MapManager: CurrentMap is null"); return; }
+        _map = map;
 
         var layersRoot = GetNode<Node2D>("Layers");
         for (int i = 0; i < 5; i++)
@@ -131,7 +132,7 @@ public partial class MapManager : Node2D
             GameManager.Instance.CurrentMapManager = null;
 
         if (!_listenersRegistered) return;
-        var pm = GameManager.Instance.PacketManager;
+        var pm = GameManager.Instance!.PacketManager;
         pm.Remove<TileUpdatePacket>(OnTileUpdate);
         pm.Remove<MapObjectPacket>(OnMapObject);
         pm.Remove<EraseObjectPacket>(OnEraseObject);

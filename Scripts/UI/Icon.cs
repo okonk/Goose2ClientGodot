@@ -3,7 +3,7 @@ namespace Goose2Client.UI;
 
 public static class Icon
 {
-    private static Shader _tintShader;
+    private static Shader? _tintShader;
     // Faithful to Character.cs:205-214 — tint.a is a BLEND factor, not opacity.
     private static Shader TintShader => _tintShader ??= new Shader { Code = @"shader_type canvas_item;
 uniform vec4 tint : source_color = vec4(0.0);

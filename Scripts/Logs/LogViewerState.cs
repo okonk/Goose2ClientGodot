@@ -447,10 +447,10 @@ namespace Goose2Client.Logs
                 typeAvailable ? (int)row.TypeId : 0,
                 primaryAvailable,
                 row.Primary?.Kind ?? LogEntityKind.Player,
-                primaryAvailable ? (int)row.Primary.Id!.Value : 0,
+                primaryAvailable ? (int)(row.Primary?.Id ?? 0) : 0,
                 relatedAvailable,
                 row.Related?.Kind ?? LogEntityKind.Player,
-                relatedAvailable ? (int)row.Related.Id!.Value : 0);
+                relatedAvailable ? (int)(row.Related?.Id ?? 0) : 0);
         }
 
         public void ApplyQuickAction(LogQuickActionTarget target, LogRow row)
@@ -471,7 +471,7 @@ namespace Goose2Client.Logs
                 case LogQuickActionTarget.Related:
                     if (!EntityQuickFilterAvailable(row.Related))
                         return;
-                    ApplyEntityKind(row.Related);
+                    ApplyEntityKind(row.Related!);
                     break;
             }
         }

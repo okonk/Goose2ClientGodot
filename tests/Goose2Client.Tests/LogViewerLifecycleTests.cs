@@ -377,13 +377,13 @@ namespace Goose2Client.Tests
             logic.SendClose();
             Assert.Equal(new[] { Window }, closes);
             logic.SendClose();
-            Assert.Equal(1, closes.Count);
+            Assert.Single(closes);
 
             var neverOpened = new LogViewerWindowLogic(Clock);
             neverOpened.BindCloseSender(id => closes.Add(id));
             neverOpened.Close();
             neverOpened.SendClose();
-            Assert.Equal(1, closes.Count);
+            Assert.Single(closes);
 
             var clw = Open();
             clw.BindCloseSender(id => closes.Add(id));
@@ -391,23 +391,23 @@ namespace Goose2Client.Tests
             Assert.True(clw.OnCloseWindow(new CloseWindowPacket { WindowId = Window }));
             Assert.False(clw.IsVisible);
             Assert.Empty(clw.State.Rows);
-            Assert.Equal(1, closes.Count);
+            Assert.Single(closes);
             Assert.False(clw.OnCloseWindow(new CloseWindowPacket { WindowId = 99 }));
 
             var disconnected = Open();
             disconnected.OnDisconnected();
             Assert.False(disconnected.IsVisible);
             Assert.Empty(disconnected.State.Rows);
-            Assert.Equal(1, closes.Count);
+            Assert.Single(closes);
 
             var errored = Open();
             errored.OnSocketError();
             Assert.False(errored.IsVisible);
-            Assert.Equal(1, closes.Count);
+            Assert.Single(closes);
 
             var replaced = Open();
             Assert.True(replaced.OnMakeWindow(new MakeWindowPacket { WindowId = ReplacedWindow, WindowFrame = WindowFrames.LogViewer }));
-            Assert.Equal(1, closes.Count);
+            Assert.Single(closes);
 
             Assert.Equal(2, (int)WindowButtons.Close);
             string clientSource = File.ReadAllText(Path.Combine(RepositoryRoot(), "Scripts/Network/NetworkClient.cs"));

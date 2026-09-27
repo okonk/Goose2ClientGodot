@@ -6,7 +6,7 @@ using Xunit;
 
 public class MinimapColorsTests
 {
-    private static Dictionary<(int, int), Color> _colors;
+    private static Dictionary<(int, int), Color> _colors = null!;
 
     private static Color? Provider(int sheet, int graphic)
         => _colors.TryGetValue((sheet, graphic), out var c) ? c : null;

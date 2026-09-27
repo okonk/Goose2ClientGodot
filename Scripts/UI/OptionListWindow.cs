@@ -12,7 +12,7 @@ public partial class OptionListWindow : BaseMultipleWindow
     // (server). See aspereta-info/protocol.txt.
     public const int LineClickOffset = 20;
 
-    private Label _heading;
+    private Label _heading = null!;
     private bool _headingVisible;
     private bool _anyIcon;
     private int _maxLine = -1;
@@ -39,7 +39,7 @@ public partial class OptionListWindow : BaseMultipleWindow
             HorizontalAlignment = HorizontalAlignment.Left,
             MouseFilter = Control.MouseFilterEnum.Ignore,
         };
-        UiScaleApplier.Instance.ApplyFontSize(_heading, LineFontSize);
+        UiScaleApplier.Instance!.ApplyFontSize(_heading, LineFontSize);
         _heading.SetMeta(UiScaleLayout.SkipMeta, true);
         GetNode<Control>("Content").AddChild(_heading);
     }
@@ -77,7 +77,7 @@ public partial class OptionListWindow : BaseMultipleWindow
             VerticalAlignment = VerticalAlignment.Center,
             MouseFilter = Control.MouseFilterEnum.Ignore,
         };
-        UiScaleApplier.Instance.ApplyFontSize(label, LineFontSize);
+        UiScaleApplier.Instance!.ApplyFontSize(label, LineFontSize);
         button.AddChild(label);
         return button;
     }
@@ -136,7 +136,7 @@ public partial class OptionListWindow : BaseMultipleWindow
     {
         _anyIcon = ComputeAnyIcon();
         base.Relayout();
-        var factor = UiScaleApplier.Instance.Factor;
+        var factor = UiScaleApplier.Instance!.Factor;
         var lineSize = OptionListMetrics.LineSize(factor, _anyIcon);
         var iconSize = UiScale.ScaleSize(OptionListMetrics.IconSize, factor);
         var iconX = UiScale.ScaleSize(OptionListMetrics.IconX, factor);

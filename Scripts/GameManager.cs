@@ -11,41 +11,41 @@ namespace Goose2Client
 {
     public partial class GameManager : Node
     {
-        private static GameManager instance;
+        private static GameManager instance = null!;
         public static GameManager Instance => instance;
 
-        public NetworkClient NetworkClient { get; private set; }
-        public PacketManager PacketManager { get; private set; }
+        public NetworkClient NetworkClient { get; private set; } = null!;
+        public PacketManager PacketManager { get; private set; } = null!;
 
-        private PausablePacketQueue _packetQueue;
-        private MainThreadStallMonitor _stallMonitor;
+        private PausablePacketQueue _packetQueue = null!;
+        private MainThreadStallMonitor _stallMonitor = null!;
         private const int MaxNetworkPacketsPerFrame = 64;
         private const ulong NetworkPacketBudgetUsec = 4000;
 
         /// <summary>Persistent CanvasLayer that survives scene swaps. HUD windows attach here.</summary>
-        public CanvasLayer UiLayer { get; private set; }
+        public CanvasLayer UiLayer { get; private set; } = null!;
 
         /// <summary>Shown when the server drops the connection in-game; offers a return-to-login path.</summary>
-        public UI.DisconnectOverlay DisconnectOverlay { get; private set; }
+        public UI.DisconnectOverlay DisconnectOverlay { get; private set; } = null!;
 
         /// <summary>Per-character settings (hotkeys, window positions, options).</summary>
-        public CharacterSettings CharacterSettings { get; set; }
+        public CharacterSettings CharacterSettings { get; set; } = null!;
 
         /// <summary>Class ID → class name lookup, populated by ClassUpdatePacket.</summary>
         public Dictionary<int, string> Classes { get; } = new();
 
         /// <summary>The parsed map for the scene currently being entered. Set in ChangeMap, read by MapManager._Ready.</summary>
-        public MapDocument CurrentMap { get; set; }
+        public MapDocument? CurrentMap { get; set; }
         public string CurrentMapName { get; private set; } = "";
 
         /// <summary>Shared UI/icon sprite cache used by HUD windows.</summary>
-        public SpriteCache Sprites { get; private set; }
+        public SpriteCache Sprites { get; private set; } = null!;
 
         /// <summary>Tracks per-slot spell cooldown timers.</summary>
         public SpellCooldownManager SpellCooldownManager { get; } = new();
 
         /// <summary>Manages on-screen spell targeting (stub until step 8).</summary>
-        public SpellTargetManager SpellTargetManager { get; private set; }
+        public SpellTargetManager SpellTargetManager { get; private set; } = null!;
 
         /// <summary>Whether the player is currently in spell-targeting mode.</summary>
         public bool IsTargeting => SpellTargetManager?.IsTargeting ?? false;
@@ -58,17 +58,17 @@ namespace Goose2Client
         public bool IsInParty(int loginId) => _partyIds.Contains(loginId);
 
         /// <summary>The active MapManager node, set/cleared by MapManager itself.</summary>
-        public MapManager CurrentMapManager { get; set; }
+        public MapManager? CurrentMapManager { get; set; }
 
         /// <summary>Owns the world sub-viewport and its display texture; map scenes attach here.</summary>
-        public WorldViewport WorldViewport { get; private set; }
+        public WorldViewport WorldViewport { get; private set; } = null!;
 
-        public WorldTextBridge WorldTextBridge { get; private set; }
+        public WorldTextBridge WorldTextBridge { get; private set; } = null!;
 
         /// <summary>The persistent HUD root, instantiated once under UiLayer.</summary>
-        public GameHud Hud { get; private set; }
+        public GameHud? Hud { get; private set; }
 
-        public event System.Action<Character.Character> CharacterUpdated;
+        public event System.Action<Character.Character>? CharacterUpdated;
         public void OnCharacterUpdated(Character.Character c) => CharacterUpdated?.Invoke(c);
 
         // User signal (not a [Signal] delegate — the tests project compiles this file without
@@ -256,7 +256,7 @@ namespace Goose2Client
             _changingMap = true;
 
             // Loading overlay: added to root directly, NOT set as a current scene — freed manually.
-            LoadingMapScene loading = null;
+            LoadingMapScene? loading = null;
             try
             {
                 // Unity parity: clear and unfocus chat input on every map change
@@ -324,8 +324,8 @@ namespace Goose2Client
                 // the loading await without re-deriving this ordering.
                 var tree = GetTree();   // captured so FinishRace can detach without touching `this`
                 bool raceDone = false;
-                System.Action onPostDraw = null;
-                System.Action onFrame = null;
+                System.Action? onPostDraw = null;
+                System.Action? onFrame = null;
                 void FinishRace()
                 {
                     // A freed GameManager must not throw inside the FramePostDraw callback
@@ -380,7 +380,7 @@ namespace Goose2Client
         public void LoadSettings(string characterName)
         {
             CharacterSettings = new CharacterSettings(characterName);
-            var applier = UiScaleApplier.Instance;
+            var applier = UiScaleApplier.Instance!;
             var mode = UiScale.NormalizeMode(CharacterSettings.GetOption<int>(Options.UiScaleMode, (int)UiScaleMode.Auto));
             var saved = CharacterSettings.GetOption<float>(Options.UiScaleValue, 1f);
             var canvas = (Vector2I)GetTree().Root.GetVisibleRect().Size;
@@ -457,7 +457,7 @@ namespace Goose2Client
             }
         }
 
-        private MapDocument LoadMap(string mapFile)
+        private MapDocument? LoadMap(string mapFile)
         {
             // The server's MapFileName carries the ".map" extension (e.g. "Map2.map");
             // normalize to the basename in case the wire name ever differs in extension.
@@ -522,7 +522,7 @@ namespace Goose2Client
             var canvas = (Vector2I)tree.Root.GetVisibleRect().Size;
             if (canvas.X < 2 || canvas.Y < 2)
                 return;
-            var applier = UiScaleApplier.Instance;
+            var applier = UiScaleApplier.Instance!;
             if (applier != null && applier.Mode == UiScaleMode.Auto)
             {
                 var f = UiScale.AutoFactor(canvas.Y);

@@ -5,7 +5,7 @@ namespace Goose2Client.Overlays
     /// <summary>Looping emote effect rendered above a character. Self-frees when clip length elapses.</summary>
     public partial class EmoteAnimation : WorldOverlay
     {
-        private AnimatedSprite2D _sprite;
+        private AnimatedSprite2D _sprite = null!;
 
         public bool Setup(int animationId)
         {

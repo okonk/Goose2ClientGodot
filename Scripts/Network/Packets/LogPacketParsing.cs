@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using Goose2Client.Logs;
 
@@ -8,7 +9,7 @@ namespace Goose2Client.Network.Packets
     {
         public const int MaxSegmentCharacters = 12288;
 
-        public static bool TrySplit(string packet, string prefix, int fieldCount, out string[] fields)
+        public static bool TrySplit(string packet, string prefix, int fieldCount, [NotNullWhen(true)] out string[]? fields)
         {
             fields = null;
             if (packet == null || packet.Length < prefix.Length)
@@ -95,7 +96,7 @@ namespace Goose2Client.Network.Packets
         public static LogTypeMetadata ParseLmt(string packet)
         {
             int wireLength = packet?.Length ?? 0;
-            if (packet == null || !TrySplit(packet, "LMT", 4, out string[] f))
+            if (packet == null || !TrySplit(packet, "LMT", 4, out string[]? f))
                 return new LogTypeMetadata(false, 0, 0, wireLength, 0, "", "");
             if (!TryParseWindowId(f[0], "LMT", out int windowId))
                 return new LogTypeMetadata(false, 0, 0, wireLength, 0, "", "");
@@ -111,7 +112,7 @@ namespace Goose2Client.Network.Packets
         public static LogMapMetadata ParseLmm(string packet)
         {
             int wireLength = packet?.Length ?? 0;
-            if (packet == null || !TrySplit(packet, "LMM", 3, out string[] f))
+            if (packet == null || !TrySplit(packet, "LMM", 3, out string[]? f))
                 return new LogMapMetadata(false, 0, 0, wireLength, 0, "");
             if (!TryParseWindowId(f[0], "LMM", out int windowId))
                 return new LogMapMetadata(false, 0, 0, wireLength, 0, "");
@@ -125,7 +126,7 @@ namespace Goose2Client.Network.Packets
         public static LogDefaultsMetadata ParseLmd(string packet)
         {
             int wireLength = packet?.Length ?? 0;
-            if (packet == null || !TrySplit(packet, "LMD", 3, out string[] f))
+            if (packet == null || !TrySplit(packet, "LMD", 3, out string[]? f))
                 return new LogDefaultsMetadata(false, 0, 0, wireLength, 0, 0);
             if (!TryParseWindowId(f[0], "LMD", out int windowId))
                 return new LogDefaultsMetadata(false, 0, 0, wireLength, 0, 0);
@@ -155,7 +156,7 @@ namespace Goose2Client.Network.Packets
         public static LogResultBegin ParseLrb(string packet)
         {
             int wireLength = packet?.Length ?? 0;
-            if (packet == null || !TrySplit(packet, "LRB", 2, out string[] f))
+            if (packet == null || !TrySplit(packet, "LRB", 2, out string[]? f))
             {
                 var identity = RecoverIdentity(packet, "LRB");
                 return new LogResultBegin(false, identity.WindowId, identity.RequestId, wireLength);
@@ -173,7 +174,7 @@ namespace Goose2Client.Network.Packets
         public static LogResultData ParseLrd(string packet)
         {
             int wireLength = packet?.Length ?? 0;
-            if (packet == null || !TrySplit(packet, "LRD", 6, out string[] f))
+            if (packet == null || !TrySplit(packet, "LRD", 6, out string[]? f))
             {
                 var identity = RecoverIdentity(packet, "LRD");
                 return new LogResultData(false, identity.WindowId, identity.RequestId, wireLength, 0, 0, 0, "");
@@ -200,7 +201,7 @@ namespace Goose2Client.Network.Packets
         public static LogResultFinish ParseLrf(string packet)
         {
             int wireLength = packet?.Length ?? 0;
-            if (packet == null || !TrySplit(packet, "LRF", 5, out string[] f))
+            if (packet == null || !TrySplit(packet, "LRF", 5, out string[]? f))
             {
                 var identity = RecoverIdentity(packet, "LRF");
                 return new LogResultFinish(false, identity.WindowId, identity.RequestId, wireLength, false, "", "");
@@ -232,7 +233,7 @@ namespace Goose2Client.Network.Packets
         public static LogResultError ParseLrx(string packet)
         {
             int wireLength = packet?.Length ?? 0;
-            if (packet == null || !TrySplit(packet, "LRX", 3, out string[] f))
+            if (packet == null || !TrySplit(packet, "LRX", 3, out string[]? f))
             {
                 var identity = RecoverIdentity(packet, "LRX");
                 return new LogResultError(false, identity.WindowId, identity.RequestId, wireLength, "");

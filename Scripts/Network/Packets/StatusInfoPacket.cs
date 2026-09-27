@@ -5,9 +5,9 @@ namespace Goose2Client.Network.Packets
 {
     class StatusInfoPacket : PacketHandler
     {
-        public string GuildName { get; set; }
-        public string UnknownProperty { get; set; }
-        public string ClassName { get; set; }
+        public string GuildName { get; set; } = null!;
+        public string UnknownProperty { get; set; } = null!;
+        public string ClassName { get; set; } = null!;
         public int Level { get; set; }
         public long MaxHP { get; set; }
         public long MaxMP { get; set; }

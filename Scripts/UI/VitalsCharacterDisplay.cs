@@ -53,7 +53,7 @@ public partial class VitalsCharacterDisplay : Control
         var path = $"res://Assets/Sprites/{folder}/{graphicId}/animations.tres";
         if (!ResourceLoader.Exists(path)) { ClearLayer(nodePath); return; }
         var frames = GD.Load<SpriteFrames>(path);
-        string anim = frames.HasAnimation("idle-down") ? "idle-down"
+        string? anim = frames.HasAnimation("idle-down") ? "idle-down"
                     : frames.HasAnimation("idle") ? "idle" : null;
         if (anim == null || frames.GetFrameCount(anim) == 0) { ClearLayer(nodePath); return; }
         var tex = frames.GetFrameTexture(anim, 0);
@@ -64,7 +64,7 @@ public partial class VitalsCharacterDisplay : Control
         // Native size * zoom * factor, centered on the scaled circle and dropped so the head
         // frames in it (drop 20 for humanoids, 0 for monsters). The Mask clip crops overflow.
         var (size, pos) = VitalsPortraitMetrics.Layout(
-            tex.GetSize(), dropPixels, UiScaleApplier.Instance.Factor);
+            tex.GetSize(), dropPixels, UiScaleApplier.Instance!.Factor);
         rect.Size = size;
         rect.Position = pos;
 
@@ -95,7 +95,7 @@ public partial class VitalsCharacterDisplay : Control
     }
 
     // Faithful to Character.cs and Icon.cs — tint.a is a BLEND factor, not opacity.
-    private static Shader _tintShader;
+    private static Shader? _tintShader;
     private static Shader TintShader => _tintShader ??= new Shader()
     {
         Code = @"shader_type canvas_item;

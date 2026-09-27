@@ -37,7 +37,7 @@ namespace Goose2Client.Network
             if (index >= packet.Length)
                 throw new InvalidOperationException($"Index {index} is out of bounds for packet {prefix}");
 
-            string strValue = null;
+            string? strValue = null;
 
             for (int i = index; i < packet.Length; i++)
             {

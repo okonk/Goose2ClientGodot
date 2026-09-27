@@ -108,7 +108,7 @@ namespace Goose2Client.Tests
                 Assert.True(a.FeedLrd(Lrd(1, i, chunks2.Count, chunks2[i])));
             Assert.True(a.FeedLrf(Lrf(true, "AAECAwQFBgcICQoLDA0ODw", "BBECAwQFBgcICQoLDA0ODw")));
             var result = a.Result;
-            Assert.Equal(2, result.Rows.Count);
+            Assert.Equal(2, result!.Rows.Count);
             Assert.Equal(PaddedSingleRow(1), result.Rows[0]);
             Assert.Equal(PaddedSingleRow(2), result.Rows[1]);
             Assert.True(result.HasMore);
@@ -127,7 +127,7 @@ namespace Goose2Client.Tests
             for (int i = 0; i < chunks.Count; i++)
                 Assert.True(a.FeedLrd(Lrd(0, i, chunks.Count, chunks[i])));
             Assert.True(a.FeedLrf(Lrf(false, "AAECAwQFBgcICQoLDA0ODw", "")));
-            Assert.Equal(new string('q', 10000), a.Result.Rows[0].OriginalText);
+            Assert.Equal(new string('q', 10000), a.Result!.Rows[0].OriginalText);
         }
 
         [Fact]
@@ -145,7 +145,7 @@ namespace Goose2Client.Tests
             for (int i = 0; i < c2.Count; i++)
                 Assert.True(ok.FeedLrd(Lrd(1, i, c2.Count, c2[i])));
             Assert.True(ok.FeedLrf(Lrf(false, "AAECAwQFBgcICQoLDA0ODw", "")));
-            Assert.Equal(2, ok.Result.Rows.Count);
+            Assert.Equal(2, ok.Result!.Rows.Count);
 
             var interleaved = new LogResponseAssembler();
             Assert.True(interleaved.FeedLrb(Lrb()));
@@ -318,7 +318,7 @@ namespace Goose2Client.Tests
                 Assert.True(a.FeedLrd(Lrd(i, 0, 1, b64)));
             }
             Assert.True(a.FeedLrf(Lrf(false, "AAECAwQFBgcICQoLDA0ODw", "")));
-            Assert.Equal(50, a.Result.Rows.Count);
+            Assert.Equal(50, a.Result!.Rows.Count);
 
             var over = new LogResponseAssembler();
             over.FeedLrb(Lrb());
@@ -342,7 +342,7 @@ namespace Goose2Client.Tests
             var a = new LogResponseAssembler();
             FeedAll(a, json);
             Assert.True(a.FeedLrf(Lrf(false, "AAECAwQFBgcICQoLDA0ODw", "")));
-            Assert.Equal(new string('a', pad), a.Result.Rows[0].OriginalText);
+            Assert.Equal(new string('a', pad), a.Result!.Rows[0].OriginalText);
 
             var over = new LogResponseAssembler();
             string overJson = MinimalRow(1).Replace("\"originalText\":\"t\"", "\"originalText\":\"" + new string('a', pad + 1) + "\"");

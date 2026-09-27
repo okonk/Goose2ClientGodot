@@ -8,7 +8,7 @@ namespace Goose2Client.Network.Packets
         public int SlotNumber { get; set; }
         public int GraphicId { get; set; }
         public int GraphicFile { get; set; }
-        public string Name { get; set; }
+        public string Name { get; set; } = null!;
         public long RemainingMs { get; set; }
         public long TotalMs { get; set; }
 

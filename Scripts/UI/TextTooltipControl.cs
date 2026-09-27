@@ -5,8 +5,8 @@ namespace Goose2Client.UI
     /// <summary>Simple text tooltip: single label.</summary>
     public partial class TextTooltipControl : Control
     {
-        private Label _label;
-        private Control _parent;
+        private Label _label = null!;
+        private Control _parent = null!;
 
         public override void _Ready()
         {
@@ -28,7 +28,7 @@ namespace Goose2Client.UI
             }
 
             // Size to the label's content (+padding) so the full-rect Background wraps the text.
-            var pad = TooltipMetrics.TextPad(UiScaleApplier.Instance.Factor);
+            var pad = TooltipMetrics.TextPad(UiScaleApplier.Instance!.Factor);
             Size = _label.GetCombinedMinimumSize() + new Vector2(pad.W, pad.H);
             _label.OffsetLeft = pad.W / 2;
             _label.OffsetTop = pad.H / 2;

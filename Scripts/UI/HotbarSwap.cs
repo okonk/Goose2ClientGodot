@@ -1,3 +1,4 @@
+using System;
 using Goose2Client;
 
 namespace Goose2Client.UI;
@@ -7,10 +8,10 @@ public enum HotbarContentKind { Empty, Item, Spell }
 public readonly struct HotbarContent
 {
     public HotbarContentKind Kind { get; }
-    public ItemStats Item { get; }
-    public SpellInfo Spell { get; }
+    public ItemStats? Item { get; }
+    public SpellInfo? Spell { get; }
 
-    private HotbarContent(HotbarContentKind kind, ItemStats item, SpellInfo spell)
+    private HotbarContent(HotbarContentKind kind, ItemStats? item, SpellInfo? spell)
     {
         Kind = kind;
         Item = item;
@@ -35,17 +36,23 @@ public static class HotbarSwap
     /// </summary>
     public static (HotbarContent Target, HotbarContent Source) Resolve(HotbarContent target, HotbarContent source)
     {
-        var newTarget = source.Kind == HotbarContentKind.Item
-            ? HotbarContent.FromItem(source.Item)
-            : HotbarContent.FromSpell(source.Spell);
-
-        var newSource = target.Kind switch
+        return source.Kind switch
         {
-            HotbarContentKind.Item  => HotbarContent.FromItem(target.Item),
-            HotbarContentKind.Spell => HotbarContent.FromSpell(target.Spell),
-            _                       => HotbarContent.Empty,
+            HotbarContentKind.Item => (HotbarContent.FromItem(source.Item!), ResolveSource(target)),
+            HotbarContentKind.Spell => (HotbarContent.FromSpell(source.Spell!), ResolveSource(target)),
+            HotbarContentKind.Empty => (target, source),
+            _ => throw new ArgumentOutOfRangeException(nameof(source)),
         };
+    }
 
-        return (newTarget, newSource);
+    private static HotbarContent ResolveSource(HotbarContent target)
+    {
+        return target.Kind switch
+        {
+            HotbarContentKind.Item => HotbarContent.FromItem(target.Item!),
+            HotbarContentKind.Spell => HotbarContent.FromSpell(target.Spell!),
+            HotbarContentKind.Empty => HotbarContent.Empty,
+            _ => throw new ArgumentOutOfRangeException(nameof(target)),
+        };
     }
 }

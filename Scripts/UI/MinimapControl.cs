@@ -17,16 +17,16 @@ public partial class MinimapControl : Control, IScalableWindow
     private const int BaseNameHeight = 14;
     private const int BaseNameOutline = 3;
 
-    private ImageTexture _bitmap;
+    private ImageTexture _bitmap = null!;
     private int _mapWidth;
     private int _mapHeight;
     private Vector2 _playerPos;
     private Direction _playerFacing;
     private bool _hasPlayer;
-    private List<UiScaleLayout.GeomRecord> _geom;
-    private Control _view;
-    private Label _name;
-    private StyleBoxFlat _frame;
+    private List<UiScaleLayout.GeomRecord> _geom = null!;
+    private Control _view = null!;
+    private Label _name = null!;
+    private StyleBoxFlat _frame = null!;
 
     public void SetMap(int mapWidth, int mapHeight, ImageTexture bitmap, string mapName)
     {
@@ -46,7 +46,7 @@ public partial class MinimapControl : Control, IScalableWindow
 
     public void Relayout()
     {
-        float factor = UiScaleApplier.Instance.Factor;
+        float factor = UiScaleApplier.Instance!.Factor;
         UiScaleLayout.Apply(_geom, factor);
         // The view's scaled inset is the border width, so the frame always hugs the map.
         _frame.SetBorderWidthAll((int)_view.OffsetLeft);
@@ -105,7 +105,7 @@ public partial class MinimapControl : Control, IScalableWindow
             0.2f, 1f));
 
         _geom = UiScaleLayout.Snapshot(this);
-        UiScaleApplier.Instance.RegisterWindow(this);
+        UiScaleApplier.Instance!.RegisterWindow(this);
         Relayout();
         TreeExited += () => UiScaleApplier.Instance.UnregisterWindow(this);
     }

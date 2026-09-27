@@ -19,13 +19,13 @@ public abstract partial class BaseMultipleWindow : BaseWindow, IWindow
     protected const int LineFontSize = 10;
     private const int ButtonFontSize = 12;
 
-    protected Control[] _lines;
-    protected Button _backButton;
-    protected Button _nextButton;
+    protected Control[] _lines = null!;
+    protected Button _backButton = null!;
+    protected Button _nextButton = null!;
     protected Button? _okButton;
-    protected Button _closeButton;
+    protected Button _closeButton = null!;
 
-    public Action<BaseMultipleWindow> OnCloseWindow { get; set; }
+    public Action<BaseMultipleWindow>? OnCloseWindow { get; set; }
 
     public int WindowId { get; private set; }
     public abstract WindowFrames WindowFrame { get; }
@@ -52,7 +52,7 @@ public abstract partial class BaseMultipleWindow : BaseWindow, IWindow
         _nextButton.Pressed += NextClicked;
         if (_okButton != null) _okButton.Pressed += OkClicked;
         _closeButton.Pressed += CloseWindow;
-        var applier = UiScaleApplier.Instance;
+        var applier = UiScaleApplier.Instance!;
         foreach (var b in new[] { _backButton, _nextButton, _okButton, _closeButton })
             if (b != null) applier.ApplyFontSize(b, ButtonFontSize);
 
@@ -75,7 +75,7 @@ public abstract partial class BaseMultipleWindow : BaseWindow, IWindow
     public override void Relayout()
     {
         base.Relayout();
-        var factor = UiScaleApplier.Instance.Factor;
+        var factor = UiScaleApplier.Instance!.Factor;
         for (int i = 0; i < _lines.Length; i++)
             _lines[i].Position = LinePosition(i, factor);
     }
@@ -83,7 +83,7 @@ public abstract partial class BaseMultipleWindow : BaseWindow, IWindow
     protected virtual Control CreateLine(int index)
     {
         var label = new Label { Text = " ", Name = "Line" + index };
-        UiScaleApplier.Instance.ApplyFontSize(label, LineFontSize);
+        UiScaleApplier.Instance!.ApplyFontSize(label, LineFontSize);
         return label;
     }
 
@@ -140,11 +140,11 @@ public abstract partial class BaseMultipleWindow : BaseWindow, IWindow
     public void CloseWindow()
     {
         GameManager.Instance.NetworkClient.WindowButtonClick(WindowButtons.Close, WindowId, NpcId);
-        Free();
+        FreeWindow();
     }
 
     // Server-initiated close (CLW): free without sending a WBC back.
-    internal void Free()
+    internal void FreeWindow()
     {
         Visible = false;
         OnCloseWindow?.Invoke(this);

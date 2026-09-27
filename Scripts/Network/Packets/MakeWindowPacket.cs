@@ -7,8 +7,8 @@ namespace Goose2Client.Network.Packets
     {
         public int WindowId { get; set; }
         public WindowFrames WindowFrame { get; set; }
-        public string Title { get; set; }
-        public bool[] Buttons { get; set; }
+        public string Title { get; set; } = null!;
+        public bool[] Buttons { get; set; } = Array.Empty<bool>();
         public int NpcId { get; set; }
         public int Unknown1 { get; set; }
         public int Unknown2 { get; set; }

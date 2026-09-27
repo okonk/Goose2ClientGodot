@@ -9,23 +9,23 @@ public partial class HairdyeWindow : BaseWindow
 {
     protected override bool DefaultVisible => false;
 
-    private CustomPreviewControl _preview;
-    private TextureRect _swatch;
-    private TextureRect _swatchCursor;
-    private TextureRect _hueBar;
-    private TextureRect _hueCursor;
-    private TextureRect _lightBar;
-    private TextureRect _lightCursor;
-    private HSlider _rSlider;
-    private HSlider _gSlider;
-    private HSlider _bSlider;
-    private HSlider _aSlider;
-    private Label _rValue;
-    private Label _gValue;
-    private Label _bValue;
-    private Label _aValue;
-    private LineEdit _nameField;
-    private Button _dyeButton;
+    private CustomPreviewControl _preview = null!;
+    private TextureRect _swatch = null!;
+    private TextureRect _swatchCursor = null!;
+    private TextureRect _hueBar = null!;
+    private TextureRect _hueCursor = null!;
+    private TextureRect _lightBar = null!;
+    private TextureRect _lightCursor = null!;
+    private HSlider _rSlider = null!;
+    private HSlider _gSlider = null!;
+    private HSlider _bSlider = null!;
+    private HSlider _aSlider = null!;
+    private Label _rValue = null!;
+    private Label _gValue = null!;
+    private Label _bValue = null!;
+    private Label _aValue = null!;
+    private LineEdit _nameField = null!;
+    private Button _dyeButton = null!;
 
     private int _r = CustomWindowMetrics.DefaultR;
     private int _g = CustomWindowMetrics.DefaultG;

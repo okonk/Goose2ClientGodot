@@ -1,3 +1,4 @@
+using System;
 using Godot;
 using Goose2Client;
 using Goose2Client.Network.Packets;
@@ -16,9 +17,9 @@ public partial class BankWindow : BaseWindow, IWindow
 
     private static readonly PackedScene SlotScene = GD.Load<PackedScene>("res://Scenes/UI/ItemSlot.tscn");
 
-    private ItemSlot[] _slots;
-    private Button _backButton;
-    private Button _nextButton;
+    private ItemSlot[] _slots = Array.Empty<ItemSlot>();
+    private Button _backButton = null!;
+    private Button _nextButton = null!;
     private bool _listenersRegistered;
 
     public int WindowId { get; private set; }
@@ -60,7 +61,7 @@ public partial class BankWindow : BaseWindow, IWindow
         GameManager.Instance.PacketManager.Listen<ClearBankSlotPacket>(OnClearBankSlot);
         _listenersRegistered = true;
 
-        UiScaleApplier.Instance.ApplyFontSize(GetNode<Label>("TitleBar/TitleLabel"), 9);
+        UiScaleApplier.Instance!.ApplyFontSize(GetNode<Label>("TitleBar/TitleLabel"), 9);
         ScaleRegister();
     }
 

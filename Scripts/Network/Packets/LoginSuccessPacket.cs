@@ -5,7 +5,7 @@ namespace Goose2Client.Network.Packets
 {
     class LoginSuccessPacket : PacketHandler
     {
-        public string RealmName { get; set; }
+        public string RealmName { get; set; } = null!;
 
         public override string Prefix { get; } = "LOK";
 

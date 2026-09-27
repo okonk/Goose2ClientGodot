@@ -22,7 +22,7 @@ namespace Goose2Client.Network.Packets.Tests
             Assert.True(result.Success);
             Assert.Null(result.Error);
             Assert.Equal("LQS10,7,F,1000,2000,Ym9i,3,2|5,aGVsbG8=", result.Packet);
-            Assert.Equal(9, result.Packet.Split(',').Length);
+            Assert.Equal(9, result.Packet!.Split(',').Length);
         }
 
         [Fact]
@@ -33,7 +33,7 @@ namespace Goose2Client.Network.Packets.Tests
             Assert.True(result.Success);
             Assert.Null(result.Error);
             Assert.Equal("LQS10,7,P," + Token, result.Packet);
-            Assert.Equal(4, result.Packet.Split(',').Length);
+            Assert.Equal(4, result.Packet!.Split(',').Length);
         }
 
         [Fact]
@@ -42,7 +42,7 @@ namespace Goose2Client.Network.Packets.Tests
             var sub = LogQuerySubmission.CreatePage(1, 1, Token, LogNavigationIntent.Previous);
             var result = LogQueryPacket.Format(sub);
             Assert.True(result.Success);
-            string[] fields = result.Packet.Split(',');
+            string[] fields = result.Packet!.Split(',');
             Assert.Equal(4, fields.Length);
             Assert.Equal("LQS1", fields[0]);
             Assert.Equal("1", fields[1]);
@@ -93,7 +93,7 @@ namespace Goose2Client.Network.Packets.Tests
             var result = LogQueryPacket.Format(sub, 0);
             Assert.True(result.Success);
             Assert.Equal("LQS1,1,F,0,1,,0,,YQ==", result.Packet);
-            Assert.DoesNotContain((char)0x01, result.Packet);
+            Assert.DoesNotContain((char)0x01, result.Packet!);
         }
 
         [Fact]
@@ -141,7 +141,7 @@ namespace Goose2Client.Network.Packets.Tests
             var sub = LogQuerySubmission.CreateFresh(1000, 1, Filter(0, 1, "", 0, types, ""));
             var result = LogQueryPacket.Format(sub, 743);
             Assert.True(result.Success);
-            Assert.Equal(8192, result.Packet.Length);
+            Assert.Equal(8192, result.Packet!.Length);
             Assert.StartsWith("LQS1000,1,F,0,1,,0,1000000000|", result.Packet);
 
             types.Add(1000000743);

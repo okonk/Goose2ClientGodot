@@ -49,11 +49,11 @@ public sealed class ChatLog
 
     // Local player's display name for outgoing tell echoes; null until the character is
     // attached, in which case echoes fall back to "You".
-    public string SelfName { get; set; }
+    public string? SelfName { get; set; }
 
-    public event Action TabsChanged;
-    public event Action ActiveChanged;
-    public event Action<string> ActiveLineAdded;
+    public event Action? TabsChanged;
+    public event Action? ActiveChanged;
+    public event Action<string>? ActiveLineAdded;
 
     public ChatLog(IEnumerable<ChatTabKind> enabled)
     {
@@ -93,7 +93,7 @@ public sealed class ChatLog
         return $"[color=#{color.ToHtml(false)}]{message}[/color]";
     }
 
-    public void Add(string message, ChatType type, string tellName = null)
+    public void Add(string message, ChatType type, string? tellName = null)
     {
         var line = Format(message, type);
         Append(_tabs[0], line);
@@ -152,7 +152,7 @@ public sealed class ChatLog
         else
         {
             var tab = _tabs.Find(t => t.Kind == kind);
-            _tabs.Remove(tab);
+            _tabs.Remove(tab!);
             if (tab == Active)
             {
                 Active = _tabs[0];
@@ -175,7 +175,7 @@ public sealed class ChatLog
         };
     }
 
-    private ChatTab Route(string message, ChatType type, string tellName)
+    private ChatTab? Route(string message, ChatType type, string? tellName)
     {
         if (type == ChatType.Tell)
         {
@@ -196,7 +196,7 @@ public sealed class ChatLog
         return kind == ChatTabKind.All ? null : _tabs.Find(t => t.Kind == kind);
     }
 
-    private static string ParseTellTo(string message)
+    private static string? ParseTellTo(string message)
     {
         if (!message.StartsWith(TellToPrefix, StringComparison.Ordinal))
             return null;

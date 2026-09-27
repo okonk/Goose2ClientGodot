@@ -5,11 +5,11 @@ namespace Goose2Client.UI
     /// <summary>Map item tooltip: name label + bind indicator label.</summary>
     public partial class MapItemTooltipControl : Control
     {
-        private Label _nameLabel;
-        private Label _bindLabel;
+        private Label _nameLabel = null!;
+        private Label _bindLabel = null!;
 
-        public ItemStats Item { get; private set; }
-        private Node2D _owner;
+        public ItemStats Item { get; private set; } = null!;
+        private Node2D _owner = null!;
 
         public override void _Ready()
         {
@@ -39,7 +39,7 @@ namespace Goose2Client.UI
 
             // Size to content so the full-rect Background wraps the name (+ bind line when shown).
             // Labels are sized to their actual text height so there is no leftover row padding.
-            var m = TooltipMetrics.MapItemMetrics(UiScaleApplier.Instance.Factor);
+            var m = TooltipMetrics.MapItemMetrics(UiScaleApplier.Instance!.Factor);
 
             Vector2 nameMin = _nameLabel.GetCombinedMinimumSize();
             _nameLabel.Position = new Vector2(m.LeftMargin, m.TopMargin);

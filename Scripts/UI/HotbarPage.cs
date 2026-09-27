@@ -7,6 +7,6 @@ namespace Goose2Client.UI;
 /// </summary>
 public sealed class HotbarPage
 {
-    public HotbarSlot[] Slots { get; init; }
-    public Control Container { get; init; }
+    public HotbarSlot[] Slots { get; init; } = null!;
+    public Control Container { get; init; } = null!;
 }

@@ -8,9 +8,9 @@ public enum ChatActionKind { None, ChatMessage, Command, Handler }
 public readonly struct ChatParseResult
 {
     public ChatActionKind Kind { get; }
-    public string Text { get; }       // ChatMessage: the (possibly truncated) message; Command: the full command; Handler: the command key
-    public string Arguments { get; }  // Handler only (may be null)
-    public ChatParseResult(ChatActionKind kind, string text, string arguments = null) { Kind = kind; Text = text; Arguments = arguments; }
+    public string? Text { get; }       // ChatMessage: the (possibly truncated) message; Command: the full command; Handler: the command key
+    public string? Arguments { get; }  // Handler only (may be null)
+    public ChatParseResult(ChatActionKind kind, string? text, string? arguments = null) { Kind = kind; Text = text; Arguments = arguments; }
 }
 
 public static class ChatCommandParser
@@ -29,7 +29,7 @@ public static class ChatCommandParser
         // Command path (HandleCommand)
         int space = input.IndexOf(' ');
         string command = space == -1 ? input : input.Substring(0, space);
-        string arguments = space == -1 ? null : input.Substring(space + 1);
+        string? arguments = space == -1 ? null : input.Substring(space + 1);
 
         if (aliases != null && aliases.TryGetValue(command.ToLowerInvariant(), out var replaced))
             command = replaced;

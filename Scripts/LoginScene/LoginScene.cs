@@ -33,7 +33,7 @@ public partial class LoginScene : Control, IScalableWindow
 
         // Register the card's font overrides so they scale with the UI factor like every
         // other window; the tscn values are the 1x bases.
-        var applier = UiScaleApplier.Instance;
+        var applier = UiScaleApplier.Instance!;
         const string vb = "LoginLayout/Center/LoginCard/CardPadding/VBox/";
         applier.ApplyFontSize(GetNode<Label>(vb + "GameTitle"), 17);
         applier.ApplyFontSize(GetNode<Label>(vb + "Subtitle"), 11);
@@ -75,7 +75,7 @@ public partial class LoginScene : Control, IScalableWindow
 
     public void Relayout()
     {
-        UiScaleLayout.Apply(_geom, UiScaleApplier.Instance.Factor);
+        UiScaleLayout.Apply(_geom, UiScaleApplier.Instance!.Factor);
         // Godot quirk: a Label's min size is not refreshed when the theme default font
         // size changes, so the stale min over-allocates the VBox after a scale-down.
         _statusLabel.UpdateMinimumSize();

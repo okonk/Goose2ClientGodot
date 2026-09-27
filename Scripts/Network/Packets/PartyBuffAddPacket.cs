@@ -11,7 +11,7 @@ namespace Goose2Client.Network.Packets
         public int GraphicFile { get; set; }
         public long RemainingMs { get; set; }
         public long TotalMs { get; set; }
-        public string Name { get; set; }
+        public string Name { get; set; } = null!;
 
         public override string Prefix { get; } = "PBA";
 

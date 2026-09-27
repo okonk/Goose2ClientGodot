@@ -10,11 +10,11 @@ public partial class PartyMember : Control
 {
     private static readonly PackedScene EffectScene = GD.Load<PackedScene>("res://Scenes/UI/PartyEffect.tscn");
 
-    private Label _nameText;
-    private TextureProgressBar _hpBar;
-    private TextureProgressBar _mpBar;
-    private Control _content;
-    private HBoxContainer _effectRow;
+    private Label _nameText = null!;
+    private TextureProgressBar _hpBar = null!;
+    private TextureProgressBar _mpBar = null!;
+    private Control _content = null!;
+    private HBoxContainer _effectRow = null!;
     private readonly Dictionary<int, PartyEffect> _effectNodes = new();
 
     public int PlayerId { get; private set; }

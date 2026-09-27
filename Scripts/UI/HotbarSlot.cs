@@ -10,13 +10,13 @@ namespace Goose2Client.UI
     /// </summary>
     public partial class HotbarSlot : Panel
     {
-        private TextureRect _icon;
-        private Label _count;
-        private Label _slotNumberLabel;
-        private CooldownOverlay _cooldownOverlay;
+        private TextureRect _icon = null!;
+        private Label _count = null!;
+        private Label _slotNumberLabel = null!;
+        private CooldownOverlay _cooldownOverlay = null!;
 
-        public Action<int> OnUseSlot { get; set; }
-        public Action OnSaveSlots { get; set; }
+        public Action<int>? OnUseSlot { get; set; }
+        public Action? OnSaveSlots { get; set; }
 
         private int _slotNumber;
         public int SlotNumber
@@ -28,13 +28,13 @@ namespace Goose2Client.UI
         /// <summary>Hotkey digit for a 0-based slot index: 9 → "0", otherwise index + 1.
         /// Matches the hotkey action mapping in HotbarWindow._Process.</summary>
         public static string SlotLabel(int index) => index == 9 ? "0" : (index + 1).ToString();
-        public IWindow Window { get; set; }
+        public IWindow Window { get; set; } = null!;
 
         public int ItemSlotIndex = -1;
         public int SpellSlotIndex = -1;
 
-        public ItemStats ItemStats { get; private set; }
-        public SpellInfo SpellInfo { get; private set; }
+        public ItemStats? ItemStats { get; private set; }
+        public SpellInfo? SpellInfo { get; private set; }
 
         public bool IsEmpty => ItemStats == null && SpellInfo == null;
 
@@ -203,7 +203,7 @@ namespace Goose2Client.UI
                 var src = d["slot"].As<SpellSlot>();
                 if (src != null && src.HasSpell)
                 {
-                    SetSpell(src.Info);
+                    SetSpell(src.Info!);
                     SaveSlots();
                 }
             }
@@ -214,7 +214,7 @@ namespace Goose2Client.UI
                     (src.Window.WindowFrame == WindowFrames.Inventory ||
                      src.Window.WindowFrame == WindowFrames.Equipped))
                 {
-                    SetItem(src.Stats);
+                    SetItem(src.Stats!);
                     SaveSlots();
                 }
             }
@@ -245,10 +245,10 @@ namespace Goose2Client.UI
             switch (content.Kind)
             {
                 case HotbarContentKind.Item:
-                    slot.SetItem(content.Item);
+                    slot.SetItem(content.Item!);
                     break;
                 case HotbarContentKind.Spell:
-                    slot.SetSpell(content.Spell);
+                    slot.SetSpell(content.Spell!);
                     break;
                 case HotbarContentKind.Empty:
                     slot.Clear();

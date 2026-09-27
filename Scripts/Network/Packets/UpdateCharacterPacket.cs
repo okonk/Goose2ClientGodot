@@ -14,7 +14,7 @@ namespace Goose2Client.Network.Packets
         public int BodyA { get; set; }
         public int BodyState { get; set; }
         public int HairId { get; set; }
-        public int[][] DisplayedEquipment { get; set; }
+        public int[][] DisplayedEquipment { get; set; } = null!;
         public int HairR { get; set; }
         public int HairG { get; set; }
         public int HairB { get; set; }

@@ -11,9 +11,9 @@ namespace Goose2Client.Network.Packets
         public int SoundFile { get; set; }
         public int TileX { get; set; }
         public int TileY { get; set; }
-        public string Title { get; set; }
-        public string Name { get; set; }
-        public string Surname { get; set; }
+        public string Title { get; set; } = null!;
+        public string Name { get; set; } = null!;
+        public string Surname { get; set; } = null!;
         public int StackSize { get; set; }
         public ItemMaterial MaterialType { get; set; }
         public ItemFlags Flags { get; set; }

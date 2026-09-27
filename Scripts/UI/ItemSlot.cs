@@ -9,18 +9,18 @@ namespace Goose2Client.UI
     /// </summary>
     public partial class ItemSlot : Panel
     {
-        private TextureRect _icon;
-        private Label _count;
+        private TextureRect _icon = null!;
+        private Label _count = null!;
 
-        public ItemStats Stats { get; private set; }
+        public ItemStats? Stats { get; private set; }
         public bool HasItem => Stats != null;
         public int StackSize => Stats?.StackSize ?? 0;
 
         public int SlotNumber { get; set; }
-        public IWindow Window { get; set; }
+        public IWindow Window { get; set; } = null!;
 
-        public Action<ItemStats> OnDoubleClick { get; set; }
-        public Action<IWindow, int, int> OnDropItem { get; set; }
+        public Action<ItemStats>? OnDoubleClick { get; set; }
+        public Action<IWindow, int, int>? OnDropItem { get; set; }
 
         public override void _Ready()
         {
@@ -48,7 +48,7 @@ namespace Goose2Client.UI
 
         private void OnMouseEntered()
         {
-            if (HasItem)
+            if (Stats != null)
                 TooltipManager.Instance.ShowItemTooltip(Stats, this);
         }
 
@@ -62,9 +62,9 @@ namespace Goose2Client.UI
             if (@event is InputEventMouseButton mb &&
                 mb.ButtonIndex == MouseButton.Left &&
                 mb.DoubleClick &&
-                HasItem)
+                Stats is { } stats)
             {
-                OnDoubleClick?.Invoke(Stats);
+                OnDoubleClick?.Invoke(stats);
             }
         }
 

@@ -15,8 +15,8 @@ public partial class CombineBagContainerWindow : BaseWindow, IWindow
 
     private static readonly PackedScene SlotScene = GD.Load<PackedScene>("res://Scenes/UI/ItemSlot.tscn");
 
-    private ItemSlot[] _slots;
-    private Button _combineButton;
+    private ItemSlot[] _slots = null!;
+    private Button _combineButton = null!;
     private bool _listenersRegistered;
 
     public int WindowId => 22;

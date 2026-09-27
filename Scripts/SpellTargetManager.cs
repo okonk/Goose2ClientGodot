@@ -6,9 +6,9 @@ namespace Goose2Client;
 /// <summary>Manages on-screen spell targeting — enter, cycle, confirm, cancel.</summary>
 public partial class SpellTargetManager : Node
 {
-    private Character.Character _target;
-    private SpellInfo _pendingSpell;
-    private SpellTarget _reticle;
+    private Character.Character? _target;
+    private SpellInfo? _pendingSpell;
+    private SpellTarget? _reticle;
     private ulong _hotkeyConfirmFrame = ulong.MaxValue;
     private readonly HoldCastGate _holdGate = new();
 
@@ -22,7 +22,7 @@ public partial class SpellTargetManager : Node
     // True while the hotkey that hold-cast is still down: the hotbar's held-key repeat then keeps
     // casting on the remembered target rather than reopening targeting behind the player's back.
     private bool IsHoldRepeating =>
-        !IsTargeting && _holdGate.IsRepeating && IsHotkeyHeld(_holdGate.Action);
+        !IsTargeting && _holdGate.IsRepeating && IsHotkeyHeld(_holdGate.Action!);
     
     public override void _Ready()
     {
@@ -142,7 +142,7 @@ public partial class SpellTargetManager : Node
 
     // A remembered target survives only while it is the same live character on this map, passes the
     // spell's target-type filter, and sits inside the view range.
-    private bool IsUsableTarget(Character.Character target, SpellTargetType spellTargetType)
+    private bool IsUsableTarget(Character.Character? target, SpellTargetType spellTargetType)
     {
         var mm = GameManager.Instance.CurrentMapManager;
         if (mm == null || target == null || !GodotObject.IsInstanceValid(target)) return false;
@@ -152,6 +152,7 @@ public partial class SpellTargetManager : Node
 
         var viewRange = GetViewRange();
         var player = mm.LocalPlayer;
+        if (player == null) return false;
         return System.Math.Abs(target.X - player.X) <= viewRange.X
             && System.Math.Abs(target.Y - player.Y) <= viewRange.Y;
     }
@@ -204,7 +205,7 @@ public partial class SpellTargetManager : Node
         if (IsTargeting) PositionReticle();
     }
 
-    private string HeldHotkeyAction()
+    private string? HeldHotkeyAction()
     {
         // Keep tracking the press already in progress so a second hotkey held down mid-press cannot
         // restart the hold; otherwise the lowest hotkey down wins.
@@ -242,6 +243,7 @@ public partial class SpellTargetManager : Node
             .Select(c => new TargetCandidate(c.LoginId, c.X, c.Y, c.CharacterType)).ToList();
         
         var player = mm.LocalPlayer;
+        if (player == null) return;
         TargetCandidate? current = _target != null ? new TargetCandidate(_target.LoginId, _target.X, _target.Y, _target.CharacterType) : (TargetCandidate?)null;
         
         var filteringEnabled = GameManager.Instance.CharacterSettings.GetOption<bool>(Options.TargetFiltering, true);
@@ -251,7 +253,7 @@ public partial class SpellTargetManager : Node
         var next = TargetCycler.Next(candidates, current, (player.X, player.Y), player.LoginId,
             GameManager.Instance.CurrentMap?.Width ?? 100,
             (viewRange.X, viewRange.Y),
-            _pendingSpell.TargetType, filteringEnabled, searchDown);
+            _pendingSpell!.TargetType, filteringEnabled, searchDown);
         
         if (next != null)
         {

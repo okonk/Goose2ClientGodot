@@ -11,20 +11,20 @@ public partial class OptionsWindow : BaseWindow
 {
     protected override bool DefaultVisible => false;
 
-    private CheckBox _targetFiltering;
-    private CheckBox _showSpiritBar;
-    private HSlider _renderScaleSlider;
-    private Label _renderScaleValueLabel;
+    private CheckBox _targetFiltering = null!;
+    private CheckBox _showSpiritBar = null!;
+    private HSlider _renderScaleSlider = null!;
+    private Label _renderScaleValueLabel = null!;
     private bool _renderScaleDragging;
-    private CheckBox _minimap;
-    private HSlider _minimapOpacitySlider;
+    private CheckBox _minimap = null!;
+    private HSlider _minimapOpacitySlider = null!;
     private bool _minimapOpacityDragging;
-    private CheckBox _scaleAuto;
-    private CheckBox _scaleManual;
-    private HSlider _scaleSlider;
-    private Label _scaleValueLabel;
-    private ButtonGroup _scaleModeGroup;
-    private Button _resetLayoutButton;
+    private CheckBox _scaleAuto = null!;
+    private CheckBox _scaleManual = null!;
+    private HSlider _scaleSlider = null!;
+    private Label _scaleValueLabel = null!;
+    private ButtonGroup _scaleModeGroup = null!;
+    private Button _resetLayoutButton = null!;
     private bool _dragging;
     private bool _initializing;
 
@@ -180,7 +180,7 @@ public partial class OptionsWindow : BaseWindow
     {
         if (!pressed || _initializing)
             return;
-        var applier = UiScaleApplier.Instance;
+        var applier = UiScaleApplier.Instance!;
         if (_scaleAuto.ButtonPressed)
         {
             CommitAuto();
@@ -219,7 +219,7 @@ public partial class OptionsWindow : BaseWindow
         var cs = GameManager.Instance.CharacterSettings;
         cs.Options[Options.UiScaleValue] = snapped;
         cs.Save();
-        var applier = UiScaleApplier.Instance;
+        var applier = UiScaleApplier.Instance!;
         if (snapped != applier.Factor)
             applier.Apply(snapped, ApplyReason.UserCommit);
         RefreshScaleLabel();
@@ -228,7 +228,7 @@ public partial class OptionsWindow : BaseWindow
     private void CommitAuto()
     {
         // Never writes UiScaleValue: the dormant manual slider choice must survive an Auto excursion.
-        var applier = UiScaleApplier.Instance;
+        var applier = UiScaleApplier.Instance!;
         applier.Mode = UiScaleMode.Auto;
         var cs = GameManager.Instance.CharacterSettings;
         cs.Options[Options.UiScaleMode] = (int)UiScaleMode.Auto;
@@ -239,7 +239,7 @@ public partial class OptionsWindow : BaseWindow
 
     private void RefreshScaleLabel()
     {
-        var applier = UiScaleApplier.Instance;
+        var applier = UiScaleApplier.Instance!;
         float f = applier.Mode == UiScaleMode.Manual
             ? (float)_scaleSlider.Value
             : applier.Factor;
@@ -262,7 +262,7 @@ public partial class OptionsWindow : BaseWindow
         GameManager.Instance.CharacterSettings.ResetWindowSettings();
         foreach (var w in GameManager.Instance.HudWindows())
             w.ResetToDefault();
-        GameManager.Instance.Hud.ResetMovableWindowPositions();
+        GameManager.Instance.Hud!.ResetMovableWindowPositions();
     }
 
     public override void Relayout()

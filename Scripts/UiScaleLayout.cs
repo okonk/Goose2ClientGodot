@@ -132,10 +132,10 @@ public static class UiScaleLayout
             c.GetParent() is Container,
             min, min != Vector2.Zero,
             constants.ToArray(),
-            hasPatch ? npr.PatchMarginLeft : 0,
-            hasPatch ? npr.PatchMarginTop : 0,
-            hasPatch ? npr.PatchMarginRight : 0,
-            hasPatch ? npr.PatchMarginBottom : 0,
+            hasPatch ? npr!.PatchMarginLeft : 0,
+            hasPatch ? npr!.PatchMarginTop : 0,
+            hasPatch ? npr!.PatchMarginRight : 0,
+            hasPatch ? npr!.PatchMarginBottom : 0,
             hasPatch);
     }
 }

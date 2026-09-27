@@ -17,15 +17,15 @@ public partial class ChatWindow : BaseWindow
     private const float TabScrollStep = 60f;
     private static readonly Texture2D CloseIcon = GD.Load<Texture2D>("res://Assets/UI/window-close.svg");
 
-    private RichTextLabel _chatLog;
-    private LineEdit _input;
-    private ScrollContainer _tabScroll;
-    private HBoxContainer _tabStrip;
-    private Control _dragFiller;
-    private Button _scrollLeft;
-    private Button _scrollRight;
-    private PopupMenu _tabMenu;
-    private ChatLog _log;
+    private RichTextLabel _chatLog = null!;
+    private LineEdit _input = null!;
+    private ScrollContainer _tabScroll = null!;
+    private HBoxContainer _tabStrip = null!;
+    private Control _dragFiller = null!;
+    private Button _scrollLeft = null!;
+    private Button _scrollRight = null!;
+    private PopupMenu _tabMenu = null!;
+    private ChatLog _log = null!;
     private bool _tabsDirty;
 
     private bool _listenersRegistered;
@@ -34,10 +34,10 @@ public partial class ChatWindow : BaseWindow
     protected override Vector2 MinResizeSize => MinSize;
 
     public bool Typing => _input.HasFocus();
-    public string ReplyToName { get; private set; }
+    public string? ReplyToName { get; private set; }
 
     private readonly Dictionary<string, string> _aliases = new();
-    private readonly Dictionary<string, Action<string, string>> _commandHandlers = new();
+    private readonly Dictionary<string, Action<string, string?>> _commandHandlers = new();
     private readonly List<string> _inputHistory = new();
     private int _historyIndex = 0;
 
@@ -99,7 +99,7 @@ public partial class ChatWindow : BaseWindow
         _commandHandlers["/quit"] = OnQuitCommand;
         _commandHandlers["/hairdye"] = OnHairdyeCommand;
 
-        var applier = UiScaleApplier.Instance;
+        var applier = UiScaleApplier.Instance!;
         applier.ApplyFontSize(_chatLog, 12, new StringName("normal_font_size"));
         applier.ApplyFontSize(_input, 12);
         ScaleRegister();
@@ -169,7 +169,7 @@ public partial class ChatWindow : BaseWindow
 
     private void ScrollTabs(int direction)
     {
-        _tabScroll.ScrollHorizontal += direction * UiScaleApplier.Instance.ScaleSize(TabScrollStep);
+        _tabScroll.ScrollHorizontal += direction * UiScaleApplier.Instance!.ScaleSize(TabScrollStep);
     }
 
     private void UpdateScrollButtons()
@@ -253,7 +253,7 @@ public partial class ChatWindow : BaseWindow
             return;
         float marginRight = tab.GetThemeStylebox("normal").ContentMarginRight;
         float iconW = CloseIcon.GetSize().X;
-        float pad = UiScaleApplier.Instance.ScaleSize(4f);
+        float pad = UiScaleApplier.Instance!.ScaleSize(4f);
         if (mb.Position.X < tab.Size.X - marginRight - iconW - pad)
             return;
         _log.Close(tabData);
@@ -294,13 +294,13 @@ public partial class ChatWindow : BaseWindow
         switch (result.Kind)
         {
             case ChatActionKind.ChatMessage:
-                GameManager.Instance.NetworkClient.ChatMessage(result.Text);
+                GameManager.Instance.NetworkClient.ChatMessage(result.Text!);
                 break;
             case ChatActionKind.Command:
-                GameManager.Instance.NetworkClient.Command(result.Text);
+                GameManager.Instance.NetworkClient.Command(result.Text!);
                 break;
             case ChatActionKind.Handler:
-                if (_commandHandlers.TryGetValue(result.Text.ToLowerInvariant(), out var h))
+                if (_commandHandlers.TryGetValue(result.Text!.ToLowerInvariant(), out var h))
                     h(result.Text, result.Arguments);
                 break;
             case ChatActionKind.None:
@@ -382,12 +382,12 @@ public partial class ChatWindow : BaseWindow
         }
     }
 
-    private void OnQuitCommand(string command, string arguments)
+    private void OnQuitCommand(string command, string? arguments)
     {
         GameManager.Instance.Quit();
     }
 
-    private void OnHairdyeCommand(string command, string arguments)
+    private void OnHairdyeCommand(string command, string? arguments)
     {
         if (string.IsNullOrWhiteSpace(arguments))
         {

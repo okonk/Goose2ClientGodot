@@ -1,3 +1,4 @@
+using System;
 using Godot;
 using Goose2Client;
 using Goose2Client.Network.Packets;
@@ -16,8 +17,8 @@ public partial class VendorWindow : BaseWindow, IWindow, INpcWindow
 
     private static readonly PackedScene SlotScene = GD.Load<PackedScene>("res://Scenes/UI/ItemSlot.tscn");
 
-    private ItemSlot[] _slots;
-    private Button _closeButton;
+    private ItemSlot[] _slots = Array.Empty<ItemSlot>();
+    private Button _closeButton = null!;
     private bool _listenersRegistered;
 
     public int WindowId { get; private set; }
@@ -56,7 +57,7 @@ public partial class VendorWindow : BaseWindow, IWindow, INpcWindow
         GameManager.Instance.PacketManager.Listen<ClearVendorPacket>(OnClearVendor);
         _listenersRegistered = true;
 
-        UiScaleApplier.Instance.ApplyFontSize(GetNode<Label>("TitleBar/TitleLabel"), 10);
+        UiScaleApplier.Instance!.ApplyFontSize(GetNode<Label>("TitleBar/TitleLabel"), 10);
         ScaleRegister();
     }
 

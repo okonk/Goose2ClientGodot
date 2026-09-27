@@ -12,7 +12,7 @@ public sealed class SpriteCache
     private const string ManifestPath = "res://Assets/Sprites/manifest.json";
 
     private readonly SpriteManifest _manifest;
-    private readonly Dictionary<int, Texture2D> _sheets = new();
+    private readonly Dictionary<int, Texture2D?> _sheets = new();
     private readonly Dictionary<(int, int), AtlasTexture> _tiles = new();
 
     // Reads through Godot.FileAccess: the manifest lives in the .pck in an exported
@@ -22,7 +22,7 @@ public sealed class SpriteCache
 
     /// <summary>The AtlasTexture for (sheet, graphic), or null when sheet==0, the manifest has no
     /// such rect, or the PNG is missing.</summary>
-    public AtlasTexture Get(int sheet, int graphic)
+    public AtlasTexture? Get(int sheet, int graphic)
     {
         if (sheet == 0) return null;
         var key = (sheet, graphic);
@@ -37,7 +37,7 @@ public sealed class SpriteCache
         return atlas;
     }
 
-    private Texture2D LoadSheet(int sheet)
+    private Texture2D? LoadSheet(int sheet)
     {
         if (_sheets.TryGetValue(sheet, out var t)) return t;
         var path = $"{SheetsDir}/{sheet}.png";

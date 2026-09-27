@@ -5,7 +5,7 @@ namespace Goose2Client.Overlays
     /// OverlayLifetime expires. Subclasses set Lifetime in _Ready and override Tick for visuals.</summary>
     public partial class WorldOverlay : Node2D
     {
-        protected OverlayLifetime Lifetime;
+        protected OverlayLifetime Lifetime = null!;
         public override void _Process(double delta)
         {
             if (Lifetime == null) return;

@@ -6,7 +6,7 @@ namespace Goose2Client.Network.Packets
     class ClassUpdatePacket : PacketHandler
     {
         public int ClassId { get; set; }
-        public string Name { get; set; }
+        public string Name { get; set; } = null!;
 
         public override string Prefix { get; } = "CUP";
 

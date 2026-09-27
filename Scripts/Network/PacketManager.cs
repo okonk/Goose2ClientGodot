@@ -49,7 +49,7 @@ namespace Goose2Client.Network
 
             for (int i = 0; i < Math.Min(8, packet.Length); i++)
             {
-                if (handlers.TryGetValue(packet.Substring(0, i + 1), out PacketHandler handler))
+                if (handlers.TryGetValue(packet.Substring(0, i + 1), out PacketHandler? handler))
                 {
                     object obj;
                     try

@@ -9,9 +9,9 @@ namespace Goose2Client.Map;
 /// characters. Cell art is bottom-center anchored via <see cref="MapTileCatalog"/>.</summary>
 public partial class MapLayer : TileMapLayer
 {
-    private MapDocument _map;
+    private MapDocument _map = null!;
     private int _layer;
-    private MapTileCatalog _catalog;
+    private MapTileCatalog _catalog = null!;
 
     public void Setup(MapDocument map, int layer, MapTileCatalog catalog)
     {

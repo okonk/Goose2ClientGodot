@@ -5,12 +5,12 @@ namespace Goose2Client.UI;
 
 public partial class CustomWindowSlot : Panel
 {
-    private TextureRect _icon;
+    private TextureRect _icon = null!;
 
-    public ItemStats Stats { get; private set; }
+    public ItemStats? Stats { get; private set; }
     public bool HasItem => Stats != null;
     public int SlotId { get; set; }
-    public Action<Godot.Collections.Dictionary> OnDrop { get; set; }
+    public Action<Godot.Collections.Dictionary>? OnDrop { get; set; }
 
     public override void _Ready()
     {

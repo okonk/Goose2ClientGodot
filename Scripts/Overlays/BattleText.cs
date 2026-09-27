@@ -8,7 +8,7 @@ namespace Goose2Client.Overlays
         private int _position;
         private float _scale = 1f;
 
-        public Character.Character AnchorOwner { get; set; }
+        public Character.Character AnchorOwner { get; set; } = null!;
         public Vector2 LocalOffsetWorld { get; set; }
 
         /// Cull rect sized to the actual line extent: spread x∈[−4,12], worst case 18 stacked lines

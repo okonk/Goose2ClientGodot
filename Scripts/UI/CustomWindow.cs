@@ -12,33 +12,33 @@ public partial class CustomWindow : BaseWindow, IWindow
     public int WindowId { get; private set; }
     public WindowFrames WindowFrame => WindowFrames.Custom;
 
-    private CustomWindowSlot _lookSlot;
-    private CustomWindowSlot _statsSlot;
-    private CustomPreviewControl _preview;
-    private TextureRect _swatch;
-    private TextureRect _swatchCursor;
-    private TextureRect _hueBar;
-    private TextureRect _hueCursor;
-    private TextureRect _lightBar;
-    private TextureRect _lightCursor;
-    private HSlider _rSlider;
-    private HSlider _gSlider;
-    private HSlider _bSlider;
-    private HSlider _aSlider;
-    private Label _rValue;
-    private Label _gValue;
-    private Label _bValue;
-    private Label _aValue;
-    private LineEdit _nameField;
-    private Button _createButton;
+    private CustomWindowSlot _lookSlot = null!;
+    private CustomWindowSlot _statsSlot = null!;
+    private CustomPreviewControl _preview = null!;
+    private TextureRect _swatch = null!;
+    private TextureRect _swatchCursor = null!;
+    private TextureRect _hueBar = null!;
+    private TextureRect _hueCursor = null!;
+    private TextureRect _lightBar = null!;
+    private TextureRect _lightCursor = null!;
+    private HSlider _rSlider = null!;
+    private HSlider _gSlider = null!;
+    private HSlider _bSlider = null!;
+    private HSlider _aSlider = null!;
+    private Label _rValue = null!;
+    private Label _gValue = null!;
+    private Label _bValue = null!;
+    private Label _aValue = null!;
+    private LineEdit _nameField = null!;
+    private Button _createButton = null!;
     private bool _listenersRegistered;
 
     private int _lookInvSlotId;
     private int _statsInvSlotId;
-    private ItemStats _lookStats;
+    private ItemStats? _lookStats;
     private bool _pendingCws;
     private bool _cwcPending;
-    private bool[] _mkwButtons;
+    private bool[]? _mkwButtons;
     private int _r = CustomWindowMetrics.DefaultR;
     private int _g = CustomWindowMetrics.DefaultG;
     private int _b = CustomWindowMetrics.DefaultB;
@@ -323,12 +323,14 @@ public partial class CustomWindow : BaseWindow, IWindow
         if (slotVal.As<ItemSlot>() is { } src)
         {
             if (!CustomWindowValidation.IsInventorySource(src.Window)) return;
-            if (!CustomWindowValidation.IsValidCandidate(src.Stats)) return;
+            if (!src.HasItem) return;
+            var stats = src.Stats!;
+            if (!CustomWindowValidation.IsValidCandidate(stats)) return;
             var other = target == _lookSlot ? _statsSlot : _lookSlot;
-            if (other.HasItem && !CustomWindowValidation.TypesCompatible(src.Stats, other.Stats)) return;
+            if (other.HasItem && !CustomWindowValidation.TypesCompatible(stats, other.Stats!)) return;
             int id = src.SlotNumber + 1;
             if (other.HasItem && other.SlotId == id) return;
-            SetSlot(target, id, src.Stats);
+            SetSlot(target, id, stats);
             return;
         }
 
@@ -340,7 +342,8 @@ public partial class CustomWindow : BaseWindow, IWindow
                 return;
             }
             var id = csrc.SlotId;
-            var stats = csrc.Stats;
+            if (!csrc.HasItem) return;
+            var stats = csrc.Stats!;
             ClearSlot(csrc);
             SetSlot(target, id, stats);
         }

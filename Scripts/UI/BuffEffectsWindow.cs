@@ -15,7 +15,7 @@ namespace Goose2Client.UI
 
         private static readonly PackedScene SlotScene = GD.Load<PackedScene>("res://Scenes/UI/BuffEffect.tscn");
 
-        private BuffEffect[] _slots;
+        private BuffEffect[] _slots = null!;
         private bool _listenersRegistered;
         private List<UiScaleLayout.GeomRecord> _geom = null!;
 
@@ -38,7 +38,7 @@ namespace Goose2Client.UI
             GameManager.Instance.PacketManager.Listen<BuffBarPacket>(OnBuffBar);
             _listenersRegistered = true;
 
-            var applier = UiScaleApplier.Instance;
+            var applier = UiScaleApplier.Instance!;
             _geom = UiScaleLayout.Snapshot(this);
             applier.RegisterWindow(this);
             Relayout();
@@ -47,7 +47,7 @@ namespace Goose2Client.UI
 
         public void Relayout()
         {
-            UiScaleLayout.Apply(_geom, UiScaleApplier.Instance.Factor);
+            UiScaleLayout.Apply(_geom, UiScaleApplier.Instance!.Factor);
             HudWindowDrag.RepositionFromSaved(this, "Buffs");
         }
 

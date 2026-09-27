@@ -38,6 +38,19 @@ public class HotbarSwapTests
     }
 
     [Fact]
+    public void Resolve_DefaultSource_DoesNothing()
+    {
+        var item = new ItemStats { SlotNumber = 1 };
+        var target = HotbarContent.FromItem(item);
+
+        var result = HotbarSwap.Resolve(target, default);
+
+        Assert.Equal(HotbarContentKind.Item, result.Target.Kind);
+        Assert.Same(item, result.Target.Item);
+        Assert.Equal(HotbarContentKind.Empty, result.Source.Kind);
+    }
+
+    [Fact]
     public void Resolve_SpellToSpell_SwapsSpells()
     {
         var spellA = new SpellInfo { SlotNumber = 1 };

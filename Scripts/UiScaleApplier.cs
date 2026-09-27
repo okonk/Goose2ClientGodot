@@ -15,11 +15,11 @@ public enum ApplyReason
 
 public class UiScaleApplier
 {
-    public static UiScaleApplier Instance { get; internal set; }
+    public static UiScaleApplier? Instance { get; internal set; }
 
     public UiScale Scale { get; } = new();
 
-    private Theme _theme;
+    private Theme? _theme;
 
     public Theme Theme => _theme ??= GD.Load<Theme>("res://Assets/UI/GameTheme.tres");
 
@@ -59,7 +59,7 @@ public class UiScaleApplier
 
     public float Factor => Scale.CurrentFactor;
 
-    public event Action<float> FactorChanged;
+    public event Action<float>? FactorChanged;
 
     public int ScaleSize(float basePx) => Scale.ScaleSize(basePx);
 

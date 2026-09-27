@@ -19,12 +19,12 @@ namespace Goose2Client
         public TextureRect WorldTexture { get; } = new();
 
         /// <summary>The attached map scene, or null before the first map.</summary>
-        public SubViewport Current { get; private set; }
+        public SubViewport? Current { get; private set; }
 
         /// <summary>Current layout, from the last <see cref="ApplyMode"/> with a map attached.</summary>
         public WorldViewportLayout Layout { get; private set; }
 
-        public event System.Action<float> ScaleChanged;
+        public event System.Action<float>? ScaleChanged;
         private int _lastAppliedScale;
 
         /// <summary>Requested scale factor, stored even with no map attached (applied on next <see cref="Attach"/>).</summary>
@@ -48,8 +48,8 @@ namespace Goose2Client
 
         // One-shot first-frame presentation deferred from <see cref="Attach"/>: the connected
         // handler (null = none pending) and the map whose first render it presents.
-        private System.Action _pendingPresent;
-        private SubViewport _presentMap;
+        private System.Action? _pendingPresent;
+        private SubViewport? _presentMap;
 
         public override void _Ready()
         {
@@ -233,12 +233,12 @@ namespace Goose2Client
             var vp = (windowPos - Layout.DisplayOrigin) / (float)Layout.Scale;
             // GetCanvasTransform() maps world→viewport; the affine inverse is required to go
             // back (using it forward would displace clicks by ~2x the camera offset).
-            return Current.GetCanvasTransform().AffineInverse() * vp;
+            return Current!.GetCanvasTransform().AffineInverse() * vp;
         }
 
         /// <summary>World (map) px → root-window px — exact inverse of <see cref="WindowToWorld"/>; keep the two in lockstep.</summary>
         public Vector2 WorldToWindow(Vector2 worldPos)
-            => WorldTextProjection.Project(worldPos, Current.GetCanvasTransform(), (float)Layout.Scale, Layout.DisplayOrigin);
+            => WorldTextProjection.Project(worldPos, Current!.GetCanvasTransform(), (float)Layout.Scale, Layout.DisplayOrigin);
 
         private bool _mouseInDisplay;
         private bool _forwardingHover;

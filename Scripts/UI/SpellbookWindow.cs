@@ -17,10 +17,10 @@ public partial class SpellbookWindow : BaseWindow, IWindow
 
     private int SlotsPerPage => Constants.SpellbookSlotsPerPage;
 
-    private SpellbookPage[] _pages;
+    private SpellbookPage[] _pages = null!;
     private int _pageIndex;
-    private SpellbookButton _backButton;
-    private SpellbookButton _nextButton;
+    private SpellbookButton _backButton = null!;
+    private SpellbookButton _nextButton = null!;
     private bool _listenersRegistered;
 
     private static readonly PackedScene SlotScene = GD.Load<PackedScene>("res://Scenes/UI/SpellSlot.tscn");
@@ -96,7 +96,7 @@ public partial class SpellbookWindow : BaseWindow, IWindow
         GameManager.Instance.PacketManager.Remove<SpellbookSlotPacket>(OnSpellbookSlot);
     }
 
-    private SpellSlot GetSlot(int globalIndex)
+    private SpellSlot? GetSlot(int globalIndex)
     {
         var loc = SpellbookPaging.Locate(globalIndex, SlotsPerPage, PageCount);
         if (loc == null) return null;

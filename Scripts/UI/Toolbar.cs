@@ -10,7 +10,7 @@ public partial class Toolbar : HBoxContainer, IScalableWindow
 
     public override void _Ready()
     {
-        var applier = UiScaleApplier.Instance;
+        var applier = UiScaleApplier.Instance!;
         _geom = UiScaleLayout.Snapshot(this);
         applier.RegisterWindow(this);
         Relayout();
@@ -19,6 +19,6 @@ public partial class Toolbar : HBoxContainer, IScalableWindow
 
     public void Relayout()
     {
-        UiScaleLayout.Apply(_geom, UiScaleApplier.Instance.Factor);
+        UiScaleLayout.Apply(_geom, UiScaleApplier.Instance!.Factor);
     }
 }

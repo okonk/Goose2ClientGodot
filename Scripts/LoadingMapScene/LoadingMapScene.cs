@@ -6,7 +6,7 @@ namespace Goose2Client;
 public partial class LoadingMapScene : Control, IScalableWindow
 {
     private List<UiScaleLayout.GeomRecord> _geom = null!;
-    private Label _statusLabel;
+    private Label? _statusLabel;
     private string _mapName = "";
 
     public override void _Ready()
@@ -14,7 +14,7 @@ public partial class LoadingMapScene : Control, IScalableWindow
         _statusLabel = GetNode<Label>("LoadingPanel/Padding/VBox/StatusLabel");
         UpdateLabel();
 
-        var applier = UiScaleApplier.Instance;
+        var applier = UiScaleApplier.Instance!;
         _geom = UiScaleLayout.Snapshot(this);
         applier.RegisterWindow(this);
         Relayout();
@@ -23,8 +23,8 @@ public partial class LoadingMapScene : Control, IScalableWindow
 
     public void Relayout()
     {
-        UiScaleLayout.Apply(_geom, UiScaleApplier.Instance.Factor);
-        _statusLabel.UpdateMinimumSize(); // Label min goes stale on theme default font change; see LoginScene.Relayout
+        UiScaleLayout.Apply(_geom, UiScaleApplier.Instance!.Factor);
+        _statusLabel!.UpdateMinimumSize(); // Label min goes stale on theme default font change; see LoginScene.Relayout
     }
 
     /// <summary>

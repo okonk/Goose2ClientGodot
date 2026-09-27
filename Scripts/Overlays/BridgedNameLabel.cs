@@ -8,7 +8,7 @@ namespace Goose2Client.Overlays
         private float _scale = 1f;
         private float _worldScale = 1f;
 
-        public Character.Character AnchorOwner { get; set; }
+        public Character.Character AnchorOwner { get; set; } = null!;
         public Vector2 LocalOffsetWorld { get; set; }
         public Rect2 ScreenBounds => new Rect2(Vector2.Zero, Size);   // node origin = label top-left
 

@@ -9,7 +9,7 @@ namespace Goose2Client.UI
     // seconds while >= 1s, one decimal below that).
     public partial class CooldownOverlay : Control
     {
-        private Label _text;
+        private Label? _text;
         private float _progress;
         private double _remaining;
         private double _dangerSeconds;

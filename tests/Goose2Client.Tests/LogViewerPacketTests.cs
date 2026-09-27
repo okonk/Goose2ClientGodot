@@ -357,7 +357,7 @@ namespace Goose2Client.Network.Packets.Tests
         public void PacketManager_ObserversReceiveInvalidPackets()
         {
             var manager = new PacketManager();
-            object received = null;
+            object? received = null;
             manager.Listen<LogResultErrorPacket>(o => received = o);
             manager.Handle("LRX0,1,QUJD");
             var p = Assert.IsType<LogResultError>(received);

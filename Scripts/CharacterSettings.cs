@@ -47,17 +47,17 @@ namespace Goose2Client
             IncludeFields = true
         };
 
-        public HotkeySetting[] Hotkeys;
+        public HotkeySetting[] Hotkeys = Array.Empty<HotkeySetting>();
 
-        public Dictionary<string, WindowSettings> WindowSettings;
+        public Dictionary<string, WindowSettings> WindowSettings = new();
 
-        public Dictionary<string, object> Options;
+        public Dictionary<string, object> Options = new();
 
-        public string MountName;
+        public string? MountName;
 
-        public List<string> ChatTabs;
+        public List<string> ChatTabs = new() { "Guild", "Group" };
 
-        private readonly string characterName;
+        private readonly string? characterName;
 
         public CharacterSettings() { }
 
@@ -86,7 +86,7 @@ namespace Goose2Client
 
             var fileContents = File.ReadAllText(filePath);
 
-            CharacterSettings deserialized;
+            CharacterSettings? deserialized;
             try
             {
                 deserialized = JsonSerializer.Deserialize<CharacterSettings>(fileContents, JsonOptions);
@@ -139,11 +139,14 @@ namespace Goose2Client
         }
 
         /// <summary>Deserialize settings JSON with null-guards; never throws on partial/corrupt input.</summary>
-        public static CharacterSettings FromJson(string json)
+        public static CharacterSettings FromJson(string? json)
         {
-            CharacterSettings result;
-            try { result = JsonSerializer.Deserialize<CharacterSettings>(json, JsonOptions); }
-            catch (System.Exception) { result = null; }
+            CharacterSettings? result = null;
+            if (json != null)
+            {
+                try { result = JsonSerializer.Deserialize<CharacterSettings>(json, JsonOptions); }
+                catch (System.Exception) { result = null; }
+            }
             result ??= new CharacterSettings();
             result.ApplyDefaults();
             return result;
@@ -174,7 +177,7 @@ namespace Goose2Client
             File.WriteAllText(filePath, fileContents);
         }
 
-        public WindowSettings GetWindowSettings(string windowName)
+        public WindowSettings? GetWindowSettings(string windowName)
         {
             if (WindowSettings.TryGetValue(windowName, out var settings))
                 return settings;
@@ -237,13 +240,13 @@ namespace Goose2Client
             Save();
         }
 
-        public T GetOption<T>(string key, T defaultValue = default)
+        public T? GetOption<T>(string key, T? defaultValue = default)
         {
             if (Options.TryGetValue(key, out var value))
             {
                 if (value is T t) return t;
-                if (value is JsonElement je) return je.Deserialize<T>(JsonOptions);
-                return (T)Convert.ChangeType(value, typeof(T));
+                if (value is JsonElement je) return je.Deserialize<T>(JsonOptions)!;
+                return (T)Convert.ChangeType(value, typeof(T))!;
             }
             return defaultValue;
         }

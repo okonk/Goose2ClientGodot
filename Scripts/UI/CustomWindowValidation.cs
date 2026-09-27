@@ -5,7 +5,7 @@ namespace Goose2Client.UI;
 
 public static class CustomWindowValidation
 {
-    public static bool IsValidCandidate(ItemStats item)
+    public static bool IsValidCandidate(ItemStats? item)
     {
         if (item == null)
         {
@@ -25,17 +25,17 @@ public static class CustomWindowValidation
         };
     }
 
-    public static bool TypesCompatible(ItemStats a, ItemStats b)
+    public static bool TypesCompatible(ItemStats? a, ItemStats? b)
     {
         return a != null && b != null && a.SlotType == b.SlotType;
     }
 
-    public static bool IsInventorySource(IWindow srcWindow)
+    public static bool IsInventorySource(IWindow? srcWindow)
     {
         return srcWindow != null && srcWindow.WindowFrame == WindowFrames.Inventory;
     }
 
-    public static CharacterSlot? PreviewTarget(ItemStats item)
+    public static CharacterSlot? PreviewTarget(ItemStats? item)
     {
         if (item == null)
         {

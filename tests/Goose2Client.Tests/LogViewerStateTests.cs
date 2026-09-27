@@ -126,7 +126,6 @@ namespace Goose2Client.Tests
             Assert.Equal(new[] { Token1 }, s.History.Select(t => t).ToArray());
             Assert.Equal(0, s.HistoryIndex);
             Assert.Equal(Token1, s.CurrentToken);
-            Assert.False(s.History.Contains(""));
             Assert.DoesNotContain("", s.History);
         }
 
@@ -610,7 +609,7 @@ namespace Goose2Client.Tests
             Assert.Equal(LogEntityKind.Player, quick.PrimaryKind);
             Assert.Equal(1, quick.PrimaryId);
             Assert.False(quick.RelatedAvailable);
-            Assert.False(s.Draft.Participant.Equals("#1"));
+            Assert.NotEqual("#1", s.Draft.Participant);
             s.ApplyQuickAction(LogQuickActionTarget.Primary, row);
             Assert.Equal("#1", s.Draft.Participant);
             s.ApplyQuickAction(LogQuickActionTarget.Type, row);

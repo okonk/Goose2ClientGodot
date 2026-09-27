@@ -9,8 +9,8 @@ namespace Goose2Client.UI
     /// </summary>
     public partial class DebugWindow : Control, IScalableWindow
     {
-        private Label _fpsText;
-        private Label _versionText;
+        private Label _fpsText = null!;
+        private Label _versionText = null!;
 
         public static int FramesPerSecond { get; private set; }
 
@@ -26,7 +26,7 @@ namespace Goose2Client.UI
 
             _versionText.Text = (string)ProjectSettings.GetSetting("application/config/version", "");
 
-            var applier = UiScaleApplier.Instance;
+            var applier = UiScaleApplier.Instance!;
             applier.ApplyFontSize(_fpsText, 12);
             applier.ApplyFontSize(_versionText, 12);
             _geom = UiScaleLayout.Snapshot(this);
@@ -37,7 +37,7 @@ namespace Goose2Client.UI
 
         public void Relayout()
         {
-            UiScaleLayout.Apply(_geom, UiScaleApplier.Instance.Factor);
+            UiScaleLayout.Apply(_geom, UiScaleApplier.Instance!.Factor);
         }
 
         public override void _Process(double delta)

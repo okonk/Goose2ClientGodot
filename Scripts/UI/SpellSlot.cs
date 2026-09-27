@@ -9,18 +9,18 @@ namespace Goose2Client.UI
     /// </summary>
     public partial class SpellSlot : Panel
     {
-        private TextureRect _icon;
-        private CooldownOverlay _cooldownOverlay;
+        private TextureRect _icon = null!;
+        private CooldownOverlay _cooldownOverlay = null!;
 
-        public SpellInfo Info { get; private set; }
+        public SpellInfo? Info { get; private set; }
         public bool HasSpell => Info != null;
 
         public int SlotNumber { get; set; }
-        public IWindow Window { get; set; }
+        public IWindow Window { get; set; } = null!;
 
-        public Action<SpellInfo> OnDoubleClick { get; set; }
-        public Action<SpellInfo> OnRightClick { get; set; }
-        public Action<int, int> OnMoveSpell { get; set; }
+        public Action<SpellInfo>? OnDoubleClick { get; set; }
+        public Action<SpellInfo>? OnRightClick { get; set; }
+        public Action<int, int>? OnMoveSpell { get; set; }
 
         public override void _Ready()
         {
@@ -52,7 +52,7 @@ namespace Goose2Client.UI
 
         private void OnMouseEntered()
         {
-            if (HasSpell)
+            if (Info != null)
                 TooltipManager.Instance.ShowSpellTooltip(Info, this);
         }
 
@@ -65,16 +65,17 @@ namespace Goose2Client.UI
         {
             if (!(@event is InputEventMouseButton mb && mb.Pressed && HasSpell)) return;
 
+            var info = Info!;
             if (mb.ButtonIndex == MouseButton.Left && mb.DoubleClick)
             {
-                if (GameManager.Instance.SpellCooldownManager.GetCooldownRemaining(Info) > TimeSpan.Zero)
+                if (GameManager.Instance.SpellCooldownManager.GetCooldownRemaining(info) > TimeSpan.Zero)
                     return;
 
-                OnDoubleClick?.Invoke(Info);
+                OnDoubleClick?.Invoke(info);
             }
             else if (mb.ButtonIndex == MouseButton.Right)
             {
-                OnRightClick?.Invoke(Info);
+                OnRightClick?.Invoke(info);
             }
         }
 
@@ -83,8 +84,9 @@ namespace Goose2Client.UI
             if (!HasSpell)
                 return;
 
-            var remaining = GameManager.Instance.SpellCooldownManager.GetCooldownRemaining(Info);
-            _cooldownOverlay.Update(remaining.TotalSeconds, Info.Cooldown.TotalSeconds);
+            var info = Info!;
+            var remaining = GameManager.Instance.SpellCooldownManager.GetCooldownRemaining(info);
+            _cooldownOverlay.Update(remaining.TotalSeconds, info.Cooldown.TotalSeconds);
         }
 
         public override Variant _GetDragData(Vector2 atPosition)

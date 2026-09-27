@@ -8,7 +8,7 @@ namespace Goose2Client.Tests
         public void FromJson_NullInput_DoesNotThrowAndReturnsDefaults()
         {
             // Act
-            var result = CharacterSettings.FromJson(null!);
+            var result = CharacterSettings.FromJson(null);
 
             // Assert — no throw, all fields defaulted
             Assert.NotNull(result);

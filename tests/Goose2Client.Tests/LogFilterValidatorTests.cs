@@ -146,7 +146,7 @@ namespace Goose2Client.Tests
             };
             var result = LogFilterValidator.Validate(draft, meta);
             Assert.True(result.Success, result.Error);
-            Assert.Equal(1700000000123L, result.Snapshot.StartUnixMs);
+            Assert.Equal(1700000000123L, result.Snapshot!.StartUnixMs);
             Assert.Equal(1700086400456L, result.Snapshot.EndUnixMs);
 
             draft.DefaultStartUnixMs = 1700086400456L;
@@ -177,7 +177,7 @@ namespace Goose2Client.Tests
             draft.Preset = LogFilterPreset.Custom;
             var fromText = LogFilterValidator.Validate(draft, meta);
             Assert.True(fromText.Success, fromText.Error);
-            Assert.Equal(new DateTimeOffset(2026, 9, 1, 10, 0, 0, TimeSpan.Zero).ToUnixTimeMilliseconds(), fromText.Snapshot.StartUnixMs);
+            Assert.Equal(new DateTimeOffset(2026, 9, 1, 10, 0, 0, TimeSpan.Zero).ToUnixTimeMilliseconds(), fromText.Snapshot!.StartUnixMs);
         }
 
         [Fact]
@@ -276,7 +276,7 @@ namespace Goose2Client.Tests
             };
             var result = LogFilterValidator.Validate(draft, MetadataWithDefaults());
             Assert.True(result.Success, result.Error);
-            Assert.Equal(new DateTimeOffset(2026, 9, 1, 10, 0, 0, TimeSpan.Zero).ToUnixTimeMilliseconds(), result.Snapshot.StartUnixMs);
+            Assert.Equal(new DateTimeOffset(2026, 9, 1, 10, 0, 0, TimeSpan.Zero).ToUnixTimeMilliseconds(), result.Snapshot!.StartUnixMs);
             Assert.Equal(new DateTimeOffset(2026, 9, 2, 10, 0, 0, TimeSpan.Zero).ToUnixTimeMilliseconds(), result.Snapshot.EndUnixMs);
 
             draft.StartText = "2026-09-01T10:00:00";
@@ -404,14 +404,14 @@ namespace Goose2Client.Tests
             empty.SelectedTypeIds = new List<int>();
             var result = LogFilterValidator.Validate(empty, meta);
             Assert.True(result.Success);
-            Assert.Empty(result.Snapshot.TypeIds);
+            Assert.Empty(result.Snapshot!.TypeIds);
 
             var explicitAll = Draft();
             explicitAll.SelectedTypeIds = new List<int> { 12, 7, 12 };
             var all = LogFilterValidator.Validate(explicitAll, meta);
             Assert.True(all.Success);
-            Assert.Equal(new[] { 7, 12 }, all.Snapshot.TypeIds.ToArray());
-            Assert.NotEqual(0, all.Snapshot.TypeIds.Count);
+            Assert.Equal(new[] { 7, 12 }, all.Snapshot!.TypeIds.ToArray());
+            Assert.NotEmpty(all.Snapshot.TypeIds);
 
             var unknown = Draft();
             unknown.SelectedTypeIds = new List<int> { 999 };
@@ -427,7 +427,7 @@ namespace Goose2Client.Tests
             draft.Text = literal;
             var result = LogFilterValidator.Validate(draft, meta);
             Assert.True(result.Success);
-            Assert.Equal(literal, result.Snapshot.Text);
+            Assert.Equal(literal, result.Snapshot!.Text);
             var tooLong = Draft();
             tooLong.Text = new string('x', 4097);
             Assert.False(LogFilterValidator.Validate(tooLong, meta).Success);

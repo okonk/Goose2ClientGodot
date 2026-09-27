@@ -39,7 +39,7 @@ namespace Goose2Client.Tests
             var back = JsonSerializer.Deserialize<CharacterSettings>(json, CharacterSettings.JsonOptions);
 
             // Assert — Hotkeys round-trip
-            Assert.Equal(3, back.Hotkeys.Length);
+            Assert.Equal(3, back!.Hotkeys.Length);
             Assert.Equal(5, back.Hotkeys[0].SlotNumber);
             Assert.Equal(HotkeySetting.SlotType.Spell, back.Hotkeys[0].Type);
             Assert.Equal(12, back.Hotkeys[1].SlotNumber);
@@ -56,7 +56,7 @@ namespace Goose2Client.Tests
             Assert.Equal("SwiftHorse", back.MountName);
 
             // Assert — GetOption handles JsonElement values (the critical trap)
-            Assert.Equal(true, back.GetOption<bool>("showTooltips", false));
+            Assert.True(back.GetOption<bool>("showTooltips", false));
             Assert.Equal(18, back.GetOption<int>("fontSize", 0));
             Assert.Equal("TestPlayer", back.GetOption<string>("nickname", null));
         }
@@ -79,7 +79,7 @@ namespace Goose2Client.Tests
             var back = JsonSerializer.Deserialize<CharacterSettings>(json, CharacterSettings.JsonOptions);
 
             // Assert — Visible survives round-trip for both entries
-            Assert.True(back.WindowSettings.ContainsKey("Spellbook"));
+            Assert.True(back!.WindowSettings.ContainsKey("Spellbook"));
             Assert.True(back.WindowSettings["Spellbook"].Visible);
             Assert.True(back.WindowSettings.ContainsKey("Bank"));
             Assert.False(back.WindowSettings["Bank"].Visible);

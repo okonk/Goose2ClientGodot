@@ -76,7 +76,7 @@ public abstract partial class BaseMultipleWindowManager<T> : Node where T : Base
     {
         var p = (CloseWindowPacket)o;
         if (_windows.Remove(p.WindowId, out var w))
-            w.Free();
+            w.FreeWindow();
     }
 
     public bool HasWindowForNpc(int npcId)

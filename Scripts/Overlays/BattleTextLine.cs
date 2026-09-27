@@ -7,7 +7,7 @@ namespace Goose2Client.Overlays
         private const float LabelWidth = 100f;
         private const float LabelHeight = 16f;
 
-        private Label _label;
+        private Label _label = null!;
         private Vector2 _baseOffset;
         private float _scale = 1f;
         private float _worldScale = 1f;

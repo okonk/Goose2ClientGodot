@@ -28,7 +28,7 @@ internal static class UiScaleSelfTest
     private static async System.Threading.Tasks.Task SelfTestBody(GameManager gm)
     {
         var tree = gm.GetTree();
-        var applier = UiScaleApplier.Instance;
+        var applier = UiScaleApplier.Instance!;
         int fontChecked = 0;
         var authored1 = new Dictionary<Control, bool>();
 
@@ -102,7 +102,7 @@ internal static class UiScaleSelfTest
 
         // The hidden log viewer is a registered root like every other window; the walk
         // below covers it, and these explicit legs pin its scale round trip.
-        var logViewer = gm.Hud.LogViewer;
+        var logViewer = gm.Hud!.LogViewer;
         Assert(ContainsRoot(logViewer), "hidden log viewer must be in the scale audit");
         Assert(!logViewer.Visible, "log viewer must start hidden");
         var logViewerTitle = logViewer.GetNode<Control>("TitleBar");
@@ -283,7 +283,7 @@ internal static class UiScaleSelfTest
 
         var tm = TooltipManager.Instance;
         Assert(tm != null, "tooltip manager missing");
-        Assert(!tm.GetNode<ItemTooltipControl>("ItemTooltip").Visible
+        Assert(!tm!.GetNode<ItemTooltipControl>("ItemTooltip").Visible
             && !tm.GetNode<SpellTooltipControl>("SpellTooltip").Visible
             && !tm.GetNode<TextTooltipControl>("TextTooltip").Visible
             && !tm.GetNode<MapItemTooltipControl>("MapItemTooltip").Visible, "tooltips not all hidden");
@@ -344,7 +344,7 @@ internal static class UiScaleSelfTest
             if (ws != null)
             { bPos = ws.Position; bVis = ws.Visible; bCanvas = ws.CanvasSize; bSize = ws.Size; bFactor = ws.Factor; bPlaced = ws.Placed; }
         }
-        BankWindow bank = null;
+        BankWindow? bank = null;
         try
         {
             cs.WindowSettings.Remove("Bank");
@@ -531,7 +531,7 @@ internal static class UiScaleSelfTest
             if (ws != null)
             { ePos = ws.Position; eVis = ws.Visible; eCanvas = ws.CanvasSize; eSize = ws.Size; eFactor = ws.Factor; ePlaced = ws.Placed; }
         }
-        BankWindow dlg = null;
+        BankWindow? dlg = null;
         try
         {
             cs.WindowSettings.Remove("Bank");

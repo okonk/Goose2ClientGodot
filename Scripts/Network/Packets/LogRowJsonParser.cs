@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 using Goose2Client.Logs;
 
@@ -8,7 +9,7 @@ namespace Goose2Client.Network.Packets
     {
         public const int MaxDecodedBytes = 262144;
 
-        public static bool TryParse(byte[] json, out LogRow row)
+        public static bool TryParse(byte[] json, [NotNullWhen(true)] out LogRow? row)
         {
             row = null;
             if (json == null || json.Length == 0 || json.Length > MaxDecodedBytes)
@@ -23,15 +24,15 @@ namespace Goose2Client.Network.Packets
                 long utc;
                 long typeId;
                 bool typeIsInteger;
-                string eventLabel;
-                string eventGroup;
-                string otherKindName;
-                LogRowEntity primary;
-                LogRowEntity related;
-                LogRowMap map;
-                LogRowRaw raw;
-                string summary;
-                string originalText;
+                string? eventLabel;
+                string? eventGroup;
+                string? otherKindName;
+                LogRowEntity? primary;
+                LogRowEntity? related;
+                LogRowMap? map;
+                LogRowRaw? raw;
+                string? summary;
+                string? originalText;
 
                 if (!ReadProperty(ref reader, "rowId")) return false;
                 if (!ReadInt64(ref reader, out rowId)) return false;
@@ -79,7 +80,7 @@ namespace Goose2Client.Network.Packets
         {
             if (!r.Read() || r.TokenType != JsonTokenType.PropertyName)
                 return false;
-            string actual = r.GetString();
+            string? actual = r.GetString();
             return actual != null && actual == name;
         }
 
@@ -115,7 +116,7 @@ namespace Goose2Client.Network.Packets
             return false;
         }
 
-        private static bool ReadString(ref Utf8JsonReader r, out string value)
+        private static bool ReadString(ref Utf8JsonReader r, [NotNullWhen(true)] out string? value)
         {
             if (!r.Read() || r.TokenType != JsonTokenType.String)
             {
@@ -126,7 +127,7 @@ namespace Goose2Client.Network.Packets
             return value != null;
         }
 
-        private static bool TryReadEntity(ref Utf8JsonReader r, out LogRowEntity entity)
+        private static bool TryReadEntity(ref Utf8JsonReader r, out LogRowEntity? entity)
         {
             entity = null;
             if (!r.Read())
@@ -135,9 +136,9 @@ namespace Goose2Client.Network.Packets
                 return true;
             if (r.TokenType != JsonTokenType.StartObject)
                 return false;
-            string label;
-            string kindName;
-            string name;
+            string? label;
+            string? kindName;
+            string? name;
             if (!ReadProperty(ref r, "label")) return false;
             if (!ReadString(ref r, out label)) return false;
             if (!ReadProperty(ref r, "kind")) return false;
@@ -162,7 +163,7 @@ namespace Goose2Client.Network.Packets
             return true;
         }
 
-        private static bool TryReadMap(ref Utf8JsonReader r, out LogRowMap map)
+        private static bool TryReadMap(ref Utf8JsonReader r, out LogRowMap? map)
         {
             map = null;
             if (!r.Read())
@@ -174,7 +175,7 @@ namespace Goose2Client.Network.Packets
             if (!ReadProperty(ref r, "id")) return false;
             if (!ReadInt64(ref r, out long id)) return false;
             if (!ReadProperty(ref r, "name")) return false;
-            if (!ReadString(ref r, out string name)) return false;
+            if (!ReadString(ref r, out string? name)) return false;
             if (!ReadProperty(ref r, "canQuickFilter")) return false;
             if (!ReadBool(ref r, out bool canQuickFilter)) return false;
             if (!r.Read() || r.TokenType != JsonTokenType.EndObject)
@@ -183,7 +184,7 @@ namespace Goose2Client.Network.Packets
             return true;
         }
 
-        private static bool TryReadRaw(ref Utf8JsonReader r, out LogRowRaw raw)
+        private static bool TryReadRaw(ref Utf8JsonReader r, [NotNullWhen(true)] out LogRowRaw? raw)
         {
             raw = null;
             if (!r.Read() || r.TokenType != JsonTokenType.StartObject)

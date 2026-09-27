@@ -5,11 +5,11 @@ namespace Goose2Client.Network.Packets
 {
     class SendCurrentMapPacket : PacketHandler
     {
-        public string MapFileName { get; set; }
+        public string MapFileName { get; set; } = null!;
 
         public int MapVersion { get; set; }
 
-        public string MapName { get; set; }
+        public string MapName { get; set; } = null!;
 
         public override string Prefix { get; } = "SCM";
 

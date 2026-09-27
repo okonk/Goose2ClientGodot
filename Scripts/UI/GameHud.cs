@@ -10,25 +10,25 @@ namespace Goose2Client.UI;
 public partial class GameHud : Control
 {
     // --- Typed public accessors (settable private) ---
-    public VitalsWindow Vitals { get; private set; }
-    public InventoryWindow Inventory { get; private set; }
-    public CharacterWindow Character { get; private set; }
-    public SpellbookWindow Spellbook { get; private set; }
-    public HotbarWindow Hotbar { get; private set; }
-    public ChatWindow Chat { get; private set; }
-    public PartyWindow Party { get; private set; }
-    public BuffEffectsWindow Buffs { get; private set; }
-    public DebugWindow Debug { get; private set; }
-    public OptionsWindow Options { get; private set; }
-    public VendorWindow Vendor { get; private set; }
-    public BankWindow Bank { get; private set; }
-    public CombineBagContainerWindow CombineBag { get; private set; }
-    public CustomWindow Custom { get; private set; }
-    public HairdyeWindow Hairdye { get; private set; }
-    public LogViewerWindow LogViewer { get; private set; }
-    public MinimapControl Minimap { get; private set; }
-    public QuestWindowManager QuestWindows { get; private set; }
-    public OptionListWindowManager OptionListWindows { get; private set; }
+    public VitalsWindow Vitals { get; private set; } = null!;
+    public InventoryWindow Inventory { get; private set; } = null!;
+    public CharacterWindow Character { get; private set; } = null!;
+    public SpellbookWindow Spellbook { get; private set; } = null!;
+    public HotbarWindow Hotbar { get; private set; } = null!;
+    public ChatWindow Chat { get; private set; } = null!;
+    public PartyWindow Party { get; private set; } = null!;
+    public BuffEffectsWindow Buffs { get; private set; } = null!;
+    public DebugWindow Debug { get; private set; } = null!;
+    public OptionsWindow Options { get; private set; } = null!;
+    public VendorWindow Vendor { get; private set; } = null!;
+    public BankWindow Bank { get; private set; } = null!;
+    public CombineBagContainerWindow CombineBag { get; private set; } = null!;
+    public CustomWindow Custom { get; private set; } = null!;
+    public HairdyeWindow Hairdye { get; private set; } = null!;
+    public LogViewerWindow LogViewer { get; private set; } = null!;
+    public MinimapControl Minimap { get; private set; } = null!;
+    public QuestWindowManager QuestWindows { get; private set; } = null!;
+    public OptionListWindowManager OptionListWindows { get; private set; } = null!;
 
     /// <summary>Instantiate a scene and add it as a child, returning the typed node.</summary>
     private T Add<T>(string path) where T : Node

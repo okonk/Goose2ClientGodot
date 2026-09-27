@@ -110,7 +110,7 @@ public partial class CustomPreviewControl : Control
             }
 
             var frames = GD.Load<SpriteFrames>(path);
-            string clip = null;
+            string? clip = null;
             foreach (var cand in AnimationNames.Candidates("idle", state, facing))
             {
                 if (frames.HasAnimation(cand))

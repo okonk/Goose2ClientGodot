@@ -7,14 +7,14 @@ namespace Goose2Client.UI
     /// <summary>Item tooltip: icon + name + type/flags + stat lines in a VBox.</summary>
     public partial class ItemTooltipControl : Control
     {
-        private TextureRect _iconRect;
-        private Panel _iconBackground;
-        private Label _nameLabel;
-        private Label _typeLabel;
-        private Label _flagsLabel;
-        private VBoxContainer _statsVBox;
+        private TextureRect _iconRect = null!;
+        private Panel _iconBackground = null!;
+        private Label _nameLabel = null!;
+        private Label _typeLabel = null!;
+        private Label _flagsLabel = null!;
+        private VBoxContainer _statsVBox = null!;
 
-        private Control _parent;
+        private Control _parent = null!;
 
         public override void _Ready()
         {
@@ -60,7 +60,7 @@ namespace Goose2Client.UI
                 return;
             }
 
-            var m = TooltipMetrics.ItemMetrics(UiScaleApplier.Instance.Factor);
+            var m = TooltipMetrics.ItemMetrics(UiScaleApplier.Instance!.Factor);
 
             _iconRect.Position = new Vector2(m.IconOffset, m.IconOffset);
             _iconRect.Size = new Vector2(m.IconSize, m.IconSize);

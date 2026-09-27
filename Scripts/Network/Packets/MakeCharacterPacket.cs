@@ -8,10 +8,10 @@ namespace Goose2Client.Network.Packets
     {
         public int LoginId { get; set; }
         public CharacterType CharacterType { get; set; }
-        public string Name { get; set; }
-        public string Title { get; set; }
-        public string Surname { get; set; }
-        public string GuildName { get; set; }
+        public string Name { get; set; } = null!;
+        public string Title { get; set; } = null!;
+        public string Surname { get; set; } = null!;
+        public string GuildName { get; set; } = null!;
         public int MapX { get; set; }
         public int MapY { get; set; }
         public Direction Facing { get; set; }
@@ -23,7 +23,7 @@ namespace Goose2Client.Network.Packets
         public int BodyA { get; set; }
         public int BodyState { get; set; }
         public int HairId { get; set; }
-        public int[][] DisplayedEquipment { get; set; }
+        public int[][] DisplayedEquipment { get; set; } = null!;
         public int HairR { get; set; }
         public int HairG { get; set; }
         public int HairB { get; set; }

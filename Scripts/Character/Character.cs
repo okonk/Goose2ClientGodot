@@ -7,7 +7,7 @@ namespace Goose2Client.Character
     public partial class Character : Node2D
     {
         public int LoginId { get; private set; }
-        public string CharacterName { get; private set; }
+        public string CharacterName { get; private set; } = null!;
         public string Title { get; private set; } = "";
         public string Surname { get; private set; } = "";
         public string FullName => NameFormatting.FullName(Title, CharacterName, Surname);
@@ -38,31 +38,31 @@ namespace Goose2Client.Character
         public int BodyState { get; private set; } = 3;
 
         // Per-slot live sprite + the graphic id it was built from (needed for the height lookup).
-        private sealed class Slot { public AnimatedSprite2D Sprite; public int GraphicId; public int AnchorHeight; }
+        private sealed class Slot { public AnimatedSprite2D Sprite = null!; public int GraphicId; public int AnchorHeight; }
         private readonly Dictionary<CharacterSlot, Slot> _slots = new();
-        private static AnimationHeights _heights;
+        private static AnimationHeights _heights = null!;
         private AppearanceData _appearance;
 
-        private Overlays.BridgedNameLabel _nameLabel;
-        private Sprite2D _icon;
+        private Overlays.BridgedNameLabel? _nameLabel;
+        private Sprite2D? _icon;
         private const float IconGap = 2f;
-        private ColorRect _hpBarBackground;
-        private ColorRect _hpBar;
-        private ColorRect _mpBar;
+        private ColorRect? _hpBarBackground;
+        private ColorRect? _hpBar;
+        private ColorRect? _mpBar;
 
         // MP bar fill color, matching the Unity CharacterHealthBars prefab (RGB 32,60,128).
         private static readonly Color MpColor = new(0.1254902f, 0.23529412f, 0.5019608f);
         private const float BarWidth = 32f;
-        private Goose2Client.Overlays.BattleText _battleText;
-        private Overlays.ChatBubble _chatBubble;
-        private Overlays.EmoteAnimation _emote;
+        private Goose2Client.Overlays.BattleText? _battleText;
+        private Overlays.ChatBubble? _chatBubble;
+        private Overlays.EmoteAnimation? _emote;
         private readonly HealthBarAutoHide _healthBarAutoHide = new();
 
         private const double BarTweenSeconds = 0.25;
         private const float HpBarHeight = 3f;
         private const float MpBarHeight = 2f;
-        private Tween _hpBarTween;
-        private Tween _mpBarTween;
+        private Tween? _hpBarTween;
+        private Tween? _mpBarTween;
         private bool _barsSeeded;
 
         private void EnsureBars()
@@ -106,8 +106,8 @@ namespace Goose2Client.Character
             MPPercent = mpPercent;
             EnsureBars();
             var hpColor = hpPercent > 0.66f ? GameColors.HpGreen : hpPercent > 0.33f ? GameColors.HpOrange : GameColors.HpRed;
-            FillBar(_hpBar, ref _hpBarTween, hpPercent, HpBarHeight, hpColor);
-            FillBar(_mpBar, ref _mpBarTween, mpPercent, MpBarHeight, null);
+            FillBar(_hpBar!, ref _hpBarTween, hpPercent, HpBarHeight, hpColor);
+            FillBar(_mpBar!, ref _mpBarTween, mpPercent, MpBarHeight, null);
             _barsSeeded = true;
 
             _healthBarAutoHide.OnVitalsChanged(hpPercent, mpPercent, Time.GetTicksMsec() / 1000.0);
@@ -116,7 +116,7 @@ namespace Goose2Client.Character
 
         /// <summary>Animates a bar to its new fill. The first update after the character
         /// spawns snaps, so a character walking into view does not sweep its bars up from zero.</summary>
-        private void FillBar(ColorRect bar, ref Tween tween, float percent, float height, Color? color)
+        private void FillBar(ColorRect bar, ref Tween? tween, float percent, float height, Color? color)
         {
             if (tween != null && tween.IsValid())
                 tween.Kill();
@@ -236,7 +236,7 @@ namespace Goose2Client.Character
 
             IsGM = p.IsGM;
             IsInvisible = p.Invisible != 0;
-            if (EnsureNameLabel()) { _nameLabel.Text = FullName; _nameLabel.Layout(this); }
+            if (EnsureNameLabel() && _nameLabel != null) { _nameLabel.Text = FullName; _nameLabel.Layout(this); }
             UpdateNameColor();
             SetVitals(p.HPPercent, 1f);
             ApplyInvisibility();
@@ -505,7 +505,7 @@ namespace Goose2Client.Character
         private Vector2 _targetPosition;
         private bool _moving;
         protected bool IsMoving => _moving;   // replaces the Task 6 stub
-        private string _lockedMotion;
+        private string? _lockedMotion;
         private double _attackTimer;
         protected bool AttackLocked => _lockedMotion != null;   // true iff a motion is locked
         private readonly AttackGate _attackGate = new();
@@ -820,7 +820,7 @@ namespace Goose2Client.Character
         /// SpriteFrames actually contains. Missing art returns null (Unity Blank / invisible) —
         /// never substitutes a different motion (e.g. idle during attack) or an arbitrary first
         /// animation on the sheet.</summary>
-        private string ResolveClip(Slot s, string motion, int state)
+        private string? ResolveClip(Slot s, string motion, int state)
         {
             var frames = s.Sprite.SpriteFrames;
             if (frames == null) return null;
@@ -848,7 +848,7 @@ namespace Goose2Client.Character
         public void ShowChatBubble(string message)
         {
             // Destroy previous bubble if still alive (one bubble per character)
-            if (GodotObject.IsInstanceValid(_chatBubble))
+            if (_chatBubble != null && GodotObject.IsInstanceValid(_chatBubble))
                 _chatBubble.QueueFree();
 
             if (GameManager.Instance?.WorldTextBridge is not { } bridge) return;
@@ -874,7 +874,7 @@ namespace Goose2Client.Character
         /// <summary>Show an emote animation above this character. Replaces any existing emote.</summary>
         public void ShowEmote(int animationId)
         {
-            if (GodotObject.IsInstanceValid(_emote))
+            if (_emote != null && GodotObject.IsInstanceValid(_emote))
                 _emote.QueueFree();
 
             var e = new Overlays.EmoteAnimation

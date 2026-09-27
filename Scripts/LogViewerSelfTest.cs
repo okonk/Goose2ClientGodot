@@ -62,7 +62,7 @@ internal static class LogViewerSelfTest
             LogQueryFormatResult result = submission is LogQuerySubmission.Fresh fresh
                 ? LogQueryPacket.Format(fresh, int.MaxValue)
                 : LogQueryPacket.Format((LogQuerySubmission.Page)submission);
-            return result.Packet;
+            return result.Packet!;
         }
     }
 
@@ -91,7 +91,7 @@ internal static class LogViewerSelfTest
     private static async System.Threading.Tasks.Task SelfTestBody(GameManager gm)
     {
         var tree = gm.GetTree();
-        var applier = UiScaleApplier.Instance;
+        var applier = UiScaleApplier.Instance!;
 
         async System.Threading.Tasks.Task Frame() => await gm.ToSignal(tree, SceneTree.SignalName.ProcessFrame);
 
@@ -111,7 +111,7 @@ internal static class LogViewerSelfTest
         await Frame();
 
         int viewerCount = 0;
-        foreach (var child in gm.Hud.GetChildren())
+        foreach (var child in gm.Hud!.GetChildren())
             if (child is LogViewerWindow) viewerCount++;
         Assert(viewerCount == 1, $"exactly one log viewer expected, found {viewerCount}");
         var viewer = gm.Hud.LogViewer;
@@ -119,7 +119,7 @@ internal static class LogViewerSelfTest
         Assert((int)WindowFrames.LogViewer == 29, $"log viewer frame {(int)WindowFrames.LogViewer} != 29");
         Assert(LogViewerLayout.DesignSize == new Vector2(1000, 620), $"design size {LogViewerLayout.DesignSize}");
         Assert(LogViewerLayout.MinSize == new Vector2(620, 340), $"min size {LogViewerLayout.MinSize}");
-        Assert(viewer.Size == LogViewerLayout.DesignSize, $"log viewer size {viewer.Size} != {LogViewerLayout.DesignSize}");
+        Assert(viewer!.Size == LogViewerLayout.DesignSize, $"log viewer size {viewer.Size} != {LogViewerLayout.DesignSize}");
 
         var preset = viewer.GetNode<OptionButton>("Content/PresetRow/PresetOptionButton");
         var customStart = viewer.GetNode<LineEdit>("Content/PresetRow/CustomStartField");

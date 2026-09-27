@@ -13,20 +13,20 @@ namespace Goose2Client.Network.Tests
         {
             Assert.Equal(22, token.Length);
             Assert.True(LogPageTokenCodec.IsCanonical(token));
-            Assert.True(LogPageTokenCodec.TryDecode(token, out byte[] bytes));
-            Assert.Equal(16, bytes.Length);
+            Assert.True(LogPageTokenCodec.TryDecode(token, out byte[]? bytes));
+            Assert.Equal(16, bytes!.Length);
         }
 
         [Fact]
         public void Decode_RecoversExactBytes()
         {
-            Assert.True(LogPageTokenCodec.TryDecode("AAAAAAAAAAAAAAAAAAAAAA", out byte[] zeros));
+            Assert.True(LogPageTokenCodec.TryDecode("AAAAAAAAAAAAAAAAAAAAAA", out byte[]? zeros));
             Assert.Equal(new byte[16], zeros);
 
             byte[] input = new byte[16];
             for (int i = 0; i < 16; i++)
                 input[i] = (byte)i;
-            Assert.True(LogPageTokenCodec.TryDecode("AAECAwQFBgcICQoLDA0ODw", out byte[] round));
+            Assert.True(LogPageTokenCodec.TryDecode("AAECAwQFBgcICQoLDA0ODw", out byte[]? round));
             Assert.Equal(input, round);
         }
 
@@ -63,7 +63,7 @@ namespace Goose2Client.Network.Tests
         {
             Assert.True(LogPageTokenCodec.IsCanonical("AAAAAAAAAAAAAAAAAAAAAA"));
             Assert.True(LogPageTokenCodec.IsCanonical("AAAAAAAAAAAAAAAAAAAAAQ"));
-            Assert.True(LogPageTokenCodec.TryDecode("AAAAAAAAAAAAAAAAAAAAAQ", out byte[] bytes));
+            Assert.True(LogPageTokenCodec.TryDecode("AAAAAAAAAAAAAAAAAAAAAQ", out byte[]? bytes));
             var expected = new byte[16];
             expected[15] = 1;
             Assert.Equal(expected, bytes);

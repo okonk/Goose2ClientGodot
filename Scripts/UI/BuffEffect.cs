@@ -14,11 +14,11 @@ namespace Goose2Client.UI
     {
         public static readonly Vector2 SlotSize = new(20, 20);
 
-        private TextureRect _icon;
-        private BuffSweepBar _sweep;
-        private Label _countdown;
-        private string _effectName;
-        private string _tooltipText;
+        private TextureRect _icon = null!;
+        private BuffSweepBar _sweep = null!;
+        private Label _countdown = null!;
+        private string? _effectName;
+        private string? _tooltipText;
         private long _remainingMs;
         private long _totalMs;
         private DateTimeOffset _expiresAt;
@@ -27,7 +27,7 @@ namespace Goose2Client.UI
         internal static float BlinkAlpha(double nowSeconds) => Mathf.Clamp(0.65f + 0.35f * (float)Math.Sin(2 * Math.PI * nowSeconds), 0.3f, 1.0f);
 
         public int SlotNumber { get; set; }
-        public Action<int> OnDoubleClick { get; set; }
+        public Action<int>? OnDoubleClick { get; set; }
 
         public override void _Ready()
         {
@@ -35,7 +35,7 @@ namespace Goose2Client.UI
             _icon = GetNode<TextureRect>("Icon");
             _sweep = GetNode<BuffSweepBar>("Sweep");
             _countdown = GetNode<Label>("Countdown");
-            UiScaleApplier.Instance.ApplyFontSize(_countdown, 10f);
+            UiScaleApplier.Instance!.ApplyFontSize(_countdown, 10f);
             // Empty slots must not steal mouse from the world / neighboring icons.
             MouseFilter = MouseFilterEnum.Ignore;
             Visible = false;

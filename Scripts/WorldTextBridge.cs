@@ -17,7 +17,7 @@ namespace Goose2Client
         /// World render scale (world units → screen px): anchors' LocalOffsetWorld conversion only.
         public float WorldScale => _worldScale;
 
-        private WorldViewport _worldViewport;
+        private WorldViewport? _worldViewport;
         private float _uiFactor = 1f;
         private float _worldScale = 1f;
 

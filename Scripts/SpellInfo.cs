@@ -7,7 +7,7 @@ namespace Goose2Client
     public class SpellInfo
     {
         public int SlotNumber { get; set; }
-        public string Name { get; set; }
+        public string Name { get; set; } = null!;
         public SpellTargetType TargetType { get; set; }
         public int GraphicId { get; set; }
         public int GraphicFile { get; set; }

@@ -20,7 +20,7 @@ public partial class ToolbarItem : Button
 {
     [Export] public ToolbarItemType ItemType { get; set; }
 
-    public Action OnOptions { get; set; }
+    public Action? OnOptions { get; set; }
 
     public override void _Ready()
     {

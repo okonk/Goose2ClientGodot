@@ -88,7 +88,7 @@ internal static class CharacterIconSelfTest
             var icon = FindIcon(c);
             Assert(icon != null, "SetIcon did not create the icon sprite");
             Assert(IconCount(c) == 1, $"icon child count {IconCount(c)} != 1");
-            Assert(icon.Texture == red, "icon texture not applied");
+            Assert(icon!.Texture == red, "icon texture not applied");
             Assert(icon.TextureFilter == CanvasItem.TextureFilterEnum.Nearest, "icon filter not Nearest");
             Assert(icon.ZIndex == 20 && !icon.ZAsRelative, $"icon z {icon.ZIndex} relative={icon.ZAsRelative} != absolute 20");
             Assert(icon.Scale == Vector2.One, $"icon scale {icon.Scale} != native");
@@ -139,13 +139,13 @@ internal static class CharacterIconSelfTest
             Assert(mm != null, "MapManager did not register");
 
             gm.PacketManager.Handle("CHI424242,0,0");
-            Assert(mm.GetCharacter(424242) == null, "unknown-login CHI spawned a character");
+            Assert(mm!.GetCharacter(424242) == null, "unknown-login CHI spawned a character");
 
             gm.PacketManager.Handle($"MKC7,1,Mon,,,0,3,4,1,50,{FixtureBodyId},255,0,0,255,0,0,999,0");
             await Frame();
             var mc = mm.GetCharacter(7);
             Assert(mc != null, "MKC did not spawn the character");
-            mc.SetIcon(red);
+            mc!.SetIcon(red);
             Assert(FindIcon(mc) is { Texture: not null }, "dispatched character has no icon");
             gm.PacketManager.Handle("CHI7,0,0");
             Assert(FindIcon(mc) is { Texture: null }, "CHI clear did not clear the icon");

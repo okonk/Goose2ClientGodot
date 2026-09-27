@@ -21,9 +21,9 @@ namespace Goose2Client.Network.Packets.Tests
 
         private static string Row(
             string rowId = "0", string utc = "0", string typeId = "0", string typeIsInteger = "true",
-            string eventLabel = null, string eventGroup = null, string otherIdKind = null,
-            string primary = null, string related = "null", string map = "null",
-            string raw = null, string summary = null, string originalText = null)
+            string? eventLabel = null, string? eventGroup = null, string? otherIdKind = null,
+            string? primary = null, string related = "null", string map = "null",
+            string? raw = null, string? summary = null, string? originalText = null)
         {
             if (eventLabel == null) eventLabel = EmptyJson;
             if (eventGroup == null) eventGroup = EmptyJson;
@@ -45,13 +45,13 @@ namespace Goose2Client.Network.Packets.Tests
 
         private static LogRow Parse(string json)
         {
-            Assert.True(LogRowJsonParser.TryParse(Bytes(json), out LogRow row), "expected valid row JSON: " + json);
-            return row;
+            Assert.True(LogRowJsonParser.TryParse(Bytes(json), out LogRow? row), "expected valid row JSON: " + json);
+            return row!;
         }
 
         private static void AssertRejects(string json)
         {
-            Assert.False(LogRowJsonParser.TryParse(Bytes(json), out LogRow row));
+            Assert.False(LogRowJsonParser.TryParse(Bytes(json), out LogRow? row));
             Assert.Null(row);
         }
 
@@ -255,8 +255,8 @@ namespace Goose2Client.Network.Packets.Tests
             int padLen = LogRowJsonParser.MaxDecodedBytes - skeletonLen + 7;
             string json = Row(originalText: Js(new string('a', padLen)));
             Assert.Equal(LogRowJsonParser.MaxDecodedBytes, Encoding.UTF8.GetByteCount(json));
-            Assert.True(LogRowJsonParser.TryParse(Bytes(json), out LogRow row));
-            Assert.Equal(new string('a', padLen), row.OriginalText);
+            Assert.True(LogRowJsonParser.TryParse(Bytes(json), out LogRow? row));
+            Assert.Equal(new string('a', padLen), row!.OriginalText);
         }
 
         [Fact]

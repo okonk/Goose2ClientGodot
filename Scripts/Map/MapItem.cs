@@ -7,7 +7,7 @@ namespace Goose2Client.Map;
 public partial class MapItem : Sprite2D
 {
     /// <summary>Item data for the hover tooltip (set by MapManager after Setup).</summary>
-    public ItemStats Item { get; set; }
+    public ItemStats? Item { get; set; }
 
     public void Setup(AtlasTexture tex, int tileX, int tileY, Color tint)
     {

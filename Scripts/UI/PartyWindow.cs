@@ -13,8 +13,8 @@ public partial class PartyWindow : Control, IScalableWindow
 
     private static readonly PackedScene MemberScene = GD.Load<PackedScene>("res://Scenes/UI/PartyMember.tscn");
 
-    private PartyMember[] _members;
-    private PartyMemberEffectState _effects;
+    private PartyMember[] _members = null!;
+    private PartyMemberEffectState _effects = null!;
     private bool _listenersRegistered;
     private List<UiScaleLayout.GeomRecord> _geom = null!;
 
@@ -43,7 +43,7 @@ public partial class PartyWindow : Control, IScalableWindow
         pm.Listen<PartyBuffClearPacket>(OnPartyBuffClear);
         _listenersRegistered = true;
 
-        var applier = UiScaleApplier.Instance;
+        var applier = UiScaleApplier.Instance!;
         _geom = UiScaleLayout.Snapshot(this);
         applier.RegisterWindow(this);
         Relayout();
@@ -52,7 +52,7 @@ public partial class PartyWindow : Control, IScalableWindow
 
     public void Relayout()
     {
-        var applier = UiScaleApplier.Instance;
+        var applier = UiScaleApplier.Instance!;
         UiScaleLayout.Apply(_geom, applier.Factor);
         foreach (var tile in _members)
         {
@@ -68,7 +68,7 @@ public partial class PartyWindow : Control, IScalableWindow
         int count = 0;
         foreach (var m in _members)
             if (m.Visible) count++;
-        var factor = UiScaleApplier.Instance.Factor;
+        var factor = UiScaleApplier.Instance!.Factor;
         int w = UiScale.ScaleSize(PartyMemberMetrics.FrameWidthPx, factor);
         int row = PartyMemberMetrics.MinSize(factor).Y;
         int sep = UiScale.ScaleSize(1f, factor);

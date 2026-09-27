@@ -17,29 +17,29 @@ public partial class CharacterWindow : BaseWindow, IWindow
 
     private static readonly PackedScene SlotScene = GD.Load<PackedScene>("res://Scenes/UI/ItemSlot.tscn");
 
-    private ItemSlot[] _slots;
+    private ItemSlot[] _slots = null!;
     private bool _listenersRegistered;
 
     // Character info labels
-    private Label _nameText;
-    private Label _levelClassText;
-    private Label _guildText;
-    private Label _experienceText;
-    private Label _experienceSoldText;
+    private Label _nameText = null!;
+    private Label _levelClassText = null!;
+    private Label _guildText = null!;
+    private Label _experienceText = null!;
+    private Label _experienceSoldText = null!;
 
     // Stat labels
-    private Label _strengthText;
-    private Label _staminaText;
-    private Label _intelligenceText;
-    private Label _dexterityText;
-    private Label _acText;
+    private Label _strengthText = null!;
+    private Label _staminaText = null!;
+    private Label _intelligenceText = null!;
+    private Label _dexterityText = null!;
+    private Label _acText = null!;
 
     // Resist labels
-    private Label _fireResistText;
-    private Label _waterResistText;
-    private Label _earthResistText;
-    private Label _airResistText;
-    private Label _spiritResistText;
+    private Label _fireResistText = null!;
+    private Label _waterResistText = null!;
+    private Label _earthResistText = null!;
+    private Label _airResistText = null!;
+    private Label _spiritResistText = null!;
 
     public int WindowId => (int)WindowFrame;
     public WindowFrames WindowFrame => WindowFrames.Equipped;

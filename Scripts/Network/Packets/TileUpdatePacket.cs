@@ -7,7 +7,7 @@ namespace Goose2Client.Network.Packets
     {
         public int X { get; set; }
         public int Y { get; set; }
-        public int[] Tiles { get; set; }
+        public int[] Tiles { get; set; } = Array.Empty<int>();
         public int Flags { get; set; }
 
         public override string Prefix { get; } = "TUP";

@@ -7,8 +7,8 @@ namespace Goose2Client.Network.Packets
     {
         public int LineNumber { get; set; }
         public int LoginId { get; set; }
-        public string Name { get; set; }
-        public string LevelClassName { get; set; }
+        public string Name { get; set; } = null!;
+        public string LevelClassName { get; set; } = null!;
 
         public override string Prefix { get; } = "GUD";
 

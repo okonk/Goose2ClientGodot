@@ -1,3 +1,5 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace Goose2Client.Network
 {
     public static class LogPageTokenCodec
@@ -21,29 +23,30 @@ namespace Goose2Client.Network
                     return false;
             }
             // 16 bytes occupy 128 of the 132 bits carried by 22 chars; the final 4 bits must be zero
-            if (Value(token[TokenLength - 1]) % 16 != 0)
+            if (Value(token![TokenLength - 1]) % 16 != 0)
                 return false;
             return true;
         }
 
-        public static bool TryDecode(string? token, out byte[] bytes)
+        public static bool TryDecode(string? token, [NotNullWhen(true)] out byte[]? bytes)
         {
             bytes = null;
             if (!IsCanonical(token))
                 return false;
+            string t = token!;
             bytes = new byte[DecodedByteLength];
             for (int grp = 0; grp < 5; grp++)
             {
-                int a = Value(token[grp * 4]);
-                int b = Value(token[grp * 4 + 1]);
-                int c = Value(token[grp * 4 + 2]);
-                int d = Value(token[grp * 4 + 3]);
+                int a = Value(t[grp * 4]);
+                int b = Value(t[grp * 4 + 1]);
+                int c = Value(t[grp * 4 + 2]);
+                int d = Value(t[grp * 4 + 3]);
                 bytes[grp * 3] = (byte)((a << 2) | (b >> 4));
                 bytes[grp * 3 + 1] = (byte)(((b & 0x0F) << 4) | (c >> 2));
                 bytes[grp * 3 + 2] = (byte)(((c & 0x03) << 6) | d);
             }
-            int x = Value(token[20]);
-            int y = Value(token[21]);
+            int x = Value(t[20]);
+            int y = Value(t[21]);
             bytes[15] = (byte)((x << 2) | (y >> 4));
             return true;
         }

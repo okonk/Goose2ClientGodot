@@ -7,10 +7,10 @@ namespace Goose2Client.UI
     {
         public static readonly Vector2 IconSize = new(12, 12);
 
-        private TextureRect _icon;
-        private BuffSweepBar _sweep;
-        private string _effectName;
-        private string _tooltipText;
+        private TextureRect _icon = null!;
+        private BuffSweepBar _sweep = null!;
+        private string? _effectName;
+        private string? _tooltipText;
         private long _totalMs;
         private long _expiresAtMs;
         private bool _permanent;

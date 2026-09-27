@@ -1,3 +1,4 @@
+using System;
 using Godot;
 using Goose2Client;
 using Goose2Client.Network.Packets;
@@ -13,8 +14,8 @@ public partial class InventoryWindow : BaseWindow, IWindow
 
     private static readonly PackedScene SlotScene = GD.Load<PackedScene>("res://Scenes/UI/ItemSlot.tscn");
 
-    private ItemSlot[] _slots;
-    private Label _goldText;
+    private ItemSlot[] _slots = Array.Empty<ItemSlot>();
+    private Label _goldText = null!;
     private bool _listenersRegistered;
 
     public int WindowId => (int)WindowFrame;
@@ -94,7 +95,7 @@ public partial class InventoryWindow : BaseWindow, IWindow
     {
         if (fromWindow.WindowId == WindowId)
         {
-            var item = _slots[fromSlot].Stats;
+            var item = _slots[fromSlot].Stats!;
             int amount = Helpers.GetStackSplitAmount(item.StackSize);
             if (item.StackSize == amount)
                 GameManager.Instance.NetworkClient.MoveItemInInventory(fromSlot, toSlot);
@@ -111,5 +112,5 @@ public partial class InventoryWindow : BaseWindow, IWindow
         }
     }
 
-    public ItemStats GetSlot(int slotNumber) => _slots[slotNumber].Stats;
+    public ItemStats? GetSlot(int slotNumber) => _slots[slotNumber].Stats;
 }

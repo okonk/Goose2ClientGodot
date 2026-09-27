@@ -8,13 +8,13 @@ namespace Goose2Client.Network.Packets
         public int SlotNumber { get; set; }
         public int GraphicId { get; set; }
         public int GraphicFile { get; set; }
-        public string Title { get; set; }
-        public string Name { get; set; }
-        public string Surname { get; set; }
+        public string Title { get; set; } = null!;
+        public string Name { get; set; } = null!;
+        public string Surname { get; set; } = null!;
         public int StackSize { get; set; }
         public int Value { get; set; }
         public ItemFlags Flags { get; set; }
-        public string Description { get; set; }
+        public string Description { get; set; } = null!;
         public int MinDamage { get; set; }
         public int MaxDamage { get; set; }
         public int Delay { get; set; }
@@ -39,7 +39,7 @@ namespace Goose2Client.Network.Packets
         public int ClassRestrictions3 { get; set; }
         public int Access { get; set; }
         public int Gender { get; set; }
-        public string SpellEffect { get; set; }
+        public string SpellEffect { get; set; } = null!;
         public int SpellEffectChance { get; set; }
         public ItemSlotType SlotType { get; set; }
         public ItemUseType UseType { get; set; }
@@ -51,14 +51,14 @@ namespace Goose2Client.Network.Packets
 
         /// <summary>Name of the currency Value is denominated in ("gold", "spirit", …).
         /// Appended after GraphicA, so an older server that does not send it leaves this null.</summary>
-        public string CurrencyName { get; set; }
+        public string? CurrencyName { get; set; }
 
         /// <summary>Comma-separated item stats the client cannot otherwise show, in wire
         /// order: haste, spell damage, spell crit, melee damage, melee crit, damage
         /// reduction, then percent/flat pairs for HP, MP and SP regeneration. Percentages
         /// are basis points. Appended after the currency name, so an older server leaves
         /// this null.</summary>
-        public string ExtraStats { get; set; }
+        public string? ExtraStats { get; set; }
 
         public override string Prefix { get; } = "SIS";
 
