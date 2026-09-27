@@ -46,6 +46,7 @@ public partial class LogViewerWindow : BaseWindow
     private Button _quickPrimary = null!;
     private Button _quickRelated = null!;
     private Button _quickMap = null!;
+    private Control _quickActions = null!;
     private PopupMenu _typesPopup = new();
 
     public LogViewerState State => _logic.State;
@@ -65,10 +66,10 @@ public partial class LogViewerWindow : BaseWindow
         _preset = GetNode<OptionButton>("Content/PresetRow/PresetOptionButton");
         _customStart = GetNode<LineEdit>("Content/PresetRow/CustomStartField");
         _customEnd = GetNode<LineEdit>("Content/PresetRow/CustomEndField");
-        _participant = GetNode<LineEdit>("Content/ParticipantRow/ParticipantField");
-        _typesButton = GetNode<Button>("Content/ParticipantRow/TypesButton");
-        _map = GetNode<LineEdit>("Content/MapRow/MapField");
-        _text = GetNode<LineEdit>("Content/MapRow/TextField");
+        _participant = GetNode<LineEdit>("Content/FilterRow/ParticipantField");
+        _typesButton = GetNode<Button>("Content/FilterRow/TypesButton");
+        _map = GetNode<LineEdit>("Content/FilterRow/MapField");
+        _text = GetNode<LineEdit>("Content/FilterRow/TextField");
         _suggestions = GetNode<ItemList>("Content/MapSuggestions");
         _search = GetNode<Button>("Content/ActionRow/SearchButton");
         _clear = GetNode<Button>("Content/ActionRow/ClearButton");
@@ -76,26 +77,33 @@ public partial class LogViewerWindow : BaseWindow
         _applied = GetNode<Label>("Content/ActionRow/AppliedFilterLabel");
         _tree = GetNode<Tree>("Content/Split/ResultsPanel/ResultsTree");
         _details = GetNode<TextEdit>("Content/Split/DetailsPanel/DetailsText");
-        _previous = GetNode<Button>("Content/Split/DetailsPanel/DetailsActions/PreviousButton");
-        _next = GetNode<Button>("Content/Split/DetailsPanel/DetailsActions/NextButton");
+        _previous = GetNode<Button>("Content/Split/ResultsPanel/Pager/PreviousButton");
+        _next = GetNode<Button>("Content/Split/ResultsPanel/Pager/NextButton");
         _copy = GetNode<Button>("Content/Split/DetailsPanel/DetailsActions/CopyButton");
         _quickType = GetNode<Button>("Content/Split/DetailsPanel/QuickActions/QuickTypeButton");
         _quickPrimary = GetNode<Button>("Content/Split/DetailsPanel/QuickActions/QuickPrimaryButton");
         _quickRelated = GetNode<Button>("Content/Split/DetailsPanel/QuickActions/QuickRelatedButton");
         _quickMap = GetNode<Button>("Content/Split/DetailsPanel/QuickActions/QuickMapButton");
+        _quickActions = GetNode<Control>("Content/Split/DetailsPanel/QuickActions");
 
         for (int i = 0; i < PresetLabels.Length; i++)
             _preset.AddItem(PresetLabels[i]);
+        _preset.GetPopup().ThemeTypeVariation = "DropdownMenu";
 
         _tree.Columns = 6;
         for (int i = 0; i < LogViewerLayout.ColumnHeaders.Length; i++)
         {
             _tree.SetColumnTitle(i, LogViewerLayout.ColumnHeaders[i]);
-            _tree.SetColumnCustomMinimumWidth(i, (int)LogViewerLayout.ColumnMinimums[i]);
-            _tree.SetColumnExpandRatio(i, (int)Math.Round(LogViewerLayout.ColumnExpandRatios[i] * 10f));
+            _tree.SetColumnTitleAlignment(i, HorizontalAlignment.Left);
+            _tree.SetColumnExpand(i, LogViewerLayout.ColumnExpandRatios[i] > 0f);
+            _tree.SetColumnExpandRatio(i, Math.Max(1, (int)Math.Round(LogViewerLayout.ColumnExpandRatios[i] * 10f)));
         }
 
+        _details.SyntaxHighlighter = new LogDetailsHighlighter();
+
         _typesPopup.Name = "TypesPopup";
+        _typesPopup.ThemeTypeVariation = "DropdownMenu";
+        _typesPopup.HideOnCheckableItemSelection = false;
         _typesPopup.IdPressed += id => OnTypeItemPressed((int)id);
         AddChild(_typesPopup);
 
@@ -104,6 +112,8 @@ public partial class LogViewerWindow : BaseWindow
         _customEnd.TextChanged += v => { ClearExactDefaults(); _state.Draft.EndText = v; RenderStatus(); };
         _participant.TextChanged += v => { _state.Draft.Participant = v; RenderStatus(); };
         _map.TextChanged += v => { _state.Draft.MapText = v; RenderSuggestions(); RenderStatus(); };
+        _map.FocusEntered += PlaceSuggestions;
+        _map.FocusExited += () => _suggestions.Visible = false;
         _text.TextChanged += v => { _state.Draft.Text = v; RenderStatus(); };
         _customStart.TextSubmitted += _ => OnSearch();
         _customEnd.TextSubmitted += _ => OnSearch();
@@ -147,6 +157,17 @@ public partial class LogViewerWindow : BaseWindow
         RenderAll();
 
         ScaleRegister();
+    }
+
+    public override void Relayout()
+    {
+        base.Relayout();
+        if (_tree is null)
+            return;
+        var applier = UiScaleApplier.Instance!;
+        for (int i = 0; i < LogViewerLayout.ColumnMinimums.Length; i++)
+            _tree.SetColumnCustomMinimumWidth(i, applier.ScaleSize(LogViewerLayout.ColumnMinimums[i]));
+        PlaceSuggestions();
     }
 
     protected override void OnClosePressed()
@@ -350,7 +371,7 @@ public partial class LogViewerWindow : BaseWindow
                     continue;
                 if (first)
                 {
-                    _typesPopup.AddItem(group, nextId);
+                    _typesPopup.AddSeparator(group, nextId);
                     _typesPopup.SetItemDisabled(nextId, true);
                     nextId++;
                     first = false;
@@ -381,7 +402,6 @@ public partial class LogViewerWindow : BaseWindow
         else if (!selected.Contains(typeId))
             selected.Add(typeId);
         RenderStatus();
-        _typesPopup.Show();
     }
 
     private void RenderSuggestions()
@@ -397,6 +417,22 @@ public partial class LogViewerWindow : BaseWindow
             _suggestions.AddItem(display);
             _suggestions.SetItemMetadata(_suggestions.ItemCount - 1, Variant.From(maps[i].MapId));
         }
+        PlaceSuggestions();
+    }
+
+    private void PlaceSuggestions()
+    {
+        _suggestions.Visible = _map.HasFocus() && _suggestions.ItemCount > 0;
+        if (!_suggestions.Visible)
+            return;
+        Rect2 field = _map.GetGlobalRect();
+        var content = _suggestions.GetParent<Control>();
+        float rowHeight = _suggestions.GetThemeFont("font").GetHeight(_suggestions.GetThemeFontSize("font_size"))
+            + _suggestions.GetThemeConstant("v_separation");
+        float chrome = _suggestions.GetThemeStylebox("panel").GetMinimumSize().Y;
+        float maxHeight = UiScaleApplier.Instance!.ScaleSize(LogViewerLayout.SuggestionMaxHeight);
+        _suggestions.Position = field.Position - content.GlobalPosition + new Vector2(0f, field.Size.Y + 2f);
+        _suggestions.Size = new Vector2(field.Size.X, Math.Min(_suggestions.ItemCount * rowHeight + chrome, maxHeight));
     }
 
     private void OnSuggestionSelected(int index)
@@ -475,6 +511,8 @@ public partial class LogViewerWindow : BaseWindow
         _status.Text = _state.DirtyStatusText ?? _state.StatusText;
         _applied.Text = _state.AppliedFilterDescription;
         _search.Disabled = _state.IsActive || !_state.IsReady;
+        int typeCount = _state.Draft.SelectedTypeIds.Count;
+        _typesButton.Text = typeCount == 0 ? "Types" : $"Types ({typeCount})";
         _previous.Disabled = _state.HistoryIndex <= 0 || _state.IsActive;
         _next.Disabled = _state.NextToken == null || _state.IsActive;
     }
@@ -489,7 +527,14 @@ public partial class LogViewerWindow : BaseWindow
             TreeItem item = _tree.CreateItem(root);
             string[] cells = LogDetailsFormatter.TableColumns(rows[i]);
             for (int c = 0; c < cells.Length; c++)
+            {
                 item.SetText(c, cells[c]);
+                if (i % 2 == 1)
+                    item.SetCustomBgColor(c, StripeColor);
+            }
+            if (GroupColor(rows[i].EventGroup) is Color groupColor)
+                item.SetCustomColor(1, groupColor);
+            item.SetTooltipText(5, cells[5]);
             item.SetMeta("row_index", Variant.From(i));
         }
         _tree.DeselectAll();
@@ -508,6 +553,7 @@ public partial class LogViewerWindow : BaseWindow
             _quickPrimary.Visible = false;
             _quickRelated.Visible = false;
             _quickMap.Visible = false;
+            _quickActions.Visible = false;
             return;
         }
         _details.Text = LogDetailsFormatter.FormatDetails(row);
@@ -516,6 +562,23 @@ public partial class LogViewerWindow : BaseWindow
         _quickPrimary.Visible = LogViewerState.PrimaryQuickFilterAvailable(_state, row);
         _quickRelated.Visible = LogViewerState.RelatedQuickFilterAvailable(_state, row);
         _quickMap.Visible = MapQuickFilterAvailable(row);
+        _quickActions.Visible = _quickType.Visible || _quickPrimary.Visible || _quickRelated.Visible || _quickMap.Visible;
+    }
+
+    private static readonly Color StripeColor = new(1f, 1f, 1f, 0.035f);
+
+    private static Color? GroupColor(string group)
+    {
+        string key = group.Replace("/", "").Replace(" ", "").ToLowerInvariant();
+        return key switch
+        {
+            "communication" => new Color(0.55f, 0.78f, 1f),
+            "sessionssecurity" => new Color(0.62f, 0.86f, 0.62f),
+            "social" => new Color(0.85f, 0.7f, 1f),
+            "itemseconomy" => new Color(0.95f, 0.8f, 0.45f),
+            "gmactions" => new Color(1f, 0.55f, 0.5f),
+            _ => null
+        };
     }
 }
 

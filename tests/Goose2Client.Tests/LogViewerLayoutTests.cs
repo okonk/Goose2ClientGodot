@@ -27,16 +27,16 @@ public class LogViewerLayoutTests
         Assert.Equal(8f, LogViewerLayout.Margin);
         Assert.Equal(24f, LogViewerLayout.TitleBarHeight);
         Assert.Equal(96f, LogViewerLayout.SuggestionMaxHeight);
-        Assert.Equal(216f, LogViewerLayout.FilterAreaHeight);
+        Assert.Equal(120f, LogViewerLayout.FilterAreaHeight);
     }
 
     [Fact]
     public void ColumnMinimums_ArePinnedInServerOrder()
-        => Assert.Equal(new[] { 150f, 100f, 90f, 90f, 80f, 50f }, LogViewerLayout.ColumnMinimums);
+        => Assert.Equal(new[] { 150f, 95f, 70f, 70f, 85f, 90f }, LogViewerLayout.ColumnMinimums);
 
     [Fact]
     public void ColumnExpandRatios_ArePinned()
-        => Assert.Equal(new[] { 1.0f, 1.2f, 1.0f, 1.0f, 1.0f, 1.6f }, LogViewerLayout.ColumnExpandRatios);
+        => Assert.Equal(new[] { 0f, 1.0f, 0.5f, 0.5f, 1.0f, 4.0f }, LogViewerLayout.ColumnExpandRatios);
 
     [Theory]
     [MemberData(nameof(Canvases))]
@@ -66,13 +66,13 @@ public class LogViewerLayoutTests
     public void ColumnWidths_AtDesignCanvas_DistributeExtraSpaceByRatio()
         => AssertClose(
             LogViewerLayout.ColumnWidths(LogViewerLayout.ResultsWidth(DesignCanvas)),
-            new[] { 151.57647f, 101.89176f, 91.57647f, 91.57647f, 81.57647f, 52.52235f });
+            new[] { 150f, 96.53143f, 70.76571f, 70.76571f, 86.53143f, 96.12571f });
 
     [Fact]
     public void ColumnWidths_AtHighDpiCanvas_DistributeExtraSpaceByRatio()
         => AssertClose(
             LogViewerLayout.ColumnWidths(LogViewerLayout.ResultsWidth(HighDpiCanvas)),
-            new[] { 236.87059f, 204.24471f, 176.87059f, 176.87059f, 166.87059f, 188.99294f });
+            new[] { 150f, 179.38857f, 112.19429f, 112.19429f, 169.38857f, 427.55429f });
 
     [Fact]
     public void ColumnWidths_NeverFallBelowMinimums()

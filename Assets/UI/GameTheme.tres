@@ -1,4 +1,4 @@
-[gd_resource type="Theme" load_steps=38 format=3]
+[gd_resource type="Theme" load_steps=43 format=3]
 
 [ext_resource type="FontFile" path="res://Assets/UI/Fonts/LiberationSans.ttf" id="font"]
 [ext_resource type="Texture2D" path="res://Assets/UI/checkbox-off.svg" id="check_off"]
@@ -400,6 +400,39 @@ corner_radius_top_right = 2
 corner_radius_bottom_right = 2
 corner_radius_bottom_left = 2
 
+[sub_resource type="StyleBoxFlat" id="table_header"]
+content_margin_left = 6.0
+content_margin_top = 4.0
+content_margin_right = 6.0
+content_margin_bottom = 4.0
+bg_color = Color(0.086275, 0.109804, 0.188235, 1)
+border_width_bottom = 1
+border_color = Color(0.584314, 0.447059, 0.235294, 1)
+
+[sub_resource type="StyleBoxFlat" id="table_header_hover"]
+content_margin_left = 6.0
+content_margin_top = 4.0
+content_margin_right = 6.0
+content_margin_bottom = 4.0
+bg_color = Color(0.117647, 0.14902, 0.254902, 1)
+border_width_bottom = 1
+border_color = Color(0.92549, 0.72549, 0.337255, 1)
+
+[sub_resource type="StyleBoxFlat" id="row_selected"]
+bg_color = Color(0.145098, 0.345098, 0.580392, 0.55)
+
+[sub_resource type="StyleBoxFlat" id="row_hover"]
+bg_color = Color(1, 1, 1, 0.05)
+
+[sub_resource type="StyleBoxFlat" id="menu_hover"]
+content_margin_left = 4.0
+content_margin_right = 4.0
+bg_color = Color(0.145098, 0.345098, 0.580392, 0.7)
+corner_radius_top_left = 2
+corner_radius_top_right = 2
+corner_radius_bottom_right = 2
+corner_radius_bottom_left = 2
+
 [resource]
 default_font = ExtResource("font")
 default_font_size = 10
@@ -526,3 +559,55 @@ ToolbarButton/styles/hover = SubResource("toolbar_hover")
 ToolbarButton/styles/pressed = SubResource("toolbar_pressed")
 ToolbarButton/styles/disabled = SubResource("toolbar_normal")
 ToolbarButton/styles/focus = SubResource("empty")
+Tree/colors/font_color = Color(0.862745, 0.85098, 0.8, 1)
+Tree/colors/font_selected_color = Color(1, 0.960784, 0.862745, 1)
+Tree/colors/font_hovered_color = Color(1, 0.960784, 0.862745, 1)
+Tree/colors/title_button_color = Color(0.964706, 0.847059, 0.560784, 1)
+Tree/colors/guide_color = Color(0, 0, 0, 0)
+Tree/constants/draw_guides = 0
+Tree/constants/draw_relationship_lines = 0
+Tree/constants/item_margin = 0
+Tree/constants/inner_item_margin_left = 6
+Tree/constants/inner_item_margin_right = 6
+Tree/constants/v_separation = 6
+Tree/constants/h_separation = 4
+Tree/styles/panel = SubResource("panel_inset")
+Tree/styles/focus = SubResource("empty")
+Tree/styles/selected = SubResource("row_selected")
+Tree/styles/selected_focus = SubResource("row_selected")
+Tree/styles/hovered = SubResource("row_hover")
+Tree/styles/cursor = SubResource("empty")
+Tree/styles/cursor_unfocused = SubResource("empty")
+Tree/styles/title_button_normal = SubResource("table_header")
+Tree/styles/title_button_hover = SubResource("table_header_hover")
+Tree/styles/title_button_pressed = SubResource("table_header_hover")
+ItemList/colors/font_color = Color(0.862745, 0.85098, 0.8, 1)
+ItemList/colors/font_hovered_color = Color(1, 0.960784, 0.862745, 1)
+ItemList/colors/font_selected_color = Color(1, 0.960784, 0.862745, 1)
+ItemList/constants/v_separation = 4
+ItemList/constants/h_separation = 6
+ItemList/styles/panel = SubResource("tooltip")
+ItemList/styles/focus = SubResource("empty")
+ItemList/styles/selected = SubResource("row_selected")
+ItemList/styles/selected_focus = SubResource("row_selected")
+ItemList/styles/hovered = SubResource("row_hover")
+ItemList/styles/cursor = SubResource("empty")
+ItemList/styles/cursor_unfocused = SubResource("empty")
+TextEdit/colors/font_color = Color(0.921569, 0.898039, 0.831373, 1)
+TextEdit/colors/font_readonly_color = Color(0.921569, 0.898039, 0.831373, 1)
+TextEdit/colors/font_placeholder_color = Color(0.517647, 0.552941, 0.639216, 1)
+TextEdit/colors/selection_color = Color(0.101961, 0.356863, 0.635294, 0.8)
+TextEdit/constants/line_spacing = 3
+TextEdit/styles/normal = SubResource("panel_inset")
+TextEdit/styles/read_only = SubResource("panel_inset")
+TextEdit/styles/focus = SubResource("empty")
+DropdownMenu/base_type = &"PopupMenu"
+DropdownMenu/colors/font_color = Color(0.921569, 0.898039, 0.831373, 1)
+DropdownMenu/colors/font_hover_color = Color(1, 0.960784, 0.862745, 1)
+DropdownMenu/colors/font_separator_color = Color(0.807843, 0.690196, 0.454902, 1)
+DropdownMenu/constants/v_separation = 6
+DropdownMenu/styles/panel = SubResource("tooltip")
+DropdownMenu/styles/hover = SubResource("menu_hover")
+DropdownMenu/styles/separator = SubResource("separator")
+DropdownMenu/styles/labeled_separator_left = SubResource("separator")
+DropdownMenu/styles/labeled_separator_right = SubResource("separator")

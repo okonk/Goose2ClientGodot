@@ -124,10 +124,10 @@ internal static class LogViewerSelfTest
         var preset = viewer.GetNode<OptionButton>("Content/PresetRow/PresetOptionButton");
         var customStart = viewer.GetNode<LineEdit>("Content/PresetRow/CustomStartField");
         var customEnd = viewer.GetNode<LineEdit>("Content/PresetRow/CustomEndField");
-        var participant = viewer.GetNode<LineEdit>("Content/ParticipantRow/ParticipantField");
-        var typesButton = viewer.GetNode<Button>("Content/ParticipantRow/TypesButton");
-        var map = viewer.GetNode<LineEdit>("Content/MapRow/MapField");
-        var text = viewer.GetNode<LineEdit>("Content/MapRow/TextField");
+        var participant = viewer.GetNode<LineEdit>("Content/FilterRow/ParticipantField");
+        var typesButton = viewer.GetNode<Button>("Content/FilterRow/TypesButton");
+        var map = viewer.GetNode<LineEdit>("Content/FilterRow/MapField");
+        var text = viewer.GetNode<LineEdit>("Content/FilterRow/TextField");
         var suggestions = viewer.GetNode<ItemList>("Content/MapSuggestions");
         var search = viewer.GetNode<Button>("Content/ActionRow/SearchButton");
         var clear = viewer.GetNode<Button>("Content/ActionRow/ClearButton");
@@ -138,8 +138,8 @@ internal static class LogViewerSelfTest
         var detailsPanel = viewer.GetNode<VBoxContainer>("Content/Split/DetailsPanel");
         var resultsTree = viewer.GetNode<Tree>("Content/Split/ResultsPanel/ResultsTree");
         var detailsText = viewer.GetNode<TextEdit>("Content/Split/DetailsPanel/DetailsText");
-        var previous = viewer.GetNode<Button>("Content/Split/DetailsPanel/DetailsActions/PreviousButton");
-        var next = viewer.GetNode<Button>("Content/Split/DetailsPanel/DetailsActions/NextButton");
+        var previous = viewer.GetNode<Button>("Content/Split/ResultsPanel/Pager/PreviousButton");
+        var next = viewer.GetNode<Button>("Content/Split/ResultsPanel/Pager/NextButton");
         var copy = viewer.GetNode<Button>("Content/Split/DetailsPanel/DetailsActions/CopyButton");
         var quickType = viewer.GetNode<Button>("Content/Split/DetailsPanel/QuickActions/QuickTypeButton");
         var quickPrimary = viewer.GetNode<Button>("Content/Split/DetailsPanel/QuickActions/QuickPrimaryButton");
