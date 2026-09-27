@@ -72,6 +72,7 @@ public static class HudWindowDrag
 
         public void Handle(InputEvent e)
         {
+            if (IsLocked()) return;
             if (e is InputEventMouseButton { ButtonIndex: MouseButton.Left } mb)
             {
                 if (mb.Pressed)
@@ -106,6 +107,9 @@ public static class HudWindowDrag
                     _window.Position = Clamp(_startPos + delta);
             }
         }
+
+        private static bool IsLocked()
+            => GameManager.Instance?.CharacterSettings?.GetOption<bool>(Options.LockHudWindows, false) == true;
 
         private void Save()
         {

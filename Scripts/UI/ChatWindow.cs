@@ -32,6 +32,7 @@ public partial class ChatWindow : BaseWindow
 
     protected override bool Resizable => true;
     protected override Vector2 MinResizeSize => MinSize;
+    protected override bool LockableHudWindow => true;
 
     public bool Typing => _input.HasFocus();
     public string? ReplyToName { get; private set; }

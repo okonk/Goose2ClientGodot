@@ -19,6 +19,7 @@ public partial class OptionsWindow : BaseWindow
     private CheckBox _minimap = null!;
     private HSlider _minimapOpacitySlider = null!;
     private bool _minimapOpacityDragging;
+    private CheckBox _lockHudWindows = null!;
     private CheckBox _scaleAuto = null!;
     private CheckBox _scaleManual = null!;
     private HSlider _scaleSlider = null!;
@@ -72,6 +73,10 @@ public partial class OptionsWindow : BaseWindow
         _minimapOpacitySlider.DragStarted += () => _minimapOpacityDragging = true;
         _minimapOpacitySlider.DragEnded += OnMinimapOpacityDragEnded;
         _minimapOpacitySlider.ValueChanged += OnMinimapOpacityChanged;
+
+        _lockHudWindows = GetNode<CheckBox>("Content/LockHudWindowsCheck");
+        _lockHudWindows.ButtonPressed = GameManager.Instance.CharacterSettings.GetOption<bool>(Options.LockHudWindows, false);
+        _lockHudWindows.Toggled += OnLockHudWindowsChanged;
 
         _initializing = true;
         _scaleAuto = GetNode<CheckBox>("Content/ScaleAutoCheck");
@@ -173,6 +178,12 @@ public partial class OptionsWindow : BaseWindow
     private void OnMinimapOpacityDragEnded(bool valueChanged)
     {
         _minimapOpacityDragging = false;
+        GameManager.Instance.CharacterSettings.Save();
+    }
+
+    private void OnLockHudWindowsChanged(bool pressed)
+    {
+        GameManager.Instance.CharacterSettings.Options[Options.LockHudWindows] = pressed;
         GameManager.Instance.CharacterSettings.Save();
     }
 

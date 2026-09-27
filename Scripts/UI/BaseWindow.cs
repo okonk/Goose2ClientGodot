@@ -35,6 +35,10 @@ public partial class BaseWindow : Control, IScalableWindow
     protected virtual bool Resizable => false;
     protected virtual Vector2 MinResizeSize => Vector2.Zero;
 
+    /// <summary>True for the HUD windows the "Lock HUD Windows" option freezes (chat, hotbar);
+    /// other BaseWindows stay freely movable and resizable.</summary>
+    protected virtual bool LockableHudWindow => false;
+
     protected Label TitleLabel { get; private set; } = null!;
     protected Control Content { get; private set; } = null!;
     protected Control Background { get; private set; } = null!;
@@ -330,6 +334,7 @@ public partial class BaseWindow : Control, IScalableWindow
 
     private void OnResizeHandleGuiInput(InputEvent @event, ResizeEdge edge)
     {
+        if (LockableHudWindow && IsHudLocked()) return;
         if (@event is InputEventMouseButton { ButtonIndex: MouseButton.Left } mb)
         {
             if (mb.Pressed)
@@ -420,8 +425,12 @@ public partial class BaseWindow : Control, IScalableWindow
     protected void MakeDragHandle(Control handle)
         => handle.GuiInput += OnTitleBarGuiInput;
 
+    private static bool IsHudLocked()
+        => GameManager.Instance?.CharacterSettings?.GetOption<bool>(Options.LockHudWindows, false) == true;
+
     private void OnTitleBarGuiInput(InputEvent @event)
     {
+        if (LockableHudWindow && IsHudLocked()) return;
         if (@event is InputEventMouseButton mb && mb.ButtonIndex == MouseButton.Left)
         {
             if (mb.Pressed)

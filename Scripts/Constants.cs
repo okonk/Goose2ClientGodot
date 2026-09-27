@@ -148,5 +148,6 @@ namespace Goose2Client
         public const string UiScaleValue = "UiScaleValue";
         public const string Minimap = "Minimap";
         public const string MinimapOpacity = "MinimapOpacity";
+        public const string LockHudWindows = "LockHudWindows";
     }
 }

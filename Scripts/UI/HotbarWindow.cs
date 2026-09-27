@@ -41,6 +41,7 @@ public partial class HotbarWindow : BaseWindow, IWindow
     // The hotbar frame is shaped art (notched paging buttons, XP gutter), not a
     // rectangular window, so it keeps its texture instead of the themed panel.
     protected override bool ThemedChrome => false;
+    protected override bool LockableHudWindow => true;
 
     public override void _Ready()
     {
