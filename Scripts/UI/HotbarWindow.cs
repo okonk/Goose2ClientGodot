@@ -292,7 +292,7 @@ public partial class HotbarWindow : BaseWindow, IWindow
     {
         if (_mounted)
         {
-            GameManager.Instance.NetworkClient.UseItem(MountSlotNumber);
+            GameManager.Instance.NetworkClient.ToggleMount();
         }
         else if (_mountSlots.Count > 0)
         {

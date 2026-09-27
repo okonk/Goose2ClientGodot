@@ -210,6 +210,11 @@ namespace Goose2Client.Network
             Send($"USE{slot + 1}");
         }
 
+        public void ToggleMount()
+        {
+            Send("MNT");
+        }
+
         public void MoveItemInInventory(int fromSlot, int toSlot)
         {
             Send($"CHANGE{fromSlot + 1},{toSlot + 1}");
