@@ -483,7 +483,7 @@ public class EditorDocumentControllerTests : IDisposable
     {
         using var rig = new SheetCloseRig();
         MapDocumentViewModel document = await rig.PullAsync(rig.Workspace.ActiveDocument);
-        document.GameData!.Session.Edits.AddSpawn(new NpcSpawnRow(1, 10, 5, 5));
+        document.GameData!.Session!.Edits.AddSpawn(new NpcSpawnRow(1, 10, 5, 5));
         rig.Dialogs.SheetDirtyResult = SheetDirtyChoice.Push;
 
         Assert.True(await rig.Workspace.CloseAsync(document));
@@ -500,7 +500,7 @@ public class EditorDocumentControllerTests : IDisposable
         using var rig = new SheetCloseRig();
         MapDocumentViewModel document = await rig.PullAsync(rig.Workspace.ActiveDocument);
         EditorDocument editorDocument = document.Document;
-        document.GameData!.Session.Edits.AddSpawn(new NpcSpawnRow(1, 10, 5, 5));
+        document.GameData!.Session!.Edits.AddSpawn(new NpcSpawnRow(1, 10, 5, 5));
         rig.Dialogs.SheetDirtyResult = SheetDirtyChoice.Discard;
 
         Assert.True(await rig.Workspace.CloseAsync(document));
@@ -517,7 +517,7 @@ public class EditorDocumentControllerTests : IDisposable
     {
         using var rig = new SheetCloseRig();
         MapDocumentViewModel document = await rig.PullAsync(rig.Workspace.ActiveDocument);
-        document.GameData!.Session.Edits.AddSpawn(new NpcSpawnRow(1, 10, 5, 5));
+        document.GameData!.Session!.Edits.AddSpawn(new NpcSpawnRow(1, 10, 5, 5));
         rig.Dialogs.SheetDirtyResult = SheetDirtyChoice.Cancel;
 
         Assert.False(await rig.Workspace.CloseAsync(document));
@@ -534,7 +534,7 @@ public class EditorDocumentControllerTests : IDisposable
     {
         using var rig = new SheetCloseRig();
         MapDocumentViewModel document = await rig.PullAsync(rig.Workspace.ActiveDocument);
-        document.GameData!.Session.Edits.AddSpawn(new NpcSpawnRow(1, 10, 5, 5));
+        document.GameData!.Session!.Edits.AddSpawn(new NpcSpawnRow(1, 10, 5, 5));
         MakeMapDirty(document);
         var sheetGate = new TaskCompletionSource<SheetDirtyChoice>(TaskCreationOptions.RunContinuationsAsynchronously);
         rig.Dialogs.SheetDirtyGate = sheetGate;
@@ -558,7 +558,7 @@ public class EditorDocumentControllerTests : IDisposable
         MapDocumentViewModel document = await rig.PullAsync(rig.Workspace.ActiveDocument);
         rig.Dialogs.SavePickResult = rig.MapPath("baseline.map");
         await document.SaveAsAsync();
-        document.GameData!.Session.Edits.AddSpawn(new NpcSpawnRow(1, 10, 5, 5));
+        document.GameData!.Session!.Edits.AddSpawn(new NpcSpawnRow(1, 10, 5, 5));
         MakeMapDirty(document);
         string path = document.Document.Path!;
         MapFileRevision revision = document.Document.Revision!.Value;
@@ -580,7 +580,7 @@ public class EditorDocumentControllerTests : IDisposable
     {
         using var rig = new SheetCloseRig();
         MapDocumentViewModel document = await rig.PullAsync(rig.Workspace.ActiveDocument);
-        document.GameData!.Session.Edits.AddSpawn(new NpcSpawnRow(999, 10, 5, 5));
+        document.GameData!.Session!.Edits.AddSpawn(new NpcSpawnRow(999, 10, 5, 5));
         MakeMapDirty(document);
         rig.Dialogs.SheetDirtyResult = SheetDirtyChoice.Push;
         rig.Dialogs.DirtyResult = DirtyChoice.Discard;
@@ -599,7 +599,7 @@ public class EditorDocumentControllerTests : IDisposable
     {
         using var rig = new SheetCloseRig();
         MapDocumentViewModel document = await rig.PullAsync(rig.Workspace.ActiveDocument);
-        document.GameData!.Session.Edits.AddSpawn(new NpcSpawnRow(1, 10, 5, 5));
+        document.GameData!.Session!.Edits.AddSpawn(new NpcSpawnRow(1, 10, 5, 5));
         MakeMapDirty(document);
         rig.Gateway.EnqueueOwnedSpawns(new[] { new NpcSpawnRow(1, 10, 8, 8) });
         rig.Dialogs.SheetDirtyResult = SheetDirtyChoice.Push;
@@ -620,7 +620,7 @@ public class EditorDocumentControllerTests : IDisposable
     {
         using var rig = new SheetCloseRig();
         MapDocumentViewModel document = await rig.PullAsync(rig.Workspace.ActiveDocument);
-        document.GameData!.Session.Edits.AddSpawn(new NpcSpawnRow(1, 10, 5, 5));
+        document.GameData!.Session!.Edits.AddSpawn(new NpcSpawnRow(1, 10, 5, 5));
         MakeMapDirty(document);
         rig.Gateway.ReplaceFailure = new InvalidOperationException("socket reset");
         rig.Dialogs.SheetDirtyResult = SheetDirtyChoice.Push;
@@ -642,7 +642,7 @@ public class EditorDocumentControllerTests : IDisposable
         MapDocumentViewModel document = await rig.PullAsync(rig.Workspace.ActiveDocument);
         rig.Dialogs.SavePickResult = rig.MapPath("saved.map");
         await document.SaveAsAsync();
-        document.GameData!.Session.Edits.AddSpawn(new NpcSpawnRow(1, 10, 5, 5));
+        document.GameData!.Session!.Edits.AddSpawn(new NpcSpawnRow(1, 10, 5, 5));
         MakeMapDirty(document);
         string path = document.Document.Path!;
         MapFileRevision revision = document.Document.Revision!.Value;
@@ -662,7 +662,7 @@ public class EditorDocumentControllerTests : IDisposable
     {
         using var rig = new SheetCloseRig();
         MapDocumentViewModel document = await rig.PullAsync(rig.Workspace.ActiveDocument);
-        document.GameData!.Session.Edits.AddSpawn(new NpcSpawnRow(1, 10, 5, 5));
+        document.GameData!.Session!.Edits.AddSpawn(new NpcSpawnRow(1, 10, 5, 5));
         DocumentGameDataState sheetState = document.GameData!;
         MakeMapDirty(document);
         rig.Dialogs.SheetDirtyResult = SheetDirtyChoice.Discard;
@@ -680,7 +680,7 @@ public class EditorDocumentControllerTests : IDisposable
     {
         using var rig = new SheetCloseRig();
         MapDocumentViewModel first = await rig.PullAsync(rig.Workspace.ActiveDocument);
-        first.GameData!.Session.Edits.AddSpawn(new NpcSpawnRow(1, 10, 5, 5));
+        first.GameData!.Session!.Edits.AddSpawn(new NpcSpawnRow(1, 10, 5, 5));
         MapDocumentViewModel second = await rig.NewDocumentAsync();
         MakeMapDirty(second);
         var sheetGate = new TaskCompletionSource<SheetDirtyChoice>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -710,7 +710,7 @@ public class EditorDocumentControllerTests : IDisposable
         MapDocumentViewModel document = await rig.PullAsync(rig.Workspace.ActiveDocument);
         rig.Dialogs.SavePickResult = rig.MapPath("save1.map");
         await document.SaveAsAsync();
-        document.GameData!.Session.Edits.AddSpawn(new NpcSpawnRow(1, 10, 5, 5));
+        document.GameData!.Session!.Edits.AddSpawn(new NpcSpawnRow(1, 10, 5, 5));
         int callsBefore = rig.Gateway.Calls.Count;
 
         await document.SaveAsync();
@@ -725,7 +725,7 @@ public class EditorDocumentControllerTests : IDisposable
     {
         using var rig = new SheetCloseRig();
         MapDocumentViewModel document = await rig.PullAsync(rig.Workspace.ActiveDocument);
-        document.GameData!.Session.Edits.AddSpawn(new NpcSpawnRow(1, 10, 5, 5));
+        document.GameData!.Session!.Edits.AddSpawn(new NpcSpawnRow(1, 10, 5, 5));
         rig.Dialogs.SavePickResult = rig.MapPath("save2.map");
 
         await document.SaveAsAsync();
@@ -745,7 +745,7 @@ public class EditorDocumentControllerTests : IDisposable
         string path = document.Document.Path!;
         MapFileRevision revision = document.Document.Revision!.Value;
         byte[] savedBytes = File.ReadAllBytes(path);
-        document.GameData!.Session.Edits.AddSpawn(new NpcSpawnRow(1, 10, 5, 5));
+        document.GameData!.Session!.Edits.AddSpawn(new NpcSpawnRow(1, 10, 5, 5));
 
         Assert.True(await rig.Workspace.Commands.PushAsync(document));
 

@@ -142,7 +142,7 @@ public class MainWindowTests : IDisposable
     }
 
     private Point TileCenter(int x = 0, int y = 0)
-        => Window.Canvas.TranslatePoint(new Point(x * 32 + 16, y * 32 + 16), Window).Value;
+        => Window.Canvas.TranslatePoint(new Point(x * 32 + 16, y * 32 + 16), Window)!.Value;
 
     [AvaloniaFact]
     public void Layout_ContainsNamedMenuToolbarStatusBarAndPanels()
@@ -251,14 +251,14 @@ public class MainWindowTests : IDisposable
         Assert.NotEqual(Brushes.Transparent, Find<Border>("Layer0Row").Background);
         Assert.Equal(Brushes.Transparent, Find<Border>("Layer3Row").Background);
 
-        Point row3 = Find<Border>("Layer3Row").TranslatePoint(new Point(10, 5), Window).Value;
+        Point row3 = Find<Border>("Layer3Row").TranslatePoint(new Point(10, 5), Window)!.Value;
         Window.MouseDown(row3, MouseButton.Left, RawInputModifiers.None);
         Window.MouseUp(row3, MouseButton.Left, RawInputModifiers.None);
         Assert.Equal((byte)0b01000, ViewModel.SelectedLayers);
         Assert.NotEqual(Brushes.Transparent, Find<Border>("Layer3Row").Background);
         Assert.Equal(Brushes.Transparent, Find<Border>("Layer0Row").Background);
 
-        Point row1 = Find<Border>("Layer1Row").TranslatePoint(new Point(10, 5), Window).Value;
+        Point row1 = Find<Border>("Layer1Row").TranslatePoint(new Point(10, 5), Window)!.Value;
         Window.MouseDown(row1, MouseButton.Left, RawInputModifiers.None);
         Window.MouseUp(row1, MouseButton.Left, RawInputModifiers.None);
         Assert.Equal((byte)0b00010, ViewModel.SelectedLayers);
@@ -266,7 +266,7 @@ public class MainWindowTests : IDisposable
         Find<CheckBox>("Layer2VisibleCheck").IsChecked = false;
         Assert.Equal((byte)0b11011, ViewModel.LayerVisibility);
 
-        Point check2 = Find<CheckBox>("Layer2VisibleCheck").TranslatePoint(new Point(5, 5), Window).Value;
+        Point check2 = Find<CheckBox>("Layer2VisibleCheck").TranslatePoint(new Point(5, 5), Window)!.Value;
         Window.MouseDown(check2, MouseButton.Left, RawInputModifiers.None);
         Window.MouseUp(check2, MouseButton.Left, RawInputModifiers.None);
         Assert.True(Find<CheckBox>("Layer2VisibleCheck").IsChecked == true);
@@ -275,7 +275,7 @@ public class MainWindowTests : IDisposable
 
         Find<MenuItem>("ViewMenu").IsSubMenuOpen = true;
         Dispatcher.UIThread.RunJobs();
-        Point gridPoint = Find<MenuItem>("GridMenuItem").TranslatePoint(new Point(5, 5), Window).Value;
+        Point gridPoint = Find<MenuItem>("GridMenuItem").TranslatePoint(new Point(5, 5), Window)!.Value;
         Window.MouseDown(gridPoint, MouseButton.Left, RawInputModifiers.None);
         Window.MouseUp(gridPoint, MouseButton.Left, RawInputModifiers.None);
         Dispatcher.UIThread.RunJobs();
@@ -284,7 +284,7 @@ public class MainWindowTests : IDisposable
 
         Find<MenuItem>("ViewMenu").IsSubMenuOpen = true;
         Dispatcher.UIThread.RunJobs();
-        Point blockedPoint = Find<MenuItem>("BlockedMenuItem").TranslatePoint(new Point(5, 5), Window).Value;
+        Point blockedPoint = Find<MenuItem>("BlockedMenuItem").TranslatePoint(new Point(5, 5), Window)!.Value;
         Window.MouseDown(blockedPoint, MouseButton.Left, RawInputModifiers.None);
         Window.MouseUp(blockedPoint, MouseButton.Left, RawInputModifiers.None);
         Dispatcher.UIThread.RunJobs();
@@ -501,7 +501,7 @@ public class MainWindowTests : IDisposable
     {
         using MainWindowHarness harness = MainWindowHarness.Create();
         harness.ViewModel.SelectionRectangle = new MapTileRectangle(0, 0, 1, 1);
-        harness.Window.FindControl<TextBox>("BrushGraphic").Focus();
+        harness.Window.FindControl<TextBox>("BrushGraphic")!.Focus();
 
         harness.Window.KeyPressQwerty(PhysicalKey.C, RawInputModifiers.Control);
         Assert.Null(harness.ViewModel.Clipboard);
@@ -541,7 +541,7 @@ public class MainWindowTests : IDisposable
         using MainWindowHarness harness = MainWindowHarness.Create();
         harness.ViewModel.Session.Document.SetLayer(0, 0, 0, new MapTileLayer(7, 7));
         harness.ViewModel.SelectionRectangle = new MapTileRectangle(0, 0, 1, 1);
-        harness.Window.FindControl<TextBox>("BrushGraphic").Focus();
+        harness.Window.FindControl<TextBox>("BrushGraphic")!.Focus();
 
         harness.Window.KeyPressQwerty(PhysicalKey.Delete, RawInputModifiers.None);
 
@@ -582,7 +582,7 @@ public class MainWindowTests : IDisposable
         using MainWindowHarness harness = MainWindowHarness.Create();
         harness.ViewModel.Session.Document.SetLayer(0, 0, 0, new MapTileLayer(7, 7));
         harness.ViewModel.SelectionRectangle = new MapTileRectangle(0, 0, 1, 1);
-        harness.Window.FindControl<TextBox>("BrushGraphic").Focus();
+        harness.Window.FindControl<TextBox>("BrushGraphic")!.Focus();
 
         harness.Window.KeyPressQwerty(PhysicalKey.X, RawInputModifiers.Control);
 
@@ -615,7 +615,7 @@ public class MainWindowTests : IDisposable
         harness.ViewModel.SelectionRectangle = new MapTileRectangle(0, 0, 1, 1);
         harness.ViewModel.CopySelection();
         harness.ViewModel.BeginPasteMode();
-        harness.Window.FindControl<TextBox>("BrushGraphic").Focus();
+        harness.Window.FindControl<TextBox>("BrushGraphic")!.Focus();
 
         harness.Window.KeyPressQwerty(PhysicalKey.Escape, RawInputModifiers.None);
 
@@ -721,7 +721,7 @@ public class MainWindowTests : IDisposable
         using MainWindowHarness harness = MainWindowHarness.Create();
         MapDocumentViewModel first = harness.ViewModel;
         first.Brush = new MapTileLayer(3, 9);
-        Point tileCenter = harness.Window.Canvas.TranslatePoint(new Point(16, 16), harness.Window).Value;
+        Point tileCenter = harness.Window.Canvas.TranslatePoint(new Point(16, 16), harness.Window)!.Value;
         harness.Window.MouseDown(tileCenter, MouseButton.Left, RawInputModifiers.None);
         Assert.True(first.Session.HasActiveStroke);
 
@@ -738,7 +738,7 @@ public class MainWindowTests : IDisposable
     {
         using MainWindowHarness harness = MainWindowHarness.Create();
         MapDocumentViewModel first = harness.ViewModel;
-        Point firstTile = harness.Window.Canvas.TranslatePoint(new Point(48, 16), harness.Window).Value;
+        Point firstTile = harness.Window.Canvas.TranslatePoint(new Point(48, 16), harness.Window)!.Value;
         harness.Window.MouseMove(firstTile, RawInputModifiers.None);
         Assert.Equal(1, first.HoverX);
         Assert.Equal(0, first.HoverY);
@@ -746,7 +746,7 @@ public class MainWindowTests : IDisposable
         harness.Dialogs.NewMapResult = new NewMapRequest(100, 100);
         await harness.Workspace.NewAsync();
 
-        Point otherTile = harness.Window.Canvas.TranslatePoint(new Point(16, 16), harness.Window).Value;
+        Point otherTile = harness.Window.Canvas.TranslatePoint(new Point(16, 16), harness.Window)!.Value;
         harness.Window.MouseMove(otherTile, RawInputModifiers.None);
 
         Assert.Equal(1, first.HoverX);
@@ -770,7 +770,7 @@ public class MainWindowTests : IDisposable
 
         harness.Workspace.Activate(first);
         first.Brush = new MapTileLayer(2, 2);
-        Point tile = harness.Window.Canvas.TranslatePoint(new Point(16, 16), harness.Window).Value;
+        Point tile = harness.Window.Canvas.TranslatePoint(new Point(16, 16), harness.Window)!.Value;
         harness.Window.MouseDown(tile, MouseButton.Left, RawInputModifiers.None);
         Assert.True(first.Session.HasActiveStroke);
         harness.Window.MouseUp(tile, MouseButton.Left, RawInputModifiers.None);
@@ -832,10 +832,10 @@ public class MainWindowTests : IDisposable
         MapCanvas canvas = harness.Window.Canvas;
         canvas.Focus();
         harness.Window.KeyPressQwerty(PhysicalKey.Space, RawInputModifiers.None);
-        harness.Window.FindControl<Button>("LoadAssetsButton").Focus();
+        harness.Window.FindControl<Button>("LoadAssetsButton")!.Focus();
 
         ViewportTransform viewport = canvas.Viewport;
-        Point tile = canvas.TranslatePoint(new Point(16, 16), harness.Window).Value;
+        Point tile = canvas.TranslatePoint(new Point(16, 16), harness.Window)!.Value;
         harness.Window.MouseDown(tile, MouseButton.Left, RawInputModifiers.None);
 
         Assert.True(first.Session.HasActiveStroke);
@@ -1202,7 +1202,7 @@ public class MainWindowTests : IDisposable
     private static void ClickTabHeader(MainWindowHarness harness, MapDocumentViewModel document)
     {
         TextBlock label = TabFor(harness, document).GetVisualDescendants().OfType<TextBlock>().First();
-        Point point = label.TranslatePoint(new Point(5, 5), harness.Window).Value;
+        Point point = label.TranslatePoint(new Point(5, 5), harness.Window)!.Value;
         harness.Window.MouseDown(point, MouseButton.Left, RawInputModifiers.None);
         harness.Window.MouseUp(point, MouseButton.Left, RawInputModifiers.None);
     }
@@ -1210,7 +1210,7 @@ public class MainWindowTests : IDisposable
     private static void ClickTabCloseButton(MainWindowHarness harness, MapDocumentViewModel document)
     {
         Button close = TabFor(harness, document).GetVisualDescendants().OfType<Button>().First();
-        Point point = close.TranslatePoint(new Point(8, 8), harness.Window).Value;
+        Point point = close.TranslatePoint(new Point(8, 8), harness.Window)!.Value;
         harness.Window.MouseDown(point, MouseButton.Left, RawInputModifiers.None);
         harness.Window.MouseUp(point, MouseButton.Left, RawInputModifiers.None);
     }
@@ -1580,7 +1580,7 @@ public class MainWindowTests : IDisposable
 
         Guid terrainId = ViewModel.Terrains.Single().Id;
         ViewModel.SelectTerrain(terrainId);
-        Point tileCenter = Window.Canvas.TranslatePoint(new Point(16, 16), Window).Value;
+        Point tileCenter = Window.Canvas.TranslatePoint(new Point(16, 16), Window)!.Value;
         Window.MouseDown(tileCenter, MouseButton.Left, RawInputModifiers.None);
         Assert.True(ViewModel.Session.HasActiveStroke);
         Assert.Equal(new MapTileLayer(1, 10), ViewModel.Session.Document[0, 0].GetLayer(0));
@@ -1602,7 +1602,7 @@ public class MainWindowTests : IDisposable
 
         ViewModel.ActiveTool = MapEditTool.Pencil;
         ViewModel.Brush = new MapTileLayer(2, 20);
-        Point tileCenter = Window.Canvas.TranslatePoint(new Point(16, 16), Window).Value;
+        Point tileCenter = Window.Canvas.TranslatePoint(new Point(16, 16), Window)!.Value;
         Window.MouseDown(tileCenter, MouseButton.Left, RawInputModifiers.None);
         Assert.True(ViewModel.Session.HasActiveStroke);
 
@@ -1883,7 +1883,7 @@ public class MainWindowGraphicViewerTests : IDisposable
         Dispatcher.UIThread.RunJobs();
 
         Assert.True(_harness.Assets.Current.IsAvailable);
-        Assert.Equal(1, Find<ComboBox>("SheetCombo").Items.Count);
+        Assert.Single(Find<ComboBox>("SheetCombo").Items);
         Assert.NotNull(Find<TextBox>("BrushSheet"));
         Assert.NotNull(Find<TextBox>("BrushGraphic"));
         Assert.Same(Window.Palette, Find<Border>("PaletteBorder").Child);

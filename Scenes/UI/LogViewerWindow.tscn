@@ -41,12 +41,13 @@ clip_text = true
 
 [node name="CloseButton" type="Button" parent="TitleBar"]
 layout_mode = 2
-anchors_preset = 6
-anchor_bottom = 1.0
-offset_left = -18.0
-offset_top = 2.0
-offset_right = -2.0
-offset_bottom = 22.0
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -20.0
+offset_top = 4.0
+offset_right = -4.0
+offset_bottom = 20.0
 flat = true
 
 [node name="Content" type="Control" parent="."]
@@ -63,8 +64,9 @@ anchor_right = 1.0
 offset_left = 8.0
 offset_top = 8.0
 offset_right = -8.0
-offset_bottom = 24.0
+offset_bottom = 22.0
 mouse_filter = 2
+theme_type_variation = &"SectionHeader"
 text = "Recent entries may be delayed by up to ten minutes."
 clip_text = true
 
@@ -72,15 +74,15 @@ clip_text = true
 layout_mode = 2
 anchor_right = 1.0
 offset_left = 8.0
-offset_top = 24.0
+offset_top = 28.0
 offset_right = -8.0
-offset_bottom = 48.0
+offset_bottom = 52.0
 mouse_filter = 2
-theme_override_constants/separation = 8
+theme_override_constants/separation = 6
 
 [node name="PresetOptionButton" type="OptionButton" parent="Content/PresetRow"]
 layout_mode = 2
-custom_minimum_size_x = 150.0
+custom_minimum_size = Vector2(150, 0)
 
 [node name="CustomStartField" type="LineEdit" parent="Content/PresetRow"]
 layout_mode = 2
@@ -88,71 +90,65 @@ size_flags_horizontal = 3
 editable = false
 placeholder_text = "2025-01-01 00:00:00"
 
+[node name="RangeToLabel" type="Label" parent="Content/PresetRow"]
+layout_mode = 2
+mouse_filter = 2
+theme_type_variation = &"SectionHeader"
+text = "to"
+
 [node name="CustomEndField" type="LineEdit" parent="Content/PresetRow"]
 layout_mode = 2
 size_flags_horizontal = 3
 editable = false
 placeholder_text = "2025-01-02 00:00:00"
 
-[node name="ParticipantRow" type="HBoxContainer" parent="Content"]
+[node name="FilterRow" type="HBoxContainer" parent="Content"]
 layout_mode = 2
 anchor_right = 1.0
 offset_left = 8.0
-offset_top = 48.0
+offset_top = 58.0
 offset_right = -8.0
-offset_bottom = 72.0
+offset_bottom = 82.0
 mouse_filter = 2
-theme_override_constants/separation = 8
+theme_override_constants/separation = 6
 
-[node name="ParticipantField" type="LineEdit" parent="Content/ParticipantRow"]
+[node name="ParticipantField" type="LineEdit" parent="Content/FilterRow"]
 layout_mode = 2
 size_flags_horizontal = 3
 placeholder_text = "Participant name or #id"
+clear_button_enabled = true
 
-[node name="TypesButton" type="Button" parent="Content/ParticipantRow"]
-layout_mode = 2
-text = "Types"
-
-[node name="MapRow" type="HBoxContainer" parent="Content"]
-layout_mode = 2
-anchor_right = 1.0
-offset_left = 8.0
-offset_top = 72.0
-offset_right = -8.0
-offset_bottom = 96.0
-mouse_filter = 2
-theme_override_constants/separation = 8
-
-[node name="MapField" type="LineEdit" parent="Content/MapRow"]
+[node name="MapField" type="LineEdit" parent="Content/FilterRow"]
 layout_mode = 2
 size_flags_horizontal = 3
 placeholder_text = "Map name or #id"
+clear_button_enabled = true
 
-[node name="TextField" type="LineEdit" parent="Content/MapRow"]
+[node name="TextField" type="LineEdit" parent="Content/FilterRow"]
 layout_mode = 2
 size_flags_horizontal = 3
 placeholder_text = "Literal text"
+clear_button_enabled = true
 
-[node name="MapSuggestions" type="ItemList" parent="Content"]
+[node name="TypesButton" type="Button" parent="Content/FilterRow"]
 layout_mode = 2
-anchor_right = 1.0
-offset_left = 8.0
-offset_top = 96.0
-offset_right = -8.0
-offset_bottom = 192.0
+custom_minimum_size = Vector2(80, 0)
+text = "Types"
 
 [node name="ActionRow" type="HBoxContainer" parent="Content"]
 layout_mode = 2
 anchor_right = 1.0
 offset_left = 8.0
-offset_top = 192.0
+offset_top = 88.0
 offset_right = -8.0
-offset_bottom = 216.0
+offset_bottom = 114.0
 mouse_filter = 2
-theme_override_constants/separation = 8
+theme_override_constants/separation = 6
 
 [node name="SearchButton" type="Button" parent="Content/ActionRow"]
 layout_mode = 2
+custom_minimum_size = Vector2(80, 0)
+theme_type_variation = &"PrimaryButton"
 text = "Search"
 
 [node name="ClearButton" type="Button" parent="Content/ActionRow"]
@@ -163,68 +159,101 @@ text = "Clear"
 layout_mode = 2
 size_flags_horizontal = 3
 mouse_filter = 2
+theme_type_variation = &"StatValue"
 clip_text = true
 
 [node name="AppliedFilterLabel" type="Label" parent="Content/ActionRow"]
 layout_mode = 2
 size_flags_horizontal = 3
 mouse_filter = 2
+theme_type_variation = &"SectionHeader"
+horizontal_alignment = 2
 clip_text = true
+text_overrun_behavior = 3
 
 [node name="Split" type="HBoxContainer" parent="Content"]
 layout_mode = 2
 anchor_right = 1.0
 anchor_bottom = 1.0
 offset_left = 8.0
-offset_top = 216.0
+offset_top = 120.0
 offset_right = -8.0
 offset_bottom = -8.0
 mouse_filter = 2
+theme_override_constants/separation = 10
 
 [node name="ResultsPanel" type="VBoxContainer" parent="Content/Split"]
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_stretch_ratio = 58
 mouse_filter = 2
+theme_override_constants/separation = 6
 
 [node name="ResultsTree" type="Tree" parent="Content/Split/ResultsPanel"]
 layout_mode = 2
 size_flags_vertical = 3
 columns = 6
 column_titles_visible = true
+hide_root = true
+select_mode = 1
+
+[node name="Pager" type="HBoxContainer" parent="Content/Split/ResultsPanel"]
+layout_mode = 2
+mouse_filter = 2
+alignment = 2
+theme_override_constants/separation = 6
+
+[node name="PreviousButton" type="Button" parent="Content/Split/ResultsPanel/Pager"]
+layout_mode = 2
+custom_minimum_size = Vector2(70, 0)
+text = "Previous"
+
+[node name="NextButton" type="Button" parent="Content/Split/ResultsPanel/Pager"]
+layout_mode = 2
+custom_minimum_size = Vector2(70, 0)
+text = "Next"
 
 [node name="DetailsPanel" type="VBoxContainer" parent="Content/Split"]
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_stretch_ratio = 42
 mouse_filter = 2
-
-[node name="DetailsText" type="TextEdit" parent="Content/Split/DetailsPanel"]
-layout_mode = 2
-size_flags_vertical = 3
-editable = false
+theme_override_constants/separation = 6
 
 [node name="DetailsActions" type="HBoxContainer" parent="Content/Split/DetailsPanel"]
 layout_mode = 2
 mouse_filter = 2
-theme_override_constants/separation = 8
+theme_override_constants/separation = 6
 
-[node name="PreviousButton" type="Button" parent="Content/Split/DetailsPanel/DetailsActions"]
+[node name="DetailsHeading" type="Label" parent="Content/Split/DetailsPanel/DetailsActions"]
 layout_mode = 2
-text = "Previous"
-
-[node name="NextButton" type="Button" parent="Content/Split/DetailsPanel/DetailsActions"]
-layout_mode = 2
-text = "Next"
+size_flags_horizontal = 3
+mouse_filter = 2
+theme_type_variation = &"WindowTitle"
+text = "Details"
 
 [node name="CopyButton" type="Button" parent="Content/Split/DetailsPanel/DetailsActions"]
 layout_mode = 2
 text = "Copy"
 
+[node name="DetailsText" type="TextEdit" parent="Content/Split/DetailsPanel"]
+layout_mode = 2
+size_flags_vertical = 3
+editable = false
+placeholder_text = "Select a row to see its details."
+wrap_mode = 1
+
 [node name="QuickActions" type="HBoxContainer" parent="Content/Split/DetailsPanel"]
 layout_mode = 2
+visible = false
 mouse_filter = 2
-theme_override_constants/separation = 8
+theme_override_constants/separation = 6
+
+[node name="QuickActionsLabel" type="Label" parent="Content/Split/DetailsPanel/QuickActions"]
+layout_mode = 2
+mouse_filter = 2
+theme_type_variation = &"SectionHeader"
+text = "Filter by"
 
 [node name="QuickTypeButton" type="Button" parent="Content/Split/DetailsPanel/QuickActions"]
 layout_mode = 2
@@ -245,3 +274,11 @@ text = "Related"
 layout_mode = 2
 visible = false
 text = "Map"
+
+[node name="MapSuggestions" type="ItemList" parent="Content"]
+visible = false
+layout_mode = 0
+offset_right = 200.0
+offset_bottom = 96.0
+focus_mode = 0
+metadata/ui_scale_skip = true

@@ -17,7 +17,7 @@ internal sealed class FakeEditorDialogs : IEditorDialogs
     public ExternalChangeChoice ExternalChangeResult = ExternalChangeChoice.Cancel;
     public Queue<ExternalChangeChoice>? ExternalChangeChoices;
     public TerrainExternalChangeChoice ReplaceTerrainCatalogResult = TerrainExternalChangeChoice.Cancel;
-    public Queue<TerrainExternalChangeChoice>? ReplaceTerrainCatalogChoices;
+    public Queue<TerrainExternalChangeChoice>? ReplaceTerrainCatalogChoices = null;
     public bool ConfirmReplaceMalformedResult;
     public string? OpenPickResult;
     public string? SavePickResult;
@@ -39,18 +39,18 @@ internal sealed class FakeEditorDialogs : IEditorDialogs
     public PushConflictChoice PushConflictResult = PushConflictChoice.Cancel;
     public int PushConflictShown;
     public string? LastPushConflictDocumentName;
-    public Queue<PushConflictChoice>? PushConflictChoices;
+    public Queue<PushConflictChoice>? PushConflictChoices = null;
     public Exception? ShowNewMapException;
     public Exception? PickOpenException;
     public Exception? PickAssetDirectoryException;
     public Exception? PickSaveException;
     public Exception? ShowDirtyException;
-    public Exception? ShowSpreadsheetUrlException;
-    public Exception? ShowMapConfirmationException;
-    public Exception? ShowSheetDirtyException;
-    public Exception? ShowPushConflictException;
-    public Exception? ConfirmReplaceTerrainCatalogException;
-    public Exception? ConfirmReplaceMalformedException;
+    public Exception? ShowSpreadsheetUrlException = null;
+    public Exception? ShowMapConfirmationException = null;
+    public Exception? ShowSheetDirtyException = null;
+    public Exception? ShowPushConflictException = null;
+    public Exception? ConfirmReplaceTerrainCatalogException = null;
+    public Exception? ConfirmReplaceMalformedException = null;
     public Exception? ShowErrorException;
     public Task? ShowErrorGate;
     public TaskCompletionSource<DirtyChoice>? DirtyGate;
@@ -59,7 +59,7 @@ internal sealed class FakeEditorDialogs : IEditorDialogs
     public TaskCompletionSource<string?>? AssetDirectoryPickGate;
     public TaskCompletionSource<string?>? SavePickGate;
     public TaskCompletionSource<TerrainExternalChangeChoice>? ReplaceTerrainCatalogGate;
-    public TaskCompletionSource<bool>? ConfirmReplaceMalformedGate;
+    public TaskCompletionSource<bool>? ConfirmReplaceMalformedGate = null;
 
     public int NewMapShown;
     public int ResizeMapShown;

@@ -8,19 +8,21 @@ public static class LogViewerLayout
     public static readonly Vector2 MinSize = new(620f, 340f);
     public const float Margin = 8f;
     public const float TitleBarHeight = 24f;
-    public const float FreshnessRowHeight = 16f;
+    public const float FreshnessRowHeight = 14f;
     public const float FilterRowHeight = 24f;
+    public const float ActionRowHeight = 26f;
+    public const float RowGap = 6f;
     public const float SuggestionMaxHeight = 96f;
     public const float ResultsRatio = 0.58f;
     public const int ResultsStretchRatio = 58;
     public const int DetailsStretchRatio = 42;
 
-    public static float FilterAreaHeight => Margin + FreshnessRowHeight + FilterRowHeight * 4 + SuggestionMaxHeight;
+    public static float FilterAreaHeight => Margin + FreshnessRowHeight + FilterRowHeight * 2 + ActionRowHeight + RowGap * 4;
 
     public static readonly string[] ColumnHeaders = { "UTC", "Event type", "Primary", "Related", "Map", "Summary" };
 
-    public static readonly float[] ColumnMinimums = { 150f, 100f, 90f, 90f, 80f, 50f };
-    public static readonly float[] ColumnExpandRatios = { 1.0f, 1.2f, 1.0f, 1.0f, 1.0f, 1.6f };
+    public static readonly float[] ColumnMinimums = { 150f, 95f, 70f, 70f, 85f, 90f };
+    public static readonly float[] ColumnExpandRatios = { 0f, 1.0f, 0.5f, 0.5f, 1.0f, 4.0f };
 
     public static float ResultsWidth(Vector2 canvas) => (canvas.X - 2f * Margin) * ResultsRatio;
 

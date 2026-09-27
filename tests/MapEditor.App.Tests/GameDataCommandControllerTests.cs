@@ -122,7 +122,7 @@ public class GameDataCommandControllerTests
         Assert.Empty(rig.Gateway.Calls);
         ErrorPresentation error = Assert.Single(rig.Dialogs.Errors);
         Assert.Equal("Pull game data", error.Title);
-        Assert.Null(document.GameData.Session);
+        Assert.Null(document.GameData!.Session);
     }
 
     [Fact]
@@ -140,9 +140,9 @@ public class GameDataCommandControllerTests
         Assert.Equal("abc123", rig.Connectivity.RememberedSpreadsheet!.Value.Id);
         Assert.Equal("https://docs.google.com/spreadsheets/d/abc123", rig.Connectivity.RememberedSpreadsheet.Value.CanonicalUrl);
         Assert.Equal(new[] { "ReadMapsAsync", "ReadMapsAsync", "ReadGameDataAsync" }, rig.Gateway.Calls.Select(call => call.Method));
-        Assert.Equal("abc123", document.GameData.Session.SpreadsheetId);
-        Assert.Equal(10, document.GameData.Session.MapId);
-        Assert.False(document.GameData.IsDirty);
+        Assert.Equal("abc123", document.GameData!.Session!.SpreadsheetId);
+        Assert.Equal(10, document.GameData!.Session!.MapId);
+        Assert.False(document.GameData!.IsDirty);
     }
 
     [Fact]
@@ -165,8 +165,8 @@ public class GameDataCommandControllerTests
     {
         using var rig = new Rig();
         var document = await rig.PullDocumentAsync(rig.Workspace.ActiveDocument, Map10);
-        document.GameData.Session.Edits.AddSpawn(new NpcSpawnRow(1, 10, 6, 6));
-        GameDataSyncSession before = document.GameData.Session;
+        document.GameData!.Session!.Edits.AddSpawn(new NpcSpawnRow(1, 10, 6, 6));
+        GameDataSyncSession before = document.GameData!.Session;
         rig.Gateway.EnqueueMapsCancellation();
         rig.Dialogs.SpreadsheetUrlResult = SheetUrl;
         int callsBefore = rig.Gateway.Calls.Count;
@@ -174,7 +174,7 @@ public class GameDataCommandControllerTests
         bool pulled = await rig.Controller.PullAsync(document);
 
         Assert.False(pulled);
-        Assert.Same(before, document.GameData.Session);
+        Assert.Same(before, document.GameData!.Session);
         Assert.Equal(1, rig.Gateway.Calls.Skip(callsBefore).Count(call => call.Method == "ReadMapsAsync"));
         Assert.Empty(rig.Dialogs.Errors);
     }
@@ -189,7 +189,7 @@ public class GameDataCommandControllerTests
         bool pulled = await rig.Controller.PullAsync(rig.Workspace.ActiveDocument);
 
         Assert.False(pulled);
-        Assert.Null(rig.Workspace.ActiveDocument.GameData.Session);
+        Assert.Null(rig.Workspace.ActiveDocument.GameData!.Session);
         ErrorPresentation error = Assert.Single(rig.Dialogs.Errors);
         Assert.Contains("Connect again", error.Message);
     }
@@ -222,7 +222,7 @@ public class GameDataCommandControllerTests
 
         Assert.True(pulled);
         Assert.Equal(0, rig.Dialogs.MapConfirmationShown);
-        Assert.Equal(10, document.GameData.Session.MapId);
+        Assert.Equal(10, document.GameData!.Session!.MapId);
     }
 
     [Fact]
@@ -239,7 +239,7 @@ public class GameDataCommandControllerTests
 
         Assert.True(pulled);
         Assert.Equal(0, rig.Dialogs.MapConfirmationShown);
-        Assert.Equal(10036, document.GameData.Session.MapId);
+        Assert.Equal(10036, document.GameData!.Session!.MapId);
     }
 
     [Fact]
@@ -327,7 +327,7 @@ public class GameDataCommandControllerTests
         rig.Dialogs.MapConfirmationResult = Map10;
         Assert.True(await rig.Controller.PullAsync(document));
 
-        document.GameData.Session.Edits.AddSpawn(new NpcSpawnRow(1, 10, 5, 5));
+        document.GameData!.Session!.Edits.AddSpawn(new NpcSpawnRow(1, 10, 5, 5));
         rig.Gateway.EnqueueMaps(AllMaps).EnqueueGameData(PullData(AllMaps));
         rig.Dialogs.SheetDirtyResult = SheetDirtyChoice.Discard;
         Assert.True(await rig.Controller.PullAsync(document));
@@ -341,15 +341,15 @@ public class GameDataCommandControllerTests
     {
         using var rig = new Rig();
         var document = await rig.PullDocumentAsync(rig.Workspace.ActiveDocument, Map10);
-        document.GameData.Session.Edits.AddSpawn(new NpcSpawnRow(1, 10, 6, 6));
-        GameDataSyncSession before = document.GameData.Session;
+        document.GameData!.Session!.Edits.AddSpawn(new NpcSpawnRow(1, 10, 6, 6));
+        GameDataSyncSession before = document.GameData!.Session;
         rig.Dialogs.SpreadsheetUrlResult = null;
         int callsBefore = rig.Gateway.Calls.Count;
 
         bool pulled = await rig.Controller.PullAsync(document);
 
         Assert.False(pulled);
-        Assert.Same(before, document.GameData.Session);
+        Assert.Same(before, document.GameData!.Session);
         Assert.Equal(callsBefore, rig.Gateway.Calls.Count);
         Assert.Empty(rig.Dialogs.Errors);
     }
@@ -359,8 +359,8 @@ public class GameDataCommandControllerTests
     {
         using var rig = new Rig();
         var document = await rig.PullDocumentAsync(rig.Workspace.ActiveDocument, Map10);
-        document.GameData.Session.Edits.AddSpawn(new NpcSpawnRow(1, 10, 6, 6));
-        GameDataSyncSession before = document.GameData.Session;
+        document.GameData!.Session!.Edits.AddSpawn(new NpcSpawnRow(1, 10, 6, 6));
+        GameDataSyncSession before = document.GameData!.Session;
         rig.Gateway.EnqueueMaps(AllMaps);
         rig.Dialogs.SpreadsheetUrlResult = SheetUrl;
         rig.Dialogs.MapConfirmationResult = null;
@@ -369,7 +369,7 @@ public class GameDataCommandControllerTests
         bool pulled = await rig.Controller.PullAsync(document);
 
         Assert.False(pulled);
-        Assert.Same(before, document.GameData.Session);
+        Assert.Same(before, document.GameData!.Session);
         Assert.Equal(new[] { "ReadMapsAsync" }, rig.Gateway.Calls.Skip(callsBefore).Select(call => call.Method));
         Assert.Empty(rig.Dialogs.Errors);
     }
@@ -379,8 +379,8 @@ public class GameDataCommandControllerTests
     {
         using var rig = new Rig();
         var document = await rig.PullDocumentAsync(rig.Workspace.ActiveDocument, Map10);
-        document.GameData.Session.Edits.AddSpawn(new NpcSpawnRow(1, 10, 6, 6));
-        GameDataSyncSession before = document.GameData.Session;
+        document.GameData!.Session!.Edits.AddSpawn(new NpcSpawnRow(1, 10, 6, 6));
+        GameDataSyncSession before = document.GameData!.Session;
         NpcSpawnRow[] beforeSpawns = before.Edits.Spawns.ToArray();
         rig.Gateway.EnqueueMaps(AllMaps).EnqueueGameDataFailure(GatewayFailureKind.Transport).EnqueueGameDataFailure(GatewayFailureKind.Transport).EnqueueGameDataFailure(GatewayFailureKind.Transport);
         rig.Dialogs.SpreadsheetUrlResult = SheetUrl;
@@ -391,9 +391,9 @@ public class GameDataCommandControllerTests
         bool pulled = await rig.Controller.PullAsync(document);
 
         Assert.False(pulled);
-        Assert.Same(before, document.GameData.Session);
-        Assert.Equal(beforeSpawns, document.GameData.Session.Edits.Spawns);
-        Assert.True(document.GameData.IsDirty);
+        Assert.Same(before, document.GameData!.Session);
+        Assert.Equal(beforeSpawns, document.GameData!.Session!.Edits.Spawns);
+        Assert.True(document.GameData!.IsDirty);
         Assert.Equal(3, rig.Gateway.Calls.Skip(callsBefore).Count(call => call.Method == "ReadGameDataAsync"));
         ErrorPresentation error = Assert.Single(rig.Dialogs.Errors);
         Assert.Equal("Pull game data", error.Title);
@@ -404,7 +404,7 @@ public class GameDataCommandControllerTests
     {
         using var rig = new Rig();
         var document = await rig.PullDocumentAsync(rig.Workspace.ActiveDocument, Map10);
-        document.GameData.Session.Edits.AddSpawn(new NpcSpawnRow(1, 10, 5, 5));
+        document.GameData!.Session!.Edits.AddSpawn(new NpcSpawnRow(1, 10, 5, 5));
         rig.Gateway
             .EnqueueMaps(AllMaps)
             .EnqueueOwnedRows(OwnedRows(new[] { new NpcSpawnRow(1, 10, 3, 4) }))
@@ -421,7 +421,7 @@ public class GameDataCommandControllerTests
         Assert.Equal(
             new[] { "ReadMapsAsync", "ReadOwnedRowsAsync", "ReplaceOwnedRowsAsync", "ReadMapsAsync", "ReadGameDataAsync" },
             rig.Gateway.Calls.Skip(callsBefore).Select(call => call.Method));
-        Assert.False(document.GameData.IsDirty);
+        Assert.False(document.GameData!.IsDirty);
         Assert.Empty(rig.Dialogs.Errors);
     }
 
@@ -430,8 +430,8 @@ public class GameDataCommandControllerTests
     {
         using var rig = new Rig();
         var document = await rig.PullDocumentAsync(rig.Workspace.ActiveDocument, Map10);
-        document.GameData.Session.Edits.AddSpawn(new NpcSpawnRow(1, 10, 150, 150));
-        GameDataSyncSession before = document.GameData.Session;
+        document.GameData!.Session!.Edits.AddSpawn(new NpcSpawnRow(1, 10, 150, 150));
+        GameDataSyncSession before = document.GameData!.Session;
         rig.Gateway.EnqueueMaps(AllMaps);
         rig.Dialogs.SpreadsheetUrlResult = SheetUrl;
         rig.Dialogs.MapConfirmationResult = Map10;
@@ -441,8 +441,8 @@ public class GameDataCommandControllerTests
         bool pulled = await rig.Controller.PullAsync(document);
 
         Assert.False(pulled);
-        Assert.Same(before, document.GameData.Session);
-        Assert.True(document.GameData.IsDirty);
+        Assert.Same(before, document.GameData!.Session);
+        Assert.True(document.GameData!.IsDirty);
         Assert.Equal(new[] { "ReadMapsAsync" }, rig.Gateway.Calls.Skip(callsBefore).Select(call => call.Method));
         ErrorPresentation error = Assert.Single(rig.Dialogs.Errors);
         Assert.Contains("outside the current map bounds", error.Message);
@@ -453,8 +453,8 @@ public class GameDataCommandControllerTests
     {
         using var rig = new Rig();
         var document = await rig.PullDocumentAsync(rig.Workspace.ActiveDocument, Map10);
-        document.GameData.Session.Edits.AddSpawn(new NpcSpawnRow(1, 10, 5, 5));
-        GameDataSyncSession before = document.GameData.Session;
+        document.GameData!.Session!.Edits.AddSpawn(new NpcSpawnRow(1, 10, 5, 5));
+        GameDataSyncSession before = document.GameData!.Session;
         rig.Gateway
             .EnqueueMaps(AllMaps)
             .EnqueueOwnedRows(OwnedRows(new[] { new NpcSpawnRow(1, 10, 7, 7) }));
@@ -467,8 +467,8 @@ public class GameDataCommandControllerTests
         bool pulled = await rig.Controller.PullAsync(document);
 
         Assert.False(pulled);
-        Assert.Same(before, document.GameData.Session);
-        Assert.True(document.GameData.IsDirty);
+        Assert.Same(before, document.GameData!.Session);
+        Assert.True(document.GameData!.IsDirty);
         Assert.Equal(1, rig.Dialogs.PushConflictShown);
         Assert.DoesNotContain("ReplaceOwnedRowsAsync", rig.Gateway.Calls.Skip(callsBefore).Select(call => call.Method));
         Assert.DoesNotContain("ReadGameDataAsync", rig.Gateway.Calls.Skip(callsBefore).Select(call => call.Method));
@@ -480,8 +480,8 @@ public class GameDataCommandControllerTests
     {
         using var rig = new Rig();
         var document = await rig.PullDocumentAsync(rig.Workspace.ActiveDocument, Map10);
-        document.GameData.Session.Edits.AddSpawn(new NpcSpawnRow(1, 10, 6, 6));
-        GameDataSyncSession before = document.GameData.Session;
+        document.GameData!.Session!.Edits.AddSpawn(new NpcSpawnRow(1, 10, 6, 6));
+        GameDataSyncSession before = document.GameData!.Session;
         NpcSpawnRow[] beforeSpawns = before.Edits.Spawns.ToArray();
         rig.Gateway.EnqueueMaps(AllMaps);
         rig.Dialogs.SpreadsheetUrlResult = SheetUrl;
@@ -492,9 +492,9 @@ public class GameDataCommandControllerTests
         bool pulled = await rig.Controller.PullAsync(document);
 
         Assert.False(pulled);
-        Assert.Same(before, document.GameData.Session);
-        Assert.Equal(beforeSpawns, document.GameData.Session.Edits.Spawns);
-        Assert.True(document.GameData.IsDirty);
+        Assert.Same(before, document.GameData!.Session);
+        Assert.Equal(beforeSpawns, document.GameData!.Session!.Edits.Spawns);
+        Assert.True(document.GameData!.IsDirty);
         Assert.Equal(1, rig.Dialogs.SheetDirtyShown);
         Assert.Equal(new[] { "ReadMapsAsync" }, rig.Gateway.Calls.Skip(callsBefore).Select(call => call.Method));
         Assert.Empty(rig.Dialogs.Errors);
@@ -505,8 +505,8 @@ public class GameDataCommandControllerTests
     {
         using var rig = new Rig();
         var document = await rig.PullDocumentAsync(rig.Workspace.ActiveDocument, Map10);
-        document.GameData.Session.Edits.AddSpawn(new NpcSpawnRow(1, 10, 5, 5));
-        GameDataSyncSession before = document.GameData.Session;
+        document.GameData!.Session!.Edits.AddSpawn(new NpcSpawnRow(1, 10, 5, 5));
+        GameDataSyncSession before = document.GameData!.Session;
 
         rig.Gateway.EnqueueMaps(AllMaps).EnqueueOwnedRows(OwnedRows(new[] { new NpcSpawnRow(1, 10, 7, 7) }));
         rig.Dialogs.SpreadsheetUrlResult = SheetUrl;
@@ -514,14 +514,14 @@ public class GameDataCommandControllerTests
         rig.Dialogs.SheetDirtyResult = SheetDirtyChoice.Push;
         rig.Dialogs.PushConflictResult = PushConflictChoice.Cancel;
         Assert.False(await rig.Controller.PullAsync(document));
-        Assert.Same(before, document.GameData.Session);
+        Assert.Same(before, document.GameData!.Session);
 
         rig.Gateway.EnqueueMaps(AllMaps).EnqueueGameData(PullData(AllMaps));
         rig.Dialogs.SheetDirtyResult = SheetDirtyChoice.Discard;
         Assert.True(await rig.Controller.PullAsync(document));
 
-        Assert.NotSame(before, document.GameData.Session);
-        Assert.False(document.GameData.IsDirty);
+        Assert.NotSame(before, document.GameData!.Session);
+        Assert.False(document.GameData!.IsDirty);
         Assert.Equal(2, rig.Dialogs.SheetDirtyShown);
     }
 
@@ -530,7 +530,7 @@ public class GameDataCommandControllerTests
     {
         using var rig = new Rig();
         var document = await rig.PullDocumentAsync(rig.Workspace.ActiveDocument, Map10);
-        document.GameData.Session.Edits.AddSpawn(new NpcSpawnRow(1, 10, 5, 5));
+        document.GameData!.Session!.Edits.AddSpawn(new NpcSpawnRow(1, 10, 5, 5));
         rig.Gateway
             .EnqueueOwnedRows(OwnedRows(new[] { new NpcSpawnRow(1, 10, 3, 4) }))
             .EnqueueReplaceSuccess();
@@ -539,7 +539,7 @@ public class GameDataCommandControllerTests
         bool pushed = await rig.Controller.PushAsync(document);
 
         Assert.True(pushed);
-        Assert.False(document.GameData.IsDirty);
+        Assert.False(document.GameData!.IsDirty);
         Assert.Equal(new[] { "ReadOwnedRowsAsync", "ReplaceOwnedRowsAsync" }, rig.Gateway.Calls.Skip(callsBefore).Select(call => call.Method));
         Assert.Empty(rig.Dialogs.Errors);
         (string title, string message) info = Assert.Single(rig.Dialogs.Infos);
@@ -581,13 +581,13 @@ public class GameDataCommandControllerTests
     {
         using var rig = new Rig();
         var document = await rig.PullDocumentAsync(rig.Workspace.ActiveDocument, Map10);
-        document.GameData.Session.Edits.AddSpawn(new NpcSpawnRow(999, 10, 5, 5));
+        document.GameData!.Session!.Edits.AddSpawn(new NpcSpawnRow(999, 10, 5, 5));
         int callsBeforePush = rig.Gateway.Calls.Count;
 
         bool pushed = await rig.Controller.PushAsync(document);
 
         Assert.False(pushed);
-        Assert.True(document.GameData.IsDirty);
+        Assert.True(document.GameData!.IsDirty);
         Assert.Equal(callsBeforePush, rig.Gateway.Calls.Count);
         ErrorPresentation error = Assert.Single(rig.Dialogs.Errors);
         Assert.Contains("NPC '999'", error.Message);
@@ -598,7 +598,7 @@ public class GameDataCommandControllerTests
     {
         using var rig = new Rig();
         var document = await rig.PullDocumentAsync(rig.Workspace.ActiveDocument, Map10);
-        document.GameData.Session.Edits.AddSpawn(new NpcSpawnRow(1, 10, 5, 5));
+        document.GameData!.Session!.Edits.AddSpawn(new NpcSpawnRow(1, 10, 5, 5));
         rig.Gateway
             .EnqueueOwnedRows(OwnedRows(new[] { new NpcSpawnRow(1, 10, 7, 7) }))
             .EnqueueReplaceSuccess();
@@ -610,7 +610,7 @@ public class GameDataCommandControllerTests
         Assert.True(pushed);
         Assert.Equal(1, rig.Dialogs.PushConflictShown);
         Assert.Equal(new[] { "ReadOwnedRowsAsync", "ReplaceOwnedRowsAsync" }, rig.Gateway.Calls.Skip(callsBefore).Select(call => call.Method));
-        Assert.False(document.GameData.IsDirty);
+        Assert.False(document.GameData!.IsDirty);
     }
 
     [Fact]
@@ -618,8 +618,8 @@ public class GameDataCommandControllerTests
     {
         using var rig = new Rig();
         var document = await rig.PullDocumentAsync(rig.Workspace.ActiveDocument, Map10);
-        document.GameData.Session.Edits.AddSpawn(new NpcSpawnRow(1, 10, 5, 5));
-        GameDataSyncSession before = document.GameData.Session;
+        document.GameData!.Session!.Edits.AddSpawn(new NpcSpawnRow(1, 10, 5, 5));
+        GameDataSyncSession before = document.GameData!.Session;
         rig.Gateway
             .EnqueueOwnedRows(OwnedRows(new[] { new NpcSpawnRow(1, 10, 7, 7) }))
             .EnqueueOwnedRows(OwnedRows(new[] { new NpcSpawnRow(1, 10, 7, 7) }))
@@ -634,8 +634,8 @@ public class GameDataCommandControllerTests
         Assert.Equal(
             new[] { "ReadOwnedRowsAsync", "ReadOwnedRowsAsync", "ReadMapsAsync", "ReadGameDataAsync" },
             rig.Gateway.Calls.Skip(callsBefore).Select(call => call.Method));
-        Assert.NotSame(before, document.GameData.Session);
-        Assert.False(document.GameData.IsDirty);
+        Assert.NotSame(before, document.GameData!.Session);
+        Assert.False(document.GameData!.IsDirty);
         Assert.Empty(rig.Dialogs.Errors);
     }
 
@@ -644,8 +644,8 @@ public class GameDataCommandControllerTests
     {
         using var rig = new Rig();
         var document = await rig.PullDocumentAsync(rig.Workspace.ActiveDocument, Map10);
-        document.GameData.Session.Edits.AddSpawn(new NpcSpawnRow(1, 10, 5, 5));
-        GameDataSyncSession before = document.GameData.Session;
+        document.GameData!.Session!.Edits.AddSpawn(new NpcSpawnRow(1, 10, 5, 5));
+        GameDataSyncSession before = document.GameData!.Session;
         rig.Gateway.EnqueueOwnedRows(OwnedRows(new[] { new NpcSpawnRow(1, 10, 7, 7) }));
         rig.Dialogs.PushConflictResult = PushConflictChoice.Cancel;
         int callsBefore = rig.Gateway.Calls.Count;
@@ -653,8 +653,8 @@ public class GameDataCommandControllerTests
         bool pushed = await rig.Controller.PushAsync(document);
 
         Assert.False(pushed);
-        Assert.Same(before, document.GameData.Session);
-        Assert.True(document.GameData.IsDirty);
+        Assert.Same(before, document.GameData!.Session);
+        Assert.True(document.GameData!.IsDirty);
         Assert.Equal(1, rig.Dialogs.PushConflictShown);
         Assert.Equal(new[] { "ReadOwnedRowsAsync" }, rig.Gateway.Calls.Skip(callsBefore).Select(call => call.Method));
         Assert.Empty(rig.Dialogs.Errors);
@@ -665,13 +665,13 @@ public class GameDataCommandControllerTests
     {
         using var rig = new Rig();
         var document = await rig.PullDocumentAsync(rig.Workspace.ActiveDocument, Map10);
-        document.GameData.Session.Edits.AddSpawn(new NpcSpawnRow(1, 10, 5, 5));
+        document.GameData!.Session!.Edits.AddSpawn(new NpcSpawnRow(1, 10, 5, 5));
         rig.Gateway.EnqueueOwnedRowsFailure(GatewayFailureKind.Authentication);
 
         bool pushed = await rig.Controller.PushAsync(document);
 
         Assert.False(pushed);
-        Assert.True(document.GameData.IsDirty);
+        Assert.True(document.GameData!.IsDirty);
         Assert.True(rig.Controller.CanPush(document));
         ErrorPresentation error = Assert.Single(rig.Dialogs.Errors);
         Assert.Contains("Connect again", error.Message);
@@ -682,7 +682,7 @@ public class GameDataCommandControllerTests
     {
         using var rig = new Rig();
         var document = await rig.PullDocumentAsync(rig.Workspace.ActiveDocument, Map10);
-        document.GameData.Session.Edits.AddSpawn(new NpcSpawnRow(1, 10, 5, 5));
+        document.GameData!.Session!.Edits.AddSpawn(new NpcSpawnRow(1, 10, 5, 5));
         rig.Gateway
             .EnqueueOwnedRows(OwnedRows(new[] { new NpcSpawnRow(1, 10, 3, 4) }))
             .EnqueueReplaceException(new InvalidOperationException("socket reset"));
@@ -690,8 +690,8 @@ public class GameDataCommandControllerTests
         bool pushed = await rig.Controller.PushAsync(document);
 
         Assert.False(pushed);
-        Assert.True(document.GameData.IsDirty);
-        Assert.True(document.GameData.RequiresPull);
+        Assert.True(document.GameData!.IsDirty);
+        Assert.True(document.GameData!.RequiresPull);
         Assert.False(rig.Controller.CanPush(document));
         Assert.Contains("Pull", Assert.Single(rig.Dialogs.Errors).Message);
 
@@ -701,7 +701,7 @@ public class GameDataCommandControllerTests
         rig.Dialogs.SheetDirtyResult = SheetDirtyChoice.Discard;
         Assert.True(await rig.Controller.PullAsync(document));
 
-        Assert.False(document.GameData.RequiresPull);
+        Assert.False(document.GameData!.RequiresPull);
         Assert.True(rig.Controller.CanPush(document));
     }
 
@@ -710,7 +710,7 @@ public class GameDataCommandControllerTests
     {
         using var rig = new Rig();
         var document = await rig.PullDocumentAsync(rig.Workspace.ActiveDocument, Map10);
-        document.GameData.Session.Edits.AddSpawn(new NpcSpawnRow(1, 10, 5, 5));
+        document.GameData!.Session!.Edits.AddSpawn(new NpcSpawnRow(1, 10, 5, 5));
         rig.Gateway
             .EnqueueOwnedRows(OwnedRows(new[] { new NpcSpawnRow(1, 10, 3, 4) }))
             .EnqueueReplaceException(new InvalidOperationException("socket reset"));
@@ -719,7 +719,7 @@ public class GameDataCommandControllerTests
         bool second = await rig.Controller.PushAsync(document);
 
         Assert.False(second);
-        Assert.True(document.GameData.IsDirty);
+        Assert.True(document.GameData!.IsDirty);
         ErrorPresentation error = Assert.Single(rig.Dialogs.Errors, entry => entry.Message.Contains("complete a Pull"));
         Assert.Equal("Push game data", error.Title);
     }
@@ -781,7 +781,7 @@ public class GameDataCommandControllerTests
         Assert.True(await rig.Controller.PullAsync(c));
 
         rig.Gateway.EnqueueOwnedRows(OwnedRows(new[] { new NpcSpawnRow(1, 10, 3, 4) }, new[] { warp })).EnqueueReplaceSuccess();
-        a.GameData.Session.Edits.AddSpawn(new NpcSpawnRow(1, 10, 1, 1));
+        a.GameData!.Session!.Edits.AddSpawn(new NpcSpawnRow(1, 10, 1, 1));
         bool pushed = await rig.Controller.PushAsync(a);
 
         Assert.True(pushed);
@@ -808,11 +808,11 @@ public class GameDataCommandControllerTests
 
         Assert.Same(rig.Connectivity, rig.Workspace.Connectivity);
         Assert.NotSame(a.GameData, b.GameData);
-        Assert.NotSame(a.GameData.Session, b.GameData.Session);
-        Assert.Equal(10, a.GameData.Session.MapId);
-        Assert.Equal(20, b.GameData.Session.MapId);
-        Assert.Equal("abc123", a.GameData.Session.SpreadsheetId);
-        Assert.Equal("abc123", b.GameData.Session.SpreadsheetId);
+        Assert.NotSame(a.GameData!.Session, b.GameData!.Session);
+        Assert.Equal(10, a.GameData!.Session!.MapId);
+        Assert.Equal(20, b.GameData!.Session!.MapId);
+        Assert.Equal("abc123", a.GameData!.Session!.SpreadsheetId);
+        Assert.Equal("abc123", b.GameData!.Session!.SpreadsheetId);
         Assert.Equal(6, rig.Gateway.Calls.Count);
     }
 
@@ -824,8 +824,8 @@ public class GameDataCommandControllerTests
         var second = await rig.NewDocumentAsync();
         int firstChanges = 0;
         int secondChanges = 0;
-        first.GameData.Changed += () => firstChanges++;
-        second.GameData.Changed += () => secondChanges++;
+        first.GameData!.Changed += () => firstChanges++;
+        second.GameData!.Changed += () => secondChanges++;
 
         Assert.True(await rig.Workspace.CloseAsync(first));
         Assert.True(await rig.Controller.ConnectAsync());
@@ -864,16 +864,16 @@ public class GameDataCommandControllerTests
     {
         using var rig = new Rig();
         var document = await rig.PullDocumentAsync(rig.Workspace.ActiveDocument, Map10);
-        document.GameData.Session.Edits.AddSpawn(new NpcSpawnRow(1, 10, 5, 5));
-        GameDataSyncSession before = document.GameData.Session;
+        document.GameData!.Session!.Edits.AddSpawn(new NpcSpawnRow(1, 10, 5, 5));
+        GameDataSyncSession before = document.GameData!.Session;
         rig.Dialogs.SheetDirtyResult = SheetDirtyChoice.Discard;
 
         bool disconnected = await rig.Controller.DisconnectAsync();
 
         Assert.True(disconnected);
         Assert.Equal(new[] { "DisconnectAsync" }, rig.Connectivity.Calls);
-        Assert.Same(before, document.GameData.Session);
-        Assert.True(document.GameData.IsDirty);
+        Assert.Same(before, document.GameData!.Session);
+        Assert.True(document.GameData!.IsDirty);
     }
 
     [Fact]
@@ -881,7 +881,7 @@ public class GameDataCommandControllerTests
     {
         using var rig = new Rig();
         var document = await rig.PullDocumentAsync(rig.Workspace.ActiveDocument, Map10);
-        document.GameData.Session.Edits.AddSpawn(new NpcSpawnRow(1, 10, 5, 5));
+        document.GameData!.Session!.Edits.AddSpawn(new NpcSpawnRow(1, 10, 5, 5));
         rig.Dialogs.SheetDirtyResult = SheetDirtyChoice.Cancel;
 
         bool disconnected = await rig.Controller.DisconnectAsync();
@@ -889,7 +889,7 @@ public class GameDataCommandControllerTests
         Assert.False(disconnected);
         Assert.True(rig.Connectivity.IsConnected);
         Assert.Empty(rig.Connectivity.Calls);
-        Assert.True(document.GameData.IsDirty);
+        Assert.True(document.GameData!.IsDirty);
     }
 
     [Fact]
@@ -897,7 +897,7 @@ public class GameDataCommandControllerTests
     {
         using var rig = new Rig();
         var document = await rig.PullDocumentAsync(rig.Workspace.ActiveDocument, Map10);
-        document.GameData.Session.Edits.AddSpawn(new NpcSpawnRow(1, 10, 5, 5));
+        document.GameData!.Session!.Edits.AddSpawn(new NpcSpawnRow(1, 10, 5, 5));
         rig.Gateway
             .EnqueueOwnedRows(OwnedRows(new[] { new NpcSpawnRow(1, 10, 3, 4) }))
             .EnqueueReplaceSuccess();
@@ -909,7 +909,7 @@ public class GameDataCommandControllerTests
         Assert.True(disconnected);
         Assert.Equal(new[] { "ReadOwnedRowsAsync", "ReplaceOwnedRowsAsync" }, rig.Gateway.Calls.Skip(callsBefore).Select(call => call.Method));
         Assert.Equal(new[] { "DisconnectAsync" }, rig.Connectivity.Calls);
-        Assert.False(document.GameData.IsDirty);
+        Assert.False(document.GameData!.IsDirty);
     }
 
     [Fact]
@@ -917,7 +917,7 @@ public class GameDataCommandControllerTests
     {
         using var rig = new Rig();
         var document = await rig.PullDocumentAsync(rig.Workspace.ActiveDocument, Map10);
-        document.GameData.Session.Edits.AddSpawn(new NpcSpawnRow(999, 10, 5, 5));
+        document.GameData!.Session!.Edits.AddSpawn(new NpcSpawnRow(999, 10, 5, 5));
         rig.Dialogs.SheetDirtyResult = SheetDirtyChoice.Push;
 
         bool disconnected = await rig.Controller.DisconnectAsync();
@@ -925,7 +925,7 @@ public class GameDataCommandControllerTests
         Assert.False(disconnected);
         Assert.True(rig.Connectivity.IsConnected);
         Assert.Empty(rig.Connectivity.Calls);
-        Assert.True(document.GameData.IsDirty);
+        Assert.True(document.GameData!.IsDirty);
         Assert.Single(rig.Dialogs.Errors);
     }
 
@@ -944,12 +944,12 @@ public class GameDataCommandControllerTests
         rig.Dialogs.SpreadsheetUrlResult = SheetUrl;
         rig.Dialogs.MapConfirmationResult = Map10;
         Assert.True(await rig.Controller.PullAsync(first));
-        first.GameData.Session.Edits.AddSpawn(new NpcSpawnRow(1, 10, 5, 5));
+        first.GameData!.Session!.Edits.AddSpawn(new NpcSpawnRow(1, 10, 5, 5));
 
         rig.Gateway.EnqueueMaps(AllMaps).EnqueueGameData(PullData(AllMaps, spawns: Array.Empty<NpcSpawnRow>()));
         rig.Dialogs.MapConfirmationResult = Map20;
         Assert.True(await rig.Controller.PullAsync(third));
-        third.GameData.Session.Edits.AddSpawn(new NpcSpawnRow(1, 20, 5, 5));
+        third.GameData!.Session!.Edits.AddSpawn(new NpcSpawnRow(1, 20, 5, 5));
 
         var activations = new List<string>();
         rig.Workspace.PropertyChanged += (_, e) =>
@@ -993,8 +993,8 @@ public class GameDataCommandControllerTests
     {
         using var rig = new Rig();
         var document = await rig.PullDocumentAsync(rig.Workspace.ActiveDocument, Map10);
-        document.GameData.Session.Edits.AddSpawn(new NpcSpawnRow(1, 10, 5, 5));
-        GameDataSyncSession before = document.GameData.Session;
+        document.GameData!.Session!.Edits.AddSpawn(new NpcSpawnRow(1, 10, 5, 5));
+        GameDataSyncSession before = document.GameData!.Session;
         var gate = new TaskCompletionSource<RemoteOwnedRows>(TaskCreationOptions.RunContinuationsAsynchronously);
         rig.Gateway.ReadOwnedRowsGate = gate;
         int callsBefore = rig.Gateway.Calls.Count;
@@ -1014,13 +1014,13 @@ public class GameDataCommandControllerTests
         Assert.Equal(dirtyShownBefore, rig.Dialogs.SheetDirtyShown);
         Assert.Equal(conflictShownBefore, rig.Dialogs.PushConflictShown);
         Assert.Empty(rig.Dialogs.Errors);
-        Assert.Same(before, document.GameData.Session);
-        Assert.True(document.GameData.IsDirty);
+        Assert.Same(before, document.GameData!.Session);
+        Assert.True(document.GameData!.IsDirty);
 
         rig.Gateway.EnqueueReplaceSuccess();
         gate.SetResult(OwnedRows(new[] { new NpcSpawnRow(1, 10, 3, 4) }));
         Assert.True(await push);
-        Assert.False(document.GameData.IsDirty);
+        Assert.False(document.GameData!.IsDirty);
         Assert.True(await rig.Controller.DisconnectAsync());
     }
 
@@ -1029,7 +1029,7 @@ public class GameDataCommandControllerTests
     {
         using var rig = new Rig();
         var document = await rig.PullDocumentAsync(rig.Workspace.ActiveDocument, Map10);
-        document.GameData.Session.Edits.AddSpawn(new NpcSpawnRow(1, 10, 5, 5));
+        document.GameData!.Session!.Edits.AddSpawn(new NpcSpawnRow(1, 10, 5, 5));
         rig.Gateway
             .EnqueueOwnedRows(OwnedRows(new[] { new NpcSpawnRow(1, 10, 3, 4) }))
             .EnqueueReplaceSuccess();
@@ -1043,7 +1043,7 @@ public class GameDataCommandControllerTests
         Assert.Equal(new[] { "ReadOwnedRowsAsync", "ReplaceOwnedRowsAsync" },
             rig.Gateway.Calls.Skip(callsBefore).Select(call => call.Method).ToArray());
         Assert.Equal(new[] { "DisconnectAsync" }, rig.Connectivity.Calls);
-        Assert.False(document.GameData.IsDirty);
+        Assert.False(document.GameData!.IsDirty);
         Assert.Empty(rig.Dialogs.Errors);
     }
 

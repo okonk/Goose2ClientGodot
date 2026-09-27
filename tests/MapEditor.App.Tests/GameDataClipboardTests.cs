@@ -361,7 +361,7 @@ public class GameDataClipboardTests : IDisposable
 
         Assert.Single(errors);
         Assert.False(_unpulled.PasteMode);
-        Assert.Null(_unpulled.GameData.Session);
+        Assert.Null(_unpulled.GameData!.Session);
         Assert.NotNull(_workspace.Clipboard.Current);
     }
 
@@ -399,7 +399,7 @@ public class GameDataClipboardTests : IDisposable
         _otherSheet.PasteSelection();
 
         Assert.Single(errors);
-        Assert.Equal(1, _otherSheet.GameData.Session.Edits.Warps.Count);
+        Assert.Single(_otherSheet.GameData!.Session!.Edits.Warps);
         Assert.Equal(versionBefore, _otherSheet.GameData.Session.Edits.HistoryVersion);
         Assert.False(_otherSheet.CanUndo);
         Assert.False(_otherSheet.PasteMode);

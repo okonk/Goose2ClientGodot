@@ -1038,10 +1038,10 @@ public class MapRendererTests
         var sink = new RecordingMapDrawSink();
         renderer.Render(Request(document, Viewport(5 * 32, 5 * 32), options), sink);
 
-        Assert.Empty(sink.Calls.OfType<GridLineDrawOperation>()
-            .Where(op => op.Color == MapRenderer.MapRenderPalette.SelectionStroke));
-        Assert.Empty(sink.Calls.OfType<CellOverlayDrawOperation>()
-            .Where(op => op.Kind == CellOverlayKind.PasteGhost));
+        Assert.DoesNotContain(sink.Calls.OfType<GridLineDrawOperation>(),
+            op => op.Color == MapRenderer.MapRenderPalette.SelectionStroke);
+        Assert.DoesNotContain(sink.Calls.OfType<CellOverlayDrawOperation>(),
+            op => op.Kind == CellOverlayKind.PasteGhost);
     }
 
     [Fact]

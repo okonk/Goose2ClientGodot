@@ -1193,7 +1193,7 @@ public class MapCanvasTests
         harness.ViewModel.CopySelection();
         harness.ViewModel.BeginPasteMode();
 
-        harness.Window.FindControl<TextBox>("BrushGraphic").Focus();
+        harness.Window.FindControl<TextBox>("BrushGraphic")!.Focus();
         harness.Window.KeyPressQwerty(PhysicalKey.Escape, RawInputModifiers.None);
 
         Assert.False(harness.ViewModel.PasteMode);
@@ -1235,7 +1235,7 @@ public class MapCanvasTests
         harness.ViewModel.CopySelection();
         harness.ViewModel.BeginPasteMode();
 
-        harness.Window.FindControl<MenuItem>("UndoCommand").RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+        harness.Window.FindControl<MenuItem>("UndoCommand")!.RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
         Assert.False(harness.ViewModel.PasteMode);
         Assert.Equal(new MapTileLayer(0, 0), document[0, 0].GetLayer(0));
 
@@ -1260,7 +1260,7 @@ public class MapCanvasTests
         harness.ViewModel.BeginPasteMode();
 
         // the status bar is a plain control with no other side effects
-        Point status = harness.Window.FindControl<Border>("StatusBar").TranslatePoint(new Point(5, 5), harness.Window).Value;
+        Point status = harness.Window.FindControl<Border>("StatusBar")!.TranslatePoint(new Point(5, 5), harness.Window)!.Value;
         harness.Window.MouseDown(status, MouseButton.Left, RawInputModifiers.None);
         harness.Window.MouseUp(status, MouseButton.Left, RawInputModifiers.None);
 
@@ -1279,7 +1279,7 @@ public class MapCanvasTests
         harness.ViewModel.BeginPasteMode();
 
         // ToggleButton marks PointerPressed handled, so only the tunneling window handler sees this press
-        Point eraser = harness.Window.FindControl<Control>("EraserTool").TranslatePoint(new Point(5, 5), harness.Window).Value;
+        Point eraser = harness.Window.FindControl<Control>("EraserTool")!.TranslatePoint(new Point(5, 5), harness.Window)!.Value;
         harness.Window.MouseDown(eraser, MouseButton.Left, RawInputModifiers.None);
         harness.Window.MouseUp(eraser, MouseButton.Left, RawInputModifiers.None);
 

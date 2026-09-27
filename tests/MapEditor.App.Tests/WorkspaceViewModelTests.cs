@@ -129,8 +129,8 @@ public class WorkspaceViewModelTests : IDisposable
         MapDocumentViewModel second = await NewDocumentAsync(workspace);
         int firstChanges = 0;
         int secondChanges = 0;
-        first.GameData.Changed += () => firstChanges++;
-        second.GameData.Changed += () => secondChanges++;
+        first.GameData!.Changed += () => firstChanges++;
+        second.GameData!.Changed += () => secondChanges++;
 
         Assert.True(await workspace.CloseAsync(first));
         Assert.True(await workspace.Commands.ConnectAsync());
@@ -189,7 +189,7 @@ public class WorkspaceViewModelTests : IDisposable
 
         await OpenDocumentAsync(path);
 
-        Assert.Equal(1, _workspace.Documents.Count);
+        Assert.Single(_workspace.Documents);
         MapDocumentViewModel active = _workspace.ActiveDocument;
         Assert.Same(_workspace.Documents[0], active);
         Assert.Equal(Path.GetFullPath(path), active.Document.Path);
@@ -208,7 +208,7 @@ public class WorkspaceViewModelTests : IDisposable
 
         await OpenDocumentAsync(path);
 
-        Assert.Equal(1, _workspace.Documents.Count);
+        Assert.Single(_workspace.Documents);
         Assert.Same(first, _workspace.ActiveDocument);
         Assert.Same(_workspace.Documents[0], first);
     }
@@ -246,7 +246,7 @@ public class WorkspaceViewModelTests : IDisposable
     {
         string pathA = WriteMap("a.map");
         await OpenDocumentAsync(pathA);
-        Assert.Equal(1, _workspace.Documents.Count);
+        Assert.Single(_workspace.Documents);
 
         string pathB = WriteMap("b.map");
         await OpenDocumentAsync(pathB);
