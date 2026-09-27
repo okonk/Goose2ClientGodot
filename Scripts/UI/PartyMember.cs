@@ -27,6 +27,7 @@ public partial class PartyMember : Control
         _content = GetNode<Control>("Content");
         _content.Visible = false;
         Visible = false;
+        _content.GuiInput += OnContentGuiInput;
         _effectRow = GetNode<HBoxContainer>("Content/EffectRow");
     }
 
@@ -51,6 +52,17 @@ public partial class PartyMember : Control
     {
         _hpBar.Value = hp;
         _mpBar.Value = mp;
+    }
+
+    // The whole member row is the hit area (name, bars, frame); buff icons carry
+    // MouseFilter.Stop and consume their own clicks. Same path as a world click on a character.
+    private void OnContentGuiInput(InputEvent e)
+    {
+        if (e is not InputEventMouseButton { Pressed: true, ButtonIndex: MouseButton.Left }) return;
+        if (!GameManager.Instance.IsTargeting) return;
+        var character = GameManager.Instance.CurrentMapManager?.GetCharacter(PlayerId);
+        if (character == null) return;
+        GameManager.Instance.SpellTargetManager?.CastOnClickedTarget(character);
     }
 
     public void ReconcileEffects(IReadOnlyList<PartyMemberEffect> effects)
