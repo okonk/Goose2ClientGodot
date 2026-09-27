@@ -1178,7 +1178,7 @@ public class AssetContextControllerTerrainPublicationTests : IDisposable
     }
 
     [Fact]
-    public void PrepareSave_WithStaleExpectedContext_Throws()
+    public async Task PrepareSave_WithStaleExpectedContext_Throws()
     {
         using AssetContextController controller = CreateController();
         string firstDirectory = WriteAssetDirectory("assets-stale-first");
@@ -1189,13 +1189,13 @@ public class AssetContextControllerTerrainPublicationTests : IDisposable
         AssetFixture.WriteTerrainSidecar(secondDirectory, AssetFixture.TerrainCatalogJson);
         Assert.True(controller.TryOpen(secondDirectory));
         TerrainCatalogPreparedSave prepared = PrepareSave(secondDirectory, controller.Current, ParseCatalog(), controller.Current.Terrain.Revision);
-        using TerrainOperationLease operation = controller.Gate.AcquireAsync().GetAwaiter().GetResult();
+        using TerrainOperationLease operation = await controller.Gate.AcquireAsync();
 
         Assert.Throws<InvalidOperationException>(() => controller.PrepareSave(operation, stale, prepared));
     }
 
     [Fact]
-    public void PrepareSave_WithMismatchedGateLease_Throws()
+    public async Task PrepareSave_WithMismatchedGateLease_Throws()
     {
         using AssetContextController controller = CreateController();
         string assetDirectory = WriteAssetDirectory("assets-lease");
@@ -1203,13 +1203,13 @@ public class AssetContextControllerTerrainPublicationTests : IDisposable
         Assert.True(controller.TryOpen(assetDirectory));
         TerrainCatalogPreparedSave prepared = PrepareSave(assetDirectory, controller.Current, ParseCatalog(), controller.Current.Terrain.Revision);
         using TerrainOperationGate otherGate = new();
-        using TerrainOperationLease operation = otherGate.AcquireAsync().GetAwaiter().GetResult();
+        using TerrainOperationLease operation = await otherGate.AcquireAsync();
 
         Assert.Throws<InvalidOperationException>(() => controller.PrepareSave(operation, controller.Current, prepared));
     }
 
     [Fact]
-    public void PrepareSave_WithInvalidPreparedCandidate_Throws()
+    public async Task PrepareSave_WithInvalidPreparedCandidate_Throws()
     {
         using AssetContextController controller = CreateController();
         string assetDirectory = WriteAssetDirectory("assets-invalid-prepared");
@@ -1223,16 +1223,16 @@ public class AssetContextControllerTerrainPublicationTests : IDisposable
             "op-invalid",
             Array.Empty<byte>(),
             invalidCatalog,
-            null,
+            null!,
             Path.Combine(assetDirectory, TerrainAssetCatalog.FileName),
             controller.Current.Terrain.Revision);
-        using TerrainOperationLease operation = controller.Gate.AcquireAsync().GetAwaiter().GetResult();
+        using TerrainOperationLease operation = await controller.Gate.AcquireAsync();
 
         Assert.Throws<InvalidOperationException>(() => controller.PrepareSave(operation, controller.Current, prepared));
     }
 
     [Fact]
-    public void PrepareSave_WhilePublicationPending_Throws()
+    public async Task PrepareSave_WhilePublicationPending_Throws()
     {
         using AssetContextController controller = CreateController();
         string assetDirectory = WriteAssetDirectory("assets-reentrant");
@@ -1240,7 +1240,7 @@ public class AssetContextControllerTerrainPublicationTests : IDisposable
         Assert.True(controller.TryOpen(assetDirectory));
         AssetContext context = controller.Current;
         TerrainCatalogPreparedSave prepared = PrepareSave(assetDirectory, context, ParseCatalog(), context.Terrain.Revision);
-        using TerrainOperationLease operation = controller.Gate.AcquireAsync().GetAwaiter().GetResult();
+        using TerrainOperationLease operation = await controller.Gate.AcquireAsync();
         ITerrainCatalogSavePublication first = controller.PrepareSave(operation, context, prepared);
 
         try
@@ -1254,7 +1254,7 @@ public class AssetContextControllerTerrainPublicationTests : IDisposable
     }
 
     [Fact]
-    public void DisposeUncommittedPublication_PublishesNothingAndReleasesReservation()
+    public async Task DisposeUncommittedPublication_PublishesNothingAndReleasesReservation()
     {
         using AssetContextController controller = CreateController();
         string assetDirectory = WriteAssetDirectory("assets-uncommitted");
@@ -1263,7 +1263,7 @@ public class AssetContextControllerTerrainPublicationTests : IDisposable
         AssetContext context = controller.Current;
         TerrainCatalogLoadResult before = context.Terrain;
         TerrainCatalogPreparedSave prepared = PrepareSave(assetDirectory, context, ParseCatalog(), before.Revision);
-        using TerrainOperationLease operation = controller.Gate.AcquireAsync().GetAwaiter().GetResult();
+        using TerrainOperationLease operation = await controller.Gate.AcquireAsync();
         ITerrainCatalogSavePublication publication = controller.PrepareSave(operation, context, prepared);
         int events = 0;
         controller.TerrainCatalogChanged += (_, _) => events++;
@@ -1280,7 +1280,7 @@ public class AssetContextControllerTerrainPublicationTests : IDisposable
     }
 
     [Fact]
-    public void CommitTerrain_PreservesContextCacheRendererAndTint()
+    public async Task CommitTerrain_PreservesContextCacheRendererAndTint()
     {
         using AssetContextController controller = CreateController();
         string assetDirectory = WriteAssetDirectory("assets-identity");
@@ -1293,7 +1293,7 @@ public class AssetContextControllerTerrainPublicationTests : IDisposable
         TerrainCatalogLoadResult before = context.Terrain;
         TerrainCatalogPreparedSave prepared = PrepareSave(assetDirectory, context, ParseCatalog(), before.Revision);
         TerrainFileRevision revision = TerrainFileRevision.FromBytes(prepared.CanonicalBytes);
-        using TerrainOperationLease operation = controller.Gate.AcquireAsync().GetAwaiter().GetResult();
+        using TerrainOperationLease operation = await controller.Gate.AcquireAsync();
         ITerrainCatalogSavePublication publication = controller.PrepareSave(operation, context, prepared);
 
         publication.Commit(SaveResult(prepared, revision));
@@ -1381,7 +1381,7 @@ public class AssetContextControllerTerrainPublicationTests : IDisposable
     }
 
     [Fact]
-    public void CommitTerrain_ThrowingCatalogChangedSubscriber_DoesNotPreventLaterSubscribers()
+    public async Task CommitTerrain_ThrowingCatalogChangedSubscriber_DoesNotPreventLaterSubscribers()
     {
         using AssetContextController controller = CreateController();
         string assetDirectory = WriteAssetDirectory("assets-subscriber-failure");
@@ -1389,7 +1389,7 @@ public class AssetContextControllerTerrainPublicationTests : IDisposable
         Assert.True(controller.TryOpen(assetDirectory));
         AssetContext context = controller.Current;
         TerrainCatalogPreparedSave prepared = PrepareSave(assetDirectory, context, ParseCatalog(), context.Terrain.Revision);
-        using TerrainOperationLease operation = controller.Gate.AcquireAsync().GetAwaiter().GetResult();
+        using TerrainOperationLease operation = await controller.Gate.AcquireAsync();
         int laterSubscribers = 0;
         controller.TerrainCatalogChanged += (_, _) => throw new InvalidOperationException("first subscriber failure");
         controller.TerrainCatalogChanged += (_, _) => laterSubscribers++;
@@ -1404,7 +1404,7 @@ public class AssetContextControllerTerrainPublicationTests : IDisposable
     }
 
     [Fact]
-    public void CommitLoaded_ValidReload_PublishesLoadedResult()
+    public async Task CommitLoaded_ValidReload_PublishesLoadedResult()
     {
         using AssetContextController controller = CreateController();
         string assetDirectory = WriteAssetDirectory("assets-loaded-valid");
@@ -1417,7 +1417,7 @@ public class AssetContextControllerTerrainPublicationTests : IDisposable
             catalog,
             TerrainAssetCatalog.Validate(catalog, context.Cache.Manifest!).Index!,
             Array.Empty<TerrainValidationIssue>());
-        using TerrainOperationLease operation = controller.Gate.AcquireAsync().GetAwaiter().GetResult();
+        using TerrainOperationLease operation = await controller.Gate.AcquireAsync();
         ITerrainCatalogLoadedPublication publication = controller.PrepareLoaded(operation, context, loaded, TerrainLoadedPublicationKind.ValidReload);
 
         publication.Commit();
@@ -1430,7 +1430,7 @@ public class AssetContextControllerTerrainPublicationTests : IDisposable
     }
 
     [Fact]
-    public void CommitLoaded_ConfirmedMalformedReload_PublishesInvalidTerrainWithoutAffectingAssets()
+    public async Task CommitLoaded_ConfirmedMalformedReload_PublishesInvalidTerrainWithoutAffectingAssets()
     {
         using AssetContextController controller = CreateController();
         string assetDirectory = WriteAssetDirectory("assets-loaded-malformed");
@@ -1444,7 +1444,7 @@ public class AssetContextControllerTerrainPublicationTests : IDisposable
             new TerrainFileRevision(true, "deadbeef"),
             new[] { new TerrainValidationIssue(TerrainValidationSeverity.Error, TerrainValidationCode.MissingSpriteFrame, "boom") },
             "Terrain validation failed");
-        using TerrainOperationLease operation = controller.Gate.AcquireAsync().GetAwaiter().GetResult();
+        using TerrainOperationLease operation = await controller.Gate.AcquireAsync();
         ITerrainCatalogLoadedPublication publication = controller.PrepareLoaded(operation, context, loaded, TerrainLoadedPublicationKind.ConfirmedMalformedReload);
 
         publication.Commit();
@@ -1458,7 +1458,7 @@ public class AssetContextControllerTerrainPublicationTests : IDisposable
     }
 
     [Fact]
-    public void PrepareLoaded_WithMismatchedKind_Throws()
+    public async Task PrepareLoaded_WithMismatchedKind_Throws()
     {
         using AssetContextController controller = CreateController();
         string assetDirectory = WriteAssetDirectory("assets-loaded-kind");
@@ -1470,7 +1470,7 @@ public class AssetContextControllerTerrainPublicationTests : IDisposable
             TerrainFileRevision.Missing,
             Array.Empty<TerrainValidationIssue>(),
             "bad");
-        using TerrainOperationLease operation = controller.Gate.AcquireAsync().GetAwaiter().GetResult();
+        using TerrainOperationLease operation = await controller.Gate.AcquireAsync();
 
         Assert.Throws<InvalidOperationException>(() => controller.PrepareLoaded(operation, context, invalidWithoutRevision, TerrainLoadedPublicationKind.ValidReload));
         Assert.Throws<InvalidOperationException>(() => controller.PrepareLoaded(operation, context, valid, TerrainLoadedPublicationKind.ConfirmedMalformedReload));
@@ -1478,7 +1478,7 @@ public class AssetContextControllerTerrainPublicationTests : IDisposable
     }
 
     [Fact]
-    public void RegisterTerrainGestureCancellation_InvokesSnapshotAndAllowsSelfUnregistration()
+    public async Task RegisterTerrainGestureCancellation_InvokesSnapshotAndAllowsSelfUnregistration()
     {
         using AssetContextController controller = CreateController();
         string assetDirectory = WriteAssetDirectory("assets-gesture");
@@ -1486,13 +1486,13 @@ public class AssetContextControllerTerrainPublicationTests : IDisposable
         Assert.True(controller.TryOpen(assetDirectory));
         AssetContext context = controller.Current;
         TerrainCatalogPreparedSave prepared = PrepareSave(assetDirectory, context, ParseCatalog(), context.Terrain.Revision);
-        using TerrainOperationLease operation = controller.Gate.AcquireAsync().GetAwaiter().GetResult();
+        using TerrainOperationLease operation = await controller.Gate.AcquireAsync();
         int calls = 0;
         IDisposable? registration = null;
         registration = controller.RegisterTerrainGestureCancellation(() =>
         {
             calls++;
-            registration.Dispose();
+            registration!.Dispose();
         });
         ITerrainCatalogSavePublication first = controller.PrepareSave(operation, context, prepared);
         first.Dispose();
@@ -1504,7 +1504,7 @@ public class AssetContextControllerTerrainPublicationTests : IDisposable
     }
 
     [Fact]
-    public void RegisterTerrainGestureCancellation_ThrowingCallback_FailsPrepareAndReleasesReservation()
+    public async Task RegisterTerrainGestureCancellation_ThrowingCallback_FailsPrepareAndReleasesReservation()
     {
         using AssetContextController controller = CreateController();
         string assetDirectory = WriteAssetDirectory("assets-gesture-throw");
@@ -1513,7 +1513,7 @@ public class AssetContextControllerTerrainPublicationTests : IDisposable
         AssetContext context = controller.Current;
         TerrainCatalogLoadResult before = context.Terrain;
         TerrainCatalogPreparedSave prepared = PrepareSave(assetDirectory, context, ParseCatalog(), before.Revision);
-        using TerrainOperationLease operation = controller.Gate.AcquireAsync().GetAwaiter().GetResult();
+        using TerrainOperationLease operation = await controller.Gate.AcquireAsync();
         IDisposable registration = controller.RegisterTerrainGestureCancellation(() => throw new InvalidOperationException("gesture failure"));
 
         Assert.Throws<InvalidOperationException>(() => controller.PrepareSave(operation, context, prepared));
@@ -1526,7 +1526,7 @@ public class AssetContextControllerTerrainPublicationTests : IDisposable
     }
 
     [Fact]
-    public void TryPrepareOpen_PreservesCurrentUntilCommit()
+    public async Task TryPrepareOpen_PreservesCurrentUntilCommit()
     {
         using AssetContextController controller = CreateController();
         string firstDirectory = WriteAssetDirectory("assets-root-first");
@@ -1544,7 +1544,7 @@ public class AssetContextControllerTerrainPublicationTests : IDisposable
         Assert.Same(first, controller.Current);
         Assert.Equal(0, events);
         Assert.False(prepared!.Context.IsDisposed);
-        using TerrainOperationLease operation = controller.Gate.AcquireAsync().GetAwaiter().GetResult();
+        using TerrainOperationLease operation = await controller.Gate.AcquireAsync();
         controller.CommitPreparedOpen(operation, prepared);
         Assert.Same(prepared.Context, controller.Current);
         Assert.Equal(1, events);
@@ -1593,7 +1593,7 @@ public class AssetContextControllerTerrainPublicationTests : IDisposable
     }
 
     [Fact]
-    public void CommitPreparedOpen_ThrowingGestureCancellation_PreservesCurrentAndSkipsParticipant()
+    public async Task CommitPreparedOpen_ThrowingGestureCancellation_PreservesCurrentAndSkipsParticipant()
     {
         using AssetContextController controller = CreateController();
         string firstDirectory = WriteAssetDirectory("assets-root-cancel-first");
@@ -1601,13 +1601,13 @@ public class AssetContextControllerTerrainPublicationTests : IDisposable
         AssetContext first = controller.Current;
         string secondDirectory = WriteAssetDirectory("assets-root-cancel");
         Assert.True(controller.TryPrepareOpen(secondDirectory, out PreparedAssetContext? prepared, out _));
-        using TerrainOperationLease operation = controller.Gate.AcquireAsync().GetAwaiter().GetResult();
+        using TerrainOperationLease operation = await controller.Gate.AcquireAsync();
         var participant = new RecordingReconciliation();
         int events = 0;
         controller.CurrentChanged += (_, _) => events++;
         IDisposable registration = controller.RegisterTerrainGestureCancellation(() => throw new InvalidOperationException("gesture failure"));
 
-        Assert.Throws<InvalidOperationException>(() => controller.CommitPreparedOpen(operation, prepared, participant));
+        Assert.Throws<InvalidOperationException>(() => controller.CommitPreparedOpen(operation, prepared!, participant));
 
         Assert.Same(first, controller.Current);
         Assert.Equal(0, events);
@@ -1620,35 +1620,35 @@ public class AssetContextControllerTerrainPublicationTests : IDisposable
     }
 
     [Fact]
-    public void CommitPreparedOpen_ParticipantAppliesBeforeFirstRootObserver()
+    public async Task CommitPreparedOpen_ParticipantAppliesBeforeFirstRootObserver()
     {
         using AssetContextController controller = CreateController();
         string assetDirectory = WriteAssetDirectory("assets-root-participant");
         Assert.True(controller.TryPrepareOpen(assetDirectory, out PreparedAssetContext? prepared, out _));
-        using TerrainOperationLease operation = controller.Gate.AcquireAsync().GetAwaiter().GetResult();
+        using TerrainOperationLease operation = await controller.Gate.AcquireAsync();
         var timeline = new List<string>();
         var participant = new RecordingReconciliation { Timeline = timeline };
         _viewModel.CanvasInvalidated += () => timeline.Add("document.canvas");
         controller.CurrentChanged += (_, _) => timeline.Add("current.changed");
 
-        controller.CommitPreparedOpen(operation, prepared, participant);
+        controller.CommitPreparedOpen(operation, prepared!, participant);
 
         Assert.Equal(new[] { "participant.apply", "document.canvas", "participant.notify", "current.changed" }, timeline);
     }
 
     [Fact]
-    public void CommitPreparedOpen_RaisesCurrentChangedOnceAndNoTerrainCatalogChanged()
+    public async Task CommitPreparedOpen_RaisesCurrentChangedOnceAndNoTerrainCatalogChanged()
     {
         using AssetContextController controller = CreateController();
         string assetDirectory = WriteAssetDirectory("assets-root-events");
         Assert.True(controller.TryPrepareOpen(assetDirectory, out PreparedAssetContext? prepared, out _));
-        using TerrainOperationLease operation = controller.Gate.AcquireAsync().GetAwaiter().GetResult();
+        using TerrainOperationLease operation = await controller.Gate.AcquireAsync();
         int currentEvents = 0;
         int terrainEvents = 0;
         controller.CurrentChanged += (_, _) => currentEvents++;
         controller.TerrainCatalogChanged += (_, _) => terrainEvents++;
 
-        controller.CommitPreparedOpen(operation, prepared);
+        controller.CommitPreparedOpen(operation, prepared!);
 
         Assert.Equal(1, currentEvents);
         Assert.Equal(0, terrainEvents);
@@ -1674,7 +1674,7 @@ public class AssetContextControllerTerrainPublicationTests : IDisposable
     }
 
     [Fact]
-    public void CommitPreparedOpen_WhilePublicationPending_Throws()
+    public async Task CommitPreparedOpen_WhilePublicationPending_Throws()
     {
         using AssetContextController controller = CreateController();
         string firstDirectory = WriteAssetDirectory("assets-root-interleave-first");
@@ -1682,14 +1682,14 @@ public class AssetContextControllerTerrainPublicationTests : IDisposable
         Assert.True(controller.TryOpen(firstDirectory));
         AssetContext context = controller.Current;
         TerrainCatalogPreparedSave prepared = PrepareSave(firstDirectory, context, ParseCatalog(), context.Terrain.Revision);
-        using TerrainOperationLease operation = controller.Gate.AcquireAsync().GetAwaiter().GetResult();
+        using TerrainOperationLease operation = await controller.Gate.AcquireAsync();
         ITerrainCatalogSavePublication publication = controller.PrepareSave(operation, context, prepared);
         string secondDirectory = WriteAssetDirectory("assets-root-interleave-second");
         Assert.True(controller.TryPrepareOpen(secondDirectory, out PreparedAssetContext? root, out _));
         int events = 0;
         controller.CurrentChanged += (_, _) => events++;
 
-        Assert.Throws<InvalidOperationException>(() => controller.CommitPreparedOpen(operation, root));
+        Assert.Throws<InvalidOperationException>(() => controller.CommitPreparedOpen(operation, root!));
 
         Assert.Same(context, controller.Current);
         Assert.Equal(0, events);
@@ -1699,7 +1699,7 @@ public class AssetContextControllerTerrainPublicationTests : IDisposable
     }
 
     [Fact]
-    public void CommitPreparedOpen_ThrowingOldContextDisposal_RecordsFailureWithoutThrowing()
+    public async Task CommitPreparedOpen_ThrowingOldContextDisposal_RecordsFailureWithoutThrowing()
     {
         using AssetContextController controller = new(
             _workspace,
@@ -1711,15 +1711,15 @@ public class AssetContextControllerTerrainPublicationTests : IDisposable
         Assert.Equal(SpriteResolutionStatus.Ready, first.Resolve(new SpriteReference(1, 10)).Status);
         string secondDirectory = WriteAssetDirectory("assets-root-dispose-second");
         Assert.True(controller.TryPrepareOpen(secondDirectory, out PreparedAssetContext? prepared, out _));
-        using TerrainOperationLease operation = controller.Gate.AcquireAsync().GetAwaiter().GetResult();
+        using TerrainOperationLease operation = await controller.Gate.AcquireAsync();
         _viewModel.PropertyChanged += (_, _) => throw new InvalidOperationException("property failure");
         _viewModel.CanvasInvalidated += () => throw new InvalidOperationException("canvas failure");
         _viewModel.PaletteInvalidated += () => throw new InvalidOperationException("palette failure");
         controller.CurrentChanged += (_, _) => throw new InvalidOperationException("subscriber failure");
 
-        controller.CommitPreparedOpen(operation, prepared);
+        controller.CommitPreparedOpen(operation, prepared!);
 
-        Assert.Same(prepared.Context, controller.Current);
+        Assert.Same(prepared!.Context, controller.Current);
         Assert.True(first.IsDisposed);
         Assert.NotNull(controller.LastPublicationNotificationErrors);
         Assert.Equal(5, controller.LastPublicationNotificationErrors.Count);
@@ -1756,7 +1756,7 @@ public class AssetContextControllerTerrainPublicationTests : IDisposable
     }
 
     [Fact]
-    public void CommitLoaded_RemovedSelectedTerrain_FallsBackToPencilAndPreservesMapBytes()
+    public async Task CommitLoaded_RemovedSelectedTerrain_FallsBackToPencilAndPreservesMapBytes()
     {
         using AssetContextController controller = CreateController();
         string assetDirectory = WriteAssetDirectory("assets-selection-removed");
@@ -1782,7 +1782,7 @@ public class AssetContextControllerTerrainPublicationTests : IDisposable
             waterOnly,
             validation.Index!,
             validation.Issues);
-        using TerrainOperationLease operation = controller.Gate.AcquireAsync().GetAwaiter().GetResult();
+        using TerrainOperationLease operation = await controller.Gate.AcquireAsync();
         ITerrainCatalogLoadedPublication publication = controller.PrepareLoaded(operation, context, loaded, TerrainLoadedPublicationKind.ValidReload);
 
         publication.Commit();
@@ -1796,7 +1796,7 @@ public class AssetContextControllerTerrainPublicationTests : IDisposable
     }
 
     [Fact]
-    public void CommitLoaded_RemovedGraphics_DoesNotMutateMapCells()
+    public async Task CommitLoaded_RemovedGraphics_DoesNotMutateMapCells()
     {
         using AssetContextController controller = CreateController();
         string assetDirectory = WriteAssetDirectory("assets-removed-graphics");
@@ -1826,7 +1826,7 @@ public class AssetContextControllerTerrainPublicationTests : IDisposable
             new TerrainFileRevision(true, "removed-graphics"),
             validation.Issues,
             "Terrain validation failed");
-        using TerrainOperationLease operation = controller.Gate.AcquireAsync().GetAwaiter().GetResult();
+        using TerrainOperationLease operation = await controller.Gate.AcquireAsync();
         ITerrainCatalogLoadedPublication publication = controller.PrepareLoaded(operation, context, loaded, TerrainLoadedPublicationKind.ConfirmedMalformedReload);
 
         publication.Commit();
@@ -1841,7 +1841,7 @@ public class AssetContextControllerTerrainPublicationTests : IDisposable
     }
 
     [Fact]
-    public void CommitLoaded_MalformedTerrain_DisablesOnlyTerrainProperties()
+    public async Task CommitLoaded_MalformedTerrain_DisablesOnlyTerrainProperties()
     {
         using AssetContextController controller = CreateController();
         string assetDirectory = WriteAssetDirectory("assets-malformed-only-terrain");
@@ -1856,7 +1856,7 @@ public class AssetContextControllerTerrainPublicationTests : IDisposable
             new TerrainFileRevision(true, "malformed"),
             new[] { new TerrainValidationIssue(TerrainValidationSeverity.Error, TerrainValidationCode.MissingSpriteFrame, "boom") },
             "Terrain validation failed");
-        using TerrainOperationLease operation = controller.Gate.AcquireAsync().GetAwaiter().GetResult();
+        using TerrainOperationLease operation = await controller.Gate.AcquireAsync();
         ITerrainCatalogLoadedPublication publication = controller.PrepareLoaded(operation, context, loaded, TerrainLoadedPublicationKind.ConfirmedMalformedReload);
 
         publication.Commit();

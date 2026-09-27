@@ -36,7 +36,7 @@ public class ShortcutTests
     {
         MainWindow window = harness.Window;
         harness.ViewModel.Brush = new MapTileLayer(1, 1);
-        Point tileCenter = window.Canvas.TranslatePoint(new Point(16, 16), window).Value;
+        Point tileCenter = window.Canvas.TranslatePoint(new Point(16, 16), window)!.Value;
         window.MouseDown(tileCenter, MouseButton.Left, RawInputModifiers.None);
         window.MouseUp(tileCenter, MouseButton.Left, RawInputModifiers.None);
     }
@@ -415,7 +415,7 @@ public class ShortcutTests
         harness.Dialogs.SavePickResult = mapPath;
         harness.ViewModel.Brush = new MapTileLayer(3, 9);
         MainWindow window = harness.Window;
-        Point tileCenter = window.Canvas.TranslatePoint(new Point(16, 16), window).Value;
+        Point tileCenter = window.Canvas.TranslatePoint(new Point(16, 16), window)!.Value;
 
         window.MouseDown(tileCenter, MouseButton.Left, RawInputModifiers.None);
         Assert.True(harness.ViewModel.Session.HasActiveStroke);
@@ -440,7 +440,7 @@ public class ShortcutTests
         PaintCell(harness);
         harness.ViewModel.Brush = new MapTileLayer(5, 5);
         MainWindow window = harness.Window;
-        Point tileCenter = window.Canvas.TranslatePoint(new Point(48, 16), window).Value;
+        Point tileCenter = window.Canvas.TranslatePoint(new Point(48, 16), window)!.Value;
 
         window.MouseDown(tileCenter, MouseButton.Left, RawInputModifiers.None);
         Assert.True(harness.ViewModel.Session.HasActiveStroke);
@@ -481,7 +481,7 @@ public class ShortcutTests
 
         Control<ToggleButton>(harness, "SpawnTool").IsChecked = true;
         vm.GameData.SelectedNpcId = 1;
-        Point tile = window.Canvas.TranslatePoint(new Point(5 * 32 + 16, 6 * 32 + 16), window).Value;
+        Point tile = window.Canvas.TranslatePoint(new Point(5 * 32 + 16, 6 * 32 + 16), window)!.Value;
         window.MouseDown(tile, MouseButton.Left, RawInputModifiers.None);
         window.MouseUp(tile, MouseButton.Left, RawInputModifiers.None);
         Dispatcher.UIThread.RunJobs();

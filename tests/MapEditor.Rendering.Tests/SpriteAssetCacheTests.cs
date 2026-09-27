@@ -26,7 +26,7 @@ public class SpriteAssetCacheTests
         SpriteAssetCache cache = SpriteAssetCache.Open(fixture.AssetRoot, loader);
 
         Assert.Equal(Path.GetFullPath(fixture.AssetRoot), cache.AssetDirectory);
-        Assert.Equal(new[] { 1, 2 }, cache.Manifest.SheetIds);
+        Assert.Equal(new[] { 1, 2 }, cache.Manifest!.SheetIds);
         Assert.Equal(6, cache.Manifest.Frames.Count);
         Assert.Equal(0, loader.CallCount);
         cache.Dispose();

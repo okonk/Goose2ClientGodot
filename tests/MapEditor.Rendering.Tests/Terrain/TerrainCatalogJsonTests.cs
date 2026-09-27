@@ -181,12 +181,12 @@ public class TerrainCatalogJsonTests
     {
         var catalog = TerrainCatalogJson.Parse(GoldenDocument);
 
-        Assert.Equal(1, catalog.Terrains.Count);
+        Assert.Single(catalog.Terrains);
         Assert.Equal(GrassId, catalog.Terrains[0].Id);
         Assert.Equal("Grass", catalog.Terrains[0].Name);
         Assert.Null(catalog.Terrains[0].ColorOverride);
 
-        Assert.Equal(1, catalog.Graphics.Count);
+        Assert.Single(catalog.Graphics);
         Assert.Equal(new TerrainGraphicReference(1, 10), catalog.Graphics[0].Reference);
         Assert.Equal(GrassId, catalog.Graphics[0].Pattern.Center);
     }
@@ -426,7 +426,7 @@ public class TerrainCatalogJsonTests
         {
             var catalog = TerrainCatalogJson.Load(path);
 
-            Assert.Equal(1, catalog.Terrains.Count);
+            Assert.Single(catalog.Terrains);
             Assert.Equal("Grass", catalog.Terrains[0].Name);
 
             File.WriteAllText(path, "{ broken");

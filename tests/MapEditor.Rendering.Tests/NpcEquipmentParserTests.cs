@@ -66,7 +66,7 @@ public class NpcEquipmentParserTests
     [InlineData("0,*,0,*,0,*,0,*,0,*,0,*,*")]
     public void TryParse_MalformedStringYieldsOneDiagnosticAndNoEquipment(string input)
     {
-        Assert.False(NpcEquipmentParser.TryParse(input, out NpcEquipment equipment, out string diagnostic));
+        Assert.False(NpcEquipmentParser.TryParse(input, out NpcEquipment equipment, out string? diagnostic));
 
         Assert.Equal(default, equipment);
         Assert.False(string.IsNullOrWhiteSpace(diagnostic));
@@ -75,7 +75,7 @@ public class NpcEquipmentParserTests
     [Fact]
     public void TryParse_NullInputYieldsOneDiagnostic()
     {
-        Assert.False(NpcEquipmentParser.TryParse(null, out NpcEquipment equipment, out string diagnostic));
+        Assert.False(NpcEquipmentParser.TryParse(null, out NpcEquipment equipment, out string? diagnostic));
 
         Assert.Equal(default, equipment);
         Assert.False(string.IsNullOrWhiteSpace(diagnostic));

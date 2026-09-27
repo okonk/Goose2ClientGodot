@@ -281,7 +281,7 @@ public class DocumentEditTimelineTests
 
         Assert.Equal(4, map.Document.Width);
         Assert.Equal(new MapTileLayer(8, 8), map.Document[3, 3].GetLayer(0));
-        Assert.Equal(1, sheet.Spawns.Count);
+        Assert.Single(sheet.Spawns);
         Assert.False(timeline.CanUndo);
         Assert.False(timeline.CanRedo);
     }

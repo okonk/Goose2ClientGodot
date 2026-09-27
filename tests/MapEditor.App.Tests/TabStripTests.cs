@@ -40,7 +40,7 @@ public class TabStripTests : IDisposable
     }
 
     private static string TabLabel(ListBoxItem tab)
-        => tab.GetVisualDescendants().OfType<TextBlock>().First().Text;
+        => tab.GetVisualDescendants().OfType<TextBlock>().First().Text!;
 
     private static object? TabTip(ListBoxItem tab)
         => tab.GetVisualDescendants().OfType<StackPanel>().First(panel => panel.Classes.Contains("tabHeader"))
@@ -50,7 +50,7 @@ public class TabStripTests : IDisposable
         => tab.GetVisualDescendants().OfType<StackPanel>().First(panel => panel.Classes.Contains("tabHeader"));
 
     private Point TabPoint(Visual target, Point local)
-        => target.TranslatePoint(local, _harness.Window).Value;
+        => target.TranslatePoint(local, _harness.Window)!.Value;
 
     private static Point PastMidpoint(Visual target)
         => new(target.Bounds.Width / 2 + 5, target.Bounds.Height / 2);
@@ -225,7 +225,7 @@ public class TabStripTests : IDisposable
         MapDocumentViewModel second = await NewDocumentAsync();
 
         TextBlock label = TabFor(second).GetVisualDescendants().OfType<TextBlock>().First();
-        Point point = label.TranslatePoint(new Point(5, 5), _harness.Window).Value;
+        Point point = label.TranslatePoint(new Point(5, 5), _harness.Window)!.Value;
         _harness.Window.MouseDown(point, MouseButton.Left, RawInputModifiers.None);
         _harness.Window.MouseUp(point, MouseButton.Left, RawInputModifiers.None);
 
@@ -241,7 +241,7 @@ public class TabStripTests : IDisposable
         MapDocumentViewModel second = await NewDocumentAsync();
 
         Button close = TabFor(first).GetVisualDescendants().OfType<Button>().First();
-        Point point = close.TranslatePoint(new Point(8, 8), _harness.Window).Value;
+        Point point = close.TranslatePoint(new Point(8, 8), _harness.Window)!.Value;
         _harness.Window.MouseDown(point, MouseButton.Left, RawInputModifiers.None);
         _harness.Window.MouseUp(point, MouseButton.Left, RawInputModifiers.None);
         Dispatcher.UIThread.RunJobs();
@@ -258,7 +258,7 @@ public class TabStripTests : IDisposable
         MapDocumentViewModel second = await NewDocumentAsync();
 
         TextBlock label = TabFor(first).GetVisualDescendants().OfType<TextBlock>().First();
-        Point point = label.TranslatePoint(new Point(5, 5), _harness.Window).Value;
+        Point point = label.TranslatePoint(new Point(5, 5), _harness.Window)!.Value;
         _harness.Window.MouseDown(point, MouseButton.Middle, RawInputModifiers.None);
         _harness.Window.MouseUp(point, MouseButton.Middle, RawInputModifiers.None);
         Dispatcher.UIThread.RunJobs();
@@ -275,7 +275,7 @@ public class TabStripTests : IDisposable
         MapDocumentViewModel second = await NewDocumentAsync();
 
         Button close = TabFor(second).GetVisualDescendants().OfType<Button>().First();
-        Point point = close.TranslatePoint(new Point(8, 8), _harness.Window).Value;
+        Point point = close.TranslatePoint(new Point(8, 8), _harness.Window)!.Value;
         _harness.Window.MouseDown(point, MouseButton.Middle, RawInputModifiers.None);
         _harness.Window.MouseUp(point, MouseButton.Middle, RawInputModifiers.None);
         Dispatcher.UIThread.RunJobs();
@@ -296,7 +296,7 @@ public class TabStripTests : IDisposable
         _harness.Dialogs.DirtyResult = DirtyChoice.Cancel;
 
         Button close = TabFor(first).GetVisualDescendants().OfType<Button>().First();
-        Point point = close.TranslatePoint(new Point(8, 8), _harness.Window).Value;
+        Point point = close.TranslatePoint(new Point(8, 8), _harness.Window)!.Value;
         _harness.Window.MouseDown(point, MouseButton.Left, RawInputModifiers.None);
         _harness.Window.MouseUp(point, MouseButton.Left, RawInputModifiers.None);
         Dispatcher.UIThread.RunJobs();
@@ -314,7 +314,7 @@ public class TabStripTests : IDisposable
         MapDocumentViewModel only = _harness.ViewModel;
 
         Button close = TabFor(only).GetVisualDescendants().OfType<Button>().First();
-        Point point = close.TranslatePoint(new Point(8, 8), _harness.Window).Value;
+        Point point = close.TranslatePoint(new Point(8, 8), _harness.Window)!.Value;
         _harness.Window.MouseDown(point, MouseButton.Left, RawInputModifiers.None);
         _harness.Window.MouseUp(point, MouseButton.Left, RawInputModifiers.None);
         Dispatcher.UIThread.RunJobs();
@@ -341,7 +341,7 @@ public class TabStripTests : IDisposable
         Assert.True(first.PasteMode);
 
         TextBlock label = TabFor(second).GetVisualDescendants().OfType<TextBlock>().First();
-        Point point = label.TranslatePoint(new Point(5, 5), _harness.Window).Value;
+        Point point = label.TranslatePoint(new Point(5, 5), _harness.Window)!.Value;
         _harness.Window.MouseDown(point, MouseButton.Left, RawInputModifiers.None);
         _harness.Window.MouseUp(point, MouseButton.Left, RawInputModifiers.None);
 
@@ -368,7 +368,7 @@ public class TabStripTests : IDisposable
         };
 
         Button close = TabFor(third).GetVisualDescendants().OfType<Button>().First();
-        Point point = close.TranslatePoint(new Point(8, 8), _harness.Window).Value;
+        Point point = close.TranslatePoint(new Point(8, 8), _harness.Window)!.Value;
         _harness.Window.MouseDown(point, MouseButton.Left, RawInputModifiers.None);
         _harness.Window.MouseUp(point, MouseButton.Left, RawInputModifiers.None);
         Dispatcher.UIThread.RunJobs();
@@ -540,7 +540,7 @@ public class TabStripTests : IDisposable
         Dispatcher.UIThread.RunJobs();
 
         Button close = TabFor(first).GetVisualDescendants().OfType<Button>().First();
-        Point press = close.TranslatePoint(new Point(8, 8), _harness.Window).Value;
+        Point press = close.TranslatePoint(new Point(8, 8), _harness.Window)!.Value;
         StackPanel secondHeader = TabHeader(TabFor(second));
         Point past = TabPoint(secondHeader, PastMidpoint(secondHeader));
         _harness.Window.MouseDown(press, MouseButton.Left, RawInputModifiers.None);
@@ -560,7 +560,7 @@ public class TabStripTests : IDisposable
         MapDocumentViewModel second = await NewDocumentAsync();
 
         TextBlock label = TabFor(first).GetVisualDescendants().OfType<TextBlock>().First();
-        Point point = label.TranslatePoint(new Point(5, 5), _harness.Window).Value;
+        Point point = label.TranslatePoint(new Point(5, 5), _harness.Window)!.Value;
         _harness.Window.MouseDown(point, MouseButton.Left, RawInputModifiers.None);
         _harness.Window.MouseUp(point, MouseButton.Left, RawInputModifiers.None);
 
@@ -576,7 +576,7 @@ public class TabStripTests : IDisposable
         MapDocumentViewModel second = await NewDocumentAsync();
 
         Button close = TabFor(first).GetVisualDescendants().OfType<Button>().First();
-        Point point = close.TranslatePoint(new Point(8, 8), _harness.Window).Value;
+        Point point = close.TranslatePoint(new Point(8, 8), _harness.Window)!.Value;
         _harness.Window.MouseDown(point, MouseButton.Left, RawInputModifiers.None);
         _harness.Window.MouseUp(point, MouseButton.Left, RawInputModifiers.None);
         Dispatcher.UIThread.RunJobs();

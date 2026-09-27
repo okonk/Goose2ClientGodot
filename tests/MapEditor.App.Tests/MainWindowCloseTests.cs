@@ -214,7 +214,7 @@ public class MainWindowCloseTests
         harness.Dialogs.DirtyResult = DirtyChoice.Save;
         harness.Dialogs.SavePickResult = mapPath;
         harness.ViewModel.Brush = new MapTileLayer(4, 6);
-        Point tileCenter = harness.Window.Canvas.TranslatePoint(new Point(16, 16), harness.Window).Value;
+        Point tileCenter = harness.Window.Canvas.TranslatePoint(new Point(16, 16), harness.Window)!.Value;
         harness.Window.MouseDown(tileCenter, MouseButton.Left, RawInputModifiers.None);
         Assert.True(harness.ViewModel.Session.HasActiveStroke);
 
@@ -492,7 +492,7 @@ public class MainWindowCloseTests
         rig.Dialogs = harness.Dialogs;
         MapDocumentViewModel doc = harness.ViewModel;
         await rig.PullAsync(harness.Workspace, doc);
-        doc.GameData!.Session.Edits.AddSpawn(new NpcSpawnRow(1, 10, 5, 5));
+        doc.GameData!.Session!.Edits.AddSpawn(new NpcSpawnRow(1, 10, 5, 5));
         harness.Dialogs.SheetDirtyResult = SheetDirtyChoice.Push;
 
         harness.Window.Close();
@@ -512,7 +512,7 @@ public class MainWindowCloseTests
         rig.Dialogs = harness.Dialogs;
         MapDocumentViewModel doc = harness.ViewModel;
         await rig.PullAsync(harness.Workspace, doc);
-        doc.GameData!.Session.Edits.AddSpawn(new NpcSpawnRow(1, 10, 5, 5));
+        doc.GameData!.Session!.Edits.AddSpawn(new NpcSpawnRow(1, 10, 5, 5));
         harness.Dialogs.SheetDirtyResult = SheetDirtyChoice.Discard;
 
         harness.Window.Close();
@@ -533,7 +533,7 @@ public class MainWindowCloseTests
         rig.Dialogs = harness.Dialogs;
         MapDocumentViewModel doc = harness.ViewModel;
         await rig.PullAsync(harness.Workspace, doc);
-        doc.GameData!.Session.Edits.AddSpawn(new NpcSpawnRow(1, 10, 5, 5));
+        doc.GameData!.Session!.Edits.AddSpawn(new NpcSpawnRow(1, 10, 5, 5));
         harness.Dialogs.SheetDirtyResult = SheetDirtyChoice.Cancel;
 
         harness.Window.Close();
@@ -555,7 +555,7 @@ public class MainWindowCloseTests
         rig.Dialogs = harness.Dialogs;
         MapDocumentViewModel doc = harness.ViewModel;
         await rig.PullAsync(harness.Workspace, doc);
-        doc.GameData!.Session.Edits.AddSpawn(new NpcSpawnRow(1, 10, 5, 5));
+        doc.GameData!.Session!.Edits.AddSpawn(new NpcSpawnRow(1, 10, 5, 5));
         MakeDirty(doc);
         var sheetGate = new TaskCompletionSource<SheetDirtyChoice>(TaskCreationOptions.RunContinuationsAsynchronously);
         harness.Dialogs.SheetDirtyGate = sheetGate;
@@ -582,7 +582,7 @@ public class MainWindowCloseTests
         await rig.PullAsync(harness.Workspace, doc);
         harness.Dialogs.SavePickResult = Path.Combine(harness.TempDirectory, "sheet-close-saved.map");
         await doc.SaveAsAsync();
-        doc.GameData!.Session.Edits.AddSpawn(new NpcSpawnRow(1, 10, 5, 5));
+        doc.GameData!.Session!.Edits.AddSpawn(new NpcSpawnRow(1, 10, 5, 5));
         MakeDirty(doc);
         string path = doc.Document.Path!;
         MapFileRevision revision = doc.Document.Revision!.Value;
@@ -609,7 +609,7 @@ public class MainWindowCloseTests
         rig.Dialogs = harness.Dialogs;
         MapDocumentViewModel doc = harness.ViewModel;
         await rig.PullAsync(harness.Workspace, doc);
-        doc.GameData!.Session.Edits.AddSpawn(new NpcSpawnRow(999, 10, 5, 5));
+        doc.GameData!.Session!.Edits.AddSpawn(new NpcSpawnRow(999, 10, 5, 5));
         MakeDirty(doc);
         harness.Dialogs.SheetDirtyResult = SheetDirtyChoice.Push;
         harness.Dialogs.DirtyResult = DirtyChoice.Discard;
@@ -634,7 +634,7 @@ public class MainWindowCloseTests
         rig.Dialogs = harness.Dialogs;
         MapDocumentViewModel doc = harness.ViewModel;
         await rig.PullAsync(harness.Workspace, doc);
-        doc.GameData!.Session.Edits.AddSpawn(new NpcSpawnRow(1, 10, 5, 5));
+        doc.GameData!.Session!.Edits.AddSpawn(new NpcSpawnRow(1, 10, 5, 5));
         var gate = new TaskCompletionSource<SheetDirtyChoice>(TaskCreationOptions.RunContinuationsAsynchronously);
         harness.Dialogs.SheetDirtyGate = gate;
 
@@ -663,7 +663,7 @@ public class MainWindowCloseTests
         rig.Dialogs = harness.Dialogs;
         MapDocumentViewModel doc = harness.ViewModel;
         await rig.PullAsync(harness.Workspace, doc);
-        doc.GameData!.Session.Edits.AddSpawn(new NpcSpawnRow(1, 10, 5, 5));
+        doc.GameData!.Session!.Edits.AddSpawn(new NpcSpawnRow(1, 10, 5, 5));
         DocumentGameDataState sheetState = doc.GameData!;
         var gate = new TaskCompletionSource<SheetDirtyChoice>(TaskCreationOptions.RunContinuationsAsynchronously);
         harness.Dialogs.SheetDirtyGate = gate;

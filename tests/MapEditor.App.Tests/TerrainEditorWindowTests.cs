@@ -411,7 +411,7 @@ public class TerrainEditorWindowTests
 
         Find<Button>(harness, "DeleteButton").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
 
-        Assert.Equal(1, harness.Session.CurrentCatalog.Terrains.Count);
+        Assert.Single(harness.Session.CurrentCatalog.Terrains);
         Assert.DoesNotContain(harness.Session.CurrentCatalog.Terrains, terrain => terrain.Id == first.Id);
         var remaining = Assert.Single(harness.ViewModel.Terrains);
         Assert.Same(remaining, harness.ViewModel.SelectedTerrain);
@@ -742,7 +742,7 @@ public class TerrainEditorWindowTests
         Assert.Equal(0, harness.Dialogs.DirtyShown);
         Assert.Null(Find<Border>(harness, "SheetHost").Child);
         Assert.Equal(1, ((AvaloniaSpriteSheetImage)image).DisposeCount);
-        Assert.Equal(1, loader.LoadedPaths.Count);
+        Assert.Single(loader.LoadedPaths);
     }
 
     [AvaloniaFact]
@@ -920,7 +920,7 @@ public class TerrainEditorWindowTests
 
         Assert.False(harness.Controller.IsTerrainFeaturesEnabled);
         Assert.Empty(harness.ViewModel.Terrains);
-        Assert.Equal(0, Find<ListBox>(harness, "TerrainList").Items.Count);
+        Assert.Empty(Find<ListBox>(harness, "TerrainList").Items);
         Assert.Equal(string.Empty, Find<TextBox>(harness, "NameBox").Text);
         Assert.True(panel.IsVisible);
         Assert.Equal(1, harness.Dialogs.ConfirmReplaceMalformedShown);
