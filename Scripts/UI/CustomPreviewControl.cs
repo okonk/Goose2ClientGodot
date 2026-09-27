@@ -137,7 +137,7 @@ public partial class CustomPreviewControl : Control
             var (size, pos) = CustomPreviewMetrics.Layout(tex.GetSize(), Size);
             layer.Size = size;
             layer.Position = pos;
-            ApplyTint(layer, tint);
+            TintMaterial.Apply(layer, tex, tint);
         }
     }
 
@@ -160,14 +160,7 @@ public partial class CustomPreviewControl : Control
         var tint = new Color(r / 255f, g / 255f, b / 255f, a / 255f);
         _slotTints[slot] = tint;
         if (!_layers.TryGetValue(slot, out var layer) || !layer.Visible) return;
-        if (a == 0)
-        {
-            layer.Material = null;
-            return;
-        }
-        if (layer.Material is not ShaderMaterial mat)
-            layer.Material = mat = new ShaderMaterial { Shader = TintMaterial.Shader };
-        mat.SetShaderParameter("tint", tint);
+        TintMaterial.Apply(layer, layer.Texture, tint);
     }
 
     public void SetTint(int r, int g, int b, int a)
@@ -177,14 +170,7 @@ public partial class CustomPreviewControl : Control
         _tintB = b;
         _tintA = a;
         if (_customSlot is not { } slot || !_layers.TryGetValue(slot, out var layer)) return;
-        if (a == 0)
-        {
-            layer.Material = null;
-            return;
-        }
-        if (layer.Material is not ShaderMaterial mat)
-            layer.Material = mat = new ShaderMaterial { Shader = TintMaterial.Shader };
-        mat.SetShaderParameter("tint", TintColor());
+        TintMaterial.Apply(layer, layer.Texture, TintColor());
     }
 
     public void HideAll()
@@ -192,24 +178,11 @@ public partial class CustomPreviewControl : Control
         foreach (var layer in _layers.Values) HideLayer(layer);
     }
 
-    // Alpha is always /255 even though the picker's A maxes at 200.
     private Color TintColor() => new Color(_tintR / 255f, _tintG / 255f, _tintB / 255f, _tintA / 255f);
 
     private void OnCharacterUpdated(Character.Character c)
     {
         if (c == GameManager.Instance.CurrentMapManager?.LocalPlayer) Refresh();
-    }
-
-    private static void ApplyTint(TextureRect layer, Color tint)
-    {
-        if (tint.A <= 0f)
-        {
-            layer.Material = null;
-            return;
-        }
-        if (layer.Material is not ShaderMaterial mat)
-            layer.Material = mat = new ShaderMaterial { Shader = TintMaterial.Shader };
-        mat.SetShaderParameter("tint", tint);
     }
 
     private static void HideLayer(TextureRect layer)

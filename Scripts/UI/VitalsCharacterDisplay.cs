@@ -68,7 +68,7 @@ public partial class VitalsCharacterDisplay : Control
         rect.Size = size;
         rect.Position = pos;
 
-        ApplyTint(rect, tint);
+        TintMaterial.Apply(rect, tex, tint);
     }
 
     private void ClearLayer(string nodePath)
@@ -78,28 +78,4 @@ public partial class VitalsCharacterDisplay : Control
         rect.Visible = false;
         rect.Material = null;
     }
-
-    private void ApplyTint(CanvasItem item, Color tint)
-    {
-        if (tint.A <= 0f)
-        {
-            item.Material = null;
-        }
-        else
-        {
-            if (item.Material is not ShaderMaterial mat)
-                item.Material = mat = new ShaderMaterial();
-            mat.Shader ??= TintShader;
-            mat.SetShaderParameter("tint", tint);
-        }
-    }
-
-    // Faithful to Character.cs and Icon.cs — tint.a is a BLEND factor, not opacity.
-    private static Shader? _tintShader;
-    private static Shader TintShader => _tintShader ??= new Shader()
-    {
-        Code = @"shader_type canvas_item;
-uniform vec4 tint : source_color = vec4(0.0);
-void fragment() { vec4 t = texture(TEXTURE, UV); COLOR = vec4(mix(t.rgb, tint.rgb, tint.a), t.a) * COLOR; }"
-    };
 }

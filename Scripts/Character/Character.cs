@@ -396,16 +396,7 @@ namespace Goose2Client.Character
             AlignSlotSprite(slot, s);
             // Only dyed slots get the tint shader; untinted slots use the default canvas path so they
             // render byte-identically to pre-shader behaviour (no global color-management shift).
-            if (tint.A > 0f)
-            {
-                if (s.Sprite.Material is not ShaderMaterial mat)
-                    s.Sprite.Material = mat = new ShaderMaterial { Shader = TintMaterial.Shader };
-                mat.SetShaderParameter("tint", tint);
-            }
-            else
-            {
-                s.Sprite.Material = null;
-            }
+            TintMaterial.Apply(s.Sprite, TintMaterial.RestingFrame(s.Sprite.SpriteFrames), tint);
         }
 
         private void RemoveSlot(CharacterSlot slot)

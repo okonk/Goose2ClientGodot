@@ -16,7 +16,7 @@ public partial class MapItem : Sprite2D
         var size = tex.GetSize();
         var anchor = MapCoords.TileBottomCenter(tileX, tileY);
         Position = new Vector2(anchor.X - size.X / 2f, anchor.Y - size.Y);
-        if (tint.A > 0) Material = TintMaterial.Make(tint);   // Unity lerp-tint shader, NOT Modulate
+        if (tint.A > 0) Material = TintMaterial.Make(tint, tex);   // Unity lerp-tint shader, NOT Modulate
 
         // Area2D for hover tooltip — covers the sprite rect.
         // Sprite is Centered=false with top-left at (0,0), so the rect is (0,0)..size.

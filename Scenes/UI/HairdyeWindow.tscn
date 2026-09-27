@@ -249,7 +249,7 @@ offset_left = 152.0
 offset_top = 96.0
 offset_right = 252.0
 offset_bottom = 114.0
-max_value = 200.0
+max_value = 255.0
 value = 160.0
 
 [node name="AValue" type="Label" parent="Content"]
