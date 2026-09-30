@@ -131,7 +131,10 @@ public sealed class InputBindingFileStoreTransaction
             try
             {
                 _store.FailDuringCleanup?.Invoke(_backupPath);
-                InputBindingFileStore.TryDelete(_backupPath);
+                File.Delete(_backupPath);
+            }
+            catch (FileNotFoundException)
+            {
             }
             catch
             {

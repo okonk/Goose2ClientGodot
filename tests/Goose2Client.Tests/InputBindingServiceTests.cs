@@ -72,16 +72,17 @@ public class InputBindingServiceTests : IDisposable
 
         Assert.True(result.Success);
         Assert.Null(result.Warning);
+        Assert.Equal(["capture"], _adapter.Operations);
         AssertObservableState(_factory, null, null);
         Assert.Empty(Directory.GetFiles(_directory));
     }
 
     [Fact]
-    public void Initialize_PartialOverrides_ResolveMissingActionsFromFactory()
+    public void Initialize_PartialOverrides_ResolveMissingActionsFromFactoryAndReplaceRuntime()
     {
-        var overrides = BuildSet(
+        var resolved = BuildSet(
             ("Attack", [new InputBinding.Keyboard(Key.E, true, false, false, false)]));
-        SeedFile(overrides);
+        SeedFile(resolved);
         var expectedBytes = _store.Read()!;
 
         var result = _service.Initialize();
@@ -92,7 +93,73 @@ public class InputBindingServiceTests : IDisposable
             [new InputBinding.Keyboard(Key.E, true, false, false, false)],
             _service.Active.GetBindings("Attack"));
         Assert.Equal(_factory.GetBindings("MoveUp"), _service.Active.GetBindings("MoveUp"));
-        AssertObservableState(_service.Active, expectedBytes, null);
+        Assert.Equal(["capture", "replace"], _adapter.Operations);
+        AssertObservableState(resolved, expectedBytes, resolved);
+    }
+
+    [Fact]
+    public void Initialize_ValidOverrides_ReplacesRuntimeMapIncludingUnboundActionAndLeavesFileUntouched()
+    {
+        var resolved = BuildSet(
+            ("Attack", [new InputBinding.Keyboard(Key.B, false, false, false, false)]),
+            ("PickUp", []));
+        SeedFile(resolved);
+        var expectedBytes = _store.Read()!;
+
+        var result = _service.Initialize();
+
+        Assert.True(result.Success);
+        Assert.Null(result.Warning);
+        Assert.Equal(["capture", "replace"], _adapter.Operations);
+        Assert.Empty(_service.Active.GetBindings("PickUp"));
+        AssertObservableState(resolved, expectedBytes, resolved);
+    }
+
+    [Fact]
+    public void Initialize_OverridesIdenticalToFactory_SkipsReplace()
+    {
+        SeedFile(_factory);
+        var bytes = _store.Read()!;
+
+        var result = _service.Initialize();
+
+        Assert.True(result.Success);
+        Assert.Null(result.Warning);
+        Assert.Equal(["capture"], _adapter.Operations);
+        AssertObservableState(_factory, bytes, null);
+    }
+
+    [Fact]
+    public void Initialize_ReplaceFailure_RuntimeRestored_FallsBackToFactoryWithWarning()
+    {
+        SeedFile(BuildSet(("Attack", [new InputBinding.Keyboard(Key.B, false, false, false, false)])));
+        var bytes = _store.Read()!;
+
+        _adapter.FailReplace = true;
+        _adapter.RuntimeRestored = true;
+        var result = _service.Initialize();
+
+        Assert.True(result.Success);
+        Assert.NotNull(result.Warning);
+        Assert.Equal(["capture", "replace"], _adapter.Operations);
+        AssertObservableState(_factory, bytes, _factory);
+    }
+
+    [Fact]
+    public void Initialize_ReplaceFailure_RuntimeNotRestored_RethrowsAndLeavesServiceUninitialized()
+    {
+        SeedFile(BuildSet(("Attack", [new InputBinding.Keyboard(Key.B, false, false, false, false)])));
+        var bytes = _store.Read()!;
+
+        _adapter.FailReplace = true;
+        _adapter.RuntimeRestored = false;
+
+        Assert.Throws<InputMapAdapterFailure>(() => _service.Initialize());
+
+        Assert.Equal(["capture", "replace"], _adapter.Operations);
+        Assert.False(_service.IsInitialized);
+        Assert.Throws<InvalidOperationException>(() => _service.Active);
+        Assert.Equal(bytes, _store.Read());
     }
 
     [Fact]
@@ -118,6 +185,7 @@ public class InputBindingServiceTests : IDisposable
 
         Assert.True(result.Success);
         Assert.NotNull(result.Warning);
+        Assert.Equal(["capture"], _adapter.Operations);
         AssertSetEquals(_factory, _service.Active);
         Assert.Equal(bytes, _store.Read());
         Assert.Null(_adapter.Current);
@@ -211,7 +279,32 @@ public class InputBindingServiceTests : IDisposable
         Assert.False(result.Success);
         Assert.NotNull(result.Error);
         Assert.Null(result.Recovery);
-        Assert.Equal(["capture", "replace"], _adapter.Operations);
+        Assert.Equal(["capture", "replace", "replace"], _adapter.Operations);
+        AssertObservableState(initial, initialBytes, initial);
+    }
+
+    [Fact]
+    public void Apply_UntypedAdapterFailure_RollsFileBackAndReportsRuntimeRecoveryRequired()
+    {
+        var initial = BuildSet(
+            ("Attack", [new InputBinding.Keyboard(Key.B, false, false, false, false)]));
+        SeedFile(initial);
+        _service.Initialize();
+        var initialBytes = _store.Read()!;
+        var injected = new InvalidOperationException("injected untyped adapter failure");
+
+        _adapter.ReplaceThrows = injected;
+        var result = _service.Apply(BuildDraft(
+            ("Attack", [new InputBinding.Keyboard(Key.E, false, false, false, false)])));
+
+        Assert.False(result.Success);
+        Assert.NotNull(result.Recovery);
+        var recovery = result.Recovery!;
+        Assert.True(recovery.RuntimeNeedsRecovery);
+        Assert.False(recovery.FileNeedsRecovery);
+        Assert.Same(injected, recovery.OriginalFailure);
+        Assert.Null(recovery.RuntimeRestorationFailure);
+        Assert.Null(recovery.FileRollbackFailure);
         AssertObservableState(initial, initialBytes, initial);
     }
 
@@ -407,6 +500,7 @@ public class InputBindingServiceTests : IDisposable
         public bool FailReplace { get; set; }
         public bool RuntimeRestored { get; set; } = true;
         public Exception? RestorationFailure { get; set; }
+        public Exception? ReplaceThrows { get; set; }
         public InputBindingSet? PartialRuntime { get; set; }
 
         public InputBindingSet CaptureFactory(IReadOnlyList<InputActionDefinition> catalog)
@@ -420,6 +514,9 @@ public class InputBindingServiceTests : IDisposable
             Operations.Add("replace");
             if (FileProbe is not null)
                 FileBytesAtReplace = FileProbe.Read();
+
+            if (ReplaceThrows is not null)
+                throw ReplaceThrows;
 
             if (FailReplace)
             {

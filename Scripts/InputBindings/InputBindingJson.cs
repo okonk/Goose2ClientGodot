@@ -327,6 +327,9 @@ public static class InputBindingJson
                 writer.WriteNumber("direction", joypadAxis.Direction);
                 writer.WriteEndObject();
                 break;
+
+            default:
+                throw new InvalidOperationException($"Unsupported binding type {binding.GetType().Name}.");
         }
     }
 }

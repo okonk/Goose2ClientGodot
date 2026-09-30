@@ -154,6 +154,24 @@ public class InputMapAdapterTests
     }
 
     [Fact]
+    public void CaptureFactory_FailsOnDuplicateBindingsAfterDeviceDiscarding()
+    {
+        var surface = SeedSurface(BuildSet());
+        var first = new InputMapEventDescriptor(
+            InputMapEventKind.JoypadButton, Key.None, Key.None, 0, false, false, false, false,
+            MouseButton.None, JoyButton.A, JoyAxis.Invalid, 0f, 0);
+        var second = new InputMapEventDescriptor(
+            InputMapEventKind.JoypadButton, Key.None, Key.None, 0, false, false, false, false,
+            MouseButton.None, JoyButton.A, JoyAxis.Invalid, 0f, 1);
+        surface.ReplaceEvents("Attack", first, second);
+
+        var adapter = new GodotInputMapAdapter(surface);
+
+        var ex = Assert.Throws<InputMapConfigurationException>(() => adapter.CaptureFactory(InputActionCatalog.Actions));
+        Assert.Contains("Attack", ex.Message);
+    }
+
+    [Fact]
     public void Replace_PublishesNextMapAndPreservesEverythingElse()
     {
         var previous = BuildSet();

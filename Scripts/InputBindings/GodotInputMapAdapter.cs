@@ -24,7 +24,6 @@ public sealed class GodotInputMapAdapter : IInputMapAdapter
             _surface.GetActionDeadzone(action.Name);
 
             var descriptors = _surface.GetActionEvents(action.Name);
-            var seen = new HashSet<InputMapEventDescriptor>(descriptors.Count);
             var converted = new List<InputBinding>(descriptors.Count);
             foreach (var descriptor in descriptors)
             {
@@ -32,11 +31,12 @@ public sealed class GodotInputMapAdapter : IInputMapAdapter
                 if (error != null)
                     throw new InputMapConfigurationException(error);
 
-                if (!seen.Add(descriptor))
-                    throw new InputMapConfigurationException($"Factory action '{action.Name}' has duplicate event {descriptor}.");
-
                 converted.Add(ToBinding(descriptor));
             }
+
+            var validation = InputBindingRules.ValidatePersisted(converted);
+            if (!validation.Success)
+                throw new InputMapConfigurationException($"Factory action '{action.Name}': {validation.Error}");
 
             bindings[action.Name] = converted.AsReadOnly();
         }

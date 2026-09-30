@@ -220,6 +220,18 @@ public class InputBindingModelTests
     }
 
     [Fact]
+    public void BothEntryPoints_RejectUnknownDerivedBindingTypes()
+    {
+        var editor = InputBindingRules.NormalizeForEditor(new[] { new UnknownBinding() });
+        Assert.False(editor.Success);
+        Assert.Contains("UnknownBinding", editor.Error);
+
+        var persisted = InputBindingRules.ValidatePersisted(new[] { new UnknownBinding() });
+        Assert.False(persisted.Success);
+        Assert.Contains("UnknownBinding", persisted.Error);
+    }
+
+    [Fact]
     public void InputBindingSet_DeepCopiesLists_SourceMutationCannotMutateSnapshot()
     {
         var source = new List<InputBinding>
@@ -294,6 +306,8 @@ public class InputBindingModelTests
 
         Assert.Throws<ArgumentException>(() => new InputBindingSet(new KeyValueList(entries)));
     }
+
+    private sealed record UnknownBinding : InputBinding;
 
     private sealed class KeyValueList : IReadOnlyDictionary<string, IReadOnlyList<InputBinding>>
     {

@@ -166,6 +166,16 @@ public class InputBindingJsonTests
         Assert.Equal(Encoding.UTF8.GetBytes(expected), InputBindingJson.Serialize(active, factory));
     }
 
+    [Fact]
+    public void Serialize_UnknownDerivedBindingType_ThrowsInsteadOfDropping()
+    {
+        var factory = FullSet();
+        var active = FullSet(("Attack", [new UnknownBinding()]));
+
+        var ex = Assert.Throws<InvalidOperationException>(() => InputBindingJson.Serialize(active, factory));
+        Assert.Contains("UnknownBinding", ex.Message);
+    }
+
     [Theory]
     [InlineData("")]
     [InlineData("{")]
@@ -368,6 +378,8 @@ public class InputBindingJsonTests
         var result = InputBindingJson.Parse("{\"version\": 1, \"actions\": []}");
         Assert.False(result.Success);
     }
+
+    private sealed record UnknownBinding : InputBinding;
 
     private static InputBindingSet FullSet(params (string Name, InputBinding[] Bindings)[] overrides)
     {

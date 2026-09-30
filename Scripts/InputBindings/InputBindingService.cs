@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace Goose2Client.InputBindings;
 
@@ -69,7 +70,29 @@ public sealed class InputBindingService
                     ? overrideBindings
                     : factory.GetBindings(action.Name);
 
-        _active = new InputBindingSet(resolved);
+        var resolvedSet = new InputBindingSet(resolved);
+        if (SetEquals(factory, resolvedSet))
+        {
+            _active = resolvedSet;
+            return new InputBindingInitializeResult(true, null);
+        }
+
+        try
+        {
+            _adapter.Replace(factory, resolvedSet);
+        }
+        catch (InputMapAdapterFailure failure)
+        {
+            if (!failure.RuntimeRestored)
+                throw;
+
+            _active = factory;
+            return new InputBindingInitializeResult(
+                true,
+                "Persisted input bindings could not be applied to the runtime input map; factory defaults are active.");
+        }
+
+        _active = resolvedSet;
         return new InputBindingInitializeResult(true, null);
     }
 
@@ -110,6 +133,18 @@ public sealed class InputBindingService
                     failure.RestorationFailure,
                     rollbackSucceeded ? null : FileRollbackFailure()));
         }
+        catch (Exception ex)
+        {
+            // An untyped Replace failure leaves the runtime map in an unknown state.
+            var rollbackSucceeded = transaction.Rollback();
+            return new InputBindingApplyResult(false, ex.Message, null,
+                new InputBindingRecoveryStatus(
+                    true,
+                    !rollbackSucceeded,
+                    ex,
+                    null,
+                    rollbackSucceeded ? null : FileRollbackFailure()));
+        }
 
         _active = candidate;
 
@@ -125,6 +160,15 @@ public sealed class InputBindingService
 
     private static Exception FileRollbackFailure() =>
         new("Input bindings file rollback failed; the file may contain the rejected bindings.");
+
+    private static bool SetEquals(InputBindingSet a, InputBindingSet b)
+    {
+        foreach (var action in InputActionCatalog.Actions)
+            if (!a.GetBindings(action.Name).SequenceEqual(b.GetBindings(action.Name)))
+                return false;
+
+        return true;
+    }
 
     private static InputBindingSet? BuildCandidate(IReadOnlyDictionary<string, IReadOnlyList<InputBinding>> draft, out string? error)
     {

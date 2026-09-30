@@ -79,7 +79,9 @@ public static class InputBindingRules
             case InputBinding.JoypadAxis { Direction: not (-1 or 1) }:
                 return "Axis direction must be -1 or +1.";
             default:
-                return null;
+                return binding is InputBinding.Keyboard or InputBinding.Mouse or InputBinding.JoypadButton or InputBinding.JoypadAxis
+                    ? null
+                    : $"Unsupported binding type {binding.GetType().Name}.";
         }
     }
 }

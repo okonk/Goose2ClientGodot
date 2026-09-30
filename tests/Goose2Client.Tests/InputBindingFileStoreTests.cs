@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using System.Text;
 using Goose2Client.InputBindings;
 using Xunit;
@@ -157,6 +158,27 @@ public class InputBindingFileStoreTests : IDisposable
         Assert.NotEmpty(FilesInDirectory());
 
         _store.FailDuringCleanup = null;
+        Assert.True(second.Complete());
+        Assert.Equal(Utf8("B"), _store.Read());
+        Assert.Equal(new[] { _filePath }, FilesInDirectory());
+    }
+
+    [Fact]
+    public void Complete_RealBackupDeletionFailure_ReportsFalseAndStaysRetryable()
+    {
+        var first = _store.Save(Utf8("A"));
+        Assert.True(first.Complete());
+
+        var second = _store.Save(Utf8("B"));
+        var backup = FilesInDirectory().Single(f => f.EndsWith(".bak"));
+        File.Delete(backup);
+        Directory.CreateDirectory(backup);
+
+        Assert.False(second.Complete());
+        Assert.True(Directory.Exists(backup));
+        Assert.Equal(Utf8("B"), _store.Read());
+
+        Directory.Delete(backup);
         Assert.True(second.Complete());
         Assert.Equal(Utf8("B"), _store.Read());
         Assert.Equal(new[] { _filePath }, FilesInDirectory());
