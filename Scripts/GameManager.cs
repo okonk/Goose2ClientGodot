@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using Godot;
 using Goose2Client.Diagnostics;
+using Goose2Client.InputBindings;
 using Goose2Client.Map;
 using Goose2Client.Network;
 using Goose2Client.Network.Packets;
@@ -16,6 +17,8 @@ namespace Goose2Client
 
         public NetworkClient NetworkClient { get; private set; } = null!;
         public PacketManager PacketManager { get; private set; } = null!;
+
+        public InputBindingService InputBindings { get; private set; } = null!;
 
         private PausablePacketQueue _packetQueue = null!;
         private MainThreadStallMonitor _stallMonitor = null!;
@@ -86,6 +89,13 @@ namespace Goose2Client
         {
             instance = this;
             GetWindow().Title = "Goose2 Client";
+
+            InputBindings = new InputBindingService(
+                new GodotInputMapAdapter(new GodotInputMapSurface()),
+                new InputBindingFileStore(ProjectSettings.GlobalizePath("user://input-bindings.json")));
+            var bindingLoad = InputBindings.Initialize();
+            if (bindingLoad.Warning is { } warning)
+                GD.PushWarning(warning);
 
             PacketManager = new PacketManager();
             NetworkClient = new NetworkClient();
