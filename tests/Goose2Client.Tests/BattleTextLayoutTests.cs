@@ -1,3 +1,4 @@
+using System;
 using Godot;
 using Goose2Client.Overlays;
 using Xunit;
@@ -111,6 +112,59 @@ public class BattleTextLayoutTests
             Assert.Equal(new Vector2(0, 0), offset);
             Assert.Equal(42, position);  // unchanged
         }
+    }
+
+    // ── Overlap push planning (lineHeight = 16) ──
+
+    [Fact]
+    public void PlanPushUps_Empty_returnsEmpty()
+    {
+        Assert.Empty(BattleTextLayout.PlanPushUps(Array.Empty<float>(), 16f));
+    }
+
+    [Fact]
+    public void PlanPushUps_LineAtAnchor_pushesOneLineHeight()
+    {
+        Assert.Equal(new[] { 16f }, BattleTextLayout.PlanPushUps(new[] { 0f }, 16f));
+    }
+
+    [Fact]
+    public void PlanPushUps_LineAlreadyOneHeightUp_notPushed()
+    {
+        Assert.Equal(new[] { 0f }, BattleTextLayout.PlanPushUps(new[] { -16f }, 16f));
+    }
+
+    [Fact]
+    public void PlanPushUps_LineRisenPastOneHeight_notPushed()
+    {
+        // Spaced-out healing tick: old line rose 24px on its own, no push needed.
+        Assert.Equal(new[] { 0f }, BattleTextLayout.PlanPushUps(new[] { -24f }, 16f));
+    }
+
+    [Fact]
+    public void PlanPushUps_LinePartiallyRisen_pushesOnlyShortfall()
+    {
+        Assert.Equal(new[] { 8f }, BattleTextLayout.PlanPushUps(new[] { -8f }, 16f));
+    }
+
+    [Fact]
+    public void PlanPushUps_SimultaneousBurst_stacksWithoutOverlap()
+    {
+        // Third line of a same-instant burst: lines sit at -16 and 0, both shift up 16.
+        Assert.Equal(new[] { 16f, 16f }, BattleTextLayout.PlanPushUps(new[] { -16f, 0f }, 16f));
+    }
+
+    [Fact]
+    public void PlanPushUps_CascadeKeepsMinimumGapBetweenExistingLines()
+    {
+        // -10 must clear the anchor by 16 → -16 (push 6); -20 must clear -16 → -32 (push 12).
+        Assert.Equal(new[] { 12f, 6f }, BattleTextLayout.PlanPushUps(new[] { -20f, -10f }, 16f));
+    }
+
+    [Fact]
+    public void PlanPushUps_NeverPushesDown()
+    {
+        Assert.Equal(new[] { 0f, 0f }, BattleTextLayout.PlanPushUps(new[] { -64f, -40f }, 16f));
     }
 
     // ── Color + display-text resolution ──

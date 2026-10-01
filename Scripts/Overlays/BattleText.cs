@@ -30,10 +30,23 @@ namespace Goose2Client.Overlays
             int childCount = GetChildCount();
             Vector2 offset = BattleTextLayout.ComputeSpreadOffset(type, childCount, ref _position);
 
-            // New line spawns at the anchor; shift existing lines up one line height so bursts stack
-            // instead of overlapping (all lines rise at the same rate, so spacing is fixed once placed).
-            for (int i = 0; i < childCount; i++)
-                if (GetChild(i) is BattleTextLine existing) existing.PushUpOneLine();
+            // A new line spawns at the anchor. Push existing lines up only as far as needed to
+            // clear it: simultaneous lines still stack (fixes overlap), but lines that have
+            // already risen away are left alone so spaced-out healing stays compact.
+            if (childCount > 0)
+            {
+                var ys = new float[childCount];
+                var lines = new BattleTextLine[childCount];
+                for (int i = 0; i < childCount; i++)
+                {
+                    lines[i] = (BattleTextLine)GetChild(i);
+                    ys[i] = lines[i].CurrentScreenOffsetY();
+                }
+
+                var pushes = BattleTextLayout.PlanPushUps(ys, BattleTextLine.LabelHeight * textScale);
+                for (int i = 0; i < childCount; i++)
+                    if (pushes[i] > 0f) lines[i].PushUpScreenPixels(pushes[i]);
+            }
 
             var (color, displayText) = BattleTextLayout.Resolve(type, text);
 

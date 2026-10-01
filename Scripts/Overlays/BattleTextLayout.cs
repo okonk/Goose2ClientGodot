@@ -3,10 +3,11 @@ using Goose2Client.Network.Packets;
 
 namespace Goose2Client.Overlays
 {
-    /// <summary>Pure logic for battle text layout: x jitter and color/text resolution.
-    /// Color/text mirrors Unity BattleTextLine.Create; x jitter keeps the reference {4,-4,12}
-    /// cycle but drops the 3-row y grid (8 px rows can't separate 16 px lines) — vertical
-    /// spacing is instead handled by BattleText pushing existing lines up per new line.</summary>
+    /// <summary>Pure logic for battle text layout: x jitter, overlap push planning, and
+    /// color/text resolution. Color/text mirrors Unity BattleTextLine.Create; x jitter keeps
+    /// the reference {4,-4,12} cycle but drops the 3-row y grid (8 px rows can't separate
+    /// 16 px lines) — vertical spacing is instead handled by BattleText pushing only the
+    /// existing lines that would still overlap a new line at the anchor.</summary>
     public static class BattleTextLayout
     {
         private static readonly System.Collections.Generic.HashSet<BattleTextType> SpreadTypes =
@@ -35,6 +36,30 @@ namespace Goose2Client.Overlays
             };
 
             return new Vector2(x, 0);
+        }
+
+        /// <summary>Upward push (screen px, ≥0) per existing line needed to make room for a new
+        /// line spawning at y=0. currentYsTopFirst are the existing lines' current screen y
+        /// offsets, oldest (topmost) first; a line already clear of the line below it is left
+        /// alone so spaced-out bursts keep natural rise spacing instead of drifting apart.</summary>
+        public static float[] PlanPushUps(float[] currentYsTopFirst, float lineHeight)
+        {
+            var pushes = new float[currentYsTopFirst.Length];
+            float below = 0f;
+            for (int i = currentYsTopFirst.Length - 1; i >= 0; i--)
+            {
+                float target = below - lineHeight;
+                if (currentYsTopFirst[i] > target)
+                {
+                    pushes[i] = currentYsTopFirst[i] - target;
+                    below = target;
+                }
+                else
+                {
+                    below = currentYsTopFirst[i];
+                }
+            }
+            return pushes;
         }
 
         /// <summary>Resolve the display color and text for a battle text type.
