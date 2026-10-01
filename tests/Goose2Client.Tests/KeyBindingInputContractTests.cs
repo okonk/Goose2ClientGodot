@@ -103,6 +103,7 @@ public class KeyBindingInputContractTests
     public void SpellTargetManager_CyclingIsExactWithEcho_OthersExactWithoutEcho()
     {
         string stm = Read("Scripts/SpellTargetManager.cs");
+        AssertEveryLiteralCallIsExactAndCataloged(stm, "SpellTargetManager.cs");
         foreach (var action in new[] { "TargetUp", "MoveUp", "MoveLeft", "TargetDown", "MoveDown", "MoveRight" })
             Assert.Contains($"IsActionPressed(\"{action}\", exactMatch: true, allowEcho: true)", stm);
         foreach (var action in new[] { "ConfirmTarget", "CancelTarget", "TargetHome" })
