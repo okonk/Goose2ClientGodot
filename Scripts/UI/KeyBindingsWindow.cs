@@ -620,6 +620,9 @@ public partial class KeyBindingsWindow : BaseWindow
                     ? $"{text}\n{ConflictTooltip(actionName, rows[i].Conflicts)}"
                     : $"{text}\nClick to rebind, right-click to remove"
             };
+            // Chips are freed and rebuilt by every rerender and sized from Px(): the snapshot must
+            // own neither their identity nor their geometry (a record would double-scale them).
+            chip.SetMeta(UiScaleLayout.SkipMeta, true);
             ApplyChipStyles(chip, kind, conflicted ? ConflictColor : KeyTextColor);
             chip.Pressed += () => OpenCapturePrompt(actionName, index);
             chip.GuiInput += @event =>
@@ -661,6 +664,7 @@ public partial class KeyBindingsWindow : BaseWindow
             CustomMinimumSize = slotSize,
             TooltipText = "Add binding"
         };
+        add.SetMeta(UiScaleLayout.SkipMeta, true);
         add.AddThemeStyleboxOverride("normal", Style("empty"));
         add.AddThemeStyleboxOverride("hover", Style("add_hover"));
         add.AddThemeStyleboxOverride("pressed", Style("key_pressed"));
