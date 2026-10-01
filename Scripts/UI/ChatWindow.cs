@@ -183,6 +183,14 @@ public partial class ChatWindow : BaseWindow
         _scrollRight.Disabled = bar.Value >= bar.MaxValue - bar.Page;
     }
 
+    public void ScrollPage(int direction)
+    {
+        if (!Visible)
+            return;
+        var bar = _chatLog.GetVScrollBar();
+        bar.Value += direction * bar.Page;
+    }
+
     private void RenderActive()
     {
         _chatLog.Clear();

@@ -16,7 +16,7 @@ public class InputActionCatalogTests
         "Attack", "PickUp", "ToggleMount",
         "ToggleInventory", "ToggleSpellbook", "ToggleCharacterWindow", "ToggleChat",
         "Hotkey1", "Hotkey2", "Hotkey3", "Hotkey4", "Hotkey5", "Hotkey6", "Hotkey7", "Hotkey8", "Hotkey9", "Hotkey0", "CycleHotbarPage",
-        "StartChat", "SlashCommand", "GuildCommand", "TellCommand", "ReplyCommand",
+        "StartChat", "SlashCommand", "GuildCommand", "TellCommand", "ReplyCommand", "ScrollChatUp", "ScrollChatDown",
         "TargetUp", "TargetDown", "ConfirmTarget", "TargetHome", "CancelTarget",
         "EmoteHeart", "EmoteQuestion", "EmoteDots", "EmotePoop", "EmoteSurprised", "EmoteSleep",
         "EmoteAnnoyed", "EmoteSweat", "EmoteMusic", "EmoteWink", "EmoteTrash", "EmoteDollar",
@@ -32,6 +32,7 @@ public class InputActionCatalogTests
         ["Hotkey5"] = "Hotbar", ["Hotkey6"] = "Hotbar", ["Hotkey7"] = "Hotbar", ["Hotkey8"] = "Hotbar",
         ["Hotkey9"] = "Hotbar", ["Hotkey0"] = "Hotbar", ["CycleHotbarPage"] = "Hotbar",
         ["StartChat"] = "Chat", ["SlashCommand"] = "Chat", ["GuildCommand"] = "Chat", ["TellCommand"] = "Chat", ["ReplyCommand"] = "Chat",
+        ["ScrollChatUp"] = "Chat", ["ScrollChatDown"] = "Chat",
         ["TargetUp"] = "Targeting", ["TargetDown"] = "Targeting", ["ConfirmTarget"] = "Targeting",
         ["TargetHome"] = "Targeting", ["CancelTarget"] = "Targeting",
         ["EmoteHeart"] = "Emotes", ["EmoteQuestion"] = "Emotes", ["EmoteDots"] = "Emotes", ["EmotePoop"] = "Emotes",
@@ -42,11 +43,11 @@ public class InputActionCatalogTests
     };
 
     [Fact]
-    public void Catalog_ContainsExactlyThe46ApprovedActions_InDesignCategoryAndDisplayOrder()
+    public void Catalog_ContainsExactlyThe48ApprovedActions_InDesignCategoryAndDisplayOrder()
     {
         var actions = InputActionCatalog.Actions;
 
-        Assert.Equal(46, actions.Count);
+        Assert.Equal(48, actions.Count);
         Assert.Equal(ExpectedActions, actions.Select(a => a.Name).ToArray());
 
         foreach (var action in actions)

@@ -77,10 +77,30 @@ public class KeyBindingInputContractTests
 
         int targeting = body.IndexOf("GameManager.Instance.IsTargeting", StringComparison.Ordinal);
         int lineEdit = body.IndexOf("GetViewport().GuiGetFocusOwner() is LineEdit", StringComparison.Ordinal);
-        int firstMatch = body.IndexOf("IsActionPressed", StringComparison.Ordinal);
+        int firstMatch = body.IndexOf("IsActionPressed(\"Toggle", StringComparison.Ordinal);
         Assert.True(targeting >= 0, "IsTargeting guard must remain in the raw-input handler");
         Assert.True(lineEdit > targeting, "LineEdit focus guard must remain after the IsTargeting guard");
         Assert.True(firstMatch > lineEdit, "catalog matches must run after both guards");
+
+        var early = Regex.Matches(body.Substring(0, lineEdit), @"IsActionPressed\(""([^""]+)""")
+            .Select(m => m.Groups[1].Value)
+            .ToArray();
+        Assert.Equal(new[] { "ScrollChatUp", "ScrollChatDown" }, early);
+        Assert.True(body.IndexOf("IsActionPressed", StringComparison.Ordinal) > targeting,
+            "chat scrolling must still be skipped while targeting");
+    }
+
+    [Fact]
+    public void GameHud_ChatScrollRepeatsWhileHeldAndPagesTheChatLog()
+    {
+        string hud = Read("Scripts/UI/GameHud.cs");
+        Assert.Contains("IsActionPressed(\"ScrollChatUp\", exactMatch: true, allowEcho: true)", hud);
+        Assert.Contains("IsActionPressed(\"ScrollChatDown\", exactMatch: true, allowEcho: true)", hud);
+        Assert.Contains("Chat.ScrollPage(-1)", hud);
+        Assert.Contains("Chat.ScrollPage(1)", hud);
+
+        string chat = Read("Scripts/UI/ChatWindow.cs");
+        Assert.Contains("public void ScrollPage(int direction)", chat);
     }
 
     [Fact]

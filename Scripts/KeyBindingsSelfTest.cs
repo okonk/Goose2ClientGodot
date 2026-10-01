@@ -109,7 +109,7 @@ internal static class KeyBindingsSelfTest
         gm.EnsureHud();
         await Frame();
 
-        Assert(catalog.Count == 46, $"catalog must define 46 actions, found {catalog.Count}");
+        Assert(catalog.Count == 48, $"catalog must define 48 actions, found {catalog.Count}");
         var factory = service.FactoryDefaults;
         foreach (var action in catalog)
         {
@@ -127,7 +127,7 @@ internal static class KeyBindingsSelfTest
             "Hotkey1 factory default must be the physical 1 key");
         Assert(factory.GetBindings("ToggleFullscreen")[0] is InputBinding.Keyboard { PhysicalKey: Key.Enter, Alt: true },
             "ToggleFullscreen factory default must be the Alt+Enter chord");
-        GD.Print("[key_bindings_selftest] OK factory capture covers all 46 actions with physical-key defaults");
+        GD.Print("[key_bindings_selftest] OK factory capture covers all 48 actions with physical-key defaults");
 
         var draft = new Dictionary<string, IReadOnlyList<InputBinding>>(catalog.Count);
         foreach (var action in catalog)
@@ -286,18 +286,18 @@ internal static class KeyBindingsSelfTest
             return (rows, chips);
         }
 
-        Assert(CountRowsAndChips() == (46, expectedChips), "all 46 rows and every applied chip must be present at 1x");
+        Assert(CountRowsAndChips() == (48, expectedChips), "all 48 rows and every applied chip must be present at 1x");
         applier.Apply(2f, ApplyReason.UserCommit);
         await Frame();
         Assert(kb.Size == new Vector2(Canvas.X, Canvas.Y), $"2x size {kb.Size} must clamp to the canvas");
-        Assert(CountRowsAndChips() == (46, expectedChips), "rows and chips must survive 2x");
+        Assert(CountRowsAndChips() == (48, expectedChips), "rows and chips must survive 2x");
         Assert(kb.Position.X >= 0 && kb.Position.Y >= 0
             && kb.Position.X + kb.Size.X <= Canvas.X && kb.Position.Y + kb.Size.Y <= Canvas.Y,
             $"window rect {kb.Position}+{kb.Size} must stay within the root canvas at 2x");
         applier.Apply(1f, ApplyReason.UserCommit);
         await Frame();
         Assert(kb.Size == KeyBindingsLayout.DesignSize, $"1x size {kb.Size} must restore the design size");
-        Assert(CountRowsAndChips() == (46, expectedChips), "rows and chips must survive the 1x/2x/1x round trip");
+        Assert(CountRowsAndChips() == (48, expectedChips), "rows and chips must survive the 1x/2x/1x round trip");
         kb.GetNode<Button>("Content/RootBox/FooterRow/CancelButton").EmitSignal("pressed");
         Assert(!kb.Visible, "Cancel must close the window after the scale round trip");
         GD.Print("[key_bindings_selftest] OK dynamic rows/chips survive 1x/2x/1x and the window stays in the canvas");
@@ -316,6 +316,22 @@ internal static class KeyBindingsSelfTest
             && service.Active.GetBindings("Attack")[0] is InputBinding.Keyboard { PhysicalKey: Key.Space, Ctrl: true },
             "Cancel must not apply the chip removal");
         GD.Print("[key_bindings_selftest] OK chip remove button callback removes the binding");
+
+        var chat = hud.Chat;
+        chat.Visible = true;
+        for (int i = 0; i < 200; i++)
+            chat.AddChatLine($"self-test line {i}", ChatType.Server);
+        await Frame();
+        await Frame();
+        var chatBar = chat.GetNode<RichTextLabel>("Content/ChatLog").GetVScrollBar();
+        double bottom = chatBar.MaxValue - chatBar.Page;
+        Assert(chatBar.Page > 0 && bottom > chatBar.Page, $"chat log must overflow for the scroll check (page {chatBar.Page}, max {chatBar.MaxValue})");
+        Assert(chatBar.Value >= bottom - 1, $"chat log must start at the bottom ({chatBar.Value} of {bottom})");
+        hud._UnhandledInput(new InputEventKey { PhysicalKeycode = Key.Pageup, Pressed = true });
+        Assert(Math.Abs(chatBar.Value - (bottom - chatBar.Page)) < 1, $"Page Up must scroll the chat log one page up ({chatBar.Value})");
+        hud._UnhandledInput(new InputEventKey { PhysicalKeycode = Key.Pagedown, Pressed = true });
+        Assert(chatBar.Value >= bottom - 1, $"Page Down must scroll the chat log back to the bottom ({chatBar.Value})");
+        GD.Print("[key_bindings_selftest] OK Page Up / Page Down page the chat log");
 
         byte[]? productionAfter = File.Exists(productionPath) ? File.ReadAllBytes(productionPath) : null;
         Assert(productionBefore == null

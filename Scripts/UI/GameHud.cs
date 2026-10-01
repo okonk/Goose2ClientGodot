@@ -124,6 +124,19 @@ public partial class GameHud : Control
         // Spell targeting captures all keyboard input (Unity disables the Player input map).
         if (GameManager.Instance.IsTargeting)
             return;
+        // Checked before the LineEdit guard so chat can scroll while a message is being typed.
+        if (@event.IsActionPressed("ScrollChatUp", exactMatch: true, allowEcho: true))
+        {
+            Chat.ScrollPage(-1);
+            GetViewport().SetInputAsHandled();
+            return;
+        }
+        if (@event.IsActionPressed("ScrollChatDown", exactMatch: true, allowEcho: true))
+        {
+            Chat.ScrollPage(1);
+            GetViewport().SetInputAsHandled();
+            return;
+        }
         // Don't toggle windows or refocus while typing in chat.
         if (GetViewport().GuiGetFocusOwner() is LineEdit)
             return;
