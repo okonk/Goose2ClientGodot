@@ -48,6 +48,16 @@ public class KeyBindingsSceneTests
     }
 
     [Fact]
+    public void CloseButton_IsAnchoredToTitleBarRightEdge()
+    {
+        var block = NodeBlock(KeyBindingsScene(), "CloseButton");
+        Assert.Contains("anchor_left = 1.0", block);
+        Assert.Contains("anchor_right = 1.0", block);
+        Assert.Contains("offset_bottom = -2.0", block);
+        Assert.DoesNotContain("offset_bottom = 22.0", block);
+    }
+
+    [Fact]
     public void EditorControls_ArePresent()
     {
         var s = KeyBindingsScene();
