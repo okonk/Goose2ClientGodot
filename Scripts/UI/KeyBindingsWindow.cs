@@ -599,7 +599,6 @@ public partial class KeyBindingsWindow : BaseWindow
         }
 
         var slotSize = new Vector2(Px(KeyBindingsLayout.ChipWidth), Px(KeyBindingsLayout.ChipHeight));
-        var bound = 0;
         for (var i = 0; i < rows.Count; i++)
         {
             if (rows[i].Binding is not { } binding)
@@ -653,40 +652,22 @@ public partial class KeyBindingsWindow : BaseWindow
             chip.AddChild(remove);
 
             shell.ChipsBox.AddChild(chip);
-            bound++;
         }
 
-        var slots = Math.Max(KeyBindingsLayout.SlotColumns, bound + 1);
-        for (var slot = bound; slot < slots; slot++)
+        var add = new Button
         {
-            if (slot == bound)
-            {
-                var add = new Button
-                {
-                    Name = "AddBindingButton",
-                    Text = "+",
-                    CustomMinimumSize = slotSize,
-                    TooltipText = "Add binding"
-                };
-                add.AddThemeStyleboxOverride("normal", Style("empty"));
-                add.AddThemeStyleboxOverride("hover", Style("add_hover"));
-                add.AddThemeStyleboxOverride("pressed", Style("key_pressed"));
-                add.AddThemeColorOverride("font_color", RemoveColor);
-                add.AddThemeColorOverride("font_hover_color", AddBorderHover);
-                add.Pressed += () => OpenCapturePrompt(actionName, -1);
-                shell.ChipsBox.AddChild(add);
-                continue;
-            }
-
-            var empty = new Panel
-            {
-                Name = $"EmptySlot_{slot}",
-                MouseFilter = MouseFilterEnum.Ignore,
-                CustomMinimumSize = slotSize
-            };
-            empty.AddThemeStyleboxOverride("panel", Style("empty"));
-            shell.ChipsBox.AddChild(empty);
-        }
+            Name = "AddBindingButton",
+            Text = "+",
+            CustomMinimumSize = slotSize,
+            TooltipText = "Add binding"
+        };
+        add.AddThemeStyleboxOverride("normal", Style("empty"));
+        add.AddThemeStyleboxOverride("hover", Style("add_hover"));
+        add.AddThemeStyleboxOverride("pressed", Style("key_pressed"));
+        add.AddThemeColorOverride("font_color", RemoveColor);
+        add.AddThemeColorOverride("font_hover_color", AddBorderHover);
+        add.Pressed += () => OpenCapturePrompt(actionName, -1);
+        shell.ChipsBox.AddChild(add);
     }
 
     private void RemoveBinding(string actionName, int index)

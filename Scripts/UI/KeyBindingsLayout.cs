@@ -18,5 +18,4 @@ public static class KeyBindingsLayout
     public const float RemoveWidth = 16f;
     public const float ResetWidth = 18f;
     public const float HeaderGap = 10f;
-    public const int SlotColumns = 3;
 }
