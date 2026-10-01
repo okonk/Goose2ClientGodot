@@ -67,6 +67,33 @@ public class InputBindingDisplayTests
     }
 
     [Theory]
+    [InlineData(Key.Kp1, "1", "NP 1")]
+    [InlineData(Key.Kp0, null, "NP 0")]
+    [InlineData(Key.Kp9, "9", "NP 9")]
+    [InlineData(Key.KpAdd, "Plus", "KpAdd")]
+    [InlineData(Key.Comma, "Period", "Comma")]
+    [InlineData(Key.Quoteleft, "Less", "Quoteleft")]
+    [InlineData(Key.A, "A", "A")]
+    [InlineData(Key.Key6, "6", "6")]
+    [InlineData(Key.F5, "F5", "F5")]
+    public void Keyboard_LayoutLabelTrustedOnlyForLettersAndDigits(Key key, string? layoutLabel, string expected)
+    {
+        var binding = new InputBinding.Keyboard(key, false, false, false, false);
+        var provider = layoutLabel is null ? new FakeLabelProvider() : new FakeLabelProvider((key, layoutLabel));
+
+        Assert.Equal(expected, InputBindingDisplay.Format(binding, provider));
+    }
+
+    [Fact]
+    public void NumpadDigits_DistinctFromTopRowDigits()
+    {
+        var provider = new FakeLabelProvider((Key.Key1, "1"), (Key.Kp1, "1"));
+
+        Assert.Equal("1", InputBindingDisplay.Format(new InputBinding.Keyboard(Key.Key1, false, false, false, false), provider));
+        Assert.Equal("NP 1", InputBindingDisplay.Format(new InputBinding.Keyboard(Key.Kp1, false, false, false, false), provider));
+    }
+
+    [Theory]
     [InlineData(MouseButton.Middle, "Middle")]
     [InlineData(MouseButton.WheelUp, "WheelUp")]
     [InlineData(MouseButton.WheelDown, "WheelDown")]
