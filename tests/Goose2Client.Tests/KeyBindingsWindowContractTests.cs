@@ -147,6 +147,44 @@ public class KeyBindingsWindowContractTests
     }
 
     [Fact]
+    public void Capture_SafeRestoreRequestedOnCloseTeardownAndHide()
+    {
+        var close = MethodBody(WindowSource(), "protected override void OnClosePressed()");
+        Assert.Contains("RequestSafeRestore()", close, StringComparison.Ordinal);
+
+        var exit = MethodBody(WindowSource(), "public override void _ExitTree()");
+        Assert.Contains("RequestSafeRestore()", exit, StringComparison.Ordinal);
+
+        var src = WindowSource();
+        Assert.Contains("VisibilityChanged += OnVisibilityChanged", src, StringComparison.Ordinal);
+        var handler = MethodBody(src, "private void OnVisibilityChanged()");
+        Assert.Contains("!Visible", handler, StringComparison.Ordinal);
+        Assert.Contains("RequestSafeRestore()", handler, StringComparison.Ordinal);
+        Assert.DoesNotContain("public override void _Notification", src, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Input_MarksCaptureEventsHandledAndExemptsCancelCaptureButton()
+    {
+        var input = MethodBody(WindowSource(), "public override void _Input(InputEvent @event)");
+        Assert.Contains("SetInputAsHandled()", input, StringComparison.Ordinal);
+        Assert.Contains("IsOverCancelCapture(mouse.Position)", input, StringComparison.Ordinal);
+
+        var exemption = MethodBody(WindowSource(), "private bool IsOverCancelCapture(Vector2 position)");
+        Assert.Contains("_cancelCapture.Visible", exemption, StringComparison.Ordinal);
+        Assert.Contains("_cancelCapture.GetGlobalRect().HasPoint(position)", exemption, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ExitTree_UnsubscribesServiceAndVisibilityHandlers()
+    {
+        var exit = MethodBody(WindowSource(), "public override void _ExitTree()");
+        Assert.Contains("CaptureGateReleased -= OnCaptureGateReleased", exit, StringComparison.Ordinal);
+        Assert.Contains("SuppressionRestored -= OnSuppressionRestored", exit, StringComparison.Ordinal);
+        Assert.Contains("VisibilityChanged -= OnVisibilityChanged", exit, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Rerender_UnboundLabelTestsForNullBindingsNotRowCount()
     {
         var body = MethodBody(WindowSource(), "private void Rerender()");

@@ -228,6 +228,23 @@ public class InputBindingSuppressionTests : IDisposable
     }
 
     [Fact]
+    public void HeldMouseButtonGate_DelaysRestoreUntilButtonIsReleased()
+    {
+        var lease = _service.BeginSuppression();
+        _input.MouseButtons.Add(MouseButton.Middle);
+        lease.RequestRestore(InputReleaseGate.ForMouseButton(MouseButton.Middle));
+
+        _service.ProcessSuppression(_input);
+        Assert.True(_service.CaptureGateHeld);
+        AssertSetEquals(EmptySet(), _adapter.Current!);
+
+        _input.MouseButtons.Remove(MouseButton.Middle);
+        _service.ProcessSuppression(_input);
+        Assert.False(_service.CaptureGateHeld);
+        AssertSetEquals(_factory, _adapter.Current!);
+    }
+
+    [Fact]
     public void HeldJoypadButtonGate_DelaysRestoreUntilButtonIsReleased()
     {
         var lease = _service.BeginSuppression();

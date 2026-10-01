@@ -191,6 +191,39 @@ public class KeyBindingCaptureStateTests
     }
 
     [Fact]
+    public void AxisCrossingAtExactThreshold_IsCaptured()
+    {
+        var state = Armed();
+
+        state.JoypadAxisEvent(0, JoyAxis.LeftX, 0f);
+        state.JoypadAxisEvent(0, JoyAxis.LeftX, 0.75f);
+
+        Assert.Equal(new InputBinding.JoypadAxis(JoyAxis.LeftX, 1), state.Candidate);
+    }
+
+    [Fact]
+    public void AxisAtExactNeutral_UnblocksStartHeldAndUnseenPairs()
+    {
+        var startHeld = new KeyBindingCaptureState();
+        startHeld.Begin();
+        startHeld.SampleAxis(0, JoyAxis.LeftX, 0.9f);
+        startHeld.Tick();
+
+        startHeld.JoypadAxisEvent(0, JoyAxis.LeftX, 0.2f);
+        Assert.Null(startHeld.Candidate);
+        startHeld.JoypadAxisEvent(0, JoyAxis.LeftX, 0.8f);
+        Assert.Equal(new InputBinding.JoypadAxis(JoyAxis.LeftX, 1), startHeld.Candidate);
+
+        var unseen = Armed();
+        unseen.JoypadAxisEvent(1, JoyAxis.RightY, 0.9f);
+        Assert.Null(unseen.Candidate);
+        unseen.JoypadAxisEvent(1, JoyAxis.RightY, -0.2f);
+        Assert.Null(unseen.Candidate);
+        unseen.JoypadAxisEvent(1, JoyAxis.RightY, -0.8f);
+        Assert.Equal(new InputBinding.JoypadAxis(JoyAxis.RightY, -1), unseen.Candidate);
+    }
+
+    [Fact]
     public void AxisHeldAtCaptureStart_MustReturnToNeutralBeforeCapture()
     {
         var state = new KeyBindingCaptureState();

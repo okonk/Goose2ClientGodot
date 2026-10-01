@@ -67,6 +67,7 @@ public partial class KeyBindingsWindow : BaseWindow
         _cancelCapture.Pressed += OnCancelCapturePressed;
         service.CaptureGateReleased += OnCaptureGateReleased;
         service.SuppressionRestored += OnSuppressionRestored;
+        VisibilityChanged += OnVisibilityChanged;
 
         Rerender();
 
@@ -76,6 +77,7 @@ public partial class KeyBindingsWindow : BaseWindow
     public override void _ExitTree()
     {
         RequestSafeRestore();
+        VisibilityChanged -= OnVisibilityChanged;
         var service = GameManager.Instance?.InputBindings;
         if (service != null)
         {
@@ -94,10 +96,9 @@ public partial class KeyBindingsWindow : BaseWindow
         }
     }
 
-    public override void _Notification(int what)
+    private void OnVisibilityChanged()
     {
-        base._Notification(what);
-        if (what == NotificationVisibilityChanged && !Visible)
+        if (!Visible)
             RequestSafeRestore();
     }
 
