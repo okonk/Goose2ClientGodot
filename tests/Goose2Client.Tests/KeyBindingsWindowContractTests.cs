@@ -147,6 +147,21 @@ public class KeyBindingsWindowContractTests
     }
 
     [Fact]
+    public void Rerender_UnboundLabelTestsForNullBindingsNotRowCount()
+    {
+        var body = MethodBody(WindowSource(), "private void Rerender()");
+        Assert.Contains("Binding is null", body, StringComparison.Ordinal);
+        Assert.DoesNotContain("rows.Count == 0", body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Close_HidesStaleCaptureOverlay()
+    {
+        var close = MethodBody(WindowSource(), "protected override void OnClosePressed()");
+        Assert.Contains("_captureOverlay.Visible = false", close, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Relayout_ReappliesScaledSizesToDynamicChips()
     {
         var body = MethodBody(WindowSource(), "public override void Relayout()");

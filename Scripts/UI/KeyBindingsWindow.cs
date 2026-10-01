@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Godot;
 using Goose2Client;
 using Goose2Client.InputBindings;
@@ -126,6 +127,7 @@ public partial class KeyBindingsWindow : BaseWindow
     {
         _editor?.Cancel();
         Rerender();
+        _captureOverlay.Visible = false;
         base.OnClosePressed();
     }
 
@@ -274,7 +276,7 @@ public partial class KeyBindingsWindow : BaseWindow
                 continue;
             }
             shell.Root.Visible = true;
-            shell.UnboundLabel.Visible = rows.Count == 0;
+            shell.UnboundLabel.Visible = rows.All(r => r.Binding is null);
             RebuildChips(shell, actionName, rows);
         }
 
