@@ -180,6 +180,22 @@ internal static class UiScaleSelfTest
         Assert(effRow.GetChildCount() == 6, $"effect count after reseed {effRow.GetChildCount()} != 6");
         GD.Print("[ui_scale_selftest] OK party buff packet path (GUD/MKC/PBC/PBA/renewal/PBR/ERC)");
 
+        // Bars follow the vitals window: the fill a row first shows seeds directly (the
+        // 7001 -> 0 -> 7002 handover above must not sweep up from the old occupant), and
+        // only later packet-driven changes tween.
+        var rowHp = row0.GetNode<TextureProgressBar>("Content/HpBar");
+        var rowMp = row0.GetNode<TextureProgressBar>("Content/MpBar");
+        Assert(Mathf.IsEqualApprox((float)rowHp.Value, 1f) && Mathf.IsEqualApprox((float)rowMp.Value, 1f),
+            $"handover party bars {rowHp.Value}/{rowMp.Value} != 1 (must seed, not sweep)");
+        gm.HandlePacket("VPU7002,40,25");
+        Assert(Mathf.IsEqualApprox((float)rowHp.Value, 1f) && Mathf.IsEqualApprox((float)rowMp.Value, 1f),
+            $"party bars jumped to {rowHp.Value}/{rowMp.Value} instead of starting a tween");
+        for (int i = 0; i < 60 && rowHp.Value >= 1.0; i++)
+            await Frame();
+        Assert(rowHp.Value is < 1.0 and > 0.4, $"party HP tween {rowHp.Value} left the 0.4..1 band");
+        Assert(rowMp.Value is < 1.0 and > 0.25, $"party MP tween {rowMp.Value} left the 0.25..1 band");
+        GD.Print("[ui_scale_selftest] OK party bars seed on handover and tween on VPU");
+
         // Step 1: 1x no-op — Relayout at factor 1 must leave every registered root bit-identical.
         await Frame();
         var geo1 = new Dictionary<Control, Vector4>();

@@ -10,12 +10,18 @@ public partial class PartyMember : Control
 {
     private static readonly PackedScene EffectScene = GD.Load<PackedScene>("res://Scenes/UI/PartyEffect.tscn");
 
+    private const double BarTweenSeconds = 0.25;
+
     private Label _nameText = null!;
     private TextureProgressBar _hpBar = null!;
     private TextureProgressBar _mpBar = null!;
     private Control _content = null!;
     private HBoxContainer _effectRow = null!;
     private readonly Dictionary<int, PartyEffect> _effectNodes = new();
+
+    private Tween? _hpTween;
+    private Tween? _mpTween;
+    private bool _barsSeeded;
 
     public int PlayerId { get; private set; }
 
@@ -33,6 +39,11 @@ public partial class PartyMember : Control
 
     public void OnGroupUpdate(GroupUpdatePacket packet)
     {
+        // A row can be handed to a different member; the new occupant's bars seed
+        // directly instead of sweeping from whoever held the row last.
+        if (packet.LoginId != PlayerId)
+            _barsSeeded = false;
+
         PlayerId = packet.LoginId;
         _content.Visible = PlayerId != 0;
         Visible = PlayerId != 0;
@@ -50,8 +61,27 @@ public partial class PartyMember : Control
 
     public void UpdateHPMP(float hp, float mp)
     {
-        _hpBar.Value = hp;
-        _mpBar.Value = mp;
+        FillTo(_hpBar, ref _hpTween, hp);
+        FillTo(_mpBar, ref _mpTween, mp);
+        _barsSeeded = true;
+    }
+
+    // A vitals packet can land every frame during combat, so each bar keeps a single
+    // tween that is restarted rather than stacked.
+    private void FillTo(TextureProgressBar bar, ref Tween? tween, float target)
+    {
+        if (tween != null && tween.IsValid())
+            tween.Kill();
+
+        if (!_barsSeeded || Mathf.IsEqualApprox((float)bar.Value, target))
+        {
+            bar.Value = target;
+            return;
+        }
+
+        tween = CreateTween();
+        tween.SetTrans(Tween.TransitionType.Sine).SetEase(Tween.EaseType.Out);
+        tween.TweenProperty(bar, "value", target, BarTweenSeconds);
     }
 
     // The whole member row is the hit area (name, bars, frame); buff icons carry
