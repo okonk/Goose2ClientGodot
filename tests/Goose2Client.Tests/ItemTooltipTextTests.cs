@@ -221,7 +221,7 @@ public class ItemTooltipTextTests
         var lines = ItemTooltipText.Build(s, ClassName);
 
         var line = lines.Single(l => l.Color == ItemTooltipColor.Requirement);
-        Assert.Equal("Requires 20m total experience", line.Text);
+        Assert.Equal("Requires 20m experience", line.Text);
     }
 
     [Fact]
@@ -242,7 +242,7 @@ public class ItemTooltipTextTests
         var lines = ItemTooltipText.Build(new ItemStats { MinExperience = minExperience }, ClassName);
 
         var line = lines.Single(l => l.Color == ItemTooltipColor.Requirement);
-        Assert.Equal($"Requires {expected} total experience", line.Text);
+        Assert.Equal($"Requires {expected} experience", line.Text);
     }
 
     [Fact]

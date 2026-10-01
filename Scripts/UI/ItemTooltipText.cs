@@ -172,7 +172,7 @@ namespace Goose2Client.UI
 
             if (s.MinExperience != 0)
                 lines.Add((
-                    $"Requires {FormatCompact(s.MinExperience)} total experience",
+                    $"Requires {FormatCompact(s.MinExperience)} experience",
                     ItemTooltipColor.Requirement));
 
             if (!string.IsNullOrEmpty(s.SpellEffect))
