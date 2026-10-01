@@ -50,7 +50,8 @@ public class InputBindingCompositionContractTests
         Assert.True(nextMember > enterTree, "_Process not found after _EnterTree in GameManager.cs");
         var body = manager.Substring(enterTree, nextMember - enterTree);
 
-        Assert.Contains("ProjectSettings.GlobalizePath(\"user://input-bindings.json\")", body, StringComparison.Ordinal);
+        Assert.Contains("\"user://input-bindings.json\"", body, StringComparison.Ordinal);
+        Assert.Contains("ProjectSettings.GlobalizePath(InputBindingsPath)", body, StringComparison.Ordinal);
         Assert.Contains("InputBindings.Initialize()", body, StringComparison.Ordinal);
 
         var initialize = body.IndexOf("InputBindings.Initialize()", StringComparison.Ordinal);

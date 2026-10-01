@@ -20,6 +20,10 @@ namespace Goose2Client
 
         public InputBindingService InputBindings { get; private set; } = null!;
 
+    public string InputBindingsPath { get; private set; } = null!;
+
+    private const string KeyBindingsSelfTestArg = "+selftest=key_bindings";
+
         private static readonly GodotInputReleaseState InputReleaseState = new();
 
         private PausablePacketQueue _packetQueue = null!;
@@ -92,9 +96,14 @@ namespace Goose2Client
             instance = this;
             GetWindow().Title = "Goose2 Client";
 
+            // The self-test must never read or write the user's production binding file,
+            // so it is pointed at a process-unique temporary path chosen before the service exists.
+            InputBindingsPath = System.Array.IndexOf(OS.GetCmdlineUserArgs(), KeyBindingsSelfTestArg) >= 0
+                ? $"user://input-bindings-selftest-{OS.GetProcessId()}.json"
+                : "user://input-bindings.json";
             InputBindings = new InputBindingService(
                 new GodotInputMapAdapter(new GodotInputMapSurface()),
-                new InputBindingFileStore(ProjectSettings.GlobalizePath("user://input-bindings.json")));
+                new InputBindingFileStore(ProjectSettings.GlobalizePath(InputBindingsPath)));
             var bindingLoad = InputBindings.Initialize();
             if (bindingLoad.Warning is { } warning)
                 GD.PushWarning(warning);
@@ -237,6 +246,8 @@ namespace Goose2Client
                 _ = CharacterIconSelfTest.Run(this);
             if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "+selftest=log_viewer") >= 0)
                 _ = LogViewerSelfTest.Run(this);
+            if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), KeyBindingsSelfTestArg) >= 0)
+                _ = KeyBindingsSelfTest.Run(this);
         }
 
         public void HandlePacket(string packet)

@@ -144,4 +144,50 @@ public class KeyBindingsIntegrationContractTests
         Assert.DoesNotContain("CharacterSettings", window);
         Assert.Contains("GameManager.Instance.InputBindings", window);
     }
+
+    [Fact]
+    public void SelfTest_Gate_SelectsProcessUniqueBindingPath_BeforeServiceConstruction()
+    {
+        string gameManager = Read("Scripts/GameManager.cs");
+        Assert.Contains("+selftest=key_bindings", gameManager);
+        Assert.Contains("user://input-bindings.json", gameManager);
+        Assert.Contains("input-bindings-selftest-", gameManager);
+        Assert.Contains("OS.GetProcessId()", gameManager);
+
+        int selfTestPath = gameManager.IndexOf("input-bindings-selftest-", StringComparison.Ordinal);
+        int service = gameManager.IndexOf("new InputBindingService(", StringComparison.Ordinal);
+        Assert.True(selfTestPath >= 0 && selfTestPath < service,
+            "the temporary self-test binding path must be chosen before the service is constructed");
+
+        int dispatch = gameManager.IndexOf("KeyBindingsSelfTest.Run(this)", StringComparison.Ordinal);
+        Assert.True(dispatch >= 0, "GameManager must dispatch the key bindings self-test");
+    }
+
+    [Fact]
+    public void SelfTest_CleansUpTemporaryFilesInFinally_AndQuitsWithStatus()
+    {
+        string selfTest = Read("Scripts/KeyBindingsSelfTest.cs");
+        Assert.Contains("[key_bindings_selftest] PASS", selfTest);
+        Assert.Contains("ERR_key_bindings_selftest", selfTest);
+        Assert.Contains("Input.ParseInputEvent(", selfTest);
+        Assert.Contains("OS.GetProcessId()", selfTest);
+
+        int finallyIndex = selfTest.IndexOf("finally", StringComparison.Ordinal);
+        Assert.True(finallyIndex >= 0, "cleanup must run in a finally block");
+        string cleanup = selfTest.Substring(finallyIndex);
+        Assert.Contains("DeleteQuietly(bindingPath)", cleanup);
+        Assert.Contains("DeleteQuietly(characterPath)", cleanup);
+        Assert.Contains("Quit(failed ? 1 : 0)", cleanup);
+    }
+
+    [Fact]
+    public void Runner_BuildsFirst_RequiresPassMarker_PropagatesGodotStatus()
+    {
+        string runner = Read("tools/tests/run_key_bindings.sh");
+        Assert.Contains("+selftest=key_bindings", runner);
+        Assert.Contains("[key_bindings_selftest] PASS", runner);
+        int build = runner.IndexOf("dotnet build", StringComparison.Ordinal);
+        int godot = runner.IndexOf("--headless", StringComparison.Ordinal);
+        Assert.True(build >= 0 && build < godot, "the runner must build before launching godot");
+    }
 }
