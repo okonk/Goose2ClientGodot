@@ -21,6 +21,7 @@ public class DefaultWindowLayoutTests
     [InlineData("CombineBag", true)]
     [InlineData("OptionList", true)]
     [InlineData("LogViewer", true)]
+    [InlineData("KeyBindings", true)]
     [InlineData("Inventory", false)]
     [InlineData("Character", false)]
     [InlineData("Spellbook", false)]

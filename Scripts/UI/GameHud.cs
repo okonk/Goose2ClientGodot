@@ -26,6 +26,7 @@ public partial class GameHud : Control
     public CustomWindow Custom { get; private set; } = null!;
     public HairdyeWindow Hairdye { get; private set; } = null!;
     public LogViewerWindow LogViewer { get; private set; } = null!;
+    public KeyBindingsWindow KeyBindings { get; private set; } = null!;
     public MinimapControl Minimap { get; private set; } = null!;
     public QuestWindowManager QuestWindows { get; private set; } = null!;
     public OptionListWindowManager OptionListWindows { get; private set; } = null!;
@@ -87,6 +88,7 @@ public partial class GameHud : Control
         Buffs = Add<BuffEffectsWindow>("res://Scenes/UI/BuffEffectsWindow.tscn");
         Debug = Add<DebugWindow>("res://Scenes/UI/DebugWindow.tscn");
         Options = Add<OptionsWindow>("res://Scenes/UI/OptionsWindow.tscn");
+        KeyBindings = Add<KeyBindingsWindow>("res://Scenes/UI/KeyBindingsWindow.tscn");
         Vendor = Add<VendorWindow>("res://Scenes/UI/VendorWindow.tscn");
         Bank = Add<BankWindow>("res://Scenes/UI/BankWindow.tscn");
         CombineBag = Add<CombineBagContainerWindow>("res://Scenes/UI/CombineBagContainerWindow.tscn");
@@ -113,6 +115,8 @@ public partial class GameHud : Control
         var optionsBtn = toolbar.GetNodeOrNull<ToolbarItem>("OptionsButton");
         if (optionsBtn != null)
             optionsBtn.OnOptions = Options.ToggleWindow;
+
+        Options.OpenKeyBindings = KeyBindings.Open;
     }
 
     public override void _UnhandledInput(InputEvent @event)
