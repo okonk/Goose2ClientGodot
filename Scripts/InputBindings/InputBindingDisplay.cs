@@ -24,6 +24,42 @@ public sealed class GodotInputBindingLabelProvider : IInputBindingLabelProvider
 
 public static class InputBindingDisplay
 {
+    // Physical keys are named by their US-layout position: the layout label lookup is
+    // only trusted for letters and digits (see ResolveKeyboardLabel).
+    private static readonly Dictionary<Key, string> FriendlyNames = new()
+    {
+        [Key.KpMultiply] = "Num *",
+        [Key.KpDivide] = "Num /",
+        [Key.KpSubtract] = "Num -",
+        [Key.KpPeriod] = "Num .",
+        [Key.KpAdd] = "Num +",
+        [Key.KpEnter] = "Num Enter",
+        [Key.Escape] = "Esc",
+        [Key.Pageup] = "Page Up",
+        [Key.Pagedown] = "Page Down",
+        [Key.Capslock] = "Caps Lock",
+        [Key.Numlock] = "Num Lock",
+        [Key.Scrolllock] = "Scroll Lock",
+        [Key.Print] = "Print Screen",
+        [Key.Sysreq] = "SysRq",
+        [Key.Quoteleft] = "Backtick",
+        [Key.Equal] = "Equals",
+        [Key.Bracketleft] = "Left Bracket",
+        [Key.Bracketright] = "Right Bracket",
+        [Key.Back] = "Browser Back",
+        [Key.Forward] = "Browser Forward",
+        [Key.Refresh] = "Browser Refresh",
+        [Key.Homepage] = "Browser Home",
+        [Key.Volumeup] = "Volume Up",
+        [Key.Volumedown] = "Volume Down",
+        [Key.Volumemute] = "Mute",
+        [Key.Mediaplay] = "Play",
+        [Key.Mediastop] = "Media Stop",
+        [Key.Mediaprevious] = "Prev Track",
+        [Key.Medianext] = "Next Track",
+        [Key.Mediarecord] = "Record"
+    };
+
     public static string Format(InputBinding binding, IInputBindingLabelProvider labels)
     {
         ArgumentNullException.ThrowIfNull(binding);
@@ -49,7 +85,9 @@ public static class InputBindingDisplay
     public static string? ResolveKeyboardLabel(Key physicalKey, string? layoutLabel)
     {
         if (physicalKey >= Key.Kp0 && physicalKey <= Key.Kp9)
-            return $"NP {physicalKey - Key.Kp0}";
+            return $"Num {physicalKey - Key.Kp0}";
+        if (FriendlyNames.TryGetValue(physicalKey, out var friendly))
+            return friendly;
         if (physicalKey >= Key.KpMultiply && physicalKey <= Key.Kp9)
             return null;
 

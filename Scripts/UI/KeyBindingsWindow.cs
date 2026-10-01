@@ -13,13 +13,31 @@ public partial class KeyBindingsWindow : BaseWindow
     protected override bool Resizable => true;
     protected override Vector2 MinResizeSize => KeyBindingsLayout.MinSize;
 
+    private static readonly Texture2D ResetIcon = GD.Load<Texture2D>("res://Assets/UI/reset-arrow.svg");
+    private static readonly string[] SlotTitles = ["Primary", "Secondary", "Alternate"];
+
     private static readonly Color UnboundColor = new(0.6f, 0.6f, 0.6f, 1f);
     private static readonly Color HeaderColor = new(0.81f, 0.69f, 0.45f, 1f);
     private static readonly Color ConflictColor = new(1f, 0.55f, 0.5f, 1f);
+    private static readonly Color StripeColor = new(1f, 1f, 1f, 0.03f);
+    private static readonly Color KeyTextColor = new(0.93f, 0.94f, 0.97f, 1f);
+    private static readonly Color KeyBg = new(0.14f, 0.17f, 0.25f, 1f);
+    private static readonly Color KeyBgHover = new(0.19f, 0.23f, 0.34f, 1f);
+    private static readonly Color KeyBgPressed = new(0.04f, 0.24f, 0.43f, 1f);
+    private static readonly Color KeyBorder = new(0.34f, 0.39f, 0.52f, 1f);
+    private static readonly Color KeyBorderHover = new(0.62f, 0.68f, 0.82f, 1f);
+    private static readonly Color ModifiedBorder = new(0.32f, 0.77f, 1f, 1f);
+    private static readonly Color ConflictBorder = new(0.85f, 0.4f, 0.36f, 1f);
+    private static readonly Color EmptyBg = new(1f, 1f, 1f, 0.02f);
+    private static readonly Color EmptyBorder = new(0.26f, 0.3f, 0.4f, 0.7f);
+    private static readonly Color AddBorderHover = new(0.93f, 0.73f, 0.34f, 1f);
+    private static readonly Color RemoveColor = new(0.6f, 0.63f, 0.72f, 1f);
+    private static readonly Color RemoveBgHover = new(0.64f, 0.18f, 0.18f, 0.6f);
 
     private KeyBindingEditorState? _editor;
     private readonly IInputBindingLabelProvider _labels = new GodotInputBindingLabelProvider();
     private LineEdit _search = null!;
+    private TextureRect _searchIcon = null!;
     private VBoxContainer _rowsBox = null!;
     private Label _status = null!;
     private Button _resetAll = null!;
@@ -29,7 +47,7 @@ public partial class KeyBindingsWindow : BaseWindow
     private Label _capturePrompt = null!;
     private Button _cancelCapture = null!;
     private readonly Dictionary<string, RowShell> _rows = new();
-    private readonly Dictionary<string, Label> _categoryHeaders = new();
+    private readonly Dictionary<string, CategoryHeader> _categoryHeaders = new();
     private readonly Dictionary<string, List<string>> _categoryActions = new();
     private bool _pendingOpen;
     private KeyBindingCaptureState? _capture;
@@ -38,6 +56,9 @@ public partial class KeyBindingsWindow : BaseWindow
     private int _capturingIndex = -1;
     private bool _candidateSaved;
     private bool _pendingApply;
+    private bool _footerLocked;
+    private float _stylesFactor = -1f;
+    private readonly Dictionary<string, StyleBox> _styles = new();
 
     public override void _Ready()
     {
@@ -46,14 +67,15 @@ public partial class KeyBindingsWindow : BaseWindow
         Visible = false;
 
         _search = GetNode<LineEdit>("Content/RootBox/SearchRow/SearchField");
+        _searchIcon = GetNode<TextureRect>("Content/RootBox/SearchRow/SearchField/SearchIcon");
         _rowsBox = GetNode<VBoxContainer>("Content/RootBox/ScrollHost/RowsBox");
         _status = GetNode<Label>("Content/RootBox/FooterRow/StatusLabel");
         _resetAll = GetNode<Button>("Content/RootBox/FooterRow/ResetAllButton");
         _apply = GetNode<Button>("Content/RootBox/FooterRow/ApplyButton");
         _cancel = GetNode<Button>("Content/RootBox/FooterRow/CancelButton");
         _captureOverlay = GetNode<Panel>("CaptureOverlay");
-        _capturePrompt = GetNode<Label>("CaptureOverlay/CaptureCenter/CaptureBox/CapturePrompt");
-        _cancelCapture = GetNode<Button>("CaptureOverlay/CaptureCenter/CaptureBox/CancelCaptureButton");
+        _capturePrompt = GetNode<Label>("CaptureOverlay/CaptureCenter/CaptureCard/CaptureBox/CapturePrompt");
+        _cancelCapture = GetNode<Button>("CaptureOverlay/CaptureCenter/CaptureCard/CaptureBox/CancelCaptureButton");
 
         var service = GameManager.Instance.InputBindings;
         _editor = new KeyBindingEditorState(service, service.StartupWarning);
@@ -190,18 +212,11 @@ public partial class KeyBindingsWindow : BaseWindow
     public override void Relayout()
     {
         base.Relayout();
-        var applier = UiScaleApplier.Instance;
-        if (applier is null)
-            return;
-        var chip = new Vector2(applier.ScaleSize(KeyBindingsLayout.ChipWidth), applier.ScaleSize(KeyBindingsLayout.RowHeight));
-        var remove = new Vector2(applier.ScaleSize(KeyBindingsLayout.RemoveWidth), applier.ScaleSize(KeyBindingsLayout.RowHeight));
-        foreach (var shell in _rows.Values)
-        {
-            foreach (var chipButton in shell.Chips)
-                chipButton.CustomMinimumSize = chip;
-            foreach (var removeButton in shell.Removes)
-                removeButton.CustomMinimumSize = remove;
-        }
+        Rerender();
+    }
+
+    protected override void ApplyHoverOpacity(float alpha)
+    {
     }
 
     protected override void OnClosePressed()
@@ -338,9 +353,17 @@ public partial class KeyBindingsWindow : BaseWindow
 
     private void SetFooterEnabled(bool enabled)
     {
-        _resetAll.Disabled = !enabled;
-        _apply.Disabled = !enabled;
+        _footerLocked = !enabled;
         _cancel.Disabled = !enabled;
+        UpdateFooterButtons();
+    }
+
+    private void UpdateFooterButtons()
+    {
+        if (_editor is null)
+            return;
+        _apply.Disabled = _footerLocked || !_editor.IsDirty;
+        _resetAll.Disabled = _footerLocked || InputActionCatalog.Actions.All(a => _editor.IsFactoryDefault(a.Name));
     }
 
     private bool IsOverCancelCapture(Vector2 position) =>
@@ -348,20 +371,16 @@ public partial class KeyBindingsWindow : BaseWindow
 
     private void BuildRows()
     {
+        BuildColumnHeader();
+
         foreach (var action in InputActionCatalog.Actions)
         {
             if (!_categoryActions.ContainsKey(action.Category))
             {
-                var header = new Label
-                {
-                    Name = $"Header_{_categoryHeaders.Count}",
-                    Text = action.Category,
-                    MouseFilter = MouseFilterEnum.Ignore
-                };
-                header.AddThemeColorOverride("font_color", HeaderColor);
+                var header = BuildCategoryHeader(action.Category);
                 _categoryHeaders.Add(action.Category, header);
                 _categoryActions.Add(action.Category, new List<string>());
-                _rowsBox.AddChild(header);
+                _rowsBox.AddChild(header.Root);
             }
             _categoryActions[action.Category].Add(action.Name);
 
@@ -378,40 +397,27 @@ public partial class KeyBindingsWindow : BaseWindow
                 Text = action.Label,
                 MouseFilter = MouseFilterEnum.Ignore,
                 VerticalAlignment = VerticalAlignment.Center,
-                SizeFlagsHorizontal = SizeFlags.Fill | SizeFlags.Expand,
+                ClipText = true,
                 CustomMinimumSize = new Vector2(KeyBindingsLayout.ActionLabelWidth, 0f)
             };
-            label.ClipText = true;
 
             var chips = new HBoxContainer
             {
                 Name = "ChipsBox",
-                Alignment = BoxContainer.AlignmentMode.End
+                SizeFlagsVertical = SizeFlags.ShrinkCenter
             };
             chips.AddThemeConstantOverride("separation", (int)KeyBindingsLayout.ChipSeparation);
-
-            var unbound = new Label
-            {
-                Name = "UnboundLabel",
-                Text = "Unbound",
-                MouseFilter = MouseFilterEnum.Ignore,
-                VerticalAlignment = VerticalAlignment.Center
-            };
-            unbound.AddThemeColorOverride("font_color", UnboundColor);
-
-            var add = new Button
-            {
-                Name = "AddBindingButton",
-                Text = "Add Binding",
-                CustomMinimumSize = new Vector2(KeyBindingsLayout.ButtonWidth, KeyBindingsLayout.RowHeight)
-            };
-            add.Pressed += () => OpenCapturePrompt(action.Name, -1);
 
             var reset = new Button
             {
                 Name = "ResetActionButton",
-                Text = "Reset Action",
-                CustomMinimumSize = new Vector2(KeyBindingsLayout.ButtonWidth, KeyBindingsLayout.RowHeight)
+                ThemeTypeVariation = "IconButton",
+                Icon = ResetIcon,
+                ExpandIcon = true,
+                TextureFilter = TextureFilterEnum.LinearWithMipmaps,
+                TooltipText = "Reset to default",
+                SizeFlagsVertical = SizeFlags.ShrinkCenter,
+                CustomMinimumSize = new Vector2(KeyBindingsLayout.ResetWidth, KeyBindingsLayout.ResetWidth)
             };
             reset.Pressed += () =>
             {
@@ -419,21 +425,103 @@ public partial class KeyBindingsWindow : BaseWindow
                 Rerender();
             };
 
+            root.AddChild(Spacer(KeyBindingsLayout.RowPadding));
             root.AddChild(label);
             root.AddChild(chips);
-            root.AddChild(unbound);
-            root.AddChild(add);
+            root.AddChild(new Control { Name = "Fill", SizeFlagsHorizontal = SizeFlags.Expand | SizeFlags.Fill, MouseFilter = MouseFilterEnum.Ignore });
             root.AddChild(reset);
+            root.AddChild(Spacer(KeyBindingsLayout.RowPadding));
             _rowsBox.AddChild(root);
 
-            _rows.Add(action.Name, new RowShell
+            var shell = new RowShell
             {
                 Root = root,
+                ActionLabel = label,
                 ChipsBox = chips,
-                UnboundLabel = unbound
-            });
+                ResetButton = reset
+            };
+            root.Draw += () =>
+            {
+                if (shell.Striped)
+                    root.DrawRect(new Rect2(Vector2.Zero, root.Size), StripeColor);
+            };
+            _rows.Add(action.Name, shell);
         }
     }
+
+    private void BuildColumnHeader()
+    {
+        var header = GetNode<HBoxContainer>("Content/RootBox/ColumnHeader");
+        header.AddThemeConstantOverride("separation", (int)KeyBindingsLayout.RowSeparation);
+        header.AddChild(Spacer(KeyBindingsLayout.RowPadding));
+        header.AddChild(new Label
+        {
+            Text = "Action",
+            ThemeTypeVariation = "SectionHeader",
+            CustomMinimumSize = new Vector2(KeyBindingsLayout.ActionLabelWidth, 0f)
+        });
+
+        var slots = new HBoxContainer();
+        slots.AddThemeConstantOverride("separation", (int)KeyBindingsLayout.ChipSeparation);
+        foreach (var title in SlotTitles)
+            slots.AddChild(new Label
+            {
+                Text = title,
+                ThemeTypeVariation = "SectionHeader",
+                HorizontalAlignment = HorizontalAlignment.Center,
+                CustomMinimumSize = new Vector2(KeyBindingsLayout.ChipWidth, 0f)
+            });
+        header.AddChild(slots);
+    }
+
+    private CategoryHeader BuildCategoryHeader(string category)
+    {
+        var root = new VBoxContainer
+        {
+            Name = $"Header_{_categoryHeaders.Count}",
+            MouseFilter = MouseFilterEnum.Ignore
+        };
+        root.AddThemeConstantOverride("separation", 2);
+
+        var gap = new Control
+        {
+            Name = "Gap",
+            MouseFilter = MouseFilterEnum.Ignore,
+            CustomMinimumSize = new Vector2(0f, KeyBindingsLayout.HeaderGap)
+        };
+
+        var line = new HBoxContainer { Name = "Line", MouseFilter = MouseFilterEnum.Ignore };
+        line.AddThemeConstantOverride("separation", (int)KeyBindingsLayout.RowSeparation);
+
+        var title = new Label
+        {
+            Name = "Title",
+            Text = category.ToUpperInvariant(),
+            MouseFilter = MouseFilterEnum.Ignore
+        };
+        title.AddThemeColorOverride("font_color", HeaderColor);
+
+        var rule = new HSeparator
+        {
+            SizeFlagsHorizontal = SizeFlags.Expand | SizeFlags.Fill,
+            SizeFlagsVertical = SizeFlags.ShrinkCenter,
+            MouseFilter = MouseFilterEnum.Ignore
+        };
+
+        line.AddChild(Spacer(KeyBindingsLayout.RowPadding));
+        line.AddChild(title);
+        line.AddChild(rule);
+        root.AddChild(gap);
+        root.AddChild(line);
+        root.AddChild(new Control { MouseFilter = MouseFilterEnum.Ignore });
+        return new CategoryHeader { Root = root, Gap = gap };
+    }
+
+    private static Control Spacer(float width) => new()
+    {
+        MouseFilter = MouseFilterEnum.Ignore,
+        CustomMinimumSize = new Vector2(width, 0f)
+    };
 
     private void Rerender()
     {
@@ -449,35 +537,57 @@ public partial class KeyBindingsWindow : BaseWindow
                 list.Add(row);
             }
 
-        foreach (var (actionName, shell) in _rows)
-        {
-            if (!rowsByAction.TryGetValue(actionName, out var rows))
-            {
-                shell.Root.Visible = false;
-                continue;
-            }
-            shell.Root.Visible = true;
-            shell.UnboundLabel.Visible = rows.All(r => r.Binding is null);
-            RebuildChips(shell, actionName, rows);
-        }
-
+        var firstVisibleHeader = true;
         foreach (var (category, header) in _categoryHeaders)
         {
-            bool any = false;
+            var striped = false;
+            var any = false;
             foreach (var actionName in _categoryActions[category])
             {
-                if (rowsByAction.ContainsKey(actionName))
+                var shell = _rows[actionName];
+                if (!rowsByAction.TryGetValue(actionName, out var rows))
                 {
-                    any = true;
-                    break;
+                    shell.Root.Visible = false;
+                    continue;
                 }
+
+                any = true;
+                shell.Root.Visible = true;
+                SetStriped(shell, striped);
+                striped = !striped;
+
+                var unbound = rows.All(r => r.Binding is null);
+                if (unbound)
+                    shell.ActionLabel.AddThemeColorOverride("font_color", UnboundColor);
+                else
+                    shell.ActionLabel.RemoveThemeColorOverride("font_color");
+                shell.ResetButton.Visible = !_editor.IsFactoryDefault(actionName);
+                RebuildChips(shell, actionName, rows);
             }
-            header.Visible = any;
+
+            header.Root.Visible = any;
+            header.Gap.Visible = any && !firstVisibleHeader;
+            if (any)
+                firstVisibleHeader = false;
         }
 
         if (_search.Text != _editor.Search)
             _search.Text = _editor.Search;
+        _searchIcon.Visible = _search.Text.Length == 0;
         _status.Text = _editor.StatusText;
+        if (_editor.Error is not null)
+            _status.AddThemeColorOverride("font_color", ConflictColor);
+        else
+            _status.RemoveThemeColorOverride("font_color");
+        UpdateFooterButtons();
+    }
+
+    private static void SetStriped(RowShell shell, bool striped)
+    {
+        if (shell.Striped == striped)
+            return;
+        shell.Striped = striped;
+        shell.Root.QueueRedraw();
     }
 
     private void RebuildChips(RowShell shell, string actionName, List<KeyBindingEditorRow> rows)
@@ -487,46 +597,164 @@ public partial class KeyBindingsWindow : BaseWindow
             shell.ChipsBox.RemoveChild(child);
             child.QueueFree();
         }
-        shell.Chips.Clear();
-        shell.Removes.Clear();
 
+        var slotSize = new Vector2(Px(KeyBindingsLayout.ChipWidth), Px(KeyBindingsLayout.ChipHeight));
+        var bound = 0;
         for (var i = 0; i < rows.Count; i++)
         {
             if (rows[i].Binding is not { } binding)
                 continue;
 
             var index = i;
+            var text = InputBindingDisplay.Format(binding, _labels);
+            var conflicted = rows[i].Conflicts.Count > 0;
+            var kind = conflicted ? "conflict" : _editor!.IsFactoryBinding(actionName, binding) ? "key" : "modified";
 
             var chip = new Button
             {
                 Name = $"Chip_{i}",
-                Text = InputBindingDisplay.Format(binding, _labels),
-                CustomMinimumSize = new Vector2(Px(KeyBindingsLayout.ChipWidth), Px(KeyBindingsLayout.RowHeight))
+                Text = text,
+                ClipText = true,
+                TextOverrunBehavior = TextServer.OverrunBehavior.TrimEllipsis,
+                CustomMinimumSize = slotSize,
+                TooltipText = conflicted
+                    ? $"{text}\n{ConflictTooltip(actionName, rows[i].Conflicts)}"
+                    : $"{text}\nClick to rebind, right-click to remove"
             };
-            if (rows[i].Conflicts.Count > 0)
-            {
-                chip.TooltipText = ConflictTooltip(actionName, rows[i].Conflicts);
-                chip.AddThemeColorOverride("font_color", ConflictColor);
-                chip.AddThemeColorOverride("font_hover_color", ConflictColor);
-            }
+            ApplyChipStyles(chip, kind, conflicted ? ConflictColor : KeyTextColor);
             chip.Pressed += () => OpenCapturePrompt(actionName, index);
-            shell.ChipsBox.AddChild(chip);
-            shell.Chips.Add(chip);
+            chip.GuiInput += @event =>
+            {
+                if (@event is InputEventMouseButton { ButtonIndex: MouseButton.Right, Pressed: true })
+                    RemoveBinding(actionName, index);
+            };
 
             var remove = new Button
             {
                 Name = $"Remove_{i}",
                 Text = "×",
-                CustomMinimumSize = new Vector2(Px(KeyBindingsLayout.RemoveWidth), Px(KeyBindingsLayout.RowHeight))
+                FocusMode = FocusModeEnum.None,
+                TooltipText = "Remove binding"
             };
-            remove.Pressed += () =>
-            {
-                _editor!.Remove(actionName, index);
-                Rerender();
-            };
-            shell.ChipsBox.AddChild(remove);
-            shell.Removes.Add(remove);
+            remove.SetAnchorsPreset(LayoutPreset.RightWide);
+            remove.OffsetLeft = -Px(KeyBindingsLayout.RemoveWidth);
+            remove.OffsetRight = 0f;
+            remove.OffsetTop = 0f;
+            remove.OffsetBottom = 0f;
+            var clear = Style("clear");
+            remove.AddThemeStyleboxOverride("normal", clear);
+            remove.AddThemeStyleboxOverride("pressed", clear);
+            remove.AddThemeStyleboxOverride("focus", clear);
+            remove.AddThemeStyleboxOverride("hover", Style("remove_hover"));
+            remove.AddThemeColorOverride("font_color", RemoveColor);
+            remove.AddThemeColorOverride("font_hover_color", Colors.White);
+            remove.AddThemeColorOverride("font_pressed_color", Colors.White);
+            remove.Pressed += () => RemoveBinding(actionName, index);
+            chip.AddChild(remove);
+
+            shell.ChipsBox.AddChild(chip);
+            bound++;
         }
+
+        var slots = Math.Max(KeyBindingsLayout.SlotColumns, bound + 1);
+        for (var slot = bound; slot < slots; slot++)
+        {
+            if (slot == bound)
+            {
+                var add = new Button
+                {
+                    Name = "AddBindingButton",
+                    Text = "+",
+                    CustomMinimumSize = slotSize,
+                    TooltipText = "Add binding"
+                };
+                add.AddThemeStyleboxOverride("normal", Style("empty"));
+                add.AddThemeStyleboxOverride("hover", Style("add_hover"));
+                add.AddThemeStyleboxOverride("pressed", Style("key_pressed"));
+                add.AddThemeColorOverride("font_color", RemoveColor);
+                add.AddThemeColorOverride("font_hover_color", AddBorderHover);
+                add.Pressed += () => OpenCapturePrompt(actionName, -1);
+                shell.ChipsBox.AddChild(add);
+                continue;
+            }
+
+            var empty = new Panel
+            {
+                Name = $"EmptySlot_{slot}",
+                MouseFilter = MouseFilterEnum.Ignore,
+                CustomMinimumSize = slotSize
+            };
+            empty.AddThemeStyleboxOverride("panel", Style("empty"));
+            shell.ChipsBox.AddChild(empty);
+        }
+    }
+
+    private void RemoveBinding(string actionName, int index)
+    {
+        _editor!.Remove(actionName, index);
+        Rerender();
+    }
+
+    private void ApplyChipStyles(Button chip, string kind, Color fontColor)
+    {
+        chip.AddThemeStyleboxOverride("normal", Style(kind));
+        chip.AddThemeStyleboxOverride("hover", Style(kind + "_hover"));
+        chip.AddThemeStyleboxOverride("pressed", Style("key_pressed"));
+        chip.AddThemeColorOverride("font_color", fontColor);
+        chip.AddThemeColorOverride("font_hover_color", fontColor);
+        chip.AddThemeColorOverride("font_focus_color", fontColor);
+    }
+
+    private StyleBox Style(string name)
+    {
+        var factor = UiScaleApplier.Instance?.Factor ?? 1f;
+        if (_stylesFactor != factor)
+        {
+            _styles.Clear();
+            _stylesFactor = factor;
+        }
+        if (_styles.TryGetValue(name, out var cached))
+            return cached;
+
+        var inset = Px(KeyBindingsLayout.RemoveWidth);
+        StyleBox style = name switch
+        {
+            "key" => Keycap(KeyBg, KeyBorder, inset),
+            "key_hover" => Keycap(KeyBgHover, KeyBorderHover, inset),
+            "modified" => Keycap(KeyBg, ModifiedBorder, inset),
+            "modified_hover" => Keycap(KeyBgHover, ModifiedBorder, inset),
+            "conflict" => Keycap(KeyBg, ConflictBorder, inset),
+            "conflict_hover" => Keycap(KeyBgHover, ConflictBorder, inset),
+            "key_pressed" => Keycap(KeyBgPressed, ModifiedBorder, inset),
+            "empty" => Keycap(EmptyBg, EmptyBorder, 0, bottom: 1),
+            "add_hover" => Keycap(KeyBg, AddBorderHover, 0, bottom: 1),
+            "remove_hover" => new StyleBoxFlat
+            {
+                BgColor = RemoveBgHover,
+                CornerRadiusTopRight = 3,
+                CornerRadiusBottomRight = 3
+            },
+            _ => new StyleBoxEmpty()
+        };
+        _styles[name] = style;
+        return style;
+    }
+
+    private static StyleBoxFlat Keycap(Color bg, Color border, int inset, int bottom = 2)
+    {
+        var style = new StyleBoxFlat
+        {
+            BgColor = bg,
+            BorderColor = border,
+            BorderWidthLeft = 1,
+            BorderWidthTop = 1,
+            BorderWidthRight = 1,
+            BorderWidthBottom = bottom,
+            ContentMarginLeft = inset,
+            ContentMarginRight = inset
+        };
+        style.SetCornerRadiusAll(3);
+        return style;
     }
 
     private static int Px(float basePx) => UiScaleApplier.Instance?.ScaleSize(basePx) ?? (int)basePx;
@@ -557,9 +785,15 @@ public partial class KeyBindingsWindow : BaseWindow
     private sealed class RowShell
     {
         public HBoxContainer Root = null!;
+        public Label ActionLabel = null!;
         public HBoxContainer ChipsBox = null!;
-        public Label UnboundLabel = null!;
-        public readonly List<Button> Chips = new();
-        public readonly List<Button> Removes = new();
+        public Button ResetButton = null!;
+        public bool Striped;
+    }
+
+    private sealed class CategoryHeader
+    {
+        public VBoxContainer Root = null!;
+        public Control Gap = null!;
     }
 }

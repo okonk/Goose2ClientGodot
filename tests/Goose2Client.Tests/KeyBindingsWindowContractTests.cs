@@ -203,7 +203,8 @@ public class KeyBindingsWindowContractTests
     public void Relayout_ReappliesScaledSizesToDynamicChips()
     {
         var body = MethodBody(WindowSource(), "public override void Relayout()");
-        Assert.Contains("ScaleSize", body, StringComparison.Ordinal);
+        Assert.Contains("Rerender()", body, StringComparison.Ordinal);
+        Assert.Contains("ScaleSize", MethodBody(WindowSource(), "private static int Px(float basePx)"), StringComparison.Ordinal);
     }
 
     [Fact]

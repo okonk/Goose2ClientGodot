@@ -67,12 +67,32 @@ public class InputBindingDisplayTests
     }
 
     [Theory]
-    [InlineData(Key.Kp1, "1", "NP 1")]
-    [InlineData(Key.Kp0, null, "NP 0")]
-    [InlineData(Key.Kp9, "9", "NP 9")]
-    [InlineData(Key.KpAdd, "Plus", "KpAdd")]
+    [InlineData(Key.Kp1, "1", "Num 1")]
+    [InlineData(Key.Kp0, null, "Num 0")]
+    [InlineData(Key.Kp9, "9", "Num 9")]
+    [InlineData(Key.KpAdd, "Plus", "Num +")]
+    [InlineData(Key.KpSubtract, null, "Num -")]
+    [InlineData(Key.KpMultiply, null, "Num *")]
+    [InlineData(Key.KpDivide, null, "Num /")]
+    [InlineData(Key.KpPeriod, null, "Num .")]
+    [InlineData(Key.KpEnter, null, "Num Enter")]
     [InlineData(Key.Comma, "Period", "Comma")]
-    [InlineData(Key.Quoteleft, "Less", "Quoteleft")]
+    [InlineData(Key.Quoteleft, "Less", "Backtick")]
+    [InlineData(Key.Equal, null, "Equals")]
+    [InlineData(Key.Bracketleft, null, "Left Bracket")]
+    [InlineData(Key.Bracketright, null, "Right Bracket")]
+    [InlineData(Key.Apostrophe, null, "Apostrophe")]
+    [InlineData(Key.Escape, null, "Esc")]
+    [InlineData(Key.Pageup, null, "Page Up")]
+    [InlineData(Key.Pagedown, null, "Page Down")]
+    [InlineData(Key.Capslock, null, "Caps Lock")]
+    [InlineData(Key.Numlock, null, "Num Lock")]
+    [InlineData(Key.Scrolllock, null, "Scroll Lock")]
+    [InlineData(Key.Print, null, "Print Screen")]
+    [InlineData(Key.Volumeup, null, "Volume Up")]
+    [InlineData(Key.Medianext, null, "Next Track")]
+    [InlineData(Key.Space, null, "Space")]
+    [InlineData(Key.Home, null, "Home")]
     [InlineData(Key.A, "A", "A")]
     [InlineData(Key.Key6, "6", "6")]
     [InlineData(Key.F5, "F5", "F5")]
@@ -90,7 +110,7 @@ public class InputBindingDisplayTests
         var provider = new FakeLabelProvider((Key.Key1, "1"), (Key.Kp1, "1"));
 
         Assert.Equal("1", InputBindingDisplay.Format(new InputBinding.Keyboard(Key.Key1, false, false, false, false), provider));
-        Assert.Equal("NP 1", InputBindingDisplay.Format(new InputBinding.Keyboard(Key.Kp1, false, false, false, false), provider));
+        Assert.Equal("Num 1", InputBindingDisplay.Format(new InputBinding.Keyboard(Key.Kp1, false, false, false, false), provider));
     }
 
     [Theory]

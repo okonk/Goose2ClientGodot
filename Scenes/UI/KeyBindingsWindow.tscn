@@ -1,14 +1,15 @@
-[gd_scene load_steps=4 format=3]
+[gd_scene load_steps=6 format=3]
 
 [ext_resource type="Script" path="res://Scripts/UI/KeyBindingsWindow.cs" id="1_kb"]
 [ext_resource type="Theme" path="res://Assets/UI/GameTheme.tres" id="theme"]
+[ext_resource type="Texture2D" path="res://Assets/UI/search.svg" id="search_icon"]
 
 [sub_resource type="StyleBoxFlat" id="kb_bg"]
 content_margin_left = 5.0
 content_margin_top = 5.0
 content_margin_right = 5.0
 content_margin_bottom = 5.0
-bg_color = Color(0.047059, 0.066667, 0.12549, 0.96)
+bg_color = Color(0.047059, 0.066667, 0.12549, 1)
 border_width_left = 1
 border_width_top = 1
 border_width_right = 1
@@ -16,6 +17,24 @@ border_width_bottom = 1
 border_color = Color(0.584314, 0.447059, 0.235294, 1)
 shadow_color = Color(0, 0, 0, 0.55)
 shadow_size = 3
+
+[sub_resource type="StyleBoxFlat" id="kb_card"]
+content_margin_left = 18.0
+content_margin_top = 12.0
+content_margin_right = 18.0
+content_margin_bottom = 14.0
+bg_color = Color(0.054902, 0.078431, 0.145098, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.584314, 0.447059, 0.235294, 1)
+corner_radius_top_left = 3
+corner_radius_top_right = 3
+corner_radius_bottom_right = 3
+corner_radius_bottom_left = 3
+shadow_color = Color(0, 0, 0, 0.6)
+shadow_size = 8
 
 [sub_resource type="StyleBoxFlat" id="kb_overlay"]
 bg_color = Color(0, 0, 0, 0.55)
@@ -91,13 +110,35 @@ theme_override_constants/separation = 6
 
 [node name="SearchRow" type="HBoxContainer" parent="Content/RootBox"]
 layout_mode = 2
-custom_minimum_size = Vector2(0, 26)
+custom_minimum_size = Vector2(0, 22)
 theme_override_constants/separation = 6
 
 [node name="SearchField" type="LineEdit" parent="Content/RootBox/SearchRow"]
 layout_mode = 2
 size_flags_horizontal = 3
 placeholder_text = "Filter actions…"
+clear_button_enabled = true
+
+[node name="SearchIcon" type="TextureRect" parent="Content/RootBox/SearchRow/SearchField"]
+modulate = Color(0.517647, 0.552941, 0.639216, 1)
+texture_filter = 4
+layout_mode = 1
+anchors_preset = 6
+anchor_left = 1.0
+anchor_top = 0.5
+anchor_right = 1.0
+anchor_bottom = 0.5
+offset_left = -20.0
+offset_top = -6.0
+offset_right = -8.0
+offset_bottom = 6.0
+mouse_filter = 2
+texture = ExtResource("search_icon")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="ColumnHeader" type="HBoxContainer" parent="Content/RootBox"]
+layout_mode = 2
 
 [node name="ScrollHost" type="ScrollContainer" parent="Content/RootBox"]
 layout_mode = 2
@@ -106,28 +147,33 @@ size_flags_vertical = 3
 [node name="RowsBox" type="VBoxContainer" parent="Content/RootBox/ScrollHost"]
 layout_mode = 2
 size_flags_horizontal = 3
-theme_override_constants/v_separation = 4
+theme_override_constants/separation = 0
 
 [node name="FooterRow" type="HBoxContainer" parent="Content/RootBox"]
 layout_mode = 2
 custom_minimum_size = Vector2(0, 28)
 theme_override_constants/separation = 6
 
+[node name="ResetAllButton" type="Button" parent="Content/RootBox/FooterRow"]
+layout_mode = 2
+custom_minimum_size = Vector2(72, 0)
+text = "Reset All"
+
 [node name="StatusLabel" type="Label" parent="Content/RootBox/FooterRow"]
 layout_mode = 2
 size_flags_horizontal = 3
+theme_type_variation = &"SectionHeader"
 vertical_alignment = 1
-
-[node name="ResetAllButton" type="Button" parent="Content/RootBox/FooterRow"]
-layout_mode = 2
-text = "Reset All"
 
 [node name="ApplyButton" type="Button" parent="Content/RootBox/FooterRow"]
 layout_mode = 2
+custom_minimum_size = Vector2(72, 0)
+theme_type_variation = &"PrimaryButton"
 text = "Apply"
 
 [node name="CancelButton" type="Button" parent="Content/RootBox/FooterRow"]
 layout_mode = 2
+custom_minimum_size = Vector2(72, 0)
 text = "Cancel"
 
 [node name="CaptureOverlay" type="Panel" parent="."]
@@ -146,15 +192,28 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 mouse_filter = 2
 
-[node name="CaptureBox" type="VBoxContainer" parent="CaptureOverlay/CaptureCenter"]
+[node name="CaptureCard" type="PanelContainer" parent="CaptureOverlay/CaptureCenter"]
 layout_mode = 2
-theme_override_constants/separation = 8
+custom_minimum_size = Vector2(240, 0)
+theme_override_styles/panel = SubResource("kb_card")
 
-[node name="CapturePrompt" type="Label" parent="CaptureOverlay/CaptureCenter/CaptureBox"]
+[node name="CaptureBox" type="VBoxContainer" parent="CaptureOverlay/CaptureCenter/CaptureCard"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="CaptureTitle" type="Label" parent="CaptureOverlay/CaptureCenter/CaptureCard/CaptureBox"]
+layout_mode = 2
+theme_type_variation = &"WindowTitleActive"
+horizontal_alignment = 1
+text = "Set Binding"
+
+[node name="CapturePrompt" type="Label" parent="CaptureOverlay/CaptureCenter/CaptureCard/CaptureBox"]
 layout_mode = 2
 horizontal_alignment = 1
 text = "Press a key…"
 
-[node name="CancelCaptureButton" type="Button" parent="CaptureOverlay/CaptureCenter/CaptureBox"]
+[node name="CancelCaptureButton" type="Button" parent="CaptureOverlay/CaptureCenter/CaptureCard/CaptureBox"]
 layout_mode = 2
+size_flags_horizontal = 4
+custom_minimum_size = Vector2(96, 0)
 text = "Cancel Capture"

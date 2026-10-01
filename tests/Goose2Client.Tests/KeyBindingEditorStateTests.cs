@@ -151,6 +151,33 @@ public class KeyBindingEditorStateTests : IDisposable
     }
 
     [Fact]
+    public void IsFactoryDefault_TracksDraftAgainstFactoryNotBaseline()
+    {
+        var editor = new KeyBindingEditorState(_service);
+        Assert.True(editor.IsFactoryDefault("Attack"));
+
+        editor.Add("Attack", new InputBinding.Keyboard(Key.B, false, false, false, false));
+        Assert.False(editor.IsFactoryDefault("Attack"));
+
+        editor.Apply();
+        Assert.False(editor.IsDirty);
+        Assert.False(editor.IsFactoryDefault("Attack"));
+
+        editor.ResetAction("Attack");
+        Assert.True(editor.IsFactoryDefault("Attack"));
+    }
+
+    [Fact]
+    public void IsFactoryBinding_MatchesOnlyThatActionsFactoryBindings()
+    {
+        var editor = new KeyBindingEditorState(_service);
+
+        Assert.True(editor.IsFactoryBinding("Attack", AttackFactory[0]));
+        Assert.False(editor.IsFactoryBinding("Attack", new InputBinding.Keyboard(Key.B, false, false, false, false)));
+        Assert.False(editor.IsFactoryBinding("MoveUp", AttackFactory[0]));
+    }
+
+    [Fact]
     public void ResetAll_CopiesEntireFactorySnapshot()
     {
         var editor = new KeyBindingEditorState(_service);

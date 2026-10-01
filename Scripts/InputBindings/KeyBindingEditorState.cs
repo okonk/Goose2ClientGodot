@@ -95,6 +95,12 @@ public sealed class KeyBindingEditorState
         Recompute();
     }
 
+    public bool IsFactoryDefault(string action) =>
+        DraftList(action).SequenceEqual(_service.FactoryDefaults.GetBindings(action));
+
+    public bool IsFactoryBinding(string action, InputBinding binding) =>
+        _service.FactoryDefaults.GetBindings(action).Contains(binding);
+
     public void ResetAll()
     {
         _draft = CloneMutable(_service.FactoryDefaults);

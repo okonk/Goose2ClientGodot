@@ -58,6 +58,15 @@ internal static class KeyBindingsSelfTest
         public InputBindingSuppressionLease? Value;
     }
 
+    private static int ChipCount(HBoxContainer chipsBox)
+    {
+        int count = 0;
+        foreach (var child in chipsBox.GetChildren())
+            if (child.Name.ToString().StartsWith("Chip_"))
+                count++;
+        return count;
+    }
+
     private static bool DeleteQuietly(string path)
     {
         try
@@ -233,7 +242,7 @@ internal static class KeyBindingsSelfTest
         var status = kb.GetNode<Label>("Content/RootBox/FooterRow/StatusLabel");
         var mountRow = kb.GetNode<HBoxContainer>("Content/RootBox/ScrollHost/RowsBox/Row_ToggleMount");
         var mountChips = mountRow.GetNode<HBoxContainer>("ChipsBox");
-        Assert(mountChips.GetChildCount() == 2, "ToggleMount must show its one applied chip and remove button");
+        Assert(ChipCount(mountChips) == 1, "ToggleMount must show its one applied chip");
         byte[] fileBefore = File.ReadAllBytes(bindingPath);
         // Reset Action deterministically produces a pending draft change without starting a capture session.
         mountRow.GetNode<Button>("ResetActionButton").EmitSignal("pressed");
@@ -250,7 +259,7 @@ internal static class KeyBindingsSelfTest
         optionsButton.EmitSignal("pressed");
         Assert(kb.Visible, "the Options callback must reopen the window");
         Assert(status.Text == "No unsaved changes.", $"status {status.Text} after reopen");
-        Assert(mountChips.GetChildCount() == 2, "reopen must restore the applied binding chip");
+        Assert(ChipCount(mountChips) == 1, "reopen must restore the applied binding chip");
 
         gm.CharacterSettings.SetWindowSetting("KeyBindings", new Vector2(100, 100), new Vector2(100, 100), 1f, true, Canvas);
         kb.Relayout();
@@ -272,7 +281,7 @@ internal static class KeyBindingsSelfTest
                 if (!child.Name.ToString().StartsWith("Row_"))
                     continue;
                 rows++;
-                chips += ((HBoxContainer)child.GetNode("ChipsBox")).GetChildCount() / 2;
+                chips += ChipCount((HBoxContainer)child.GetNode("ChipsBox"));
             }
             return (rows, chips);
         }
@@ -297,9 +306,9 @@ internal static class KeyBindingsSelfTest
         Assert(kb.Visible, "the Options callback must reopen the window for the chip callback check");
         var attackRow = kb.GetNode<HBoxContainer>("Content/RootBox/ScrollHost/RowsBox/Row_Attack");
         var attackChips = attackRow.GetNode<HBoxContainer>("ChipsBox");
-        Assert(attackChips.GetChildCount() == 2, "Attack must show its one applied chip and remove button");
-        attackChips.GetNode<Button>("Remove_0").EmitSignal("pressed");
-        Assert(attackChips.GetChildCount() == 0, "pressing the chip remove button must remove the chip");
+        Assert(ChipCount(attackChips) == 1, "Attack must show its one applied chip");
+        attackChips.GetNode<Button>("Chip_0/Remove_0").EmitSignal("pressed");
+        Assert(ChipCount(attackChips) == 0, "pressing the chip remove button must remove the chip");
         Assert(status.Text == "Unsaved changes.", $"status {status.Text} after a chip removal");
         kb.GetNode<Button>("Content/RootBox/FooterRow/CancelButton").EmitSignal("pressed");
         Assert(!kb.Visible, "Cancel must close the window after the chip removal");
