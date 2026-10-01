@@ -152,7 +152,9 @@ namespace Goose2Client
 
         public override void _Input(InputEvent @event)
         {
-            if (@event.IsActionPressed("ToggleFullscreen"))
+            if (GetTree().Root.GuiGetFocusOwner() is LineEdit)
+                return;
+            if (@event.IsActionPressed("ToggleFullscreen", exactMatch: true))
                 ToggleFullscreen();
         }
 

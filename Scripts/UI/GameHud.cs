@@ -128,60 +128,55 @@ public partial class GameHud : Control
         if (GetViewport().GuiGetFocusOwner() is LineEdit)
             return;
 
-        // Godot also fires unmodified actions (Enter → StartChat) when a modified
-        // variant (Alt+Enter → ToggleFullscreen) is pressed; Alt combos are reserved.
-        if (@event is InputEventKey { AltPressed: true })
-            return;
-
-        if (@event.IsActionPressed("ToggleInventory"))
+        if (@event.IsActionPressed("ToggleInventory", exactMatch: true))
             Inventory.Toggle();
-        else if (@event.IsActionPressed("ToggleSpellbook"))
+        else if (@event.IsActionPressed("ToggleSpellbook", exactMatch: true))
             Spellbook.Toggle();
-        else if (@event.IsActionPressed("ToggleCharacterWindow"))
+        else if (@event.IsActionPressed("ToggleCharacterWindow", exactMatch: true))
             Character.Toggle();
-        else if (@event.IsActionPressed("CycleHotbarPage"))
+        else if (@event.IsActionPressed("CycleHotbarPage", exactMatch: true))
             Hotbar.CyclePage();
-        else if (@event.IsActionPressed("ToggleMount"))
+        else if (@event.IsActionPressed("ToggleMount", exactMatch: true))
             Hotbar.ToggleMount();
-        else if (@event.IsActionPressed("PickUp"))
+        else if (@event.IsActionPressed("PickUp", exactMatch: true))
             GameManager.Instance.NetworkClient.Pickup();
-        else if (@event.IsActionPressed("ToggleChat"))
+        else if (@event.IsActionPressed("ToggleChat", exactMatch: true))
             Chat.Toggle();
-        else if (@event.IsActionPressed("StartChat"))
+        else if (@event.IsActionPressed("StartChat", exactMatch: true))
             Chat.FocusChat("");
-        else if (@event.IsActionPressed("SlashCommand"))
+        else if (@event.IsActionPressed("SlashCommand", exactMatch: true))
             Chat.FocusChat("/");
-        else if (@event.IsActionPressed("GuildCommand"))
+        else if (@event.IsActionPressed("GuildCommand", exactMatch: true))
             Chat.FocusChat("/guild ");
-        else if (@event.IsActionPressed("TellCommand"))
+        else if (@event.IsActionPressed("TellCommand", exactMatch: true))
             Chat.FocusChat("/tell ");
-        else if (@event.IsActionPressed("RefreshPosition"))
+        else if (@event.IsActionPressed("RefreshPosition", exactMatch: true))
             GameManager.Instance.NetworkClient.Command("/refresh");
-        else if (@event.IsActionPressed("ReplyCommand"))
+        else if (@event.IsActionPressed("ReplyCommand", exactMatch: true))
             Chat.FocusChat(Chat.ReplyToName == null ? "/tell " : $"/tell {Chat.ReplyToName} ");
-        else if (@event.IsActionPressed("EmoteHeart"))
+        else if (@event.IsActionPressed("EmoteHeart", exactMatch: true))
             SendEmote(1080, 8);
-        else if (@event.IsActionPressed("EmoteQuestion"))
+        else if (@event.IsActionPressed("EmoteQuestion", exactMatch: true))
             SendEmote(1081, 8);
-        else if (@event.IsActionPressed("EmoteDots"))
+        else if (@event.IsActionPressed("EmoteDots", exactMatch: true))
             SendEmote(1083, 8);
-        else if (@event.IsActionPressed("EmotePoop"))
+        else if (@event.IsActionPressed("EmotePoop", exactMatch: true))
             SendEmote(1084, 9);
-        else if (@event.IsActionPressed("EmoteSurprised"))
+        else if (@event.IsActionPressed("EmoteSurprised", exactMatch: true))
             SendEmote(1085, 9);
-        else if (@event.IsActionPressed("EmoteSleep"))
+        else if (@event.IsActionPressed("EmoteSleep", exactMatch: true))
             SendEmote(1086, 9);
-        else if (@event.IsActionPressed("EmoteAnnoyed"))
+        else if (@event.IsActionPressed("EmoteAnnoyed", exactMatch: true))
             SendEmote(1087, 9);
-        else if (@event.IsActionPressed("EmoteSweat"))
+        else if (@event.IsActionPressed("EmoteSweat", exactMatch: true))
             SendEmote(1088, 10);
-        else if (@event.IsActionPressed("EmoteMusic"))
+        else if (@event.IsActionPressed("EmoteMusic", exactMatch: true))
             SendEmote(1089, 10);
-        else if (@event.IsActionPressed("EmoteWink"))
+        else if (@event.IsActionPressed("EmoteWink", exactMatch: true))
             SendEmote(1091, 10);
-        else if (@event.IsActionPressed("EmoteTrash"))
+        else if (@event.IsActionPressed("EmoteTrash", exactMatch: true))
             SendEmote(1082, 8);
-        else if (@event.IsActionPressed("EmoteDollar"))
+        else if (@event.IsActionPressed("EmoteDollar", exactMatch: true))
             SendEmote(1090, 10);
     }
 

@@ -649,7 +649,7 @@ namespace Goose2Client.Character
             if (GetTree().Root.GuiGetFocusOwner() is LineEdit) return;   // ignore movement/attack while typing in chat
 
             // Unity suppresses attacks entirely while mounted; gate input before AttackGate.
-            if (!IsMounted && Input.IsActionPressed("Attack"))
+            if (!IsMounted && Input.IsActionPressed("Attack", exactMatch: true))
             {
                 int ws = GameManager.Instance.CurrentMapManager?.WeaponSpeed ?? 0;
                 if (_attackGate.TryAttack(Time.GetTicksMsec() / 1000.0, ws))
@@ -659,10 +659,10 @@ namespace Goose2Client.Character
                 }
             }
 
-            bool up = Input.IsActionPressed("MoveUp");
-            bool down = Input.IsActionPressed("MoveDown");
-            bool left = Input.IsActionPressed("MoveLeft");
-            bool right = Input.IsActionPressed("MoveRight");
+            bool up = Input.IsActionPressed("MoveUp", exactMatch: true);
+            bool down = Input.IsActionPressed("MoveDown", exactMatch: true);
+            bool left = Input.IsActionPressed("MoveLeft", exactMatch: true);
+            bool right = Input.IsActionPressed("MoveRight", exactMatch: true);
 
             // Resolve currently held movement actions through MovementInput.
             // Use a local copy so diagonal direction stays stable while waiting for the hold
@@ -714,10 +714,10 @@ namespace Goose2Client.Character
 
             bool nextWasMovingVertical = _wasMovingVertical;
             Direction? dir = MovementInput.Resolve(
-                Input.IsActionPressed("MoveUp"),
-                Input.IsActionPressed("MoveDown"),
-                Input.IsActionPressed("MoveLeft"),
-                Input.IsActionPressed("MoveRight"),
+                Input.IsActionPressed("MoveUp", exactMatch: true),
+                Input.IsActionPressed("MoveDown", exactMatch: true),
+                Input.IsActionPressed("MoveLeft", exactMatch: true),
+                Input.IsActionPressed("MoveRight", exactMatch: true),
                 ref nextWasMovingVertical);
 
             if (dir == null)

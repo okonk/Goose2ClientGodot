@@ -59,22 +59,22 @@ public partial class SpellTargetManager : Node
         // match against the configured actions on the raw event. While targeting, movement keys
         // (WASD) cycle the target alongside the arrow-key TargetUp/TargetDown bindings: up/left
         // step backward through targets, down/right step forward (Unity's "Targeting" map).
-        if (@event.IsActionPressed("TargetUp", allowEcho: true)
-            || @event.IsActionPressed("MoveUp", allowEcho: true)
-            || @event.IsActionPressed("MoveLeft", allowEcho: true))
+        if (@event.IsActionPressed("TargetUp", exactMatch: true, allowEcho: true)
+            || @event.IsActionPressed("MoveUp", exactMatch: true, allowEcho: true)
+            || @event.IsActionPressed("MoveLeft", exactMatch: true, allowEcho: true))
             CycleTarget(searchDown: false);
-        else if (@event.IsActionPressed("TargetDown", allowEcho: true)
-            || @event.IsActionPressed("MoveDown", allowEcho: true)
-            || @event.IsActionPressed("MoveRight", allowEcho: true))
+        else if (@event.IsActionPressed("TargetDown", exactMatch: true, allowEcho: true)
+            || @event.IsActionPressed("MoveDown", exactMatch: true, allowEcho: true)
+            || @event.IsActionPressed("MoveRight", exactMatch: true, allowEcho: true))
             CycleTarget(searchDown: true);
-        else if (@event.IsActionPressed("ConfirmTarget")) ConfirmTarget();
+        else if (@event.IsActionPressed("ConfirmTarget", exactMatch: true)) ConfirmTarget();
         else if (IsHotkeyPressed(@event))
         {
             _hotkeyConfirmFrame = Engine.GetProcessFrames();
             ConfirmTarget();
         }
-        else if (@event.IsActionPressed("CancelTarget")) CancelTarget();
-        else if (@event.IsActionPressed("TargetHome")) GoHome();
+        else if (@event.IsActionPressed("CancelTarget", exactMatch: true)) CancelTarget();
+        else if (@event.IsActionPressed("TargetHome", exactMatch: true)) GoHome();
         else return;
 
         GetViewport().SetInputAsHandled();
