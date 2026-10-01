@@ -15,6 +15,8 @@ public sealed class GodotInputBindingLabelProvider : IInputBindingLabelProvider
     {
         if (physicalKey == Key.None)
             return null;
+        if ((string)DisplayServer.GetName() == "headless")
+            return null;
         var label = OS.GetKeycodeString(DisplayServer.KeyboardGetLabelFromPhysical(physicalKey));
         return string.IsNullOrEmpty(label) ? null : label;
     }

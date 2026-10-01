@@ -16,12 +16,13 @@ internal static class KeyBindingsSelfTest
     {
         await gm.ToSignal(gm.GetTree(), SceneTree.SignalName.ProcessFrame);
         bool failed = false;
+        var leaseSlot = new LeaseSlot();
         var bindingPath = ProjectSettings.GlobalizePath(gm.InputBindingsPath);
         var character = $"key-bindings-selftest-{OS.GetProcessId()}";
         var characterPath = Path.Combine(ProjectSettings.GlobalizePath("user://"), character + "-settings.json");
         try
         {
-            await SelfTestBody(gm, character, bindingPath, characterPath);
+            await SelfTestBody(gm, character, bindingPath, characterPath, leaseSlot);
             GD.Print("[key_bindings_selftest] PASS");
         }
         catch (System.Exception e)
@@ -31,26 +32,48 @@ internal static class KeyBindingsSelfTest
         }
         finally
         {
-            DeleteQuietly(bindingPath);
-            DeleteQuietly(characterPath);
+            var lease = leaseSlot.Value;
+            if (lease is { IsRestored: false })
+            {
+                try
+                {
+                    lease.RequestRestore(InputReleaseGate.Immediate);
+                    gm.InputBindings.ProcessSuppression(new GodotInputReleaseState());
+                }
+                catch (System.Exception restore)
+                {
+                    GD.PrintErr($"ERR_key_bindings_selftest: suppression restore failed: {restore.Message}");
+                }
+            }
+            if (!DeleteQuietly(bindingPath))
+                failed = true;
+            if (!DeleteQuietly(characterPath))
+                failed = true;
         }
         gm.GetTree().Quit(failed ? 1 : 0);
     }
 
-    private static void DeleteQuietly(string path)
+    private sealed class LeaseSlot
+    {
+        public InputBindingSuppressionLease? Value;
+    }
+
+    private static bool DeleteQuietly(string path)
     {
         try
         {
             if (File.Exists(path))
                 File.Delete(path);
+            return !File.Exists(path);
         }
-        catch
+        catch (System.Exception e)
         {
-            GD.PrintErr($"ERR_key_bindings_selftest: could not delete {path}");
+            GD.PrintErr($"ERR_key_bindings_selftest: could not delete {path}: {e.Message}");
+            return false;
         }
     }
 
-    private static async System.Threading.Tasks.Task SelfTestBody(GameManager gm, string character, string bindingPath, string characterPath)
+    private static async System.Threading.Tasks.Task SelfTestBody(GameManager gm, string character, string bindingPath, string characterPath, LeaseSlot leaseSlot)
     {
         var tree = gm.GetTree();
         var service = gm.InputBindings;
@@ -70,6 +93,8 @@ internal static class KeyBindingsSelfTest
         byte[]? productionBefore = File.Exists(productionPath) ? File.ReadAllBytes(productionPath) : null;
 
         tree.Root.Size = Canvas;
+        var canvas = (Vector2I)tree.Root.GetVisibleRect().Size;
+        Assert(canvas == Canvas, $"headless canvas {canvas} != 1280x720");
         gm.LoadSettings(character);
         await Frame();
         gm.EnsureHud();
@@ -142,6 +167,7 @@ internal static class KeyBindingsSelfTest
 
         var activeBefore = service.Active;
         var lease = service.BeginSuppression();
+        leaseSlot.Value = lease;
         Assert(service.CaptureGateHeld, "capture gate must be held during suppression");
         foreach (var action in catalog)
             Assert(InputMap.ActionGetEvents(action.Name).Count == 0, $"suppression must empty the {action.Name} event list");
@@ -167,15 +193,18 @@ internal static class KeyBindingsSelfTest
                 $"restored map must carry the exact active bindings for {action.Name}");
         service.ProcessSuppression(new GodotInputReleaseState());
         Assert(restored == 1 && !service.CaptureGateHeld, "restore must run exactly once");
+        leaseSlot.Value = null;
         GD.Print("[key_bindings_selftest] OK suppression empties the map, blocks matching, and restores exactly once");
 
         var wheelLease = service.BeginSuppression();
+        leaseSlot.Value = wheelLease;
         Assert(InputMap.ActionGetEvents("Attack").Count == 0, "the second suppression must empty the map again");
         wheelLease.RequestRestore(InputReleaseGate.NextFrame);
         Assert(InputMap.ActionGetEvents("Attack").Count == 0, "a wheel (NextFrame) restore must not run before the next process frame");
         await Frame();
         Assert(InputMap.ActionGetEvents("Attack").Count == 1 && !service.CaptureGateHeld,
             "a wheel (NextFrame) restore must complete on the following process frame");
+        leaseSlot.Value = null;
         GD.Print("[key_bindings_selftest] OK wheel capture restores on the following process frame");
 
         var hud = gm.Hud!;
@@ -206,8 +235,7 @@ internal static class KeyBindingsSelfTest
         var mountChips = mountRow.GetNode<HBoxContainer>("ChipsBox");
         Assert(mountChips.GetChildCount() == 2, "ToggleMount must show its one applied chip and remove button");
         byte[] fileBefore = File.ReadAllBytes(bindingPath);
-        // Reset Action drives the pending change: its handler captures the foreach action,
-        // unlike the chip/remove buttons which capture the for-loop index.
+        // Reset Action deterministically produces a pending draft change without starting a capture session.
         mountRow.GetNode<Button>("ResetActionButton").EmitSignal("pressed");
         Assert(status.Text == "Unsaved changes.", $"status {status.Text} after a draft change");
         kb.GetNode<Button>("Content/RootBox/FooterRow/CancelButton").EmitSignal("pressed");

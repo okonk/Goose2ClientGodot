@@ -20,9 +20,9 @@ namespace Goose2Client
 
         public InputBindingService InputBindings { get; private set; } = null!;
 
-    public string InputBindingsPath { get; private set; } = null!;
+        public string InputBindingsPath { get; private set; } = null!;
 
-    private const string KeyBindingsSelfTestArg = "+selftest=key_bindings";
+        private const string KeyBindingsSelfTestArg = "+selftest=key_bindings";
 
         private static readonly GodotInputReleaseState InputReleaseState = new();
 
