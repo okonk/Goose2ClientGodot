@@ -68,7 +68,7 @@ namespace Goose2Client.UI
             _mapItemTooltip.Visible = true;
         }
 
-        public void HideMapItemTooltip() => _mapItemTooltip.Visible = false;
+        public void HideMapItemTooltip() => _mapItemTooltip.HideTooltip();
 
         public void HideMapItemTooltipIfMatching(ItemStats stats)
         {
@@ -89,7 +89,7 @@ namespace Goose2Client.UI
             _itemTooltip.Visible = false;
             _spellTooltip.Visible = false;
             _textTooltip.Visible = false;
-            _mapItemTooltip.Visible = false;
+            _mapItemTooltip.HideTooltip();
         }
     }
 }

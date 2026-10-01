@@ -252,7 +252,8 @@ namespace Goose2Client
         /// TextureRect display never does that (only SubViewportContainer would). Notify
         /// exited when leaving the display rect: it drops the hovered area synchronously
         /// (tools/tests/subviewport_hover_pick.gd pins all of this). _Input (not
-        /// _UnhandledInput) so motion over HUD windows still clears the hover.
+        /// _UnhandledInput) so a window consuming the motion still lets us exit the hover;
+        /// motion over a window is then not forwarded — an item behind one must not tooltip.
         /// The map must keep handle_input_locally=true: with false, the pushed event's
         /// picking set_input_as_handled() propagates to the root window, skipping its GUI
         /// phase and breaking Control drag & drop.
@@ -266,7 +267,8 @@ namespace Goose2Client
                 return;
             }
             if (_forwardingHover) return;   // push_input re-enters node _Input with local coords
-            if (WorldViewportScale.IsInsideDisplay(Layout, (Vector2I)motion.Position))
+            if (WorldViewportScale.IsInsideDisplay(Layout, (Vector2I)motion.Position)
+                && !Goose2Client.UI.WindowOcclusion.IsPointCovered(motion.Position))
             {
                 if (!_mouseInDisplay)
                 {

@@ -10,6 +10,7 @@ namespace Goose2Client.UI
 
         public ItemStats Item { get; private set; } = null!;
         private Node2D _owner = null!;
+        private bool _shown;
 
         public override void _Ready()
         {
@@ -21,6 +22,7 @@ namespace Goose2Client.UI
         {
             Item = stats;
             _owner = owner;
+            _shown = true;
 
             _nameLabel.Text = $"{stats.Title} {stats.Name} {stats.Surname}".Trim();
             if (stats.StackSize > 1)
@@ -29,13 +31,25 @@ namespace Goose2Client.UI
             _bindLabel.Visible = stats.Flags.HasFlag(ItemFlags.BindOnPickup);
         }
 
+        public void HideTooltip()
+        {
+            _shown = false;
+            Visible = false;
+        }
+
         public override void _Process(double delta)
         {
-            if (_owner == null || !Godot.GodotObject.IsInstanceValid(_owner) || !_owner.Visible)
+            if (!_shown || _owner == null || !Godot.GodotObject.IsInstanceValid(_owner) || !_owner.Visible)
             {
-                Visible = false;
+                HideTooltip();
                 return;
             }
+
+            // A window opened over a motionless cursor produces no input event, so
+            // WorldViewport's gate never ran and the world hover is still live here.
+            Visible = !WindowOcclusion.IsPointCovered(GetGlobalMousePosition());
+            if (!Visible)
+                return;
 
             // Size to content so the full-rect Background wraps the name (+ bind line when shown).
             // Labels are sized to their actual text height so there is no leftover row padding.
