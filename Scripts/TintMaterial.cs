@@ -45,6 +45,14 @@ void fragment() {
             mat.SetShaderParameter("mean_lum", MeanLuminance(texture));
         }
 
+        /// <summary>Give <paramref name="target"/> the same tint as an already-styled source
+        /// (a UI icon), so drag previews keep the colour. Sharing the source's material is safe:
+        /// it holds only uniforms, no per-node state, and the source outlives the drag.</summary>
+        public static void CopyTint(CanvasItem target, CanvasItem source)
+        {
+            target.Material = source.Material;
+        }
+
         public static Texture2D? RestingFrame(SpriteFrames? frames)
         {
             if (frames == null) return null;

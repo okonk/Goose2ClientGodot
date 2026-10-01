@@ -80,6 +80,7 @@ namespace Goose2Client.UI
                 ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
                 StretchMode = TextureRect.StretchModeEnum.KeepAspect
             };
+            TintMaterial.CopyTint(preview, _icon);
             SetDragPreview(preview);
 
             return new Godot.Collections.Dictionary
