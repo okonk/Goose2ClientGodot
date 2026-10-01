@@ -67,6 +67,23 @@ public class KeyBindingInputContractTests
     }
 
     [Fact]
+    public void GameHud_RetainsTargetingAndLineEditGuardsBeforeCatalogMatches()
+    {
+        string hud = Read("Scripts/UI/GameHud.cs");
+        int input = hud.IndexOf("public override void _UnhandledInput(", StringComparison.Ordinal);
+        int next = hud.IndexOf("private static void SendEmote(", input, StringComparison.Ordinal);
+        Assert.True(input >= 0 && next > input, "raw-input handler must precede SendEmote");
+        string body = hud.Substring(input, next - input);
+
+        int targeting = body.IndexOf("GameManager.Instance.IsTargeting", StringComparison.Ordinal);
+        int lineEdit = body.IndexOf("GetViewport().GuiGetFocusOwner() is LineEdit", StringComparison.Ordinal);
+        int firstMatch = body.IndexOf("IsActionPressed", StringComparison.Ordinal);
+        Assert.True(targeting >= 0, "IsTargeting guard must remain in the raw-input handler");
+        Assert.True(lineEdit > targeting, "LineEdit focus guard must remain after the IsTargeting guard");
+        Assert.True(firstMatch > lineEdit, "catalog matches must run after both guards");
+    }
+
+    [Fact]
     public void GameManager_Fullscreen_IsExactAndSkippedWhileTypingInChat()
     {
         string gm = Read("Scripts/GameManager.cs");
