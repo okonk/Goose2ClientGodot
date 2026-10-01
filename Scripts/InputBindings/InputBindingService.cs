@@ -34,6 +34,12 @@ public sealed class InputBindingService
 
     public bool IsInitialized => _active is not null;
 
+    public string? StartupWarning { get; private set; }
+
+    public bool CaptureGateHeld { get; private set; }
+
+    public event Action? CaptureGateReleased;
+
     public InputBindingSet FactoryDefaults =>
         _factoryDefaults ?? throw new InvalidOperationException("Initialize must be called before use.");
 
@@ -41,6 +47,13 @@ public sealed class InputBindingService
         _active ?? throw new InvalidOperationException("Initialize must be called before use.");
 
     public InputBindingInitializeResult Initialize()
+    {
+        var result = InitializeCore();
+        StartupWarning = result.Warning;
+        return result;
+    }
+
+    private InputBindingInitializeResult InitializeCore()
     {
         if (_active is not null)
             throw new InvalidOperationException("Initialize can only be called once.");

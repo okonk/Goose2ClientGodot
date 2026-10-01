@@ -1,3 +1,4 @@
+using System;
 using Godot;
 using Goose2Client;
 
@@ -26,8 +27,11 @@ public partial class OptionsWindow : BaseWindow
     private Label _scaleValueLabel = null!;
     private ButtonGroup _scaleModeGroup = null!;
     private Button _resetLayoutButton = null!;
+    private Button _keyBindingsButton = null!;
     private bool _dragging;
     private bool _initializing;
+
+    public Action? OpenKeyBindings;
 
     public override void _Ready()
     {
@@ -106,6 +110,9 @@ public partial class OptionsWindow : BaseWindow
 
         _resetLayoutButton = GetNode<Button>("Content/ResetLayoutButton");
         _resetLayoutButton.Pressed += OnResetLayoutPressed;
+
+        _keyBindingsButton = GetNode<Button>("Content/KeyBindingsButton");
+        _keyBindingsButton.Pressed += OnKeyBindingsPressed;
         // Synchronous clear, not a next-frame await: a deferred clear would race the
         // deferred ScaleRegister and ready-flush ordering.
         _initializing = false;
@@ -266,6 +273,11 @@ public partial class OptionsWindow : BaseWindow
     public override void ResetToDefault()
     {
         RepositionFromSaved();
+    }
+
+    private void OnKeyBindingsPressed()
+    {
+        OpenKeyBindings?.Invoke();
     }
 
     private void OnResetLayoutPressed()
