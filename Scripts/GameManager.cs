@@ -20,6 +20,8 @@ namespace Goose2Client
 
         public InputBindingService InputBindings { get; private set; } = null!;
 
+        private static readonly GodotInputReleaseState InputReleaseState = new();
+
         private PausablePacketQueue _packetQueue = null!;
         private MainThreadStallMonitor _stallMonitor = null!;
         private const int MaxNetworkPacketsPerFrame = 64;
@@ -96,6 +98,7 @@ namespace Goose2Client
             var bindingLoad = InputBindings.Initialize();
             if (bindingLoad.Warning is { } warning)
                 GD.PushWarning(warning);
+            InputBindings.FailureLogger = GD.PushError;
 
             PacketManager = new PacketManager();
             NetworkClient = new NetworkClient();
@@ -108,6 +111,7 @@ namespace Goose2Client
 
         public override void _Process(double delta)
         {
+            InputBindings.ProcessSuppression(InputReleaseState);
             _stallMonitor.Heartbeat("frame-start");
             try
             {

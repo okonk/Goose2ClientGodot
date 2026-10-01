@@ -32,6 +32,12 @@ public partial class KeyBindingsWindow : BaseWindow
     private readonly Dictionary<string, Label> _categoryHeaders = new();
     private readonly Dictionary<string, List<string>> _categoryActions = new();
     private bool _pendingOpen;
+    private KeyBindingCaptureState? _capture;
+    private InputBindingSuppressionLease? _lease;
+    private string? _capturingAction;
+    private int _capturingIndex = -1;
+    private bool _candidateSaved;
+    private bool _pendingApply;
 
     public override void _Ready()
     {
@@ -60,6 +66,7 @@ public partial class KeyBindingsWindow : BaseWindow
         _cancel.Pressed += OnCancelPressed;
         _cancelCapture.Pressed += OnCancelCapturePressed;
         service.CaptureGateReleased += OnCaptureGateReleased;
+        service.SuppressionRestored += OnSuppressionRestored;
 
         Rerender();
 
@@ -68,9 +75,82 @@ public partial class KeyBindingsWindow : BaseWindow
 
     public override void _ExitTree()
     {
+        RequestSafeRestore();
         var service = GameManager.Instance?.InputBindings;
         if (service != null)
+        {
             service.CaptureGateReleased -= OnCaptureGateReleased;
+            service.SuppressionRestored -= OnSuppressionRestored;
+        }
+    }
+
+    public override void _Process(double delta)
+    {
+        base._Process(delta);
+        if (_capture is { WaitingInitiating: true })
+        {
+            _capture.Tick();
+            SetCapturePrompt();
+        }
+    }
+
+    public override void _Notification(int what)
+    {
+        base._Notification(what);
+        if (what == NotificationVisibilityChanged && !Visible)
+            RequestSafeRestore();
+    }
+
+    public override void _Input(InputEvent @event)
+    {
+        var capture = _capture;
+        if (capture is null || !capture.IsActive)
+        {
+            base._Input(@event);
+            return;
+        }
+
+        switch (@event)
+        {
+            case InputEventKey key:
+                capture.KeyEvent(
+                    key.PhysicalKeycode,
+                    key.Pressed,
+                    key.Echo,
+                    key.CtrlPressed,
+                    key.ShiftPressed,
+                    key.AltPressed,
+                    key.MetaPressed);
+                break;
+            case InputEventMouseButton mouse:
+                if (mouse.ButtonIndex == MouseButton.Left && IsOverCancelCapture(mouse.Position))
+                {
+                    base._Input(@event);
+                    return;
+                }
+                capture.MouseButtonEvent(
+                    mouse.ButtonIndex,
+                    mouse.Pressed,
+                    mouse.CtrlPressed,
+                    mouse.ShiftPressed,
+                    mouse.AltPressed,
+                    mouse.MetaPressed);
+                break;
+            case InputEventJoypadButton joypadButton:
+                capture.JoypadButtonEvent(joypadButton.Device, joypadButton.ButtonIndex, joypadButton.Pressed);
+                break;
+            case InputEventJoypadMotion joypadMotion:
+                capture.JoypadAxisEvent(joypadMotion.Device, joypadMotion.Axis, joypadMotion.AxisValue);
+                break;
+            default:
+                base._Input(@event);
+                return;
+        }
+
+        // SetInputAsHandled stops GUI propagation only; the service-owned empty
+        // InputMap lease is what keeps capture input from firing mapped actions.
+        GetViewport().SetInputAsHandled();
+        AfterCaptureTransition();
     }
 
     public void Open()
@@ -125,6 +205,7 @@ public partial class KeyBindingsWindow : BaseWindow
 
     protected override void OnClosePressed()
     {
+        RequestSafeRestore();
         _editor?.Cancel();
         Rerender();
         _captureOverlay.Visible = false;
@@ -150,20 +231,119 @@ public partial class KeyBindingsWindow : BaseWindow
 
     private void OnApplyPressed()
     {
+        if (_capture is { IsActive: true })
+        {
+            _pendingApply = true;
+            RequestSafeRestore();
+            return;
+        }
+
         _editor!.Apply();
         Rerender();
     }
 
     private void OnCancelCapturePressed()
     {
-        _captureOverlay.Visible = false;
+        RequestSafeRestore();
     }
 
-    private void OpenCapturePrompt()
+    private void OnSuppressionRestored()
     {
-        _capturePrompt.Text = "Press a key…";
+        EndCaptureSession();
+        _lease = null;
+        if (_pendingApply)
+        {
+            _pendingApply = false;
+            _editor!.Apply();
+            Rerender();
+        }
+    }
+
+    private void RequestSafeRestore()
+    {
+        var lease = _lease;
+        if (lease is null)
+            return;
+        var gate = _capture is { IsActive: true } ? _capture.Cancel() : InputReleaseGate.Immediate;
+        lease.RequestRestore(gate);
+    }
+
+    private void OpenCapturePrompt(string action, int index = -1)
+    {
+        if (_capture is { IsActive: true })
+            return;
+
+        var service = GameManager.Instance.InputBindings;
+        if (service.CaptureGateHeld)
+            return;
+
+        var capture = new KeyBindingCaptureState();
+        capture.Begin();
+        var lease = service.BeginSuppression();
+
+        _capture = capture;
+        _lease = lease;
+        _capturingAction = action;
+        _capturingIndex = index;
+        _candidateSaved = false;
+
+        foreach (var device in Input.GetConnectedJoypads())
+            for (var axis = 1; axis < (int)JoyAxis.Max; axis++)
+                capture.SampleAxis(device, (JoyAxis)axis, Input.GetJoyAxis(device, (JoyAxis)axis));
+
+        SetFooterEnabled(false);
+        SetCapturePrompt();
         _captureOverlay.Visible = true;
     }
+
+    private void AfterCaptureTransition()
+    {
+        var capture = _capture!;
+        if (!capture.IsActive)
+        {
+            EndCaptureSession();
+            return;
+        }
+
+        if (capture.Candidate is { } candidate && !_candidateSaved)
+        {
+            _candidateSaved = true;
+            if (_capturingIndex < 0)
+                _editor!.Add(_capturingAction!, candidate);
+            else
+                _editor!.Replace(_capturingAction!, _capturingIndex, candidate);
+            Rerender();
+            _lease!.RequestRestore(capture.CandidateGate);
+        }
+
+        SetCapturePrompt();
+    }
+
+    private void EndCaptureSession()
+    {
+        _capture = null;
+        _capturingAction = null;
+        _capturingIndex = -1;
+        _candidateSaved = false;
+        _captureOverlay.Visible = false;
+        SetFooterEnabled(true);
+    }
+
+    private void SetCapturePrompt()
+    {
+        if (_capture is { } capture)
+            _capturePrompt.Text = capture.Prompt;
+    }
+
+    private void SetFooterEnabled(bool enabled)
+    {
+        _resetAll.Disabled = !enabled;
+        _apply.Disabled = !enabled;
+        _cancel.Disabled = !enabled;
+    }
+
+    private bool IsOverCancelCapture(Vector2 position) =>
+        _cancelCapture.Visible && _cancelCapture.GetGlobalRect().HasPoint(position);
 
     private void BuildRows()
     {
@@ -224,7 +404,7 @@ public partial class KeyBindingsWindow : BaseWindow
                 Text = "Add Binding",
                 CustomMinimumSize = new Vector2(KeyBindingsLayout.ButtonWidth, KeyBindingsLayout.RowHeight)
             };
-            add.Pressed += OpenCapturePrompt;
+            add.Pressed += () => OpenCapturePrompt(action.Name, -1);
 
             var reset = new Button
             {
@@ -326,7 +506,7 @@ public partial class KeyBindingsWindow : BaseWindow
                 chip.AddThemeColorOverride("font_color", ConflictColor);
                 chip.AddThemeColorOverride("font_hover_color", ConflictColor);
             }
-            chip.Pressed += OpenCapturePrompt;
+            chip.Pressed += () => OpenCapturePrompt(actionName, i);
             shell.ChipsBox.AddChild(chip);
             shell.Chips.Add(chip);
 

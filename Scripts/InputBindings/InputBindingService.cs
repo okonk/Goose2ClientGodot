@@ -19,12 +19,45 @@ public sealed record InputBindingApplyResult(
     string? Warning,
     InputBindingRecoveryStatus? Recovery);
 
+public sealed class InputBindingSuppressionLease
+{
+    private InputReleaseGate _restoreGate = InputReleaseGate.Immediate;
+    private bool _restoreRequested;
+
+    internal InputBindingSuppressionLease()
+    {
+    }
+
+    public bool IsRestored { get; private set; }
+
+    internal bool RestoreRequested => _restoreRequested;
+
+    internal InputReleaseGate RestoreGate => _restoreGate;
+
+    public void RequestRestore(InputReleaseGate gate)
+    {
+        ArgumentNullException.ThrowIfNull(gate);
+        if (_restoreRequested || IsRestored)
+            return;
+        _restoreRequested = true;
+        _restoreGate = gate;
+    }
+
+    internal void MarkRestored()
+    {
+        IsRestored = true;
+    }
+}
+
 public sealed class InputBindingService
 {
+    private static readonly InputBindingSet EmptySet = CreateEmptySet();
+
     private readonly IInputMapAdapter _adapter;
     private readonly InputBindingFileStore _store;
     private InputBindingSet? _factoryDefaults;
     private InputBindingSet? _active;
+    private InputBindingSuppressionLease? _lease;
 
     public InputBindingService(IInputMapAdapter adapter, InputBindingFileStore store)
     {
@@ -36,9 +69,13 @@ public sealed class InputBindingService
 
     public string? StartupWarning { get; private set; }
 
-    public bool CaptureGateHeld { get; private set; }
+    public bool CaptureGateHeld => _lease is not null;
 
     public event Action? CaptureGateReleased;
+
+    public event Action? SuppressionRestored;
+
+    public Action<string>? FailureLogger { get; set; }
 
     public InputBindingSet FactoryDefaults =>
         _factoryDefaults ?? throw new InvalidOperationException("Initialize must be called before use.");
@@ -111,6 +148,13 @@ public sealed class InputBindingService
 
     public InputBindingApplyResult Apply(IReadOnlyDictionary<string, IReadOnlyList<InputBinding>> draft)
     {
+        if (_lease is not null)
+            return new InputBindingApplyResult(
+                false,
+                "Input bindings cannot be applied while a key binding capture is in progress.",
+                null,
+                null);
+
         var active = Active;
         var factory = FactoryDefaults;
 
@@ -169,6 +213,62 @@ public sealed class InputBindingService
             null,
             "Input bindings were applied but file transaction cleanup failed; a backup artifact may remain.",
             null);
+    }
+
+    public InputBindingSuppressionLease BeginSuppression()
+    {
+        if (_active is null)
+            throw new InvalidOperationException("Initialize must be called before use.");
+        if (_lease is not null)
+            throw new InvalidOperationException("A suppression lease is already active.");
+
+        // A failed Replace rolls the runtime back to Active inside the adapter,
+        // so no lease is published on failure.
+        _adapter.Replace(_active, EmptySet);
+        _lease = new InputBindingSuppressionLease();
+        return _lease;
+    }
+
+    public void ProcessSuppression(IInputReleaseState input)
+    {
+        ArgumentNullException.ThrowIfNull(input);
+
+        var lease = _lease;
+        if (lease is null || !lease.RestoreRequested)
+            return;
+        if (!lease.RestoreGate.IsSatisfied(input))
+            return;
+
+        RestoreSuppression();
+    }
+
+    private void RestoreSuppression()
+    {
+        var lease = _lease!;
+        try
+        {
+            _adapter.Replace(EmptySet, _active!);
+        }
+        catch (Exception ex)
+        {
+            // The lease stays service-owned; GameManager polls ProcessSuppression
+            // every frame, so a destroyed window cannot strand the empty map.
+            FailureLogger?.Invoke($"Input bindings suppression restore failed; retrying next frame: {ex.Message}");
+            return;
+        }
+
+        lease.MarkRestored();
+        _lease = null;
+        SuppressionRestored?.Invoke();
+        CaptureGateReleased?.Invoke();
+    }
+
+    private static InputBindingSet CreateEmptySet()
+    {
+        var empty = new Dictionary<string, IReadOnlyList<InputBinding>>(InputActionCatalog.Actions.Count);
+        foreach (var action in InputActionCatalog.Actions)
+            empty[action.Name] = Array.Empty<InputBinding>();
+        return new InputBindingSet(empty);
     }
 
     private static Exception FileRollbackFailure() =>
