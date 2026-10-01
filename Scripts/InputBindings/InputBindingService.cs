@@ -98,7 +98,18 @@ public sealed class InputBindingService
         var factory = _adapter.CaptureFactory(InputActionCatalog.Actions);
         _factoryDefaults = factory;
 
-        var bytes = _store.Read();
+        byte[]? bytes;
+        try
+        {
+            bytes = _store.Read();
+        }
+        catch (Exception ex)
+        {
+            _active = factory;
+            return new InputBindingInitializeResult(
+                true, $"Input bindings file could not be loaded and factory defaults are active: {ex.Message}");
+        }
+
         if (bytes is null)
         {
             _active = factory;

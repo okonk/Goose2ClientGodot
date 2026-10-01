@@ -495,6 +495,8 @@ public partial class KeyBindingsWindow : BaseWindow
             if (rows[i].Binding is not { } binding)
                 continue;
 
+            var index = i;
+
             var chip = new Button
             {
                 Name = $"Chip_{i}",
@@ -507,7 +509,7 @@ public partial class KeyBindingsWindow : BaseWindow
                 chip.AddThemeColorOverride("font_color", ConflictColor);
                 chip.AddThemeColorOverride("font_hover_color", ConflictColor);
             }
-            chip.Pressed += () => OpenCapturePrompt(actionName, i);
+            chip.Pressed += () => OpenCapturePrompt(actionName, index);
             shell.ChipsBox.AddChild(chip);
             shell.Chips.Add(chip);
 
@@ -519,7 +521,7 @@ public partial class KeyBindingsWindow : BaseWindow
             };
             remove.Pressed += () =>
             {
-                _editor!.Remove(actionName, i);
+                _editor!.Remove(actionName, index);
                 Rerender();
             };
             shell.ChipsBox.AddChild(remove);

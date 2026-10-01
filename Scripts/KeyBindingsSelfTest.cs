@@ -173,9 +173,9 @@ internal static class KeyBindingsSelfTest
             Assert(InputMap.ActionGetEvents(action.Name).Count == 0, $"suppression must empty the {action.Name} event list");
         Assert(ReferenceEquals(service.Active, activeBefore), "suppression must not change Active");
 
-        Input.ParseInputEvent(chordPress);
+        Input.ParseInputEvent((InputEvent)chordPress.Duplicate());
         Assert(chordPress.GetActionStrength("Attack") == 0f, "synthetic captured input must not match a gameplay action during suppression");
-        Input.ParseInputEvent(joypadPress);
+        Input.ParseInputEvent((InputEvent)joypadPress.Duplicate());
         Assert(joypadPress.GetActionStrength("ToggleMount") == 0f, "synthetic captured joypad input must not match during suppression");
         var chordRelease = new InputEventKey { PhysicalKeycode = Key.Space, CtrlPressed = true, Pressed = false };
         Input.ParseInputEvent(chordRelease);
@@ -292,6 +292,21 @@ internal static class KeyBindingsSelfTest
         kb.GetNode<Button>("Content/RootBox/FooterRow/CancelButton").EmitSignal("pressed");
         Assert(!kb.Visible, "Cancel must close the window after the scale round trip");
         GD.Print("[key_bindings_selftest] OK dynamic rows/chips survive 1x/2x/1x and the window stays in the canvas");
+
+        optionsButton.EmitSignal("pressed");
+        Assert(kb.Visible, "the Options callback must reopen the window for the chip callback check");
+        var attackRow = kb.GetNode<HBoxContainer>("Content/RootBox/ScrollHost/RowsBox/Row_Attack");
+        var attackChips = attackRow.GetNode<HBoxContainer>("ChipsBox");
+        Assert(attackChips.GetChildCount() == 2, "Attack must show its one applied chip and remove button");
+        attackChips.GetNode<Button>("Remove_0").EmitSignal("pressed");
+        Assert(attackChips.GetChildCount() == 0, "pressing the chip remove button must remove the chip");
+        Assert(status.Text == "Unsaved changes.", $"status {status.Text} after a chip removal");
+        kb.GetNode<Button>("Content/RootBox/FooterRow/CancelButton").EmitSignal("pressed");
+        Assert(!kb.Visible, "Cancel must close the window after the chip removal");
+        Assert(service.Active.GetBindings("Attack").Count == 1
+            && service.Active.GetBindings("Attack")[0] is InputBinding.Keyboard { PhysicalKey: Key.Space, Ctrl: true },
+            "Cancel must not apply the chip removal");
+        GD.Print("[key_bindings_selftest] OK chip remove button callback removes the binding");
 
         byte[]? productionAfter = File.Exists(productionPath) ? File.ReadAllBytes(productionPath) : null;
         Assert(productionBefore == null

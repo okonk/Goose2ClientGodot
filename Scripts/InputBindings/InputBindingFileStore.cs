@@ -18,6 +18,7 @@ public sealed class InputBindingFileStore
 
     public byte[]? Read()
     {
+        FailBeforeRead?.Invoke();
         return File.Exists(_path) ? File.ReadAllBytes(_path) : null;
     }
 
@@ -58,6 +59,7 @@ public sealed class InputBindingFileStore
     }
 
     // Fault injection seams for tests; null in production.
+    public Action? FailBeforeRead { get; set; }
     public Action<string>? FailBeforePublish { get; set; }
     public Action<string>? FailDuringRollback { get; set; }
     public Action<string>? FailDuringCleanup { get; set; }

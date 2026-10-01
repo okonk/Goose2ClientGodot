@@ -30,6 +30,7 @@ public class InputBindingServiceTests : IDisposable
 
     public void Dispose()
     {
+        _store.FailBeforeRead = null;
         _store.FailBeforePublish = null;
         _store.FailDuringRollback = null;
         _store.FailDuringCleanup = null;
@@ -173,6 +174,20 @@ public class InputBindingServiceTests : IDisposable
         Assert.Null(result.Warning);
         Assert.Empty(_service.Active.GetBindings("Attack"));
         Assert.Equal(_factory.GetBindings("MoveUp"), _service.Active.GetBindings("MoveUp"));
+    }
+
+    [Fact]
+    public void Initialize_ReadFailure_PublishesFactoryWithOneWarningAndLeavesRuntimeUntouched()
+    {
+        _store.FailBeforeRead = () => throw new IOException("injected read failure");
+
+        var result = _service.Initialize();
+
+        Assert.True(result.Success);
+        Assert.NotNull(result.Warning);
+        Assert.Equal(["capture"], _adapter.Operations);
+        AssertSetEquals(_factory, _service.Active);
+        Assert.Null(_adapter.Current);
     }
 
     [Fact]
