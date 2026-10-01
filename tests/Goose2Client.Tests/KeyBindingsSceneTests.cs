@@ -96,11 +96,11 @@ public class KeyBindingsSceneTests
     }
 
     [Fact]
-    public void Options_GrowsTo344KeepsResetLayoutAndAddsKeyBindingsButton()
+    public void Options_PlacesKeyBindingsBesideResetLayout()
     {
         var s = OptionsScene();
         var root = NodeBlock(s, "OptionsWindow");
-        Assert.Contains("offset_bottom = 344.0", root);
+        Assert.Contains("offset_bottom = 316.0", root);
 
         var reset = NodeBlock(s, "ResetLayoutButton");
         Assert.Contains("offset_top = 284.0", reset);
@@ -109,9 +109,9 @@ public class KeyBindingsSceneTests
 
         var button = NodeBlock(s, "KeyBindingsButton");
         Assert.Contains("parent=\"Content\"", button);
-        Assert.Contains("offset_top = 312.0", button);
-        Assert.Contains("offset_bottom = 336.0", button);
-        Assert.Contains("text = \"Key Bindings…\"", button);
+        Assert.Contains("offset_top = 284.0", button);
+        Assert.Contains("offset_bottom = 308.0", button);
+        Assert.Contains("text = \"Key Bindings\"", button);
         Assert.True(
             s.IndexOf("[node name=\"KeyBindingsButton\"", StringComparison.Ordinal) >
             s.IndexOf("[node name=\"ResetLayoutButton\"", StringComparison.Ordinal),
