@@ -60,6 +60,10 @@ namespace Goose2Client.Network.Packets
         /// this null.</summary>
         public string? ExtraStats { get; set; }
 
+        /// <summary>Total experience (current plus sold) the item gates on. Appended after the
+        /// extra stats, so an older server leaves this 0.</summary>
+        public long MinExperience { get; set; }
+
         public override string Prefix { get; } = "SIS";
 
         public override object Parse(PacketParser p)
@@ -113,6 +117,7 @@ namespace Goose2Client.Network.Packets
                 GraphicA = p.GetInt32(),
                 CurrencyName = p.LengthRemaining() > 0 ? p.GetString() : null,
                 ExtraStats = p.LengthRemaining() > 0 ? p.GetString() : null,
+                MinExperience = p.LengthRemaining() > 0 ? p.GetInt64() : 0,
             };
         }
     }

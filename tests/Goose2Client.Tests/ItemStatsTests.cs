@@ -6,8 +6,9 @@ using Xunit;
 
 public class ItemStatsTests
 {
-    /// <summary>An SIS body: 43 fields, slot number first, everything else zeroed. The
-    /// currency name the server appends after GraphicA goes in <paramref name="trailing"/>.</summary>
+    /// <summary>An SIS body: 43 fields, slot number first, everything else zeroed. The fields
+    /// the server appends after GraphicA (currency name, extra stats, minimum experience) go in
+    /// <paramref name="trailing"/>.</summary>
     private static string InventorySlotBody(params string[] trailing)
     {
         var fields = Enumerable.Repeat("0", 43).ToArray();
@@ -140,5 +141,80 @@ public class ItemStatsTests
         Assert.Equal("Sword", s.Name);
         Assert.Equal(3, s.StackSize);
         Assert.Equal(ItemUseType.Weapon, s.UseType);
+    }
+
+    [Fact]
+    public void InventorySlot_reads_the_trailing_min_experience()
+    {
+        var body = InventorySlotBody("gold", "400", "20000000");
+
+        var p = (InventorySlotPacket)new InventorySlotPacket().Parse(new PacketParser("SIS" + body, "SIS"));
+
+        Assert.Equal(20_000_000, p.MinExperience);
+    }
+
+    /// <summary>The server trims the extra-stats list to nothing when every stat is zero, so the
+    /// empty field must not shift the experience that follows it.</summary>
+    [Fact]
+    public void InventorySlot_reads_min_experience_after_an_empty_extra_stats_field()
+    {
+        var body = InventorySlotBody("gold", "", "1500");
+
+        var p = (InventorySlotPacket)new InventorySlotPacket().Parse(new PacketParser("SIS" + body, "SIS"));
+
+        Assert.Equal("gold", p.CurrencyName);
+        Assert.Equal("", p.ExtraStats);
+        Assert.Equal(1500, p.MinExperience);
+    }
+
+    [Fact]
+    public void InventorySlot_without_a_min_experience_reports_none()
+    {
+        var body = InventorySlotBody("gold", "400");
+
+        var p = (InventorySlotPacket)new InventorySlotPacket().Parse(new PacketParser("SIS" + body, "SIS"));
+
+        Assert.Equal(0, p.MinExperience);
+    }
+
+    [Fact]
+    public void VendorSlot_reads_the_trailing_min_experience()
+    {
+        var body = InventorySlotBody("credits", "", "2000000000");
+
+        var p = (VendorSlotPacket)new VendorSlotPacket().Parse(new PacketParser("SVS" + body, "SVS"));
+
+        Assert.Equal(2_000_000_000, p.MinExperience);
+    }
+
+    [Fact]
+    public void BankSlot_reads_the_trailing_fields()
+    {
+        var body = InventorySlotBody("gold", "400", "20000000");
+
+        var p = (BankSlotPacket)new BankSlotPacket().Parse(new PacketParser("SBS" + body, "SBS"));
+
+        Assert.Equal("gold", p.CurrencyName);
+        Assert.Equal("400", p.ExtraStats);
+        Assert.Equal(20_000_000, p.MinExperience);
+    }
+
+    [Fact]
+    public void CombineBagSlot_reads_the_trailing_fields()
+    {
+        var body = InventorySlotBody("gold", "", "1500");
+
+        var p = (CombineBagSlotPacket)new CombineBagSlotPacket().Parse(new PacketParser("SCS" + body, "SCS"));
+
+        Assert.Equal("gold", p.CurrencyName);
+        Assert.Equal(1500, p.MinExperience);
+    }
+
+    [Fact]
+    public void FromPacket_copies_the_min_experience()
+    {
+        var s = ItemStats.FromPacket(new InventorySlotPacket { MinExperience = 20_000_000 });
+
+        Assert.Equal(20_000_000, s.MinExperience);
     }
 }

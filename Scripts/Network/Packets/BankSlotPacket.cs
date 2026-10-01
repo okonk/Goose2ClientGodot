@@ -56,6 +56,9 @@ namespace Goose2Client.Network.Packets
                 GraphicG = p.GetInt32(),
                 GraphicB = p.GetInt32(),
                 GraphicA = p.GetInt32(),
+                CurrencyName = p.LengthRemaining() > 0 ? p.GetString() : null,
+                ExtraStats = p.LengthRemaining() > 0 ? p.GetString() : null,
+                MinExperience = p.LengthRemaining() > 0 ? p.GetInt64() : 0,
             };
         }
     }

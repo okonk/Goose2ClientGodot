@@ -213,4 +213,47 @@ public class ItemTooltipTextTests
         Assert.True(acIndex < valueIndex, $"AC at {acIndex} should be before Value at {valueIndex}");
         Assert.Equal("No Value", lines[valueIndex].Text);
     }
+
+    [Fact]
+    public void Build_Min_experience_requirement()
+    {
+        var s = new ItemStats { MinExperience = 20_000_000 };
+        var lines = ItemTooltipText.Build(s, ClassName);
+
+        var line = lines.Single(l => l.Color == ItemTooltipColor.Requirement);
+        Assert.Equal("Requires 20m total experience", line.Text);
+    }
+
+    [Fact]
+    public void Build_No_experience_line_when_the_item_has_none()
+    {
+        var lines = ItemTooltipText.Build(new ItemStats { MinExperience = 0 }, ClassName);
+
+        Assert.DoesNotContain(lines, l => l.Text.Contains("experience"));
+    }
+
+    [Theory]
+    [InlineData(500L, "500")]
+    [InlineData(1500L, "1.5k")]
+    [InlineData(999_999L, "999k")]
+    [InlineData(2_000_000_000L, "2b")]
+    public void Build_Min_experience_matches_the_servers_number_formatting(long minExperience, string expected)
+    {
+        var lines = ItemTooltipText.Build(new ItemStats { MinExperience = minExperience }, ClassName);
+
+        var line = lines.Single(l => l.Color == ItemTooltipColor.Requirement);
+        Assert.Equal($"Requires {expected} total experience", line.Text);
+    }
+
+    [Fact]
+    public void Build_Experience_requirement_follows_the_level_requirement()
+    {
+        var s = new ItemStats { MinLevel = 50, MinExperience = 20_000_000 };
+        var lines = ItemTooltipText.Build(s, ClassName);
+
+        int levelIndex = lines.FindIndex(l => l.Text.StartsWith("Requires level"));
+        int expIndex = lines.FindIndex(l => l.Text.StartsWith("Requires 20m"));
+
+        Assert.True(levelIndex < expIndex, $"level at {levelIndex} should precede experience at {expIndex}");
+    }
 }

@@ -58,6 +58,10 @@ namespace Goose2Client
 
         public int[] ExtraStats { get; set; } = Array.Empty<int>();
 
+        /// <summary>Total experience (current plus sold) needed to use the item; 0 when there is
+        /// no gate. Never present on a map object or on an item from an older server.</summary>
+        public long MinExperience { get; set; }
+
         public static ItemStats FromPacket(InventorySlotPacket packet)
         {
             return new ItemStats
@@ -107,6 +111,7 @@ namespace Goose2Client
                 GraphicA = packet.GraphicA,
                 CurrencyName = packet.CurrencyName,
                 ExtraStats = ParseExtraStats(packet.ExtraStats),
+                MinExperience = packet.MinExperience,
             };
         }
 

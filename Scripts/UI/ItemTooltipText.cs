@@ -30,6 +30,30 @@ namespace Goose2Client.UI
             return "+" + v.ToString("N0", Inv);
         }
 
+        /// <summary>Mirrors the server's Utils.FormatNumber so tooltip text reads the same as
+        /// the requirement messages the server sends in chat.</summary>
+        private static string FormatCompact(long v)
+        {
+            ulong magnitude = v < 0 ? (ulong)(-(v + 1)) + 1 : (ulong)v;
+
+            if (magnitude < 1000)
+                return v.ToString("N0", Inv);
+
+            ulong scale = (ulong)Math.Pow(10, (int)Math.Max(0, Math.Log10(magnitude) - 2));
+            magnitude = magnitude / scale * scale;
+
+            char suffix;
+            double shown;
+            if (magnitude >= 1_000_000_000)
+                (suffix, shown) = ('b', magnitude / 1_000_000_000D);
+            else if (magnitude >= 1_000_000)
+                (suffix, shown) = ('m', magnitude / 1_000_000D);
+            else
+                (suffix, shown) = ('k', magnitude / 1_000D);
+
+            return (v < 0 ? "-" : "") + shown.ToString("0.##", Inv) + suffix;
+        }
+
         /// <summary>Build ordered stat lines from item stats. No Godot types.</summary>
         public static List<(string Text, ItemTooltipColor Color)> Build(ItemStats s, Func<int, string> className)
         {
@@ -144,6 +168,11 @@ namespace Goose2Client.UI
             else if (s.MinLevel != 0 && s.MaxLevel == 0)
                 lines.Add((
                     $"Requires level {s.MinLevel}",
+                    ItemTooltipColor.Requirement));
+
+            if (s.MinExperience != 0)
+                lines.Add((
+                    $"Requires {FormatCompact(s.MinExperience)} total experience",
                     ItemTooltipColor.Requirement));
 
             if (!string.IsNullOrEmpty(s.SpellEffect))
