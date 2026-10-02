@@ -171,6 +171,7 @@ internal sealed class DocumentGameDataState : IDisposable, INotifyPropertyChange
         _selectedSpawn = null;
         _selectedWarp = null;
         _selectedNpcId = null;
+        _selectedCanMove = null;
         _selectedDestinationMapId = null;
         _pendingDestinationX = null;
         _pendingDestinationY = null;

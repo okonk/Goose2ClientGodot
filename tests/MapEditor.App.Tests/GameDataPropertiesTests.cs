@@ -267,6 +267,18 @@ public class GameDataPropertiesTests
     }
 
     [AvaloniaFact]
+    public void SessionReplacement_ClearsThePendingCanMoveOverride()
+    {
+        using MainWindowHarness harness = MainWindowHarness.Create();
+        harness.ViewModel.GameData!.AttachSession(SessionWithSpawn(3, 4));
+        harness.ViewModel.GameData.SelectedCanMove = SpawnMoveOverride.Stationary;
+
+        harness.ViewModel.GameData.AttachSession(SessionWithSpawn(9, 9));
+
+        Assert.Null(harness.ViewModel.GameData.SelectedCanMove);
+    }
+
+    [AvaloniaFact]
     public void CommitSpawnCanMove_WithSelectedSpawn_WritesRow_AndUndoRestores()
     {
         using MainWindowHarness harness = MainWindowHarness.Create();
