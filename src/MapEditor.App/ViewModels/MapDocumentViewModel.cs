@@ -1053,12 +1053,22 @@ internal sealed class MapDocumentViewModel : ViewModelBase, ITerrainDocumentReco
         if (state.SelectedSpawn is { } index && state.Session is { } session && index < session.Edits.Spawns.Count)
         {
             NpcSpawnRow row = session.Edits.Spawns[index];
-            if (!SpawnPropertiesJson.TryWrite(row.Properties, value, out string result))
+            if (!SpawnPropertiesJson.TryRead(row.Properties, out SpawnMoveOverride current))
             {
                 return;
             }
 
             state.SelectedCanMove = value;
+            if (current == value)
+            {
+                return;
+            }
+
+            if (!SpawnPropertiesJson.TryWrite(row.Properties, value, out string result))
+            {
+                return;
+            }
+
             session.Edits.UpdateSpawn(index, row with { Properties = result });
             return;
         }

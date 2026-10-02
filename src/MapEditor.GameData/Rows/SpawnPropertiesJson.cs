@@ -24,28 +24,33 @@ public static class SpawnPropertiesJson
 
         using (document)
         {
-            var root = document.RootElement;
-            if (!root.TryGetProperty("canMove", out var canMove))
-            {
-                return true;
-            }
-
-            // The server crashes on startup for non-boolean canMove values (e.g. {"canMove":1});
-            // refuse to treat them as editable.
-            if (canMove.ValueKind == JsonValueKind.True)
-            {
-                value = SpawnMoveOverride.Movable;
-                return true;
-            }
-
-            if (canMove.ValueKind == JsonValueKind.False)
-            {
-                value = SpawnMoveOverride.Stationary;
-                return true;
-            }
-
-            return false;
+            return TryReadValue(document.RootElement, out value);
         }
+    }
+
+    private static bool TryReadValue(JsonElement root, out SpawnMoveOverride value)
+    {
+        value = SpawnMoveOverride.Default;
+        if (!root.TryGetProperty("canMove", out var canMove))
+        {
+            return true;
+        }
+
+        // The server crashes on startup for non-boolean canMove values (e.g. {"canMove":1});
+        // refuse to treat them as editable.
+        if (canMove.ValueKind == JsonValueKind.True)
+        {
+            value = SpawnMoveOverride.Movable;
+            return true;
+        }
+
+        if (canMove.ValueKind == JsonValueKind.False)
+        {
+            value = SpawnMoveOverride.Stationary;
+            return true;
+        }
+
+        return false;
     }
 
     public static bool TryWrite(string properties, SpawnMoveOverride value, out string result)
@@ -68,6 +73,11 @@ public static class SpawnPropertiesJson
 
         using (document)
         {
+            if (!TryReadValue(document.RootElement, out _))
+            {
+                return false;
+            }
+
             return Write(value, document.RootElement, ref result);
         }
     }
@@ -84,7 +94,14 @@ public static class SpawnPropertiesJson
             return false;
         }
 
-        return document.RootElement.ValueKind == JsonValueKind.Object;
+        if (document.RootElement.ValueKind != JsonValueKind.Object)
+        {
+            document.Dispose();
+            document = null!;
+            return false;
+        }
+
+        return true;
     }
 
     private static bool Write(SpawnMoveOverride value, JsonElement? root, ref string result)

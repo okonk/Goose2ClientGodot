@@ -92,6 +92,23 @@ public class SpawnPropertiesJsonTests
         Assert.Equal("{\"canMove\":false,\"foo\":1}", result);
     }
 
+    [Theory]
+    [InlineData(SpawnMoveOverride.Movable)]
+    [InlineData(SpawnMoveOverride.Default)]
+    [InlineData(SpawnMoveOverride.Stationary)]
+    public void TryWrite_NonBooleanCanMove_ReturnsFalse(SpawnMoveOverride value)
+    {
+        Assert.False(SpawnPropertiesJson.TryWrite("{\"canMove\":1}", value, out var result));
+        Assert.Equal("", result);
+    }
+
+    [Fact]
+    public void TryWrite_StringCanMove_ReturnsFalse()
+    {
+        Assert.False(SpawnPropertiesJson.TryWrite("{\"canMove\":\"yes\"}", SpawnMoveOverride.Stationary, out var result));
+        Assert.Equal("", result);
+    }
+
     [Fact]
     public void TryWrite_MalformedInput_ReturnsFalse()
     {

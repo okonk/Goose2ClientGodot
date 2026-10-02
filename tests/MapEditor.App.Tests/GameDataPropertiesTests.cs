@@ -325,6 +325,42 @@ public class GameDataPropertiesTests
     }
 
     [AvaloniaFact]
+    public void CommitSpawnCanMove_NoOpToggle_DoesNotDirtySession()
+    {
+        using MainWindowHarness harness = MainWindowHarness.Create();
+        harness.ViewModel.GameData!.AttachSession(SessionWithSpawnProperties("{\"foo\": 1}"));
+        harness.ViewModel.GameData.SelectedSpawn = 0;
+
+        harness.ViewModel.CommitSpawnCanMove(SpawnMoveOverride.Default);
+
+        Assert.Equal("{\"foo\": 1}", harness.ViewModel.GameData.Session!.Edits.Spawns[0].Properties);
+        Assert.Equal(SpawnMoveOverride.Default, harness.ViewModel.GameData.SelectedCanMove);
+        Assert.False(harness.ViewModel.Timeline.CanUndo);
+    }
+
+    [AvaloniaFact]
+    public void SpawnCanMoveCheckbox_SelectingDefaultRowAfterMovableRow_DoesNotDirtySession()
+    {
+        using MainWindowHarness harness = MainWindowHarness.Create();
+        harness.ViewModel.GameData!.AttachSession(SessionWithSpawnProperties("{\"canMove\":true}", "{\"foo\": 1}"));
+        Control<ToggleButton>(harness, "SpawnTool").IsChecked = true;
+        Dispatcher.UIThread.RunJobs();
+
+        CheckBox check = Control<CheckBox>(harness, "SpawnCanMoveCheck");
+
+        harness.ViewModel.GameData.SelectedSpawn = 0;
+        Dispatcher.UIThread.RunJobs();
+        Assert.True(check.IsChecked);
+
+        harness.ViewModel.GameData.SelectedSpawn = 1;
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Null(check.IsChecked);
+        Assert.Equal("{\"foo\": 1}", harness.ViewModel.GameData.Session!.Edits.Spawns[1].Properties);
+        Assert.False(harness.ViewModel.Timeline.CanUndo);
+    }
+
+    [AvaloniaFact]
     public void SpawnCanMoveCheckbox_ReflectsSelectedRowState()
     {
         using MainWindowHarness harness = MainWindowHarness.Create();
