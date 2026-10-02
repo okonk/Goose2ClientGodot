@@ -52,6 +52,7 @@ namespace Goose2Client.Overlays
         public void SetText(string message, float textScale, float worldScale)
         {
             if (string.IsNullOrEmpty(message)) return;
+            message = ChatText.ToDisplay(message);
             _message = message;
             DisplayScale = textScale;
             _worldScale = worldScale;

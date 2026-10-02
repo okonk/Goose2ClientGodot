@@ -88,7 +88,7 @@ public sealed class ChatLog
 
     public static string Format(string message, ChatType type)
     {
-        message = message.Replace("[", "[lb]").Replace('`', '♥');
+        message = ChatText.ToDisplay(message.Replace("[", "[lb]"));
         var color = TypeColors.TryGetValue(type, out var c) ? c : GameColors.White;
         return $"[color=#{color.ToHtml(false)}]{message}[/color]";
     }

@@ -84,6 +84,7 @@ public partial class ChatWindow : BaseWindow
 
         // Input signals
         _input.TextSubmitted += OnTextSubmitted;
+        _input.TextChanged += OnInputTextChanged;
         _input.GuiInput += OnInputGuiInput;
 
         // Populate aliases (lowercase keys)
@@ -298,6 +299,7 @@ public partial class ChatWindow : BaseWindow
 
     private void OnTextSubmitted(string text)
     {
+        text = ChatText.ToWire(text);
         var result = ChatCommandParser.Parse(_log.ApplyChannel(text), _aliases, _commandHandlers.Keys);
 
         switch (result.Kind)
@@ -327,10 +329,27 @@ public partial class ChatWindow : BaseWindow
         ClearAndUnfocus();
     }
 
+    // Godot's set_text neither emits text_changed nor keeps the caret, so every programmatic write
+    // has to apply the display form itself. Caret goes to the end, as the callers all did before.
+    private void ShowDraft(string wireText)
+    {
+        _input.Text = ChatText.ToDisplay(wireText);
+        _input.CaretColumn = _input.Text.Length;
+    }
+
     private void ClearAndUnfocus()
     {
         _input.Text = "";
         _input.ReleaseFocus();
+    }
+
+    private void OnInputTextChanged(string text)
+    {
+        if (text.IndexOf(ChatText.HeartCode) < 0)
+            return;
+        int caret = _input.CaretColumn;
+        _input.Text = ChatText.ToDisplay(text);
+        _input.CaretColumn = caret;
     }
 
     /// <summary>
@@ -338,9 +357,8 @@ public partial class ChatWindow : BaseWindow
     /// </summary>
     public void FocusChat(string prefill)
     {
-        _input.Text = prefill;
+        ShowDraft(prefill);
         _input.GrabFocus();
-        _input.CaretColumn = prefill.Length;
     }
 
     private void OnInputGuiInput(InputEvent @event)
@@ -371,8 +389,7 @@ public partial class ChatWindow : BaseWindow
     {
         if (_inputHistory.Count == 0) return;
         _historyIndex = Math.Max(0, _historyIndex - 1);
-        _input.Text = _inputHistory[_historyIndex];
-        _input.CaretColumn = _input.Text.Length;
+        ShowDraft(_inputHistory[_historyIndex]);
     }
 
     private void HistoryDown()
@@ -380,10 +397,7 @@ public partial class ChatWindow : BaseWindow
         if (_inputHistory.Count == 0) return;
         _historyIndex++;
         if (_historyIndex < _inputHistory.Count)
-        {
-            _input.Text = _inputHistory[_historyIndex];
-            _input.CaretColumn = _input.Text.Length;
-        }
+            ShowDraft(_inputHistory[_historyIndex]);
         else
         {
             _input.Text = "";
