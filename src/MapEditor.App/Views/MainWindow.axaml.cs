@@ -94,6 +94,7 @@ internal partial class MainWindow : Window
         SpawnNpcPicker.ItemText = npc => $"{npc.NpcId}  {npc.NpcName}";
         WarpDestinationPicker.ItemText = map => $"{map.MapId}  {map.MapName}  {map.MapFilename}";
         SpawnNpcPicker.PropertyChanged += OnSpawnNpcPickerChanged;
+        SpawnCanMoveCheck.PropertyChanged += OnSpawnCanMoveCheckChanged;
         WarpDestinationPicker.PropertyChanged += OnWarpDestinationPickerChanged;
         WarpDestinationX.LostFocus += OnWarpDestinationFieldLostFocus;
         WarpDestinationY.LostFocus += OnWarpDestinationFieldLostFocus;
@@ -963,6 +964,21 @@ internal partial class MainWindow : Window
         }
     }
 
+    private void OnSpawnCanMoveCheckChanged(object? sender, AvaloniaPropertyChangedEventArgs e)
+    {
+        if (e.Property != ToggleButton.IsCheckedProperty)
+        {
+            return;
+        }
+
+        Document.CommitSpawnCanMove(SpawnCanMoveCheck.IsChecked switch
+        {
+            true => SpawnMoveOverride.Movable,
+            false => SpawnMoveOverride.Stationary,
+            _ => SpawnMoveOverride.Default,
+        });
+    }
+
     private void OnWarpDestinationPickerChanged(object? sender, AvaloniaPropertyChangedEventArgs e)
     {
         if (e.Property != SearchPickerControl<MapReference>.SelectedItemProperty)
@@ -1606,8 +1622,26 @@ internal partial class MainWindow : Window
             {
                 SpawnNpcPicker.SelectedItem = npc;
             }
+
+            bool editable = SpawnPropertiesJson.TryRead(spawn.Properties, out SpawnMoveOverride move);
+            SpawnCanMoveCheck.IsEnabled = editable;
+            SpawnCanMoveWarning.IsVisible = !editable;
+            SpawnCanMoveCheck.IsChecked = editable ? ToIsChecked(move) : null;
+        }
+        else
+        {
+            SpawnCanMoveCheck.IsEnabled = true;
+            SpawnCanMoveWarning.IsVisible = false;
+            SpawnCanMoveCheck.IsChecked = ToIsChecked(state.SelectedCanMove ?? SpawnMoveOverride.Default);
         }
     }
+
+    private static bool? ToIsChecked(SpawnMoveOverride value) => value switch
+    {
+        SpawnMoveOverride.Movable => true,
+        SpawnMoveOverride.Stationary => false,
+        _ => null,
+    };
 
     private void SyncWarpProperties(DocumentGameDataState state, bool wasVisible)
     {

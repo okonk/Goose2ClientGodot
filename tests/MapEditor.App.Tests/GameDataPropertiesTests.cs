@@ -325,6 +325,106 @@ public class GameDataPropertiesTests
     }
 
     [AvaloniaFact]
+    public void SpawnCanMoveCheckbox_ReflectsSelectedRowState()
+    {
+        using MainWindowHarness harness = MainWindowHarness.Create();
+        harness.ViewModel.GameData!.AttachSession(SessionWithSpawnProperties("", "{\"canMove\":true}", "{\"canMove\":false}"));
+        Control<ToggleButton>(harness, "SpawnTool").IsChecked = true;
+        Dispatcher.UIThread.RunJobs();
+
+        CheckBox check = Control<CheckBox>(harness, "SpawnCanMoveCheck");
+        TextBlock warning = Control<TextBlock>(harness, "SpawnCanMoveWarning");
+
+        harness.ViewModel.GameData.SelectedSpawn = 0;
+        Dispatcher.UIThread.RunJobs();
+        Assert.Null(check.IsChecked);
+        Assert.True(check.IsEnabled);
+        Assert.False(warning.IsVisible);
+
+        harness.ViewModel.GameData.SelectedSpawn = 1;
+        Dispatcher.UIThread.RunJobs();
+        Assert.True(check.IsChecked);
+        Assert.True(check.IsEnabled);
+        Assert.False(warning.IsVisible);
+
+        harness.ViewModel.GameData.SelectedSpawn = 2;
+        Dispatcher.UIThread.RunJobs();
+        Assert.False(check.IsChecked);
+        Assert.True(check.IsEnabled);
+        Assert.False(warning.IsVisible);
+    }
+
+    [AvaloniaFact]
+    public void SpawnCanMoveCheckbox_OnMalformedProperties_DisablesAndWarns()
+    {
+        using MainWindowHarness harness = MainWindowHarness.Create();
+        harness.ViewModel.GameData!.AttachSession(SessionWithSpawnProperties("{\"canMove\":"));
+        Control<ToggleButton>(harness, "SpawnTool").IsChecked = true;
+        harness.ViewModel.GameData.SelectedSpawn = 0;
+        Dispatcher.UIThread.RunJobs();
+
+        CheckBox check = Control<CheckBox>(harness, "SpawnCanMoveCheck");
+        Assert.False(check.IsEnabled);
+        Assert.True(Control<TextBlock>(harness, "SpawnCanMoveWarning").IsVisible);
+    }
+
+    [AvaloniaFact]
+    public void SpawnCanMoveCheckbox_Toggle_WritesRowAndUndoRestores()
+    {
+        using MainWindowHarness harness = MainWindowHarness.Create();
+        harness.ViewModel.GameData!.AttachSession(SessionWithSpawn(3, 4));
+        Control<ToggleButton>(harness, "SpawnTool").IsChecked = true;
+        harness.ViewModel.GameData.SelectedSpawn = 0;
+        Dispatcher.UIThread.RunJobs();
+
+        CheckBox check = Control<CheckBox>(harness, "SpawnCanMoveCheck");
+        check.IsChecked = true;
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Equal("{\"canMove\":true}", harness.ViewModel.GameData.Session!.Edits.Spawns[0].Properties);
+        Assert.True(harness.ViewModel.Undo());
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Equal("", harness.ViewModel.GameData.Session.Edits.Spawns[0].Properties);
+        Assert.Null(check.IsChecked);
+    }
+
+    [AvaloniaFact]
+    public void SpawnCanMoveCheckbox_ToggleOnDisabledRow_LeavesRowUntouched()
+    {
+        using MainWindowHarness harness = MainWindowHarness.Create();
+        harness.ViewModel.GameData!.AttachSession(SessionWithSpawnProperties("{\"canMove\":"));
+        Control<ToggleButton>(harness, "SpawnTool").IsChecked = true;
+        harness.ViewModel.GameData.SelectedSpawn = 0;
+        Dispatcher.UIThread.RunJobs();
+
+        CheckBox check = Control<CheckBox>(harness, "SpawnCanMoveCheck");
+        Assert.False(check.IsEnabled);
+        check.IsChecked = true;
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Equal("{\"canMove\":", harness.ViewModel.GameData.Session!.Edits.Spawns[0].Properties);
+        Assert.True(Control<TextBlock>(harness, "SpawnCanMoveWarning").IsVisible);
+    }
+
+    [AvaloniaFact]
+    public void SpawnCanMoveCheckbox_NoSelection_EditsPendingForNextPlacement()
+    {
+        using MainWindowHarness harness = MainWindowHarness.Create();
+        harness.ViewModel.GameData!.AttachSession(SessionWithSpawn(3, 4));
+        Control<ToggleButton>(harness, "SpawnTool").IsChecked = true;
+        Dispatcher.UIThread.RunJobs();
+
+        Control<CheckBox>(harness, "SpawnCanMoveCheck").IsChecked = false;
+        harness.ViewModel.GameData.SelectedNpcId = 1;
+        harness.ViewModel.AddSpawnAt(5, 6);
+
+        var spawns = harness.ViewModel.GameData.Session!.Edits.Spawns;
+        Assert.Equal(2, spawns.Count);
+        Assert.Equal("{\"canMove\":false}", spawns[1].Properties);
+    }
+
+    [AvaloniaFact]
     public void AddSpawnAt_StampsPendingOverride_AndNewDocumentDefaultsToBlank()
     {
         using MainWindowHarness harness = MainWindowHarness.Create();
@@ -367,12 +467,18 @@ public class GameDataPropertiesTests
         return new GameDataSyncSession("sheet", 10, data);
     }
 
-    private static GameDataSyncSession SessionWithSpawnProperties(string properties)
+    private static GameDataSyncSession SessionWithSpawnProperties(params string[] properties)
     {
+        List<RemoteRow<NpcSpawnRow>> spawns = new();
+        for (int i = 0; i < properties.Length; i++)
+        {
+            spawns.Add(new RemoteRow<NpcSpawnRow>(2 + i, new NpcSpawnRow(1, 10, 3 + i, 4, properties[i])));
+        }
+
         var data = new RemoteGameData(
             new[] { Map10 },
             new Dictionary<int, NpcAppearance> { [1] = Npc1 },
-            new List<RemoteRow<NpcSpawnRow>> { new(2, new NpcSpawnRow(1, 10, 3, 4, properties)) },
+            spawns,
             new List<RemoteRow<WarpRow>>());
         return new GameDataSyncSession("sheet", 10, data);
     }

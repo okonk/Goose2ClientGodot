@@ -241,6 +241,13 @@
           <StackPanel Spacing="8">
             <TextBlock Text="NPC" Classes="muted" FontSize="11" />
             <controls:SearchPickerControl x:Name="SpawnNpcPicker" x:TypeArguments="rows:NpcAppearance" />
+            <TextBlock Text="Can move" Classes="muted" FontSize="11" />
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <CheckBox x:Name="SpawnCanMoveCheck" IsThreeState="True" VerticalAlignment="Center" />
+              <TextBlock x:Name="SpawnCanMoveWarning" Classes="muted" IsVisible="False" MaxWidth="180"
+                         TextWrapping="Wrap" VerticalAlignment="Center"
+                         Text="Invalid properties value — edit in the sheet to fix." />
+            </StackPanel>
           </StackPanel>
         </Border>
       </StackPanel>
