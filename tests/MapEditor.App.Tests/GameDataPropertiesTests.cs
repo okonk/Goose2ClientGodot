@@ -266,6 +266,71 @@ public class GameDataPropertiesTests
         Assert.True(Control<SearchPickerControl<NpcAppearance>>(harness, "SpawnNpcPicker").SelectedItem == default);
     }
 
+    [AvaloniaFact]
+    public void CommitSpawnCanMove_WithSelectedSpawn_WritesRow_AndUndoRestores()
+    {
+        using MainWindowHarness harness = MainWindowHarness.Create();
+        harness.ViewModel.GameData!.AttachSession(SessionWithSpawn(3, 4));
+        harness.ViewModel.GameData.SelectedSpawn = 0;
+
+        harness.ViewModel.CommitSpawnCanMove(SpawnMoveOverride.Movable);
+
+        NpcSpawnRow spawn = harness.ViewModel.GameData.Session!.Edits.Spawns[0];
+        Assert.Equal("{\"canMove\":true}", spawn.Properties);
+        Assert.Equal(SpawnMoveOverride.Movable, harness.ViewModel.GameData.SelectedCanMove);
+        Assert.True(harness.ViewModel.Timeline.CanUndo);
+        Assert.True(harness.ViewModel.Undo());
+        Assert.Equal("", harness.ViewModel.GameData.Session.Edits.Spawns[0].Properties);
+    }
+
+    [AvaloniaFact]
+    public void CommitSpawnCanMove_OnUnparseableCell_TouchesNeitherRowNorPending()
+    {
+        using MainWindowHarness harness = MainWindowHarness.Create();
+        harness.ViewModel.GameData!.AttachSession(SessionWithSpawnProperties("{\"canMove\":"));
+        harness.ViewModel.GameData.SelectedSpawn = 0;
+
+        harness.ViewModel.CommitSpawnCanMove(SpawnMoveOverride.Movable);
+
+        Assert.Equal("{\"canMove\":", harness.ViewModel.GameData.Session!.Edits.Spawns[0].Properties);
+        Assert.Null(harness.ViewModel.GameData.SelectedCanMove);
+        Assert.False(harness.ViewModel.Timeline.CanUndo);
+    }
+
+    [AvaloniaFact]
+    public void CommitSpawnCanMove_WithNoSelection_SetsPendingOnly()
+    {
+        using MainWindowHarness harness = MainWindowHarness.Create();
+        harness.ViewModel.GameData!.AttachSession(SessionWithSpawn(3, 4));
+
+        harness.ViewModel.CommitSpawnCanMove(SpawnMoveOverride.Stationary);
+
+        var spawns = harness.ViewModel.GameData.Session!.Edits.Spawns;
+        Assert.Single(spawns);
+        Assert.Equal("", spawns[0].Properties);
+        Assert.Equal(SpawnMoveOverride.Stationary, harness.ViewModel.GameData.SelectedCanMove);
+        Assert.False(harness.ViewModel.Timeline.CanUndo);
+    }
+
+    [AvaloniaFact]
+    public void AddSpawnAt_StampsPendingOverride_AndNewDocumentDefaultsToBlank()
+    {
+        using MainWindowHarness harness = MainWindowHarness.Create();
+        harness.ViewModel.GameData!.AttachSession(SessionWithSpawn(3, 4));
+        harness.ViewModel.GameData.SelectedNpcId = 1;
+        harness.ViewModel.GameData.SelectedCanMove = SpawnMoveOverride.Stationary;
+
+        harness.ViewModel.AddSpawnAt(5, 6);
+
+        var spawns = harness.ViewModel.GameData.Session!.Edits.Spawns;
+        Assert.Equal(2, spawns.Count);
+        Assert.Equal("{\"canMove\":false}", spawns[1].Properties);
+
+        harness.ViewModel.GameData.SelectedCanMove = null;
+        harness.ViewModel.AddSpawnAt(7, 8);
+        Assert.Equal("", harness.ViewModel.GameData.Session.Edits.Spawns[2].Properties);
+    }
+
     private static T Control<T>(MainWindowHarness harness, string name) where T : Control
         => harness.Window.FindControl<T>(name)
            ?? throw new InvalidOperationException($"missing control {name}");
@@ -286,6 +351,16 @@ public class GameDataPropertiesTests
             new[] { Map10 },
             new Dictionary<int, NpcAppearance> { [1] = Npc1 },
             new List<RemoteRow<NpcSpawnRow>> { new(2, new NpcSpawnRow(1, 10, x, y)) },
+            new List<RemoteRow<WarpRow>>());
+        return new GameDataSyncSession("sheet", 10, data);
+    }
+
+    private static GameDataSyncSession SessionWithSpawnProperties(string properties)
+    {
+        var data = new RemoteGameData(
+            new[] { Map10 },
+            new Dictionary<int, NpcAppearance> { [1] = Npc1 },
+            new List<RemoteRow<NpcSpawnRow>> { new(2, new NpcSpawnRow(1, 10, 3, 4, properties)) },
             new List<RemoteRow<WarpRow>>());
         return new GameDataSyncSession("sheet", 10, data);
     }

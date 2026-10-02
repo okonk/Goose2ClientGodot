@@ -4,6 +4,7 @@ using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using MapEditor.App.Connectivity;
 using MapEditor.GameData.Editing;
+using MapEditor.GameData.Rows;
 using MapEditor.GameData.Sync;
 
 namespace MapEditor.App.ViewModels;
@@ -29,6 +30,7 @@ internal sealed class DocumentGameDataState : IDisposable, INotifyPropertyChange
     private int? _selectedSpawn;
     private int? _selectedWarp;
     private int? _selectedNpcId;
+    private SpawnMoveOverride? _selectedCanMove;
     private int? _selectedDestinationMapId;
     private int? _pendingDestinationX;
     private int? _pendingDestinationY;
@@ -128,6 +130,12 @@ internal sealed class DocumentGameDataState : IDisposable, INotifyPropertyChange
     {
         get => _selectedNpcId;
         set => SetField(ref _selectedNpcId, value);
+    }
+
+    public SpawnMoveOverride? SelectedCanMove
+    {
+        get => _selectedCanMove;
+        set => SetField(ref _selectedCanMove, value);
     }
 
     public int? SelectedDestinationMapId

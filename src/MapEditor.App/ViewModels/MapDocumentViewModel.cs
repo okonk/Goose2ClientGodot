@@ -973,7 +973,8 @@ internal sealed class MapDocumentViewModel : ViewModelBase, ITerrainDocumentReco
         }
 
         int index = session.Edits.Spawns.Count;
-        session.Edits.AddSpawn(new NpcSpawnRow(npcId, session.MapId, x, y));
+        SpawnPropertiesJson.TryWrite(string.Empty, state.SelectedCanMove ?? SpawnMoveOverride.Default, out string properties);
+        session.Edits.AddSpawn(new NpcSpawnRow(npcId, session.MapId, x, y, properties));
         state.SelectedSpawn = index;
     }
 
@@ -1040,6 +1041,29 @@ internal sealed class MapDocumentViewModel : ViewModelBase, ITerrainDocumentReco
         }
 
         edits.MoveWarpSource(index, x, y);
+    }
+
+    internal void CommitSpawnCanMove(SpawnMoveOverride value)
+    {
+        if (_gameData is not { } state)
+        {
+            return;
+        }
+
+        if (state.SelectedSpawn is { } index && state.Session is { } session && index < session.Edits.Spawns.Count)
+        {
+            NpcSpawnRow row = session.Edits.Spawns[index];
+            if (!SpawnPropertiesJson.TryWrite(row.Properties, value, out string result))
+            {
+                return;
+            }
+
+            state.SelectedCanMove = value;
+            session.Edits.UpdateSpawn(index, row with { Properties = result });
+            return;
+        }
+
+        state.SelectedCanMove = value;
     }
 
     internal void CommitSpawnNpc(int npcId)
