@@ -113,4 +113,13 @@ public partial class InventoryWindow : BaseWindow, IWindow
     }
 
     public ItemStats? GetSlot(int slotNumber) => _slots[slotNumber].Stats;
+
+    protected override bool AcceptsItemDrops => true;
+
+    protected override void OnItemDropOnWindow(ItemSlot source, Vector2 globalPosition)
+    {
+        int toSlot = NearestSlot(_slots, globalPosition);
+        if (toSlot >= 0)
+            DropItem(source.Window, source.SlotNumber, toSlot);
+    }
 }

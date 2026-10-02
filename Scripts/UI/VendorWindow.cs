@@ -121,4 +121,11 @@ public partial class VendorWindow : BaseWindow, IWindow, INpcWindow
         GameManager.Instance.NetworkClient.WindowButtonClick(WindowButtons.Close, WindowId, NpcId);
         Hide();
     }
+
+    protected override bool AcceptsItemDrops => true;
+
+    protected override bool AcceptsItemDropSource(ItemSlot source) => source.Window is InventoryWindow;
+
+    protected override void OnItemDropOnWindow(ItemSlot source, Vector2 globalPosition)
+        => DropItem(source.Window, source.SlotNumber, -1);
 }

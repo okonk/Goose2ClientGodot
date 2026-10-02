@@ -134,4 +134,13 @@ public partial class BankWindow : BaseWindow, IWindow
         GameManager.Instance.NetworkClient.WindowButtonClick(WindowButtons.Close, WindowId, NpcId);
         Hide();
     }
+
+    protected override bool AcceptsItemDrops => true;
+
+    protected override void OnItemDropOnWindow(ItemSlot source, Vector2 globalPosition)
+    {
+        int toSlot = NearestSlot(_slots, globalPosition);
+        if (toSlot >= 0)
+            DropItem(source.Window, source.SlotNumber, toSlot);
+    }
 }

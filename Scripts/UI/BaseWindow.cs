@@ -496,6 +496,53 @@ public partial class BaseWindow : Control, IScalableWindow
             GameManager.Instance.CharacterSettings.SetWindowVisible(WindowName, Visible);
     }
 
+    /// <summary>Godot's drop walk-up starts at the control under the cursor and climbs to
+    /// its parents, so accepting here catches every drop a slot didn't take (gaps, margins,
+    /// title bar). Windows without an item grid keep the default and pass drops through.</summary>
+    protected virtual bool AcceptsItemDrops => false;
+
+    protected virtual bool AcceptsItemDropSource(ItemSlot source) => true;
+
+    /// <summary>Called with the drop point in global coordinates.</summary>
+    protected virtual void OnItemDropOnWindow(ItemSlot source, Vector2 globalPosition) { }
+
+    public override bool _CanDropData(Vector2 atPosition, Variant data)
+        => AcceptsItemDrops && TryGetItemDrag(data, out var src) && AcceptsItemDropSource(src!);
+
+    public override void _DropData(Vector2 atPosition, Variant data)
+    {
+        if (AcceptsItemDrops && TryGetItemDrag(data, out var src) && AcceptsItemDropSource(src!))
+            OnItemDropOnWindow(src!, GetGlobalTransform() * atPosition);
+    }
+
+    protected static int NearestSlot(ItemSlot[] slots, Vector2 globalPoint)
+    {
+        var rects = new Rect2[slots.Length];
+        for (int i = 0; i < slots.Length; i++)
+            rects[i] = slots[i].GetGlobalRect();
+        return SlotDropRouting.NearestSlot(rects, globalPoint);
+    }
+
+    private static bool TryGetItemDrag(Variant data, out ItemSlot? source)
+    {
+        source = null;
+        if (data.VariantType != Variant.Type.Dictionary)
+            return false;
+
+        var d = data.AsGodotDictionary();
+        if (!d.TryGetValue("kind", out Variant kind) || kind.AsString() != "item")
+            return false;
+        if (!d.TryGetValue("slot", out Variant slotVar) || slotVar.VariantType != Variant.Type.Object)
+            return false;
+
+        var slot = slotVar.As<ItemSlot>();
+        if (slot == null || !GodotObject.IsInstanceValid(slot) || !slot.HasItem)
+            return false;
+
+        source = slot;
+        return true;
+    }
+
     protected virtual void OnClosePressed()
     {
         Hide();
