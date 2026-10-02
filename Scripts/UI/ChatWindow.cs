@@ -327,7 +327,7 @@ public partial class ChatWindow : BaseWindow
         ClearAndUnfocus();
     }
 
-    public void ClearAndUnfocus()
+    private void ClearAndUnfocus()
     {
         _input.Text = "";
         _input.ReleaseFocus();

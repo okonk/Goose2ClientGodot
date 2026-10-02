@@ -288,10 +288,8 @@ namespace Goose2Client
             LoadingMapScene? loading = null;
             try
             {
-                // Unity parity: clear and unfocus chat input on every map change
-                if (Hud != null && GodotObject.IsInstanceValid(Hud))
-                    Hud.Chat?.ClearAndUnfocus();
-
+                // Unity clears/unfocuses the chat input on every map load (LoadingMapScene.cs:50-52).
+                // Deliberately not replicated: warping mid-message threw away a draft in progress.
                 SetPaused(true);
                 _stallMonitor.SetActivity("map-loading-overlay");
 

@@ -462,7 +462,7 @@ Each step is independently testable; the order front-loads the foundations the r
 - **GameColors shared palette** — ported Unity `Colors.cs` + health-bar colors into `GameColors` (not `Colors` to avoid Godot collision)
 - **Pause-aware packet drain** — `PausablePacketQueue.Drain` stops mid-batch when a handler re-pauses (back-to-back map changes)
 - **Persistent in-game `SendCurrentMapPacket` listener** — moved from login-scene-only to `GameManager` so warps/doors/death-recalls work in-world
-- **Chat clear/unfocus on map changes** — `ChatWindow.ClearAndUnfocus()` called at top of `ChangeMap` (Unity `LoadingMapScene` parity)
+- **Chat clear/unfocus on map changes** — `ChatWindow.ClearAndUnfocus()` called at top of `ChangeMap` (Unity `LoadingMapScene` parity). **Reverted (2026-10-02):** warping mid-message discarded the draft in the input box; a map change now leaves the chat input's text and focus untouched, so this parity behavior must not be reintroduced.
 - **Backward target-cycle fix** — `TargetCycler.Next` with `idx == -1` now returns last candidate, not n−2
 - **1.0 s pre-WPS attack default** — `AttackGate.DefaultWindowSeconds` raised from 0.5 s to 1.0 s (Unity `MapManager` default)
 - **Mounted attack suppression** — `Character` attack input gated on `!IsMounted` (Unity `PlayerController` parity)
