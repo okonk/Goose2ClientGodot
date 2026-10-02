@@ -157,15 +157,15 @@ public class GoogleSheetsTransportIntegrationTests
         var spawnAppendRows = spawnAppend.GetProperty("rows");
         Assert.Equal(2, spawnAppendRows.GetArrayLength());
         Assert.Equal(
-            new[] { "10", "1", "5", "6" },
+            new double[] { 10, 1, 5, 6 },
             AppendCellValues(spawnAppendRows[0]));
         var interiorBlankRow = spawnAppendRows[1].GetProperty("values");
         Assert.Equal(4, interiorBlankRow.GetArrayLength());
-        Assert.Equal("12", interiorBlankRow[0].GetProperty("userEnteredValue").GetProperty("stringValue").GetString());
+        Assert.Equal(12, interiorBlankRow[0].GetProperty("userEnteredValue").GetProperty("numberValue").GetDouble());
         Assert.Equal(JsonValueKind.Object, interiorBlankRow[1].ValueKind);
         Assert.False(interiorBlankRow[1].TryGetProperty("userEnteredValue", out _));
-        Assert.Equal("9", interiorBlankRow[2].GetProperty("userEnteredValue").GetProperty("stringValue").GetString());
-        Assert.Equal("9", interiorBlankRow[3].GetProperty("userEnteredValue").GetProperty("stringValue").GetString());
+        Assert.Equal(9, interiorBlankRow[2].GetProperty("userEnteredValue").GetProperty("numberValue").GetDouble());
+        Assert.Equal(9, interiorBlankRow[3].GetProperty("userEnteredValue").GetProperty("numberValue").GetDouble());
 
         var warpDelete = requests[3].GetProperty("deleteDimension").GetProperty("range");
         Assert.Equal(104, warpDelete.GetProperty("sheetId").GetInt32());
@@ -177,14 +177,14 @@ public class GoogleSheetsTransportIntegrationTests
         Assert.Equal(104, warpAppend.GetProperty("sheetId").GetInt32());
         Assert.Equal("userEnteredValue", warpAppend.GetProperty("fields").GetString());
         Assert.Equal(
-            new[] { "1", "2", "3", "9", "4", "5" },
+            new double[] { 1, 2, 3, 9, 4, 5 },
             AppendCellValues(warpAppend.GetProperty("rows")[0]));
     }
 
-    private static List<string> AppendCellValues(JsonElement row)
+    private static List<double> AppendCellValues(JsonElement row)
         => row.GetProperty("values")
             .EnumerateArray()
-            .Select(cell => cell.GetProperty("userEnteredValue").GetProperty("stringValue").GetString()!)
+            .Select(cell => cell.GetProperty("userEnteredValue").GetProperty("numberValue").GetDouble())
             .ToList();
 
     private static GoogleSheetsGateway CreateGateway(LoopbackSheetsServer server)

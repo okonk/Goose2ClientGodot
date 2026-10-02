@@ -1,26 +1,30 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using Google.Apis.Sheets.v4.Data;
 using MapEditor.GameData.Replacement;
+using MapEditor.GameData.Schema;
 
 namespace MapEditor.GameData.Google.Sheets;
 
 internal static class GoogleBatchBuilder
 {
     public static BatchUpdateSpreadsheetRequest Build(
+        GameDataSchema schema,
         IReadOnlyDictionary<string, int> sheetIds,
         ReplacementPlan spawnPlan,
         ReplacementPlan warpPlan)
     {
         var requests = new List<Request>();
-        AppendPlan(requests, sheetIds, spawnPlan);
-        AppendPlan(requests, sheetIds, warpPlan);
+        AppendPlan(requests, schema.GetRequiredSheet(spawnPlan.Sheet).Columns, sheetIds, spawnPlan);
+        AppendPlan(requests, schema.GetRequiredSheet(warpPlan.Sheet).Columns, sheetIds, warpPlan);
         return new BatchUpdateSpreadsheetRequest { Requests = requests };
     }
 
     private static void AppendPlan(
         List<Request> requests,
+        IReadOnlyList<ColumnSchema> columns,
         IReadOnlyDictionary<string, int> sheetIds,
         ReplacementPlan plan)
     {
@@ -65,7 +69,7 @@ internal static class GoogleBatchBuilder
                     }
                     values.Add(new CellData
                     {
-                        UserEnteredValue = new ExtendedValue { StringValue = cell }
+                        UserEnteredValue = BuildValue(cell, columns, i)
                     });
                 }
                 rows.Add(new RowData { Values = values });
@@ -81,4 +85,19 @@ internal static class GoogleBatchBuilder
             });
         }
     }
+
+    private static ExtendedValue BuildValue(string cell, IReadOnlyList<ColumnSchema> columns, int column)
+    {
+        if (column < columns.Count
+            && IsNumericKind(columns[column].Kind)
+            && long.TryParse(cell, NumberStyles.Integer, CultureInfo.InvariantCulture, out var number))
+        {
+            return new ExtendedValue { NumberValue = number };
+        }
+        return new ExtendedValue { StringValue = cell };
+    }
+
+    // Id and Int are the only numeric kinds on the two appended sheets (NPC Spawns, Warptiles).
+    private static bool IsNumericKind(string kind)
+        => kind == "Id" || kind == "Int";
 }

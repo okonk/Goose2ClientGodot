@@ -277,7 +277,7 @@ public sealed class GoogleSheetsGateway : IGameDataGateway
                 return;
             }
             var sheetIds = await ResolveSheetIdsAsync(spreadsheetId, cancellationToken).ConfigureAwait(false);
-            var request = GoogleBatchBuilder.Build(sheetIds, spawnPlan, warpPlan);
+            var request = GoogleBatchBuilder.Build(_schema, sheetIds, spawnPlan, warpPlan);
             await _operations.BatchUpdateAsync(spreadsheetId, request, cancellationToken).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
