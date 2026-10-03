@@ -46,4 +46,10 @@ public class GenericContainerWindowSceneTests
     {
         Assert.Contains("[node name=\"CloseButton\" type=\"Button\" parent=\"TitleBar\"]", Scene());
     }
+
+    [Fact]
+    public void Scene_RootWindowName_IsGenericContainer()
+    {
+        Assert.Contains("WindowName = \"GenericContainer\"", Scene());
+    }
 }

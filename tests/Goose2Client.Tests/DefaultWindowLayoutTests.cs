@@ -18,6 +18,7 @@ public class DefaultWindowLayoutTests
     [InlineData("Vendor", true)]
     [InlineData("Info", true)]
     [InlineData("Bank", true)]
+    [InlineData("GenericContainer", true)]
     [InlineData("CombineBag", true)]
     [InlineData("OptionList", true)]
     [InlineData("LogViewer", true)]
