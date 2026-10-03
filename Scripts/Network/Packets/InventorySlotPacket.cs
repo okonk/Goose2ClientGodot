@@ -70,55 +70,59 @@ namespace Goose2Client.Network.Packets
         {
             p.Delimeter = '|';
 
-            return new InventorySlotPacket()
-            {
-                SlotNumber = p.GetInt32() - 1,
-                GraphicId = p.GetInt32(),
-                GraphicFile = p.GetInt32(),
-                Title = p.GetString(),
-                Name = p.GetString(),
-                Surname = p.GetString(),
-                StackSize = p.GetInt32(),
-                Value = p.GetInt32(),
-                Flags = (ItemFlags)p.GetInt32(),
-                Description = p.GetString(),
-                MinDamage = p.GetInt32(),
-                MaxDamage = p.GetInt32(),
-                Delay = p.GetInt32(),
-                MaterialType = (ItemMaterial)p.GetInt32(),
-                AC = p.GetInt32(),
-                HP = p.GetInt32(),
-                MP = p.GetInt32(),
-                SP = p.GetInt32(),
-                Strength = p.GetInt32(),
-                Stamina = p.GetInt32(),
-                Intelligence = p.GetInt32(),
-                Dexterity = p.GetInt32(),
-                FireResist = p.GetInt32(),
-                WaterResist = p.GetInt32(),
-                EarthResist = p.GetInt32(),
-                AirResist = p.GetInt32(),
-                SpiritResist = p.GetInt32(),
-                MinLevel = p.GetInt32(),
-                MaxLevel = p.GetInt32(),
-                ClassRestrictions1 = p.GetInt32(),
-                ClassRestrictions2 = p.GetInt32(),
-                ClassRestrictions3 = p.GetInt32(),
-                Access = p.GetInt32(),
-                Gender = p.GetInt32(),
-                SpellEffect = p.GetString(),
-                SpellEffectChance = p.GetInt32(),
-                SlotType = (ItemSlotType)p.GetInt32(),
-                UseType = (ItemUseType)p.GetInt32(),
-                NotSure = p.GetInt32(),
-                GraphicR = p.GetInt32(),
-                GraphicG = p.GetInt32(),
-                GraphicB = p.GetInt32(),
-                GraphicA = p.GetInt32(),
-                CurrencyName = p.LengthRemaining() > 0 ? p.GetString() : null,
-                ExtraStats = p.LengthRemaining() > 0 ? p.GetString() : null,
-                MinExperience = p.LengthRemaining() > 0 ? p.GetInt64() : 0,
-            };
+            var pkt = new InventorySlotPacket();
+            ReadFieldsInto(p, pkt);
+            return pkt;
+        }
+
+        protected static void ReadFieldsInto(PacketParser p, InventorySlotPacket pkt)
+        {
+            pkt.SlotNumber = p.GetInt32() - 1;
+            pkt.GraphicId = p.GetInt32();
+            pkt.GraphicFile = p.GetInt32();
+            pkt.Title = p.GetString();
+            pkt.Name = p.GetString();
+            pkt.Surname = p.GetString();
+            pkt.StackSize = p.GetInt32();
+            pkt.Value = p.GetInt32();
+            pkt.Flags = (ItemFlags)p.GetInt32();
+            pkt.Description = p.GetString();
+            pkt.MinDamage = p.GetInt32();
+            pkt.MaxDamage = p.GetInt32();
+            pkt.Delay = p.GetInt32();
+            pkt.MaterialType = (ItemMaterial)p.GetInt32();
+            pkt.AC = p.GetInt32();
+            pkt.HP = p.GetInt32();
+            pkt.MP = p.GetInt32();
+            pkt.SP = p.GetInt32();
+            pkt.Strength = p.GetInt32();
+            pkt.Stamina = p.GetInt32();
+            pkt.Intelligence = p.GetInt32();
+            pkt.Dexterity = p.GetInt32();
+            pkt.FireResist = p.GetInt32();
+            pkt.WaterResist = p.GetInt32();
+            pkt.EarthResist = p.GetInt32();
+            pkt.AirResist = p.GetInt32();
+            pkt.SpiritResist = p.GetInt32();
+            pkt.MinLevel = p.GetInt32();
+            pkt.MaxLevel = p.GetInt32();
+            pkt.ClassRestrictions1 = p.GetInt32();
+            pkt.ClassRestrictions2 = p.GetInt32();
+            pkt.ClassRestrictions3 = p.GetInt32();
+            pkt.Access = p.GetInt32();
+            pkt.Gender = p.GetInt32();
+            pkt.SpellEffect = p.GetString();
+            pkt.SpellEffectChance = p.GetInt32();
+            pkt.SlotType = (ItemSlotType)p.GetInt32();
+            pkt.UseType = (ItemUseType)p.GetInt32();
+            pkt.NotSure = p.GetInt32();
+            pkt.GraphicR = p.GetInt32();
+            pkt.GraphicG = p.GetInt32();
+            pkt.GraphicB = p.GetInt32();
+            pkt.GraphicA = p.GetInt32();
+            pkt.CurrencyName = p.LengthRemaining() > 0 ? p.GetString() : null;
+            pkt.ExtraStats = p.LengthRemaining() > 0 ? p.GetString() : null;
+            pkt.MinExperience = p.LengthRemaining() > 0 ? p.GetInt64() : 0;
         }
     }
 }
