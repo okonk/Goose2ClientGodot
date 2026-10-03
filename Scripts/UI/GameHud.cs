@@ -22,6 +22,7 @@ public partial class GameHud : Control
     public OptionsWindow Options { get; private set; } = null!;
     public VendorWindow Vendor { get; private set; } = null!;
     public BankWindow Bank { get; private set; } = null!;
+    public GenericContainerWindow Generic { get; private set; } = null!;
     public CombineBagContainerWindow CombineBag { get; private set; } = null!;
     public CustomWindow Custom { get; private set; } = null!;
     public HairdyeWindow Hairdye { get; private set; } = null!;
@@ -91,6 +92,7 @@ public partial class GameHud : Control
         KeyBindings = Add<KeyBindingsWindow>("res://Scenes/UI/KeyBindingsWindow.tscn");
         Vendor = Add<VendorWindow>("res://Scenes/UI/VendorWindow.tscn");
         Bank = Add<BankWindow>("res://Scenes/UI/BankWindow.tscn");
+        Generic = Add<GenericContainerWindow>("res://Scenes/UI/GenericContainerWindow.tscn");
         CombineBag = Add<CombineBagContainerWindow>("res://Scenes/UI/CombineBagContainerWindow.tscn");
         Custom = Add<CustomWindow>("res://Scenes/UI/CustomWindow.tscn");
         Hairdye = Add<HairdyeWindow>("res://Scenes/UI/HairdyeWindow.tscn");

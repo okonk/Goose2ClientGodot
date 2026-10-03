@@ -1,0 +1,88 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://Scripts/UI/GenericContainerWindow.cs" id="1_gcn"]
+[ext_resource type="Theme" path="res://Assets/UI/GameTheme.tres" id="theme"]
+
+[node name="GenericContainerWindow" type="Control"]
+script = ExtResource("1_gcn")
+theme = ExtResource("theme")
+layout_mode = 3
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 168.0
+offset_bottom = 253.0
+WindowName = "GenericContainer"
+
+[node name="Background" type="TextureRect" parent="."]
+layout_mode = 2
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+
+[node name="TitleBar" type="Control" parent="."]
+layout_mode = 2
+anchors_preset = 10
+anchor_right = 0.0
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 168.0
+offset_bottom = 19.0
+mouse_filter = 0
+
+[node name="TitleLabel" type="Label" parent="TitleBar"]
+layout_mode = 2
+anchors_preset = 0
+offset_left = 6.0
+offset_top = 4.0
+offset_right = 145.0
+offset_bottom = 15.0
+mouse_filter = 2
+text = ""
+clip_text = true
+
+[node name="CloseButton" type="Button" parent="TitleBar"]
+layout_mode = 2
+anchors_preset = 0
+offset_left = 151.0
+offset_top = 2.0
+offset_right = 167.0
+offset_bottom = 18.0
+flat = true
+
+[node name="Content" type="Control" parent="."]
+layout_mode = 2
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 1
+
+[node name="SlotGrid" type="GridContainer" parent="Content"]
+layout_mode = 2
+anchors_preset = 0
+offset_left = 2.0
+offset_top = 20.0
+offset_right = 166.0
+offset_bottom = 217.0
+mouse_filter = 1
+columns = 5
+theme_override_constants/h_separation = 1
+theme_override_constants/v_separation = 1
+
+[node name="BackButton" type="Button" parent="Content"]
+layout_mode = 2
+anchors_preset = 0
+offset_left = 20.0
+offset_top = 222.0
+offset_right = 80.0
+offset_bottom = 244.0
+text = "Back"
+
+[node name="NextButton" type="Button" parent="Content"]
+layout_mode = 2
+anchors_preset = 0
+offset_left = 88.0
+offset_top = 222.0
+offset_right = 148.0
+offset_bottom = 244.0
+text = "Next"
