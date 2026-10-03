@@ -123,6 +123,9 @@ public partial class ChatWindow : BaseWindow
     private void OnChat(object o)
     {
         var p = (ChatPacket)o;
+        // Unity parity logged NPC chat here too; deviation on purpose — NPC speech stays bubble-only.
+        if (GameManager.Instance.CurrentMapManager?.GetCharacter(p.LoginId)?.CharacterType != CharacterType.Player)
+            return;
         AddChatLine(p.Message, ChatType.Chat);
     }
 
