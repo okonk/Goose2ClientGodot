@@ -76,7 +76,7 @@ offset_left = 20.0
 offset_top = 222.0
 offset_right = 80.0
 offset_bottom = 244.0
-text = "<"
+text = "Back"
 
 [node name="NextButton" type="Button" parent="Content"]
 layout_mode = 2
@@ -85,4 +85,4 @@ offset_left = 88.0
 offset_top = 222.0
 offset_right = 148.0
 offset_bottom = 244.0
-text = ">"
+text = "Next"
