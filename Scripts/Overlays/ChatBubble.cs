@@ -74,7 +74,7 @@ namespace Goose2Client.Overlays
 
             var styleBox = new StyleBoxFlat
             {
-                BgColor = new Color(0.15f, 0.15f, 0.15f, 0.85f),
+                BgColor = new Color(0.15f, 0.15f, 0.15f, 1f),
                 CornerRadiusTopLeft = Mathf.RoundToInt(6f * textScale),
                 CornerRadiusTopRight = Mathf.RoundToInt(6f * textScale),
                 CornerRadiusBottomLeft = Mathf.RoundToInt(6f * textScale),
