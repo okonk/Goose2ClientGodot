@@ -47,6 +47,16 @@ namespace Goose2Client
 
         public override void _Process(double delta) => UpdateProjection();
 
+        /// <summary>Hides the bridge and drops its elements. UpdateProjection early-returns while
+        /// no world is attached, so without this the last frame's names/bubbles linger over the
+        /// login screen. ChangeMap re-shows the bridge; characters re-register their elements.</summary>
+        public void Clear()
+        {
+            Visible = false;
+            for (int i = GetChildCount() - 1; i >= 0; i--)
+                GetChild(i).QueueFree();
+        }
+
         public override void _ExitTree()
         {
             if (_worldViewport != null) _worldViewport.ScaleChanged -= OnWorldScaleChanged;

@@ -518,6 +518,7 @@ namespace Goose2Client
             _packetQueue.Clear();
             SetPaused(false);
             WorldViewport.Detach();
+            WorldTextBridge.Clear();
             foreach (var child in UiLayer.GetChildren())
                 child.QueueFree();
             Hud = null;
