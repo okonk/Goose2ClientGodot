@@ -86,11 +86,10 @@ public partial class MapManager : Node2D
         // Layer 2 ("Objects 1": trees, walls) shares the characters' z_index (15) and Y-sorts with them,
         // so the player passes in front of an object's base and behind its top. It must be a direct
         // Y-sort child of this (Y-sort) node to merge into the same sort as the Characters node; placing
-        // it AFTER Characters makes the object win the same-tile tie, matching Aspereta, which paints a
-        // tile's layer-2 graphic over the character standing on it (tools/tests/ysort_tie_order.gd).
+        // it just before Characters makes a character win the tie when it shares an object's base tile.
         _objectLayer = new ObjectLayer { Name = "Objects1", ZIndex = 15, YSortEnabled = true };
         AddChild(_objectLayer);
-        MoveChild(_objectLayer, _characterRoot.GetIndex() + 1);
+        MoveChild(_objectLayer, _characterRoot.GetIndex());
         _objectLayer.Setup(_map, 2, _cache);
 
         var pm = GameManager.Instance.PacketManager;
