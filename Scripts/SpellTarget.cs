@@ -2,18 +2,27 @@ using Godot;
 
 namespace Goose2Client;
 
-/// <summary>Spell targeting reticle — a white rectangle outline framing the target character.
+/// <summary>Spell targeting reticle — a rectangle outline framing the target character.
 /// Mirrors the Unity client's white-tinted, 9-sliced "spelltarget" sprite (sort order 1000):
-/// the border stays a constant pixel width while the frame scales to the character.</summary>
+/// the border stays a constant pixel width while the frame scales to the character. The color
+/// is the player's TargetBoxColor option, white by default.</summary>
 public partial class SpellTarget : Node2D
 {
     private const float BorderWidth = 2f;
     private Vector2 _size = new(Map.MapCoords.TileSize, Map.MapCoords.TileSize);
+    private Color _color = GameColors.White;
 
     public override void _Ready()
     {
         // High ZIndex so the frame draws above the character body (Unity sortingOrder 1000).
         ZIndex = 1000;
+        RefreshColor();
+    }
+
+    /// <summary>Re-read the configured outline color, for a reticle that outlives the setting change.</summary>
+    public void RefreshColor()
+    {
+        _color = TargetBoxColor.CurrentColor();
         QueueRedraw();
     }
 
@@ -35,9 +44,9 @@ public partial class SpellTarget : Node2D
 
     public override void _Draw()
     {
-        // White rectangle outline centered on this node's origin. Constant border width (the node
+        // Rectangle outline centered on this node's origin. Constant border width (the node
         // itself is never scaled — the size is baked into the rect), matching Unity's 9-slice.
         var rect = new Rect2(-_size / 2f, _size);
-        DrawRect(rect, Colors.White, filled: false, width: BorderWidth);
+        DrawRect(rect, _color, filled: false, width: BorderWidth);
     }
 }

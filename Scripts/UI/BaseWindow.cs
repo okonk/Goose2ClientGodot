@@ -481,13 +481,17 @@ public partial class BaseWindow : Control, IScalableWindow
 
     public override void _Process(double delta)
     {
-        bool inside = Visible && GetGlobalRect().HasPoint(GetGlobalMousePosition());
+        bool inside = Visible && IsHoverPoint(GetGlobalMousePosition());
         if (inside != _hovered)
         {
             _hovered = inside;
             ApplyHoverOpacity(inside ? HoverOpacity : UnhoveredOpacity);
         }
     }
+
+    /// <summary>Hit test for the hover fade. Windows with floating children that extend past the
+    /// frame (a picker panel, say) widen it so the panel does not dim the window it belongs to.</summary>
+    protected virtual bool IsHoverPoint(Vector2 globalPoint) => GetGlobalRect().HasPoint(globalPoint);
 
     public void Toggle()
     {

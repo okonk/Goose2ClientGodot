@@ -294,6 +294,14 @@ public partial class SpellTargetManager : Node
         }
 
         _reticle.ResizeTarget(_target.Height);
+        _reticle.RefreshColor();
+    }
+
+    /// <summary>Re-apply the outline color option to a reticle that is already showing.</summary>
+    public void RefreshReticleColor()
+    {
+        if (_reticle != null && GodotObject.IsInstanceValid(_reticle))
+            _reticle.RefreshColor();
     }
     
     // A confirm the player asked for (Enter, or a fresh hotkey press) ends the hold: the key has to

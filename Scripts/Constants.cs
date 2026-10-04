@@ -149,5 +149,7 @@ namespace Goose2Client
         public const string Minimap = "Minimap";
         public const string MinimapOpacity = "MinimapOpacity";
         public const string LockHudWindows = "LockHudWindows";
+        /// <summary>Target reticle outline as "#rrggbb" hex; unset means white.</summary>
+        public const string TargetBoxColor = "TargetBoxColor";
     }
 }

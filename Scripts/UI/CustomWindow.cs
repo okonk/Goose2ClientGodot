@@ -15,20 +15,7 @@ public partial class CustomWindow : BaseWindow, IWindow
     private CustomWindowSlot _lookSlot = null!;
     private CustomWindowSlot _statsSlot = null!;
     private CustomPreviewControl _preview = null!;
-    private TextureRect _swatch = null!;
-    private TextureRect _swatchCursor = null!;
-    private TextureRect _hueBar = null!;
-    private TextureRect _hueCursor = null!;
-    private TextureRect _lightBar = null!;
-    private TextureRect _lightCursor = null!;
-    private HSlider _rSlider = null!;
-    private HSlider _gSlider = null!;
-    private HSlider _bSlider = null!;
-    private HSlider _aSlider = null!;
-    private Label _rValue = null!;
-    private Label _gValue = null!;
-    private Label _bValue = null!;
-    private Label _aValue = null!;
+    private ColorPickerControl _picker = null!;
     private LineEdit _nameField = null!;
     private Button _createButton = null!;
     private bool _listenersRegistered;
@@ -43,9 +30,6 @@ public partial class CustomWindow : BaseWindow, IWindow
     private int _g = CustomWindowMetrics.DefaultG;
     private int _b = CustomWindowMetrics.DefaultB;
     private int _a = CustomWindowMetrics.DefaultA;
-    private float _lastHue = -1f;
-    private float _hue;
-    private bool _preservingHue;
 
     public override void _Ready()
     {
@@ -60,30 +44,9 @@ public partial class CustomWindow : BaseWindow, IWindow
 
         _preview = GetNode<CustomPreviewControl>("Content/Preview");
 
-        _swatch = GetNode<TextureRect>("Content/Swatch");
-        _swatchCursor = GetNode<TextureRect>("Content/Swatch/Cursor");
-        _hueBar = GetNode<TextureRect>("Content/HueBar");
-        _hueCursor = GetNode<TextureRect>("Content/HueBar/Cursor");
-        _lightBar = GetNode<TextureRect>("Content/LightBar");
-        _lightCursor = GetNode<TextureRect>("Content/LightBar/Cursor");
-        _swatch.GuiInput += OnSwatchGuiInput;
-        _hueBar.GuiInput += OnHueGuiInput;
-        _lightBar.GuiInput += OnLightBarGuiInput;
-        _swatch.TextureFilter = CanvasItem.TextureFilterEnum.Linear;
-        SyncHsl();
-
-        _rSlider = GetNode<HSlider>("Content/RSlider");
-        _gSlider = GetNode<HSlider>("Content/GSlider");
-        _bSlider = GetNode<HSlider>("Content/BSlider");
-        _aSlider = GetNode<HSlider>("Content/ASlider");
-        _rValue = GetNode<Label>("Content/RValue");
-        _gValue = GetNode<Label>("Content/GValue");
-        _bValue = GetNode<Label>("Content/BValue");
-        _aValue = GetNode<Label>("Content/AValue");
-        _rSlider.ValueChanged += v => { _r = (int)v; _rValue.Text = _r.ToString(); UpdateTint(); };
-        _gSlider.ValueChanged += v => { _g = (int)v; _gValue.Text = _g.ToString(); UpdateTint(); };
-        _bSlider.ValueChanged += v => { _b = (int)v; _bValue.Text = _b.ToString(); UpdateTint(); };
-        _aSlider.ValueChanged += v => { _a = (int)v; _aValue.Text = _a.ToString(); UpdateTint(); };
+        _picker = GetNode<ColorPickerControl>("Content/ColorPicker");
+        _picker.SetColor(new Color(_r / 255f, _g / 255f, _b / 255f, _a / 255f));
+        _picker.ColorChanged += OnPickerColorChanged;
 
         _nameField = GetNode<LineEdit>("Content/NameField");
         _nameField.TextChanged += OnNameTextChanged;
@@ -118,136 +81,16 @@ public partial class CustomWindow : BaseWindow, IWindow
         // CustomPreviewControl has no resize handling and lays out against its Size at
         // Refresh() time, so Relayout must re-run the layout after UI scale changes.
         _preview.Refresh();
-        SyncHsl();
+        _picker.SyncHsl();
     }
 
-    private void BuildSwatchTexture(float hue)
+    private void OnPickerColorChanged(Color c)
     {
-        const int size = 64;
-        var img = Image.CreateEmpty(size, size, false, Image.Format.Rgba8);
-        for (int y = 0; y < size; y++)
-        {
-            for (int x = 0; x < size; x++)
-            {
-                var (r, g, b) = HslColor.ToRgb(hue, x / (size - 1f), 1f - y / (size - 1f));
-                img.SetPixel(x, y, new Color(r / 255f, g / 255f, b / 255f, 1f));
-            }
-        }
-        _swatch.Texture = ImageTexture.CreateFromImage(img);
-    }
-
-    private void BuildLightBarTexture(float hue)
-    {
-        var (r, g, b) = HslColor.ToRgb(hue, 1f, 0.5f);
-        var grad = new Gradient
-        {
-            Colors = new[] { Colors.Black, new Color(r / 255f, g / 255f, b / 255f), Colors.White },
-            Offsets = new[] { 0f, 0.5f, 1f },
-        };
-        _lightBar.Texture = new GradientTexture2D
-        {
-            Gradient = grad,
-            Width = 128,
-            Height = 12,
-            FillFrom = new Vector2(0, 0.5f),
-            FillTo = new Vector2(1, 0.5f),
-        };
-    }
-
-    private void SetRgb(int r, int g, int b)
-    {
-        _rSlider.Value = r;
-        _gSlider.Value = g;
-        _bSlider.Value = b;
-    }
-
-    private void SyncHsl()
-    {
-        var (h, s, l) = HslColor.FromRgb(_r, _g, _b);
-        // The swatch and lightness bar work at a fixed hue; re-deriving it from the
-        // quantized RGB round-trip would drift it (large near grey/extreme lightness).
-        if (!_preservingHue && s > 0f) _hue = h;
-        if (Math.Abs(_hue - _lastHue) > 0.5f)
-        {
-            _lastHue = _hue;
-            BuildSwatchTexture(_hue);
-            BuildLightBarTexture(_hue);
-        }
-        _swatchCursor.Position = LockCursor(new Vector2(s * _swatch.Size.X, (1f - l) * _swatch.Size.Y), _swatchCursor.Size, _swatch.Size);
-        _hueCursor.Position = LockCursor(new Vector2(_hue / 360f * _hueBar.Size.X, _hueBar.Size.Y / 2f), _hueCursor.Size, _hueBar.Size);
-        _lightCursor.Position = LockCursor(new Vector2(l * _lightBar.Size.X, _lightBar.Size.Y / 2f), _lightCursor.Size, _lightBar.Size);
-    }
-
-    private static Vector2 LockCursor(Vector2 center, Vector2 cursorSize, Vector2 parentSize)
-    {
-        var pos = center - cursorSize / 2f;
-        pos.X = Mathf.Clamp(pos.X, 0f, Mathf.Max(0f, parentSize.X - cursorSize.X));
-        pos.Y = Mathf.Clamp(pos.Y, 0f, Mathf.Max(0f, parentSize.Y - cursorSize.Y));
-        return pos;
-    }
-
-    private void OnSwatchGuiInput(InputEvent @event)
-    {
-        if (@event is InputEventMouseButton { ButtonIndex: MouseButton.Left, Pressed: true } mb)
-            ApplySwatchAt(mb.Position);
-        else if (@event is InputEventMouseMotion mm && Input.IsMouseButtonPressed(MouseButton.Left))
-            ApplySwatchAt(mm.Position);
-    }
-
-    private void ApplySwatchAt(Vector2 pos)
-    {
-        var (_, s, l) = HslColor.FromRgb(_r, _g, _b);
-        var ns = Mathf.Clamp(pos.X / _swatch.Size.X, 0f, 1f);
-        var nl = 1f - Mathf.Clamp(pos.Y / _swatch.Size.Y, 0f, 1f);
-        var (r, g, b) = HslColor.ToRgb(_hue, ns, nl);
-        _preservingHue = true;
-        SetRgb(r, g, b);
-        _preservingHue = false;
-        _swatchCursor.Position = LockCursor(pos, _swatchCursor.Size, _swatch.Size);
-    }
-
-    private void OnHueGuiInput(InputEvent @event)
-    {
-        if (@event is InputEventMouseButton { ButtonIndex: MouseButton.Left, Pressed: true } mb)
-            ApplyHueAt(mb.Position);
-        else if (@event is InputEventMouseMotion mm && Input.IsMouseButtonPressed(MouseButton.Left))
-            ApplyHueAt(mm.Position);
-    }
-
-    private void ApplyHueAt(Vector2 pos)
-    {
-        var (_, s, l) = HslColor.FromRgb(_r, _g, _b);
-        _hue = Mathf.Clamp(pos.X / _hueBar.Size.X, 0f, 1f) * 360f;
-        var (r, g, b) = HslColor.ToRgb(_hue, s, l);
-        SetRgb(r, g, b);
-        // Grey RGB produces no ValueChanged, so SyncHsl must run here to rebuild textures for the new hue.
-        SyncHsl();
-        _hueCursor.Position = LockCursor(pos, _hueCursor.Size, _hueBar.Size);
-    }
-
-    private void OnLightBarGuiInput(InputEvent @event)
-    {
-        if (@event is InputEventMouseButton { ButtonIndex: MouseButton.Left, Pressed: true } mb)
-            ApplyLightAt(mb.Position);
-        else if (@event is InputEventMouseMotion mm && Input.IsMouseButtonPressed(MouseButton.Left))
-            ApplyLightAt(mm.Position);
-    }
-
-    private void ApplyLightAt(Vector2 pos)
-    {
-        var (_, s, l) = HslColor.FromRgb(_r, _g, _b);
-        var nl = Mathf.Clamp(pos.X / _lightBar.Size.X, 0f, 1f);
-        var (r, g, b) = HslColor.ToRgb(_hue, s, nl);
-        _preservingHue = true;
-        SetRgb(r, g, b);
-        _preservingHue = false;
-        _lightCursor.Position = LockCursor(pos, _lightCursor.Size, _lightBar.Size);
-    }
-
-    private void UpdateTint()
-    {
+        _r = Mathf.RoundToInt(c.R * 255f);
+        _g = Mathf.RoundToInt(c.G * 255f);
+        _b = Mathf.RoundToInt(c.B * 255f);
+        _a = Mathf.RoundToInt(c.A * 255f);
         _preview.SetTint(_r, _g, _b, _a);
-        SyncHsl();
     }
 
     private void OnMakeWindow(object o)
@@ -260,7 +103,7 @@ public partial class CustomWindow : BaseWindow, IWindow
         if (p.WindowId != WindowId)
             ResetState();
         Visible = true;
-        SyncHsl();
+        _picker.SyncHsl();
         Title = p.Title;
         WindowId = p.WindowId;
         _preview.Refresh();
@@ -441,18 +284,8 @@ public partial class CustomWindow : BaseWindow, IWindow
         _g = CustomWindowMetrics.DefaultG;
         _b = CustomWindowMetrics.DefaultB;
         _a = CustomWindowMetrics.DefaultA;
-        _rSlider.Value = _r;
-        _gSlider.Value = _g;
-        _bSlider.Value = _b;
-        _aSlider.Value = _a;
-        _rValue.Text = _r.ToString();
-        _gValue.Text = _g.ToString();
-        _bValue.Text = _b.ToString();
-        _aValue.Text = _a.ToString();
         _nameField.Text = "";
-        _lastHue = -1f;
-        _hue = 0f;
-        SyncHsl();
+        _picker.SetColor(new Color(_r / 255f, _g / 255f, _b / 255f, _a / 255f));
         _preview.SetTint(_r, _g, _b, _a);
         _preview.SetCustomGraphic(null, 0, 0);
         _preview.Refresh();

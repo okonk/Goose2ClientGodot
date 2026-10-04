@@ -1,0 +1,195 @@
+[gd_scene load_steps=8 format=3]
+
+[ext_resource type="Script" path="res://Scripts/UI/ColorPickerControl.cs" id="1_cpc"]
+
+[sub_resource type="Gradient" id="Gradient_cursor"]
+colors = PackedColorArray(1, 1, 1, 1, 1, 1, 1, 1)
+
+[sub_resource type="GradientTexture2D" id="GradientTexture2D_cursor"]
+gradient = SubResource("Gradient_cursor")
+width = 8
+height = 8
+
+[sub_resource type="Gradient" id="Gradient_bar"]
+colors = PackedColorArray(1, 1, 1, 1)
+
+[sub_resource type="GradientTexture2D" id="GradientTexture2D_bar"]
+gradient = SubResource("Gradient_bar")
+width = 4
+height = 12
+
+[sub_resource type="Gradient" id="Gradient_hue"]
+colors = PackedColorArray(1, 0, 0, 1, 1, 1, 0, 1, 0, 1, 0, 1, 0, 1, 1, 1, 0, 0, 1, 1, 1, 0, 1, 1, 1, 0, 0, 1)
+offsets = PackedFloat32Array(0, 0.166667, 0.333333, 0.5, 0.666667, 0.833333, 1)
+
+[sub_resource type="GradientTexture2D" id="GradientTexture2D_hue"]
+gradient = SubResource("Gradient_hue")
+width = 128
+height = 12
+fill_from = Vector2(0, 0.5)
+fill_to = Vector2(1, 0.5)
+
+[node name="ColorPickerControl" type="Control"]
+script = ExtResource("1_cpc")
+layout_mode = 3
+anchors_preset = 0
+offset_right = 270.0
+offset_bottom = 148.0
+mouse_filter = 2
+
+[node name="Swatch" type="TextureRect" parent="."]
+layout_mode = 0
+offset_right = 112.0
+offset_bottom = 112.0
+mouse_filter = 0
+expand_mode = 1
+stretch_mode = 5
+
+[node name="Cursor" type="TextureRect" parent="Swatch"]
+layout_mode = 0
+mouse_filter = 2
+offset_right = 8.0
+offset_bottom = 8.0
+texture = SubResource("GradientTexture2D_cursor")
+
+[node name="HueBar" type="TextureRect" parent="."]
+layout_mode = 0
+offset_top = 118.0
+offset_right = 112.0
+offset_bottom = 130.0
+mouse_filter = 0
+expand_mode = 1
+stretch_mode = 5
+texture = SubResource("GradientTexture2D_hue")
+
+[node name="Cursor" type="TextureRect" parent="HueBar"]
+layout_mode = 0
+mouse_filter = 2
+offset_right = 4.0
+offset_bottom = 12.0
+texture = SubResource("GradientTexture2D_bar")
+
+[node name="LightBar" type="TextureRect" parent="."]
+layout_mode = 0
+offset_top = 136.0
+offset_right = 112.0
+offset_bottom = 148.0
+mouse_filter = 0
+expand_mode = 1
+stretch_mode = 5
+
+[node name="Cursor" type="TextureRect" parent="LightBar"]
+layout_mode = 0
+mouse_filter = 2
+offset_right = 4.0
+offset_bottom = 12.0
+texture = SubResource("GradientTexture2D_bar")
+
+[node name="RLabel" type="Label" parent="."]
+layout_mode = 0
+mouse_filter = 2
+offset_left = 124.0
+offset_right = 138.0
+offset_bottom = 18.0
+text = "R"
+
+[node name="RSlider" type="HSlider" parent="."]
+layout_mode = 0
+offset_left = 140.0
+offset_right = 240.0
+offset_bottom = 18.0
+max_value = 255.0
+value = 255.0
+
+[node name="RValue" type="Label" parent="."]
+layout_mode = 0
+mouse_filter = 2
+offset_left = 244.0
+offset_right = 270.0
+offset_bottom = 18.0
+horizontal_alignment = 2
+text = "255"
+
+[node name="GLabel" type="Label" parent="."]
+layout_mode = 0
+mouse_filter = 2
+offset_left = 124.0
+offset_top = 22.0
+offset_right = 138.0
+offset_bottom = 40.0
+text = "G"
+
+[node name="GSlider" type="HSlider" parent="."]
+layout_mode = 0
+offset_left = 140.0
+offset_top = 22.0
+offset_right = 240.0
+offset_bottom = 40.0
+max_value = 255.0
+value = 255.0
+
+[node name="GValue" type="Label" parent="."]
+layout_mode = 0
+mouse_filter = 2
+offset_left = 244.0
+offset_top = 22.0
+offset_right = 270.0
+offset_bottom = 40.0
+horizontal_alignment = 2
+text = "255"
+
+[node name="BLabel" type="Label" parent="."]
+layout_mode = 0
+mouse_filter = 2
+offset_left = 124.0
+offset_top = 44.0
+offset_right = 138.0
+offset_bottom = 62.0
+text = "B"
+
+[node name="BSlider" type="HSlider" parent="."]
+layout_mode = 0
+offset_left = 140.0
+offset_top = 44.0
+offset_right = 240.0
+offset_bottom = 62.0
+max_value = 255.0
+value = 255.0
+
+[node name="BValue" type="Label" parent="."]
+layout_mode = 0
+mouse_filter = 2
+offset_left = 244.0
+offset_top = 44.0
+offset_right = 270.0
+offset_bottom = 62.0
+horizontal_alignment = 2
+text = "255"
+
+[node name="ALabel" type="Label" parent="."]
+layout_mode = 0
+mouse_filter = 2
+offset_left = 124.0
+offset_top = 66.0
+offset_right = 138.0
+offset_bottom = 84.0
+text = "A"
+
+[node name="ASlider" type="HSlider" parent="."]
+layout_mode = 0
+offset_left = 140.0
+offset_top = 66.0
+offset_right = 240.0
+offset_bottom = 84.0
+max_value = 255.0
+value = 255.0
+
+[node name="AValue" type="Label" parent="."]
+layout_mode = 0
+mouse_filter = 2
+offset_left = 244.0
+offset_top = 66.0
+offset_right = 270.0
+offset_bottom = 84.0
+horizontal_alignment = 2
+text = "255"

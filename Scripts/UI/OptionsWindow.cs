@@ -21,6 +21,10 @@ public partial class OptionsWindow : BaseWindow
     private HSlider _minimapOpacitySlider = null!;
     private bool _minimapOpacityDragging;
     private CheckBox _lockHudWindows = null!;
+    private Panel _targetColorSwatch = null!;
+    private StyleBoxFlat _targetColorStyle = null!;
+    private Control _targetColorPicker = null!;
+    private ColorPickerControl _targetColorPickerControl = null!;
     private CheckBox _scaleAuto = null!;
     private CheckBox _scaleManual = null!;
     private HSlider _scaleSlider = null!;
@@ -81,6 +85,17 @@ public partial class OptionsWindow : BaseWindow
         _lockHudWindows = GetNode<CheckBox>("Content/LockHudWindowsCheck");
         _lockHudWindows.ButtonPressed = GameManager.Instance.CharacterSettings.GetOption<bool>(Options.LockHudWindows, false);
         _lockHudWindows.Toggled += OnLockHudWindowsChanged;
+
+        _targetColorSwatch = GetNode<Panel>("Content/TargetColorSwatch");
+        _targetColorStyle = (StyleBoxFlat)_targetColorSwatch.GetThemeStylebox("panel").Duplicate();
+        _targetColorSwatch.AddThemeStyleboxOverride("panel", _targetColorStyle);
+        _targetColorSwatch.GuiInput += OnTargetColorSwatchGuiInput;
+
+        _targetColorPicker = GetNode<Control>("Content/TargetColorPicker");
+        _targetColorPickerControl = GetNode<ColorPickerControl>("Content/TargetColorPicker/Picker");
+        _targetColorPickerControl.SetColor(TargetBoxColor.CurrentColor());
+        _targetColorPickerControl.ColorChanged += OnTargetColorChanged;
+        _targetColorStyle.BgColor = TargetBoxColor.CurrentColor();
 
         _initializing = true;
         _scaleAuto = GetNode<CheckBox>("Content/ScaleAutoCheck");
@@ -194,6 +209,73 @@ public partial class OptionsWindow : BaseWindow
         GameManager.Instance.CharacterSettings.Save();
     }
 
+    private void OnTargetColorSwatchGuiInput(InputEvent @event)
+    {
+        if (@event is not InputEventMouseButton { ButtonIndex: MouseButton.Left, Pressed: true })
+            return;
+        if (_targetColorPicker.Visible)
+        {
+            CloseTargetColorPicker();
+            return;
+        }
+
+        _targetColorPicker.Visible = true;
+        _targetColorPickerControl.SetColor(TargetBoxColor.CurrentColor());
+        PositionTargetColorPicker();
+        _targetColorPickerControl.SyncHsl();
+    }
+
+    private void OnTargetColorChanged(Color color)
+    {
+        GameManager.Instance.CharacterSettings.Options[Options.TargetBoxColor] = TargetBoxColor.Format(color);
+        _targetColorStyle.BgColor = color;
+        GameManager.Instance.SpellTargetManager?.RefreshReticleColor();
+    }
+
+    // Beside the swatch, flipping to its left when the canvas has no room on the right.
+    private void PositionTargetColorPicker()
+    {
+        var origin = GlobalPosition;
+        var swatch = _targetColorSwatch.GetGlobalRect();
+        var size = _targetColorPicker.Size;
+        var canvas = GetTree().Root.GetVisibleRect();
+        float x = swatch.End.X - origin.X + 6f;
+        if (swatch.End.X + 6f + size.X > canvas.End.X)
+            x = swatch.Position.X - origin.X - size.X - 6f;
+        float y = swatch.GetCenter().Y - origin.Y - size.Y / 2f;
+        _targetColorPicker.Position = new Vector2(x, Mathf.Clamp(y, 4f - origin.Y, canvas.End.Y - origin.Y - size.Y - 4f));
+    }
+
+    private void CloseTargetColorPicker()
+    {
+        if (_targetColorPicker == null || !_targetColorPicker.Visible)
+            return;
+        _targetColorPicker.Visible = false;
+        GameManager.Instance.CharacterSettings.Save();
+    }
+
+    // No popup node to own the click-away, so the panel closes itself on any press outside it.
+    // The swatch is excluded: its own handler toggles, and closing here would reopen it.
+    public override void _Input(InputEvent @event)
+    {
+        base._Input(@event);
+        if (!Visible || _targetColorPicker == null || !_targetColorPicker.Visible)
+            return;
+        if (@event is not InputEventMouseButton { ButtonIndex: MouseButton.Left, Pressed: true } mb)
+            return;
+        if (_targetColorPicker.GetGlobalRect().HasPoint(mb.GlobalPosition)
+            || _targetColorSwatch.GetGlobalRect().HasPoint(mb.GlobalPosition))
+            return;
+        CloseTargetColorPicker();
+        // Swallowed like a popup's click-away, so dismissing never reaches the world as a walk or cast.
+        GetViewport().SetInputAsHandled();
+    }
+
+    protected override bool IsHoverPoint(Vector2 globalPoint)
+        => base.IsHoverPoint(globalPoint)
+           || (_targetColorPicker != null && _targetColorPicker.Visible
+               && _targetColorPicker.GetGlobalRect().HasPoint(globalPoint));
+
     private void OnScaleModeToggled(bool pressed)
     {
         if (!pressed || _initializing)
@@ -293,10 +375,16 @@ public partial class OptionsWindow : BaseWindow
         base.Relayout();
         RefreshScaleLabel();
         RefreshRenderScaleLabel();
+        if (_targetColorPicker == null)
+            return;
+        _targetColorPickerControl.SyncHsl();
+        if (_targetColorPicker.Visible)
+            PositionTargetColorPicker();
     }
 
     public void ToggleWindow()
     {
+        CloseTargetColorPicker();
         Visible = !Visible;
         if (!Visible)
             GameManager.Instance.CharacterSettings.Save();
@@ -304,6 +392,7 @@ public partial class OptionsWindow : BaseWindow
 
     protected override void OnClosePressed()
     {
+        CloseTargetColorPicker();
         Hide();
         GameManager.Instance.CharacterSettings.Save();
     }

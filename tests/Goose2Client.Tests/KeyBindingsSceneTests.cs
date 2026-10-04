@@ -100,17 +100,17 @@ public class KeyBindingsSceneTests
     {
         var s = OptionsScene();
         var root = NodeBlock(s, "OptionsWindow");
-        Assert.Contains("offset_bottom = 316.0", root);
+        Assert.Contains("offset_bottom = 344.0", root);
 
         var reset = NodeBlock(s, "ResetLayoutButton");
-        Assert.Contains("offset_top = 284.0", reset);
-        Assert.Contains("offset_bottom = 308.0", reset);
+        Assert.Contains("offset_top = 312.0", reset);
+        Assert.Contains("offset_bottom = 336.0", reset);
         Assert.Contains("text = \"Reset UI Layout\"", reset);
 
         var button = NodeBlock(s, "KeyBindingsButton");
         Assert.Contains("parent=\"Content\"", button);
-        Assert.Contains("offset_top = 284.0", button);
-        Assert.Contains("offset_bottom = 308.0", button);
+        Assert.Contains("offset_top = 312.0", button);
+        Assert.Contains("offset_bottom = 336.0", button);
         Assert.Contains("text = \"Key Bindings\"", button);
         Assert.True(
             s.IndexOf("[node name=\"KeyBindingsButton\"", StringComparison.Ordinal) >
@@ -137,6 +137,10 @@ public class KeyBindingsSceneTests
                 continue;
             nodes++;
             int nameEnd = line.IndexOf("\" type=", StringComparison.Ordinal);
+            if (nameEnd < 0)
+                nameEnd = line.IndexOf("\" parent=", StringComparison.Ordinal);
+            if (nameEnd < 0)
+                nameEnd = line.IndexOf(']');
             string name = line.Substring(12, nameEnd - 12);
             int parentStart = line.IndexOf("parent=\"", StringComparison.Ordinal);
             string parent = parentStart < 0 ? "." : line.Substring(parentStart + 8, line.IndexOf('"', parentStart + 8) - parentStart - 8);
