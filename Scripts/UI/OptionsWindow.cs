@@ -61,7 +61,7 @@ public partial class OptionsWindow : BaseWindow
         var viewport = GameManager.Instance.WorldViewport;
         if (viewport != null)
         {
-            viewport.ScaleChanged += _ => RefreshRenderScaleLabel();
+            viewport.ScaleChanged += OnViewportScaleChanged;
             viewport.GetWindow().SizeChanged += RefreshRenderScaleLabel;
         }
         RefreshRenderScaleLabel();
@@ -306,5 +306,21 @@ public partial class OptionsWindow : BaseWindow
     {
         Hide();
         GameManager.Instance.CharacterSettings.Save();
+    }
+
+    // WorldViewport outlives the HUD (ReturnToLogin frees the UI layer but keeps it), and
+    // ScaleChanged is a plain C# event, so the subscription must be removed manually or the
+    // old window's handler fires against its disposed nodes after a reconnect.
+    public override void _ExitTree()
+    {
+        var viewport = GameManager.Instance?.WorldViewport;
+        if (viewport != null)
+            viewport.ScaleChanged -= OnViewportScaleChanged;
+        base._ExitTree();
+    }
+
+    private void OnViewportScaleChanged(float _)
+    {
+        RefreshRenderScaleLabel();
     }
 }
