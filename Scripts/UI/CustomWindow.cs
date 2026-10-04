@@ -163,7 +163,7 @@ public partial class CustomWindow : BaseWindow, IWindow
         if (!data.TryGetValue("kind", out var kind) || kind.AsString() != "item") return;
         if (!data.TryGetValue("slot", out var slotVal)) return;
 
-        if (slotVal.As<ItemSlot>() is { } src)
+        if (SlotDropRouting.AsOrDefault<ItemSlot>(slotVal) is { } src)
         {
             if (!CustomWindowValidation.IsInventorySource(src.Window)) return;
             if (!src.HasItem) return;
@@ -172,12 +172,11 @@ public partial class CustomWindow : BaseWindow, IWindow
             var other = target == _lookSlot ? _statsSlot : _lookSlot;
             if (other.HasItem && !CustomWindowValidation.TypesCompatible(stats, other.Stats!)) return;
             int id = src.SlotNumber + 1;
-            if (other.HasItem && other.SlotId == id) return;
             SetSlot(target, id, stats);
             return;
         }
 
-        if (slotVal.As<CustomWindowSlot>() is { } csrc)
+        if (SlotDropRouting.AsOrDefault<CustomWindowSlot>(slotVal) is { } csrc)
         {
             if (csrc == target)
             {
