@@ -539,7 +539,7 @@ public partial class BaseWindow : Control, IScalableWindow
         if (!d.TryGetValue("slot", out Variant slotVar) || slotVar.VariantType != Variant.Type.Object)
             return false;
 
-        var slot = slotVar.As<ItemSlot>();
+        var slot = SlotDropRouting.AsOrDefault<ItemSlot>(slotVar);
         if (slot == null || !GodotObject.IsInstanceValid(slot) || !slot.HasItem)
             return false;
 

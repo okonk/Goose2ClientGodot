@@ -35,7 +35,7 @@ namespace Goose2Client.UI
 
             if (kind == "item")
             {
-                var src = d["slot"].As<ItemSlot>();
+                var src = SlotDropRouting.AsOrDefault<ItemSlot>(d["slot"]);
                 if (src != null && src.HasItem && src.Window != null && src.Window.WindowFrame == WindowFrames.Inventory)
                     GameManager.Instance.NetworkClient.DestroyItem(src.SlotNumber);
             }

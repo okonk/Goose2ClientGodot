@@ -210,7 +210,7 @@ namespace Goose2Client.UI
             }
             else if (kind == "item")
             {
-                var src = d["slot"].As<ItemSlot>();
+                var src = SlotDropRouting.AsOrDefault<ItemSlot>(d["slot"]);
                 if (src != null && src.HasItem &&
                     (src.Window.WindowFrame == WindowFrames.Inventory ||
                      src.Window.WindowFrame == WindowFrames.Equipped))

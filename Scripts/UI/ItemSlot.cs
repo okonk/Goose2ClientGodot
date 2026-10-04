@@ -102,7 +102,7 @@ namespace Goose2Client.UI
         public override void _DropData(Vector2 atPosition, Variant data)
         {
             var d = data.AsGodotDictionary();
-            var src = d["slot"].As<ItemSlot>();
+            var src = SlotDropRouting.AsOrDefault<ItemSlot>(d["slot"]);
             if (src != null && src.HasItem)
                 OnDropItem?.Invoke(src.Window, src.SlotNumber, SlotNumber);
         }

@@ -5,6 +5,13 @@ namespace Goose2Client.UI;
 
 public static class SlotDropRouting
 {
+    // Variant.As<T> throws InvalidCastException on a type mismatch, but drag sources
+    // share kind "item" across slot classes (ItemSlot, CustomWindowSlot).
+    public static T? AsOrDefault<T>(Variant value) where T : class
+    {
+        return value.VariantType == Variant.Type.Object ? value.AsGodotObject() as T : null;
+    }
+
     public static int NearestSlot(IReadOnlyList<Rect2> rects, Vector2 point)
     {
         int best = -1;
