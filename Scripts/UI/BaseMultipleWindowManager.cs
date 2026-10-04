@@ -24,6 +24,7 @@ public abstract partial class BaseMultipleWindowManager<T> : Node where T : Base
         GameManager.Instance.PacketManager.Listen<EndWindowPacket>(OnEndWindow);
         GameManager.Instance.PacketManager.Listen<WindowLinePacket>(OnWindowLine);
         GameManager.Instance.PacketManager.Listen<WindowOpeningLinePacket>(OnOpeningLine);
+        GameManager.Instance.PacketManager.Listen<WindowLineItemPacket>(OnWindowLineItem);
         GameManager.Instance.PacketManager.Listen<CloseWindowPacket>(OnCloseWindowPacket);
         _listenersRegistered = true;
     }
@@ -35,6 +36,7 @@ public abstract partial class BaseMultipleWindowManager<T> : Node where T : Base
         GameManager.Instance.PacketManager.Remove<EndWindowPacket>(OnEndWindow);
         GameManager.Instance.PacketManager.Remove<WindowLinePacket>(OnWindowLine);
         GameManager.Instance.PacketManager.Remove<WindowOpeningLinePacket>(OnOpeningLine);
+        GameManager.Instance.PacketManager.Remove<WindowLineItemPacket>(OnWindowLineItem);
         GameManager.Instance.PacketManager.Remove<CloseWindowPacket>(OnCloseWindowPacket);
     }
 
@@ -99,6 +101,13 @@ public abstract partial class BaseMultipleWindowManager<T> : Node where T : Base
         var p = (WindowLinePacket)o;
         if (_windows.TryGetValue(p.WindowId, out var w))
             w.OnWindowLine(p);
+    }
+
+    private void OnWindowLineItem(object o)
+    {
+        var p = (WindowLineItemPacket)o;
+        if (_windows.TryGetValue(p.WindowId, out var w))
+            w.OnWindowLineItem(p);
     }
 
     private void OnOpeningLine(object o)

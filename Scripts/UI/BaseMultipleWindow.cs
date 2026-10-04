@@ -132,6 +132,10 @@ public abstract partial class BaseMultipleWindow : BaseWindow, IWindow
     /// default; only windows that render an opening line override it.</summary>
     internal virtual void OnOpeningLine(string text) { }
 
+    /// <summary>Called by the manager when a WindowLineItemPacket (WLI) attaches item stats to
+    /// a line. No-op by default; only windows that show item tooltips on hover override it.</summary>
+    internal virtual void OnWindowLineItem(WindowLineItemPacket packet) { }
+
     protected override void OnClosePressed()
     {
         CloseWindow();

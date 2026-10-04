@@ -16,6 +16,7 @@ public partial class OptionListWindow : BaseMultipleWindow
     private bool _headingVisible;
     private bool _anyIcon;
     private int _maxLine = -1;
+    private readonly ItemStats?[] _lineStats = new ItemStats[MaxLines];
 
     public override WindowFrames WindowFrame => WindowFrames.OptionList;
 
@@ -47,7 +48,8 @@ public partial class OptionListWindow : BaseMultipleWindow
     protected override Control CreateLine(int index)
     {
         // The Button is a full-row click layer (empty text); the label + icon are children
-        // positioned explicitly so both share the row's vertical centre.
+        // positioned explicitly so both share the row's vertical centre. The icon is a hover
+        // target for item tooltips, so it takes mouse input and forwards clicks to the row.
         var button = new Button
         {
             Name = "Line" + index,
@@ -61,10 +63,21 @@ public partial class OptionListWindow : BaseMultipleWindow
         var icon = new TextureRect
         {
             Name = "Icon",
-            MouseFilter = Control.MouseFilterEnum.Ignore,
+            MouseFilter = Control.MouseFilterEnum.Stop,
             Visible = false,
             ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
             StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
+        };
+        icon.MouseEntered += () =>
+        {
+            if (_lineStats[index] is { } stats)
+                TooltipManager.Instance.ShowItemTooltip(stats, icon);
+        };
+        icon.MouseExited += () => TooltipManager.Instance.HideItemTooltip();
+        icon.GuiInput += @event =>
+        {
+            if (@event is InputEventMouseButton { ButtonIndex: MouseButton.Left, Pressed: false })
+                LineClicked(index);
         };
         button.AddChild(icon);
 
@@ -106,6 +119,7 @@ public partial class OptionListWindow : BaseMultipleWindow
     {
         _maxLine = -1;
         _headingVisible = false;
+        Array.Clear(_lineStats, 0, _lineStats.Length);
         _heading.Text = "";
         _heading.Visible = false;
         base.OnMakeWindow(packet);
@@ -123,6 +137,15 @@ public partial class OptionListWindow : BaseMultipleWindow
         base.OnWindowLine(packet);
         if (packet.LineNumber < 0 || packet.LineNumber >= _lines.Length) return;
         ApplyLineGraphics(packet.LineNumber, packet);
+    }
+
+    internal override void OnWindowLineItem(WindowLineItemPacket packet)
+    {
+        if (packet.LineNumber < 0 || packet.LineNumber >= _lineStats.Length) return;
+        SetLineText(packet.LineNumber, packet.Name);
+        var icon = GetIcon(packet.LineNumber);
+        Icon.Apply(icon, packet.GraphicFile, packet.GraphicId, packet.GraphicR, packet.GraphicG, packet.GraphicB, packet.GraphicA);
+        _lineStats[packet.LineNumber] = ItemStats.FromPacket(packet);
     }
 
     private void ApplyLineGraphics(int index, WindowLinePacket p)
