@@ -410,7 +410,7 @@ namespace Goose2Client.Character
             var frames = sprite.SpriteFrames;
             if (frames == null || !frames.HasAnimation(sprite.Animation) || sprite.Frame >= frames.GetFrameCount(sprite.Animation))
                 return;
-            var texture = frames.GetFrameTexture(sprite.Animation, sprite.Frame);
+            var texture = FrameTextureCache.Get(frames, sprite.Animation, sprite.Frame);
             if (texture != null)
             {
                 var offset = CharacterAnchor.SpriteOffset(slot.AnchorHeight, texture.GetSize());
@@ -456,7 +456,7 @@ namespace Goose2Client.Character
         public bool ContainsPoint(Vector2 worldPoint)
         {
             if (!_slots.TryGetValue(CharacterSlot.Body, out var b) || b.Sprite.SpriteFrames == null) return false;
-            var tex = b.Sprite.SpriteFrames.GetFrameTexture(b.Sprite.Animation, b.Sprite.Frame);
+            var tex = FrameTextureCache.Get(b.Sprite.SpriteFrames, b.Sprite.Animation, b.Sprite.Frame);
             if (tex == null) return false;
             var size = tex.GetSize();
             var center = GlobalPosition + b.Sprite.Offset;   // Centered sprite: Offset is the sprite center relative to origin

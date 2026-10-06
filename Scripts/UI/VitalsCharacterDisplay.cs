@@ -56,7 +56,8 @@ public partial class VitalsCharacterDisplay : Control
         string? anim = frames.HasAnimation("idle-down") ? "idle-down"
                     : frames.HasAnimation("idle") ? "idle" : null;
         if (anim == null || frames.GetFrameCount(anim) == 0) { ClearLayer(nodePath); return; }
-        var tex = frames.GetFrameTexture(anim, 0);
+        var tex = FrameTextureCache.Get(frames, anim, 0);
+        if (tex == null) { ClearLayer(nodePath); return; }
         rect.Texture = tex;
         rect.Visible = true;
         rect.TextureFilter = CanvasItem.TextureFilterEnum.Nearest;

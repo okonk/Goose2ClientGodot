@@ -125,7 +125,7 @@ public partial class CustomPreviewControl : Control
                 continue;
             }
 
-            var tex = frames.GetFrameTexture(clip, 0);
+            var tex = FrameTextureCache.Get(frames, clip, 0);
             if (tex == null)
             {
                 HideLayer(layer);

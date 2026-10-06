@@ -27,7 +27,7 @@ namespace Goose2Client.Overlays
 
             // Plan: bottom-pivot — offset the sprite so its bottom edge sits at the node origin,
             // matching Unity's emote anchor point above the character.
-            var firstFrame = _sprite.SpriteFrames.GetFrameTexture(clip, 0);
+            var firstFrame = FrameTextureCache.Get(_sprite.SpriteFrames, clip, 0);
             if (firstFrame != null)
             {
                 int height = (int)firstFrame.GetSize().Y;

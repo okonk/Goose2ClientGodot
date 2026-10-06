@@ -59,11 +59,11 @@ void fragment() {
             foreach (var name in new[] { "idle-down", "idle-equip-down", "idle-no-equip-down" })
             {
                 if (frames.HasAnimation(name) && frames.GetFrameCount(name) > 0)
-                    return frames.GetFrameTexture(name, 0);
+                    return FrameTextureCache.Get(frames, name, 0);
             }
             var animations = frames.GetAnimationNames();
             return animations.Length > 0 && frames.GetFrameCount(animations[0]) > 0
-                ? frames.GetFrameTexture(animations[0], 0)
+                ? FrameTextureCache.Get(frames, animations[0], 0)
                 : null;
         }
 
