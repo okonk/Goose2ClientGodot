@@ -113,6 +113,8 @@ public partial class SpellbookWindow : BaseWindow, IWindow
 
     public void UseSpell(SpellInfo info, bool heldRepeat = false)
     {
+        if (GameManager.Instance.IsLoadingMap) return;
+
         var lp = GameManager.Instance.CurrentMapManager?.LocalPlayer;
         if (!CurrentMapFlags.Value.SpellsEnabled && lp?.IsGM != true)
         {

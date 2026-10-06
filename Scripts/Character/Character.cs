@@ -643,6 +643,7 @@ namespace Goose2Client.Character
         private void ProcessLocalInput(double delta)
         {
             if (!IsLocalPlayer) return;
+            if (GameManager.Instance.IsLoadingMap) return;
             if (GameManager.Instance.IsTargeting) return;   // spell targeting consumes movement/attack input
             // Root viewport explicitly: world nodes' own viewport is the map sub-viewport, whose
             // GUI focus owner is always null — the chat LineEdit focus lives on the root.
@@ -709,6 +710,7 @@ namespace Goose2Client.Character
         private bool TryChainLocalStep()
         {
             if (!IsLocalPlayer) return false;
+            if (GameManager.Instance.IsLoadingMap) return false;
             if (GameManager.Instance.IsTargeting) return false;
             if (GetTree().Root.GuiGetFocusOwner() is LineEdit) return false;   // root viewport — see ProcessLocalInput
 

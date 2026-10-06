@@ -318,7 +318,7 @@ public partial class SpellTargetManager : Node
         // re-send the spell the first one already cast.
         var spell = _pendingSpell;
         _pendingSpell = null;
-        if (_target != null && spell != null)
+        if (_target != null && spell != null && !GameManager.Instance.IsLoadingMap)
         {
             GameManager.Instance.SpellCooldownManager.Cast(spell.SlotNumber, spell.Cooldown);
             GameManager.Instance.NetworkClient.CastSpell(spell.SlotNumber, _target.LoginId);

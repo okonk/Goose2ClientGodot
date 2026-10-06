@@ -9,6 +9,10 @@ namespace Goose2Client.UI
     /// </summary>
     public partial class DisconnectOverlay : CanvasLayer
     {
+        private const string DefaultMessage = "Disconnected from server";
+
+        private readonly Label _label;
+
         public DisconnectOverlay()
         {
             Name = "DisconnectOverlay";
@@ -58,19 +62,23 @@ namespace Goose2Client.UI
             vbox.AddThemeConstantOverride("separation", 16);
             margins.AddChild(vbox);
 
-            var label = new Label
+            _label = new Label
             {
-                Text = "Disconnected from server",
+                Text = DefaultMessage,
                 HorizontalAlignment = HorizontalAlignment.Center
             };
-            vbox.AddChild(label);
+            vbox.AddChild(_label);
 
             var button = new Button { Text = "Return to Login" };
             button.Pressed += OnReturnToLogin;
             vbox.AddChild(button);
         }
 
-        public void ShowDisconnect() => Visible = true;
+        public void ShowDisconnect(string message = DefaultMessage)
+        {
+            _label.Text = message;
+            Visible = true;
+        }
 
         private void OnReturnToLogin()
         {

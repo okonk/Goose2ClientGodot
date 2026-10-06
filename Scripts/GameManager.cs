@@ -59,6 +59,8 @@ namespace Goose2Client
         /// <summary>Whether the player is currently in spell-targeting mode.</summary>
         public bool IsTargeting => SpellTargetManager?.IsTargeting ?? false;
 
+        public bool IsLoadingMap => NetworkClient.LoadingMap;
+
         public bool CanSeeInvisible { get; set; }
 
         private readonly HashSet<int> _partyIds = new();
@@ -283,6 +285,7 @@ namespace Goose2Client
             // path — including the missing-map early return and exceptions.
             if (_changingMap) return;
             _changingMap = true;
+            NetworkClient.LoadingMap = true;
 
             // Loading overlay: added to root directly, NOT set as a current scene — freed manually.
             LoadingMapScene? loading = null;
@@ -313,10 +316,13 @@ namespace Goose2Client
 
                 _stallMonitor.SetActivity("map-load-file");
                 var nextMap = LoadMap(mapFile);
-                if (nextMap == null) return;
+                if (nextMap == null)
+                {
+                    FailMapLoad(mapFile, mapName);
+                    return;
+                }
                 CurrentMap = nextMap;
                 CurrentMapName = mapName ?? "";
-                // finally: frees loading, unpauses; old world stays live, no DoneLoadingMap sent
 
                 // The Map scene IS its own SubViewport; attaching it to WorldViewport puts it in
                 // the tree, forces its first render, and sizes it (RefreshFromSettings). The
@@ -396,6 +402,7 @@ namespace Goose2Client
             finally
             {
                 _changingMap = false;   // release on every exit path (early return, throw, normal)
+                NetworkClient.LoadingMap = false;
                 if (loading != null && GodotObject.IsInstanceValid(loading))
                     loading.QueueFree();   // no leaked full-window Control
                 WorldTextBridge.Visible = true;
@@ -482,6 +489,13 @@ namespace Goose2Client
                 NetworkClient?.Quit();         // notify the server with a graceful QUIT (mirrors Unity OnApplicationQuit)
                 NetworkClient?.Disconnect();   // then tear down the socket + join the receive thread
             }
+        }
+
+        private void FailMapLoad(string mapFile, string? mapName)
+        {
+            NetworkClient.Disconnect();
+            DisconnectOverlay.ShowDisconnect(
+                $"Could not load map {mapName ?? mapFile} ({mapFile}).\nYour client may be out of date.");
         }
 
         private MapDocument? LoadMap(string mapFile)

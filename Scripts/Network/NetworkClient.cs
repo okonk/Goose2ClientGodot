@@ -18,6 +18,7 @@ namespace Goose2Client.Network
 
         public bool IsConnected => socket != null && socket.Connected;
         public bool Pause { get; set; } = false;
+        public bool LoadingMap { get; set; }
         public int PendingPacketCount => _packetInbox.Count;
         internal MainThreadStallMonitor? StallMonitor { get; set; }
 
@@ -83,10 +84,14 @@ namespace Goose2Client.Network
             socket = null;
             packetBuffer = "";
             _packetInbox.Clear();
+            LoadingMap = false;
         }
 
         public void Send(string packet)
         {
+            // Mirrors the server, which drops everything but DLM and PONG until DLM arrives.
+            if (LoadingMap && packet != "DLM") return;
+
             packet += '\x1';
             StallMonitor?.SetActivity("network-send wait-lock");
             try
