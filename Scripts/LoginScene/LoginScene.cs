@@ -18,10 +18,14 @@ public partial class LoginScene : Control, IScalableWindow
     private LineEdit _passwordInput = default!;
     private Button _loginButton = default!;
     private Label _statusLabel = default!;
+    private Label _footer = default!;
+    private Control _serverModal = default!;
+    private LineEdit _addressInput = default!;
+    private LineEdit _portInput = default!;
+    private Label _modalError = default!;
+    private Color _footerColor;
 
-    // Server config — defaults match Unity LoginButton:98, overridable via env vars for headless testing
-    private static string Host => OS.GetEnvironment("GOOSE_HOST") is { Length: > 0 } h ? h : "game.illutia.net";
-    private static int Port => int.TryParse(OS.GetEnvironment("GOOSE_PORT"), out int p) ? p : 2006;
+    private const string ModalVb = "ServerModal/Center/Card/CardPadding/VBox/";
 
     public override void _Ready()
     {
@@ -30,6 +34,11 @@ public partial class LoginScene : Control, IScalableWindow
         _passwordInput = GetNode<LineEdit>("LoginLayout/Center/LoginCard/CardPadding/VBox/PasswordInput");
         _loginButton = GetNode<Button>("LoginLayout/Center/LoginCard/CardPadding/VBox/LoginButton");
         _statusLabel = GetNode<Label>("LoginLayout/Center/LoginCard/CardPadding/VBox/StatusLabel");
+        _footer = GetNode<Label>("LoginLayout/Center/LoginCard/CardPadding/VBox/Footer");
+        _serverModal = GetNode<Control>("ServerModal");
+        _addressInput = GetNode<LineEdit>(ModalVb + "AddressInput");
+        _portInput = GetNode<LineEdit>(ModalVb + "PortInput");
+        _modalError = GetNode<Label>(ModalVb + "ModalError");
 
         // Register the card's font overrides so they scale with the UI factor like every
         // other window; the tscn values are the 1x bases.
@@ -44,11 +53,20 @@ public partial class LoginScene : Control, IScalableWindow
         applier.ApplyFontSize(_loginButton, 12);
         applier.ApplyFontSize(_statusLabel, 11);
         applier.ApplyFontSize(GetNode<Label>(vb + "Footer"), 10);
+        applier.ApplyFontSize(GetNode<Label>(ModalVb + "Title"), 12);
+        applier.ApplyFontSize(GetNode<Label>(ModalVb + "AddressLabel"), 11);
+        applier.ApplyFontSize(_addressInput, 12);
+        applier.ApplyFontSize(GetNode<Label>(ModalVb + "PortLabel"), 11);
+        applier.ApplyFontSize(_portInput, 12);
+        applier.ApplyFontSize(_modalError, 10);
+        applier.ApplyFontSize(GetNode<Button>(ModalVb + "Buttons/CancelButton"), 12);
+        applier.ApplyFontSize(GetNode<Button>(ModalVb + "Buttons/SaveButton"), 12);
 
         // 2. Autofill from credential store
         var (name, password) = LoginCredentialStore.Load();
         _nameInput.Text = name;
         _passwordInput.Text = password;
+        UpdateServerLabel();
 
         // 3. Register packet listeners on the autoload PacketManager
         var gm = GameManager.Instance;
@@ -63,6 +81,25 @@ public partial class LoginScene : Control, IScalableWindow
         // 5. Wire UI signals
         _loginButton.Pressed += OnLoginClicked;
         _passwordInput.TextSubmitted += _ => OnLoginClicked();
+
+        _footerColor = _footer.GetThemeColor("font_color");
+        _footer.MouseDefaultCursorShape = CursorShape.PointingHand;
+        _footer.GuiInput += e =>
+        {
+            if (e is InputEventMouseButton { Pressed: true, ButtonIndex: MouseButton.Left })
+                OpenServerModal();
+        };
+        _footer.MouseEntered += () => _footer.AddThemeColorOverride("font_color", new Color(1f, 0.807843f, 0.4f));
+        _footer.MouseExited += () => _footer.AddThemeColorOverride("font_color", _footerColor);
+        GetNode<ColorRect>("ServerModal/Dim").GuiInput += e =>
+        {
+            if (e is InputEventMouseButton { Pressed: true })
+                CloseServerModal();
+        };
+        GetNode<Button>(ModalVb + "Buttons/CancelButton").Pressed += CloseServerModal;
+        GetNode<Button>(ModalVb + "Buttons/SaveButton").Pressed += OnServerSaveClicked;
+        _addressInput.TextSubmitted += _ => OnServerSaveClicked();
+        _portInput.TextSubmitted += _ => OnServerSaveClicked();
 
         // Clear status label initially
         _statusLabel.Text = "";
@@ -79,6 +116,16 @@ public partial class LoginScene : Control, IScalableWindow
         // Godot quirk: a Label's min size is not refreshed when the theme default font
         // size changes, so the stale min over-allocates the VBox after a scale-down.
         _statusLabel.UpdateMinimumSize();
+        _modalError.UpdateMinimumSize();
+    }
+
+    public override void _UnhandledKeyInput(InputEvent @event)
+    {
+        if (_serverModal.Visible && @event.IsActionPressed("ui_cancel"))
+        {
+            CloseServerModal();
+            GetViewport().SetInputAsHandled();
+        }
     }
 
     public override void _ExitTree()
@@ -97,6 +144,9 @@ public partial class LoginScene : Control, IScalableWindow
 
     private void OnLoginClicked()
     {
+        if (_serverModal.Visible)
+            return;
+
         string name = _nameInput.Text;
         string password = _passwordInput.Text;
 
@@ -106,7 +156,43 @@ public partial class LoginScene : Control, IScalableWindow
         _statusLabel.Text = "Connecting...";
         _loginButton.Disabled = true;
 
-        GameManager.Instance.NetworkClient.Connect(Host, Port);
+        var (host, port) = ServerConfig.Load();
+        GameManager.Instance.NetworkClient.Connect(host, port);
+    }
+
+    private void OpenServerModal()
+    {
+        var (host, port) = ServerConfig.Load();
+        _addressInput.Text = host;
+        _portInput.Text = port.ToString();
+        _modalError.Text = "";
+        _serverModal.Visible = true;
+        _addressInput.GrabFocus();
+    }
+
+    private void CloseServerModal()
+    {
+        _serverModal.Visible = false;
+    }
+
+    private void OnServerSaveClicked()
+    {
+        if (!ServerSettings.TryValidate(_addressInput.Text, _portInput.Text,
+                out string host, out int port, out string? error))
+        {
+            _modalError.Text = error ?? "";
+            return;
+        }
+
+        ServerConfig.Save(host, port);
+        UpdateServerLabel();
+        CloseServerModal();
+    }
+
+    private void UpdateServerLabel()
+    {
+        var (host, port) = ServerConfig.Load();
+        _footer.Text = ServerSettings.FormatLabel(host, port);
     }
 
     // --- NetworkClient event handlers ---

@@ -150,7 +150,107 @@ autowrap_mode = 2
 
 [node name="Footer" type="Label" parent="LoginLayout/Center/LoginCard/CardPadding/VBox"]
 layout_mode = 2
+mouse_filter = 0
+tooltip_text = "Change server"
 theme_override_colors/font_color = Color(0.482353, 0.533333, 0.643137, 1)
 theme_override_font_sizes/font_size = 10
 text = "game.illutia.net"
 horizontal_alignment = 1
+
+[node name="ServerModal" type="Control" parent="."]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Dim" type="ColorRect" parent="ServerModal"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 0
+color = Color(0, 0, 0, 0.6)
+
+[node name="Center" type="CenterContainer" parent="ServerModal"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Card" type="PanelContainer" parent="ServerModal/Center"]
+custom_minimum_size = Vector2(300, 0)
+layout_mode = 2
+theme_override_styles/panel = SubResource("login_card")
+
+[node name="CardPadding" type="MarginContainer" parent="ServerModal/Center/Card"]
+layout_mode = 2
+theme_override_constants/margin_left = 22
+theme_override_constants/margin_top = 16
+theme_override_constants/margin_right = 22
+theme_override_constants/margin_bottom = 14
+
+[node name="VBox" type="VBoxContainer" parent="ServerModal/Center/Card/CardPadding"]
+layout_mode = 2
+theme_override_constants/separation = 7
+
+[node name="Title" type="Label" parent="ServerModal/Center/Card/CardPadding/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.807843, 0.4, 1)
+theme_override_font_sizes/font_size = 12
+text = "SERVER SETTINGS"
+horizontal_alignment = 1
+
+[node name="AddressLabel" type="Label" parent="ServerModal/Center/Card/CardPadding/VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 11
+text = "SERVER ADDRESS"
+
+[node name="AddressInput" type="LineEdit" parent="ServerModal/Center/Card/CardPadding/VBox"]
+custom_minimum_size = Vector2(0, 30)
+layout_mode = 2
+theme_override_font_sizes/font_size = 12
+placeholder_text = "host or address"
+clear_button_enabled = true
+
+[node name="PortLabel" type="Label" parent="ServerModal/Center/Card/CardPadding/VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 11
+text = "PORT"
+
+[node name="PortInput" type="LineEdit" parent="ServerModal/Center/Card/CardPadding/VBox"]
+custom_minimum_size = Vector2(0, 30)
+layout_mode = 2
+theme_override_font_sizes/font_size = 12
+placeholder_text = "2006"
+
+[node name="ModalError" type="Label" parent="ServerModal/Center/Card/CardPadding/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.45, 0.45, 1)
+theme_override_font_sizes/font_size = 10
+text = ""
+autowrap_mode = 2
+
+[node name="Buttons" type="HBoxContainer" parent="ServerModal/Center/Card/CardPadding/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="CancelButton" type="Button" parent="ServerModal/Center/Card/CardPadding/VBox/Buttons"]
+custom_minimum_size = Vector2(0, 30)
+layout_mode = 2
+theme_override_font_sizes/font_size = 12
+text = "CANCEL"
+
+[node name="SaveButton" type="Button" parent="ServerModal/Center/Card/CardPadding/VBox/Buttons"]
+custom_minimum_size = Vector2(0, 30)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_type_variation = &"PrimaryButton"
+theme_override_font_sizes/font_size = 12
+text = "SAVE"

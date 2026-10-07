@@ -29,6 +29,7 @@ public static class LoginCredentialStore
     public static void Save(string name, string password)
     {
         var cfg = new ConfigFile();
+        cfg.Load(Path);   // preserve other sections (e.g. ServerConfig's [server])
         cfg.SetValue("credentials", "name", name);
         cfg.SetValue("credentials", "password", password);
         cfg.Save(Path);

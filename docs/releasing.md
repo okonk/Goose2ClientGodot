@@ -182,4 +182,6 @@ never made it into the `.pck`; a missing stamp entirely means startup threw befo
 overlay was created — check the client's stderr.
 
 To point the client at a local server, set `GOOSE_HOST` / `GOOSE_PORT`
-(`Scripts/LoginScene/LoginScene.cs:20-21`); they default to `game.illutia.net:2006`.
+(`Scripts/LoginScene/ServerConfig.cs`); they default to `game.illutia.net:2006` and
+override whatever was saved from the login screen's server dialog (click the address
+label at the bottom of the login card; persisted to `[server]` in `user://login.cfg`).
