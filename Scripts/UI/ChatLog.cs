@@ -31,6 +31,12 @@ public sealed class ChatLog
     private const string TellToPrefix = "[tell to] ";
     private const string TellFromPrefix = "[tell from] ";
 
+    // illutiagooseserver LoginEvent/LogoutEvent: "<Name> has joined the world." / "<Name> has left the world."
+    private static readonly string[] PresenceSuffixes = { " has joined the world.", " has left the world." };
+
+    // illutiagooseserver WhoCommand ends its /who reply with "[Matched N players]".
+    private const string WhoTerminatorPrefix = "[Matched ";
+
     public static readonly ChatTabKind[] OptionalKinds =
         { ChatTabKind.Guild, ChatTabKind.Group, ChatTabKind.Chat, ChatTabKind.System };
 
@@ -46,6 +52,7 @@ public sealed class ChatLog
     };
 
     private readonly List<ChatTab> _tabs = new();
+    private ChatTab? _whoTab;
 
     // Local player's display name for outgoing tell echoes; null until the character is
     // attached, in which case echoes fall back to "You".
@@ -100,6 +107,49 @@ public sealed class ChatLog
         var target = Route(message, type, tellName);
         if (target != null)
             Append(target, type == ChatType.Tell ? Format(TellTabText(message), type) : line);
+
+        var presence = PresenceTab(message);
+        if (presence != null && presence != target)
+            Append(presence, line);
+
+        AppendWhoEcho(message, type, line, target);
+    }
+
+    // Latches the tab that should mirror the reply to the /who the player is about to send.
+    public void ExpectWhoResponse()
+    {
+        _whoTab = Active;
+    }
+
+    // Who reply lines are the only chat-type messages starting with "[MapName]"; any other line
+    // ends the burst, as does the "[Matched N players]" terminator.
+    private void AppendWhoEcho(string message, ChatType type, string line, ChatTab? target)
+    {
+        if (_whoTab == null)
+            return;
+        if (type != ChatType.Chat || !message.StartsWith('['))
+        {
+            _whoTab = null;
+            return;
+        }
+        if (_whoTab != _tabs[0] && _whoTab != target && _tabs.Contains(_whoTab))
+            Append(_whoTab, line);
+        if (message.StartsWith(WhoTerminatorPrefix, StringComparison.Ordinal))
+            _whoTab = null;
+    }
+
+    private ChatTab? PresenceTab(string message)
+    {
+        foreach (var suffix in PresenceSuffixes)
+        {
+            if (!message.EndsWith(suffix, StringComparison.Ordinal))
+                continue;
+            string name = message.Substring(0, message.Length - suffix.Length);
+            if (name.Length == 0)
+                return null;
+            return _tabs.Find(t => t.Kind == ChatTabKind.Tell && string.Equals(t.Label, name, StringComparison.OrdinalIgnoreCase));
+        }
+        return null;
     }
 
     // The tell tab is a 1:1 conversation: drop the [tell from]/[tell to] prefix and show the

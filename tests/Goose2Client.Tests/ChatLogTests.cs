@@ -278,6 +278,142 @@ public class ChatLogTests
     }
 
     [Fact]
+    public void Add_PresenceWithoutOpenTellTab_DoesNotOpenOne()
+    {
+        var log = NewLog(ChatTabKind.System);
+        log.Add("Bob has joined the world.", ChatType.Server);
+        Assert.DoesNotContain(log.Tabs, t => t.Kind == ChatTabKind.Tell);
+        Assert.Single(Tab(log, ChatTabKind.All).Lines);
+        Assert.Single(Tab(log, ChatTabKind.System).Lines);
+    }
+
+    [Theory]
+    [InlineData("Bob has joined the world.")]
+    [InlineData("Bob has left the world.")]
+    public void Add_PresenceMessage_MirrorsIntoOpenTellTab(string message)
+    {
+        var log = NewLog();
+        log.Add("[tell from] Bob: hi", ChatType.Tell, "Bob");
+        log.Add(message, ChatType.Server);
+
+        Assert.Equal(2, TellTab(log, "Bob").Lines.Count);
+        Assert.Equal(ChatLog.Format(message, ChatType.Server), TellTab(log, "Bob").Lines[1]);
+    }
+
+    [Fact]
+    public void Add_PresenceMessage_MatchesTellTabCaseInsensitively()
+    {
+        var log = NewLog();
+        log.Add("[tell from] bob: hi", ChatType.Tell, "bob");
+        log.Add("Bob has left the world.", ChatType.Server);
+        Assert.Equal(2, TellTab(log, "bob").Lines.Count);
+    }
+
+    [Fact]
+    public void Add_PresenceMessage_OtherPlayersTellsUnaffected()
+    {
+        var log = NewLog();
+        log.Add("[tell from] Bob: hi", ChatType.Tell, "Bob");
+        log.Add("[tell from] Ann: hi", ChatType.Tell, "Ann");
+        log.Add("Bob has left the world.", ChatType.Server);
+        Assert.Equal(2, TellTab(log, "Bob").Lines.Count);
+        Assert.Single(TellTab(log, "Ann").Lines);
+    }
+
+    [Fact]
+    public void Add_TellThatReadsLikePresence_ActiveTellTabGetsOneLine()
+    {
+        var log = NewLog();
+        log.Add("[tell to] Bob: hi", ChatType.Tell);
+        log.Activate(TellTab(log, "Bob"));
+        log.Add("Bob has left the world.", ChatType.Tell);
+        Assert.Equal(2, TellTab(log, "Bob").Lines.Count);
+    }
+
+    [Fact]
+    public void ExpectWhoResponse_MirrorsReplyIntoLatchedTab()
+    {
+        var log = NewLog(ChatTabKind.Guild, ChatTabKind.Chat);
+        log.Activate(Tab(log, ChatTabKind.Guild));
+        log.ExpectWhoResponse();
+        log.Add("[Asperetia] Bob (Level 10 Fighter)", ChatType.Chat);
+        log.Add("[Matched 1 players]", ChatType.Chat);
+
+        Assert.Equal(2, Tab(log, ChatTabKind.Guild).Lines.Count);
+        Assert.Equal(2, Tab(log, ChatTabKind.All).Lines.Count);
+        Assert.Equal(2, Tab(log, ChatTabKind.Chat).Lines.Count);
+    }
+
+    [Fact]
+    public void ExpectWhoResponse_FromTellTab_MirrorsIntoConversation()
+    {
+        var log = NewLog();
+        log.Add("[tell to] Bob: hi", ChatType.Tell);
+        log.Activate(TellTab(log, "Bob"));
+        log.ExpectWhoResponse();
+        log.Add("[Asperetia] Bob (Level 10 Fighter)", ChatType.Chat);
+        log.Add("[Matched 1 players]", ChatType.Chat);
+        Assert.Equal(3, TellTab(log, "Bob").Lines.Count);
+    }
+
+    [Fact]
+    public void ExpectWhoResponse_StopsAfterMatchedLine()
+    {
+        var log = NewLog(ChatTabKind.Guild);
+        log.Activate(Tab(log, ChatTabKind.Guild));
+        log.ExpectWhoResponse();
+        log.Add("[Matched 0 players]", ChatType.Chat);
+        log.Add("[Asperetia] Bob (Level 10 Fighter)", ChatType.Chat);
+        Assert.Single(Tab(log, ChatTabKind.Guild).Lines);
+    }
+
+    [Fact]
+    public void ExpectWhoResponse_NonWhoHashLineEndsMirroring()
+    {
+        var log = NewLog(ChatTabKind.Guild);
+        log.Activate(Tab(log, ChatTabKind.Guild));
+        log.ExpectWhoResponse();
+        log.Add("Bob shouts: hello", ChatType.Chat);
+        log.Add("[Asperetia] Bob (Level 10 Fighter)", ChatType.Chat);
+        Assert.Empty(Tab(log, ChatTabKind.Guild).Lines);
+    }
+
+    [Fact]
+    public void ExpectWhoResponse_OtherChannelLineEndsMirroring()
+    {
+        var log = NewLog(ChatTabKind.Guild);
+        log.Activate(Tab(log, ChatTabKind.Guild));
+        log.ExpectWhoResponse();
+        log.Add("saved", ChatType.Server);
+        log.Add("[Asperetia] Bob (Level 10 Fighter)", ChatType.Chat);
+        Assert.Empty(Tab(log, ChatTabKind.Guild).Lines);
+    }
+
+    [Fact]
+    public void ExpectWhoResponse_WhenAllActive_DoesNotDuplicate()
+    {
+        var log = NewLog(ChatTabKind.Guild);
+        log.ExpectWhoResponse();
+        log.Add("[Matched 0 players]", ChatType.Chat);
+        Assert.Single(Tab(log, ChatTabKind.All).Lines);
+        Assert.Equal(1, log.Tabs.Sum(t => t.Lines.Count));
+    }
+
+    [Fact]
+    public void ExpectWhoResponse_TabClosedMidReply_OnlyAllKeepsLine()
+    {
+        var log = NewLog();
+        log.Add("[tell to] Bob: hi", ChatType.Tell);
+        var bob = TellTab(log, "Bob");
+        log.Activate(bob);
+        log.ExpectWhoResponse();
+        log.Close(bob);
+        log.Add("[Matched 0 players]", ChatType.Chat);
+        Assert.Equal(2, Tab(log, ChatTabKind.All).Lines.Count);
+        Assert.Equal(2, log.Tabs.Sum(t => t.Lines.Count));
+    }
+
+    [Fact]
     public void Buffer_CapsAtMaxLines_DroppingOldest()
     {
         var log = NewLog();

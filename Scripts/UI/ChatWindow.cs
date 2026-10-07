@@ -311,6 +311,8 @@ public partial class ChatWindow : BaseWindow
                 GameManager.Instance.NetworkClient.ChatMessage(result.Text!);
                 break;
             case ChatActionKind.Command:
+                if (ChatCommandParser.IsWhoCommand(result.Text!))
+                    _log.ExpectWhoResponse();
                 GameManager.Instance.NetworkClient.Command(result.Text!);
                 break;
             case ChatActionKind.Handler:

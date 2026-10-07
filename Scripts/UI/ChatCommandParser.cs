@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -41,5 +42,11 @@ public static class ChatCommandParser
         if (fullCommand.Length > 0 && fullCommand[0] == '/')
             return new ChatParseResult(ChatActionKind.Command, fullCommand);
         return new ChatParseResult(ChatActionKind.ChatMessage, fullCommand); // e.g. "/h" -> "Hello there!" (NOT truncated, matching Unity)
+    }
+
+    public static bool IsWhoCommand(string command)
+    {
+        int space = command.IndexOf(' ');
+        return (space == -1 ? command : command.Substring(0, space)).Equals("/who", StringComparison.OrdinalIgnoreCase);
     }
 }

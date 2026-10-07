@@ -73,6 +73,25 @@ public class ChatCommandParserTests
         Assert.Equal("/random 1000", result.Text);
     }
 
+    [Theory]
+    [InlineData("/who", true)]
+    [InlineData("/WHO all", true)]
+    [InlineData("/who all bob", true)]
+    [InlineData("/whoami", false)]
+    [InlineData("/tell Bob hi", false)]
+    [InlineData("/w", false)]
+    public void IsWhoCommand_DetectsWhoOnly(string command, bool expected)
+    {
+        Assert.Equal(expected, ChatCommandParser.IsWhoCommand(command));
+    }
+
+    [Fact]
+    public void Parse_SlashAlias_IsRecognisedAsWho()
+    {
+        var result = ChatCommandParser.Parse("/", _aliases, _handlerKeys);
+        Assert.True(ChatCommandParser.IsWhoCommand(result.Text!));
+    }
+
     [Fact]
     public void Parse_Whitespace_ReturnsNone()
     {
