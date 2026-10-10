@@ -63,6 +63,9 @@ namespace Goose2Client
 
         public bool CanSeeInvisible { get; set; }
 
+        public Goose2Client.Character.NameDisplayMode NameDisplay { get; set; } =
+            Goose2Client.Character.NameDisplayMode.PlayersOnly;
+
         private readonly HashSet<int> _partyIds = new();
         private readonly int[] _partySlots = new int[PartyWindow.MaxMembers];
 
@@ -414,6 +417,10 @@ namespace Goose2Client
         public void LoadSettings(string characterName)
         {
             CharacterSettings = new CharacterSettings(characterName);
+            int nd = CharacterSettings.GetOption<int>(Options.NameDisplay, (int)Goose2Client.Character.NameDisplayMode.PlayersOnly);
+            NameDisplay = System.Enum.IsDefined(typeof(Goose2Client.Character.NameDisplayMode), nd)
+                ? (Goose2Client.Character.NameDisplayMode)nd
+                : Goose2Client.Character.NameDisplayMode.PlayersOnly;
             var applier = UiScaleApplier.Instance!;
             var mode = UiScale.NormalizeMode(CharacterSettings.GetOption<int>(Options.UiScaleMode, (int)UiScaleMode.Auto));
             var saved = CharacterSettings.GetOption<float>(Options.UiScaleValue, 1f);
