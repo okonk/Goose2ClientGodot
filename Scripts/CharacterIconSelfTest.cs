@@ -141,7 +141,7 @@ internal static class CharacterIconSelfTest
             gm.PacketManager.Handle("CHI424242,0,0");
             Assert(mm!.GetCharacter(424242) == null, "unknown-login CHI spawned a character");
 
-            gm.PacketManager.Handle($"MKC7,1,Mon,,,0,3,4,1,50,{FixtureBodyId},255,0,0,255,0,0,999,0");
+            gm.PacketManager.Handle($"MKC7,1,Mon,,,0,3,4,1,50,{FixtureBodyId},255,0,0,255,0,0,0,999,0");
             await Frame();
             var mc = mm.GetCharacter(7);
             Assert(mc != null, "MKC did not spawn the character");
