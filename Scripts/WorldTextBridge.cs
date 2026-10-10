@@ -112,6 +112,7 @@ namespace Goose2Client
                 // Roof band must draw above overhead text: the bridge's CanvasLayer can't be z-sorted
                 // under it, so hide the element when a visible roof tile covers the anchor's tile.
                 if (element.AnchorOwner.IsRoofOccluded) { item.Visible = false; continue; }
+                if (element is Goose2Client.Overlays.BridgedNameLabel && !element.AnchorOwner.ShouldShowNameOverhead) { item.Visible = false; continue; }
                 var pos = _worldViewport.WorldToWindow(element.AnchorOwner.GlobalPosition)   // calls the shared forward transform (lockstep with WindowToWorld)
                     + element.LocalOffsetWorld * _worldScale;
                 // Whole window pixels: the anchor projects integrally (snapped character, snapped
