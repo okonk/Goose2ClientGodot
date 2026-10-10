@@ -89,9 +89,9 @@ namespace Goose2Client.UI
 
         public void HideTextTooltip() => _textTooltip.Visible = false;
 
-        public void ShowNameTooltip(Goose2Client.Character.Character? c) { _nameTooltip.SetCharacter(c); _nameTooltip.Visible = c != null; }
+        public void ShowNameTooltip(Goose2Client.Character.Character? c) => _nameTooltip.SetCharacter(c);
 
-        public void HideNameTooltip() => _nameTooltip.Visible = false;
+        public void HideNameTooltip() => _nameTooltip.SetCharacter(null);
 
         public void HideAll()
         {
@@ -99,7 +99,7 @@ namespace Goose2Client.UI
             _spellTooltip.Visible = false;
             _textTooltip.Visible = false;
             _mapItemTooltip.HideTooltip();
-            _nameTooltip.Visible = false;
+            HideNameTooltip();
         }
     }
 }

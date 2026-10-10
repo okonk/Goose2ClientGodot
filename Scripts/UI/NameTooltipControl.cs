@@ -23,13 +23,14 @@ namespace Goose2Client.UI
 
         public override void _Process(double delta)
         {
-            if (_owner == null || !GodotObject.IsInstanceValid(_owner)
-                || !Goose2Client.Character.NameDisplayRule.ShouldShowNameTooltip(
-                       !_owner.IsHiddenFromViewer, _owner.IsRoofOccluded, _owner.ShouldShowNameOverhead))
-            {
-                Visible = false;
-                return;
-            }
+            // A window opened over a motionless cursor produces no input event, so
+            // WorldViewport's gate never ran and the world hover is still live here.
+            var show = _owner != null && GodotObject.IsInstanceValid(_owner)
+                && Goose2Client.Character.NameDisplayRule.ShouldShowNameTooltip(
+                       !_owner.IsHiddenFromViewer, _owner.IsRoofOccluded, _owner.ShouldShowNameOverhead)
+                && !WindowOcclusion.IsPointCovered(GetGlobalMousePosition());
+            if (!show) { Visible = false; return; }
+            Visible = true;
 
             var pad = TooltipMetrics.TextPad(UiScaleApplier.Instance!.Factor);
             Size = _label.GetCombinedMinimumSize() + new Vector2(pad.W, pad.H);
