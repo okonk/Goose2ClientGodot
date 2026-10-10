@@ -7,11 +7,11 @@ namespace Goose2Client.UI
     public partial class NameTooltipControl : Control
     {
         private Label _label = null!;
-        private Goose2Client.Character.Character _owner = null!;
+        private Goose2Client.Character.Character? _owner;
 
         public override void _Ready() => _label = GetNode<Label>("Label");
 
-        public void SetCharacter(Goose2Client.Character.Character c)
+        public void SetCharacter(Goose2Client.Character.Character? c)
         {
             _owner = c;
             if (c != null)

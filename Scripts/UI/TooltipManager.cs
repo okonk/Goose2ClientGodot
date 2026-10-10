@@ -89,7 +89,7 @@ namespace Goose2Client.UI
 
         public void HideTextTooltip() => _textTooltip.Visible = false;
 
-        public void ShowNameTooltip(Goose2Client.Character.Character c) { _nameTooltip.SetCharacter(c); _nameTooltip.Visible = c != null; }
+        public void ShowNameTooltip(Goose2Client.Character.Character? c) { _nameTooltip.SetCharacter(c); _nameTooltip.Visible = c != null; }
 
         public void HideNameTooltip() => _nameTooltip.Visible = false;
 

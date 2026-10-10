@@ -280,11 +280,13 @@ namespace Goose2Client
                 local.Position = (motion.Position - Layout.DisplayOrigin) / (float)Layout.Scale;
                 Current.PushInput(local, true);
                 _forwardingHover = false;
+                GameManager.Instance.CurrentMapManager?.HandleWorldHover(WindowToWorld(motion.Position));
             }
             else if (_mouseInDisplay)
             {
                 _mouseInDisplay = false;
                 Current.NotifyMouseExited();
+                GameManager.Instance.CurrentMapManager?.ClearWorldHover();
             }
         }
 
