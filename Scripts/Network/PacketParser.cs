@@ -102,5 +102,21 @@ namespace Goose2Client.Network
 
             return packet.Length - index;
         }
+
+        public int TokensRemaining()
+        {
+            if (index >= packet.Length)
+                return 0;
+
+            int tokens = 0;
+            for (int i = index; i < packet.Length; i++)
+            {
+                if (packet[i] == Delimeter)
+                    tokens++;
+            }
+
+            // A trailing delimiter closes the last token, it does not open an empty one
+            return packet[packet.Length - 1] == Delimeter ? tokens : tokens + 1;
+        }
     }
 }

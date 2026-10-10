@@ -67,7 +67,13 @@ namespace Goose2Client.Network.Packets
                 packet.HairB = p.GetInt32();
                 packet.HairA = p.GetInt32();
                 packet.Invisible = p.GetInt32();
-                packet.HideName = p.GetInt32() != 0;
+
+                // Older servers omit hide_name, leaving face id, move speed, is_gm and the mount as the tail;
+                // the mount is either "id,*" or "id,r,g,b,a"
+                int mountTokens = p.GetWholePacket().EndsWith('*') ? 2 : 5;
+                if (p.TokensRemaining() > 3 + mountTokens)
+                    packet.HideName = p.GetInt32() != 0;
+
                 packet.FaceId = p.GetInt32();
                 packet.MoveSpeed = p.GetInt32();
                 packet.IsGM = p.GetBool();
@@ -88,10 +94,14 @@ namespace Goose2Client.Network.Packets
                 // hair b
                 // hair a
                 packet.Invisible = p.GetInt32();
-                packet.HideName = p.GetInt32() != 0;
+
+                // Servers without the hide_name field send 2 tokens here (move speed, is_gm), not 3+
+                if (p.TokensRemaining() > 2)
+                    packet.HideName = p.GetInt32() != 0;
+
                 // face id
                 packet.MoveSpeed = p.GetInt32();
-                packet.IsGM = p.GetBool();
+                packet.IsGM = p.TokensRemaining() > 0 && p.GetBool();
                 // mount stuff
             }
 

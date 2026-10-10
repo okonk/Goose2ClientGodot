@@ -129,6 +129,41 @@ namespace Goose2Client.Network.Tests
         }
 
         [Fact]
+        public void TokensRemaining_CountsUnreadTokens()
+        {
+            var parser = new PacketParser("PFX,42,rest", "PFX,");
+            Assert.Equal(2, parser.TokensRemaining());
+
+            parser.GetInt32(); // consumes "42"
+            Assert.Equal(1, parser.TokensRemaining());
+
+            parser.GetString(); // consumes "rest"
+            Assert.Equal(0, parser.TokensRemaining());
+            Assert.Equal(0, parser.LengthRemaining());
+        }
+
+        [Fact]
+        public void TokensRemaining_TrailingDelimiterClosesLastToken()
+        {
+            var parser = new PacketParser("P,0,", "P,");
+            Assert.Equal(1, parser.TokensRemaining());
+        }
+
+        [Fact]
+        public void TokensRemaining_CountsEmptyTokensBetweenDelimiters()
+        {
+            var parser = new PacketParser("P,,value", "P,");
+            Assert.Equal(2, parser.TokensRemaining());
+        }
+
+        [Fact]
+        public void TokensRemaining_ZeroForEmptyPacket()
+        {
+            var parser = new PacketParser("PFX", "PFX");
+            Assert.Equal(0, parser.TokensRemaining());
+        }
+
+        [Fact]
         public void GetWholePacket_ReturnsOriginalPacket()
         {
             var parser = new PacketParser("PFX,42,true,hello", "PFX,");
