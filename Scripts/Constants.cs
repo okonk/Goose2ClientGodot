@@ -151,5 +151,7 @@ namespace Goose2Client
         public const string LockHudWindows = "LockHudWindows";
         /// <summary>Target reticle outline as "#rrggbb" hex; unset means white.</summary>
         public const string TargetBoxColor = "TargetBoxColor";
+        /// <summary>Overhead name display: see <see cref="Goose2Client.Character.NameDisplayMode"/>. Default PlayersOnly.</summary>
+        public const string NameDisplay = "NameDisplay";
     }
 }
