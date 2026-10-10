@@ -100,17 +100,17 @@ public class KeyBindingsSceneTests
     {
         var s = OptionsScene();
         var root = NodeBlock(s, "OptionsWindow");
-        Assert.Contains("offset_bottom = 344.0", root);
+        Assert.Contains("offset_bottom = 372.0", root);
 
         var reset = NodeBlock(s, "ResetLayoutButton");
-        Assert.Contains("offset_top = 312.0", reset);
-        Assert.Contains("offset_bottom = 336.0", reset);
+        Assert.Contains("offset_top = 340.0", reset);
+        Assert.Contains("offset_bottom = 364.0", reset);
         Assert.Contains("text = \"Reset UI Layout\"", reset);
 
         var button = NodeBlock(s, "KeyBindingsButton");
         Assert.Contains("parent=\"Content\"", button);
-        Assert.Contains("offset_top = 312.0", button);
-        Assert.Contains("offset_bottom = 336.0", button);
+        Assert.Contains("offset_top = 340.0", button);
+        Assert.Contains("offset_bottom = 364.0", button);
         Assert.Contains("text = \"Key Bindings\"", button);
         Assert.True(
             s.IndexOf("[node name=\"KeyBindingsButton\"", StringComparison.Ordinal) >

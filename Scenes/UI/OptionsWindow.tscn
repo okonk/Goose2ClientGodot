@@ -51,7 +51,7 @@ layout_mode = 3
 offset_left = 0.0
 offset_top = 0.0
 offset_right = 240.0
-offset_bottom = 344.0
+offset_bottom = 372.0
 WindowName = "Options"
 
 [node name="Background" type="Panel" parent="."]
@@ -269,13 +269,32 @@ mouse_filter = 1
 text = "Target Box Color"
 vertical_alignment = 1
 
-[node name="ResetLayoutButton" type="Button" parent="Content"]
+[node name="NameDisplayLabel" type="Label" parent="Content"]
 layout_mode = 2
 anchors_preset = 0
 offset_left = 8.0
 offset_top = 312.0
-offset_right = 116.0
+offset_right = 96.0
 offset_bottom = 336.0
+mouse_filter = 1
+text = "Name Display"
+vertical_alignment = 1
+
+[node name="NameDisplayOption" type="OptionButton" parent="Content"]
+layout_mode = 2
+anchors_preset = 0
+offset_left = 100.0
+offset_top = 312.0
+offset_right = 232.0
+offset_bottom = 336.0
+
+[node name="ResetLayoutButton" type="Button" parent="Content"]
+layout_mode = 2
+anchors_preset = 0
+offset_left = 8.0
+offset_top = 340.0
+offset_right = 116.0
+offset_bottom = 364.0
 mouse_filter = 1
 text = "Reset UI Layout"
 
@@ -283,9 +302,9 @@ text = "Reset UI Layout"
 layout_mode = 2
 anchors_preset = 0
 offset_left = 124.0
-offset_top = 312.0
+offset_top = 340.0
 offset_right = 232.0
-offset_bottom = 336.0
+offset_bottom = 364.0
 mouse_filter = 1
 text = "Key Bindings"
 

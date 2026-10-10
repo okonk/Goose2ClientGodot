@@ -1,6 +1,7 @@
 using System;
 using Godot;
 using Goose2Client;
+using Goose2Client.Character;
 
 namespace Goose2Client.UI;
 
@@ -32,6 +33,7 @@ public partial class OptionsWindow : BaseWindow
     private ButtonGroup _scaleModeGroup = null!;
     private Button _resetLayoutButton = null!;
     private Button _keyBindingsButton = null!;
+    private OptionButton _nameDisplay = null!;
     private bool _dragging;
     private bool _initializing;
 
@@ -96,6 +98,13 @@ public partial class OptionsWindow : BaseWindow
         _targetColorPickerControl.SetColor(TargetBoxColor.CurrentColor());
         _targetColorPickerControl.ColorChanged += OnTargetColorChanged;
         _targetColorStyle.BgColor = TargetBoxColor.CurrentColor();
+
+        _nameDisplay = GetNode<OptionButton>("Content/NameDisplayOption");
+        foreach (var item in new[] { "Always", "Players only", "Never" })
+            _nameDisplay.AddItem(item);
+        int nd = GameManager.Instance.CharacterSettings.GetOption<int>(Options.NameDisplay, (int)NameDisplayMode.PlayersOnly);
+        _nameDisplay.Selected = System.Enum.IsDefined(typeof(NameDisplayMode), nd) ? nd : (int)NameDisplayMode.PlayersOnly;
+        _nameDisplay.ItemSelected += OnNameDisplayChanged;
 
         _initializing = true;
         _scaleAuto = GetNode<CheckBox>("Content/ScaleAutoCheck");
@@ -178,6 +187,14 @@ public partial class OptionsWindow : BaseWindow
         var cs = GameManager.Instance.CharacterSettings;
         cs.Options[Options.RenderScale] = (int)_renderScaleSlider.Value;
         cs.Save();
+    }
+
+    private void OnNameDisplayChanged(long index)
+    {
+        var cs = GameManager.Instance.CharacterSettings;
+        cs.Options[Options.NameDisplay] = (int)(NameDisplayMode)index;
+        cs.Save();
+        GameManager.Instance.NameDisplay = (NameDisplayMode)index;
     }
 
     private void OnMinimapChanged(bool pressed)

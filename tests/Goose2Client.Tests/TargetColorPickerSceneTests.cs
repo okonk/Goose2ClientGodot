@@ -51,7 +51,7 @@ public class TargetColorPickerSceneTests
     {
         var s = OptionsScene();
         Assert.Contains("offset_top = 284.0", NodeBlock(s, "TargetColorSwatch"));
-        Assert.Contains("offset_top = 312.0", NodeBlock(s, "ResetLayoutButton"));
+        Assert.Contains("offset_top = 340.0", NodeBlock(s, "ResetLayoutButton"));
     }
 
     [Fact]
