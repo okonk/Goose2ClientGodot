@@ -4,6 +4,8 @@ namespace Goose2Client.Overlays
 {
     public partial class ChatBubble : WorldOverlay, IBridgedText
     {
+        private static int _zSequence;
+
         private Panel? _background;
         private Label? _label;
         private Vector2 _bgScreen;
@@ -26,8 +28,10 @@ namespace Goose2Client.Overlays
         public override void _Ready()
         {
             Lifetime = new OverlayLifetime(ChatBubbleLayout.LifetimeSeconds);
-            // Just above name labels (NamesZIndex) so the bubble draws on top of player names (reference: 1002 > 1000).
-            ZIndex = Constants.NamesZIndex + 2;
+            // Godot flattens z across the whole canvas: one shared z pair would draw every
+            // bubble's label over every other bubble's background. Each bubble takes its own
+            // band just above the name labels (background at base, label at base+1).
+            ZIndex = ChatBubbleLayout.ZBandBase(_zSequence++);
             ZAsRelative = false;
         }
 
@@ -65,7 +69,7 @@ namespace Goose2Client.Overlays
             {
                 _background = new Panel
                 {
-                    ZIndex = 20,
+                    // Band +0: must stay within the band's 2-wide window, or it overlaps the next bubble.
                     // A Stop Panel in the root viewport would swallow world clicks — bubble clicks must fall through.
                     MouseFilter = Control.MouseFilterEnum.Ignore,
                 };
@@ -89,7 +93,7 @@ namespace Goose2Client.Overlays
                 _label = new Label
                 {
                     VerticalAlignment = VerticalAlignment.Center,
-                    ZIndex = 21,
+                    ZIndex = 1,   // band +1: above this bubble's background, below the next bubble's band
                     // The wrapped label rect overhangs the background — the transparent overhang must not steal mouse input.
                     MouseFilter = Control.MouseFilterEnum.Ignore,
                 };

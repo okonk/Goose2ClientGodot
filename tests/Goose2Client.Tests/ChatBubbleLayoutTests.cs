@@ -39,4 +39,24 @@ public class ChatBubbleLayoutTests
         l.Advance(0.02);
         Assert.True(l.Expired);
     }
+
+    [Fact]
+    public void ZBandBase_FirstBubbles_SitJustAboveNamesTwoApart()
+    {
+        Assert.Equal(102, ChatBubbleLayout.ZBandBase(0));
+        Assert.Equal(104, ChatBubbleLayout.ZBandBase(1));
+    }
+
+    [Fact]
+    public void ZBandBase_NewerBackgroundClearsOlderLabel()
+    {
+        // Label rides the band at base+1; the next bubble's background must draw fully over it.
+        Assert.True(ChatBubbleLayout.ZBandBase(6) > ChatBubbleLayout.ZBandBase(5) + 1);
+    }
+
+    [Fact]
+    public void ZBandBase_CyclesAfterBandCount()
+    {
+        Assert.Equal(ChatBubbleLayout.ZBandBase(0), ChatBubbleLayout.ZBandBase(ChatBubbleLayout.ZBandCount));
+    }
 }

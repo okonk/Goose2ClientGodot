@@ -19,5 +19,13 @@ namespace Goose2Client.Overlays
         /// <summary>Compute the background Control size from measured text size (text + padding
         /// on every side, so the label is inset by exactly <see cref="Padding"/>).</summary>
         public static Vector2 BackgroundSize(Vector2 textSize) => textSize + Padding * 2;
+
+        public const int ZBandCount = 64;
+
+        /// <summary>Absolute z for bubble #sequence: a 2-wide band (background at base, label at
+        /// base+1) so overlapping bubbles draw as whole units, newest on top, instead of every
+        /// label drawing over every background. Bands cycle after <see cref="ZBandCount"/>.</summary>
+        public static int ZBandBase(int sequence) =>
+            Constants.NamesZIndex + 2 + (int)((uint)sequence % (uint)ZBandCount) * 2;
     }
 }
