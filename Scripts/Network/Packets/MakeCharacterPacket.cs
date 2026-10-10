@@ -32,6 +32,7 @@ namespace Goose2Client.Network.Packets
         public int FaceId { get; set; }
         public int MoveSpeed { get; set; }
         public bool IsGM { get; set; }
+        public bool HideName { get; set; }
 
         public override string Prefix { get; } = "MKC";
 
@@ -66,6 +67,7 @@ namespace Goose2Client.Network.Packets
                 packet.HairB = p.GetInt32();
                 packet.HairA = p.GetInt32();
                 packet.Invisible = p.GetInt32();
+                packet.HideName = p.GetInt32() != 0;
                 packet.FaceId = p.GetInt32();
                 packet.MoveSpeed = p.GetInt32();
                 packet.IsGM = p.GetBool();
@@ -86,6 +88,7 @@ namespace Goose2Client.Network.Packets
                 // hair b
                 // hair a
                 packet.Invisible = p.GetInt32();
+                packet.HideName = p.GetInt32() != 0;
                 // face id
                 packet.MoveSpeed = p.GetInt32();
                 packet.IsGM = p.GetBool();

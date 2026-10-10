@@ -20,6 +20,9 @@ namespace Goose2Client.Character
         public bool IsGM { get; private set; }
         public bool IsInvisible { get; private set; }
         public bool IsHiddenFromViewer { get; private set; }
+        public bool NameHiddenByServer { get; private set; }
+        public bool ShouldShowNameOverhead => NameDisplayRule.ShouldRenderNameOverhead(
+            GameManager.Instance?.NameDisplay ?? NameDisplayMode.PlayersOnly, CharacterType, NameHiddenByServer);
         private bool _hiddenBeforeApply;
 
         public bool IsRoofOccluded
@@ -236,6 +239,7 @@ namespace Goose2Client.Character
 
             IsGM = p.IsGM;
             IsInvisible = p.Invisible != 0;
+            NameHiddenByServer = p.HideName;
             if (EnsureNameLabel() && _nameLabel != null) { _nameLabel.Text = FullName; _nameLabel.Layout(this); }
             UpdateNameColor();
             SetVitals(p.HPPercent, 1f);

@@ -13,7 +13,7 @@ public class CharacterPacketAppearanceTests
         // Weapon (slot 5) stays nonzero so the parser's BodyState correction does not fire.
         var raw = "MKC42,0,Asp,T1,S1,G1,10,20,2,75,10001,10,20,30,40,4,10070,"
             + "11,100,90,80,255,12,90,80,70,255,13,80,70,60,255,14,70,60,50,255,"
-            + "15,60,50,40,255,16,50,40,30,255,111,222,33,44,1,10002,123,1,10040,5,6,7,8";
+            + "15,60,50,40,255,16,50,40,30,255,111,222,33,44,1,0,10002,123,1,10040,5,6,7,8";
         var p = (MakeCharacterPacket)new MakeCharacterPacket().Parse(new PacketParser(raw, "MKC"));
 
         Assert.Equal(42, p.LoginId);
@@ -85,7 +85,7 @@ public class CharacterPacketAppearanceTests
     [Fact]
     public void CompactMkc_Body10100_StaysCompact_AndTrailingFieldsAlign()
     {
-        var raw = "MKC5,1,Compact,,,0,3,4,1,50,10100,255,0,0,255,0,1,777,0";
+        var raw = "MKC5,1,Compact,,,0,3,4,1,50,10100,255,0,0,255,0,1,0,777,0";
         var p = (MakeCharacterPacket)new MakeCharacterPacket().Parse(new PacketParser(raw, "MKC"));
 
         Assert.Equal(5, p.LoginId);
@@ -126,7 +126,7 @@ public class CharacterPacketAppearanceTests
     [Fact]
     public void CompactMkc_Body150_Alignment_Unchanged()
     {
-        var raw = "MKC6,1,Morp,,,0,3,4,1,50,150,255,0,0,255,0,1,555,1";
+        var raw = "MKC6,1,Morp,,,0,3,4,1,50,150,255,0,0,255,0,1,0,555,1";
         var p = (MakeCharacterPacket)new MakeCharacterPacket().Parse(new PacketParser(raw, "MKC"));
 
         Assert.Equal(150, p.BodyId);
