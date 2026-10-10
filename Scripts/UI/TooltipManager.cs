@@ -1,12 +1,13 @@
 using Godot;
 using Goose2Client;
+using Goose2Client.Character;
 using System;
 using System.Collections.Generic;
 
 namespace Goose2Client.UI
 {
     /// <summary>
-    /// Central tooltip manager. Holds four tooltip controls and shows/hides them.
+    /// Central tooltip manager. Holds five tooltip controls and shows/hides them.
     ///
     /// TextTooltipEventHandler replacement: any Control wanting a text tooltip
     /// connects its MouseEntered / MouseExited signals to:
@@ -21,6 +22,9 @@ namespace Goose2Client.UI
         private SpellTooltipControl _spellTooltip = null!;
         private TextTooltipControl _textTooltip = null!;
         private MapItemTooltipControl _mapItemTooltip = null!;
+        private NameTooltipControl _nameTooltip = null!;
+
+        public MapItemTooltipControl MapItemTooltip => _mapItemTooltip;
 
         private List<UiScaleLayout.GeomRecord> _geom = null!;
 
@@ -32,8 +36,9 @@ namespace Goose2Client.UI
             _spellTooltip = GetNode<SpellTooltipControl>("SpellTooltip");
             _textTooltip = GetNode<TextTooltipControl>("TextTooltip");
             _mapItemTooltip = GetNode<MapItemTooltipControl>("MapItemTooltip");
+            _nameTooltip = GetNode<NameTooltipControl>("NameTooltip");
 
-            // The four dynamic tooltip nodes carry ui_scale_skip meta (Tooltips.tscn); the snapshot excludes them.
+            // The five dynamic tooltip nodes carry ui_scale_skip meta (Tooltips.tscn); the snapshot excludes them.
             var applier = UiScaleApplier.Instance!;
             _geom = UiScaleLayout.Snapshot(this);
             applier.RegisterWindow(this);
@@ -84,12 +89,17 @@ namespace Goose2Client.UI
 
         public void HideTextTooltip() => _textTooltip.Visible = false;
 
+        public void ShowNameTooltip(Goose2Client.Character.Character c) { _nameTooltip.SetCharacter(c); _nameTooltip.Visible = c != null; }
+
+        public void HideNameTooltip() => _nameTooltip.Visible = false;
+
         public void HideAll()
         {
             _itemTooltip.Visible = false;
             _spellTooltip.Visible = false;
             _textTooltip.Visible = false;
             _mapItemTooltip.HideTooltip();
+            _nameTooltip.Visible = false;
         }
     }
 }

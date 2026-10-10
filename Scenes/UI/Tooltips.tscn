@@ -1,10 +1,11 @@
-[gd_scene load_steps=7 format=3]
+[gd_scene load_steps=8 format=3]
 
 [ext_resource type="Script" path="res://Scripts/UI/TooltipManager.cs" id="1_manager"]
 [ext_resource type="Script" path="res://Scripts/UI/ItemTooltipControl.cs" id="2_item"]
 [ext_resource type="Script" path="res://Scripts/UI/SpellTooltipControl.cs" id="3_spell"]
 [ext_resource type="Script" path="res://Scripts/UI/TextTooltipControl.cs" id="4_text"]
 [ext_resource type="Script" path="res://Scripts/UI/MapItemTooltipControl.cs" id="5_mapitem"]
+[ext_resource type="Script" path="res://Scripts/UI/NameTooltipControl.cs" id="6_name"]
 
 [sub_resource type="StyleBoxFlat" id="sb_tooltip_bg"]
 content_margin_left = 6.0
@@ -178,3 +179,28 @@ offset_bottom = 40.0
 text = "This item will bind on pickup"
 theme_override_colors/font_color = Color(1, 0.431373, 0.384314, 1)
 visible = false
+
+[node name="NameTooltip" type="Control" parent="."]
+script = ExtResource("6_name")
+layout_mode = 0
+mouse_filter = 2
+visible = false
+metadata/ui_scale_skip = true
+
+[node name="Background" type="Panel" parent="NameTooltip"]
+layout_mode = 0
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+theme_override_styles/panel = SubResource("sb_tooltip_bg")
+
+[node name="Label" type="Label" parent="NameTooltip"]
+layout_mode = 0
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 4.0
+offset_top = 2.0
+offset_right = -4.0
+offset_bottom = -2.0
