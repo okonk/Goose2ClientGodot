@@ -47,7 +47,10 @@ namespace Goose2Client.UI
 
             var item = TooltipManager.Instance?.MapItemTooltip;
             if (item != null && item.Visible)
-                y = item.GlobalPosition.Y + item.Size.Y + 2f;
+            {
+                y = item.GlobalPosition.Y - Size.Y - 2f;
+                if (y < 0) y = item.GlobalPosition.Y + item.Size.Y + 2f;
+            }
 
             if (y + Size.Y > vp.Y) y = vp.Y - Size.Y;
             GlobalPosition = new Vector2(x, y);
