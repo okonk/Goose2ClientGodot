@@ -43,18 +43,28 @@ covered by a visible roof band shows neither overhead name nor tooltip.
 
 ## Wire format
 
-`HideName` rides as a new **trailing field on MKC** (the character-spawn packet), after the
-mount data, so no existing positional field shifts. It is static template data fixed at spawn,
-so **CHP is unchanged** and the client's CHP parser is untouched.
+`HideName` rides on **MKC** (the character-spawn packet) as a new field **immediately after the
+existing `Invisible` field**, read explicitly in both the layered and monster parse branches. It
+is static template data fixed at spawn, so **CHP is unchanged** and the client's CHP parser is
+untouched.
 
-- Server emits `...,<hideName>` (0/1) on every MKC builder. Players and pets emit `0`; NPCs
-  emit their `hide_name` value.
-- Client reads the trailing token as the last field in both the layered and monster branches,
-  guarded by `p.LengthRemaining() > 0` so a packet from a server without the field defaults to
-  `false` (not hidden).
+A *trailing* field was considered and rejected: the client's mount parser consumes only one token
+for a zero-id mount (`MakeCharacterPacket.cs:117`) while the server emits `"0,*"` (players) or
+`"0,0,0,0,0"` (NPCs), leaving unconsumed trailing tokens — a field appended at the end would be
+mis-read. Placing `HideName` right after `Invisible` (a position both sides read by name) avoids
+that and keeps every later field aligned by symmetric insertion.
 
-The value is only ever set from NPC data today (see Server section); the player/pet `0` keeps
-the wire uniform and leaves room for a future per-player source.
+- Server emits `...,<invis>,<hideName>,...` (0/1) in every MKC builder. Players and pets emit `0`;
+  NPCs emit their `hide_name` value.
+- Client reads `packet.HideName = p.GetInt32() != 0;` right after `packet.Invisible = p.GetInt32();`
+  in both the layered and monster branches.
+
+**Deployment:** because the field is positional (mid-packet), client and server must deploy
+together — a new client against an old server (no field) would mis-parse subsequent fields. This
+is an accepted, coordinated change.
+
+The value is only ever set from NPC data today (see Server section); the player/pet `0` keeps the
+wire uniform and leaves room for a future per-player source.
 
 ## Client components
 
@@ -109,8 +119,8 @@ the dropdown updates overhead names instantly with no explicit refresh.
 
 ### 6. Packet parse
 
-`Scripts/Network/Packets/MakeCharacterPacket.cs`: after the existing fields, read `HideName` as
-the final token in both the layered and monster branches, guarded by `LengthRemaining()`.
+`Scripts/Network/Packets/MakeCharacterPacket.cs`: add `packet.HideName = p.GetInt32() != 0;`
+immediately after `packet.Invisible = p.GetInt32();` in both the layered and monster branches.
 `Character.SetAppearance(MakeCharacterPacket)` sets `NameHiddenByServer` from it.
 
 ## Server components (`illutiagooseserver`)
@@ -134,8 +144,9 @@ regenerated from CSV each run, so no `ALTER TABLE` migration is needed. The sour
 
 ### 2. Packet emission
 
-`Goose/Packets.cs`: append the trailing `HideName` field to `MakeCharacter`, `MakeNPCCharacter`,
-and `MakePetCharacter` (players/pets emit `0`). `UpdateCharacter` / `UpdateNPC` (CHP) unchanged.
+`Goose/Packets.cs`: insert the `HideName` field immediately after the `Invisible` field in
+`MakeCharacter`, `MakeNPCCharacter`, and `MakePetCharacter` (players/pets emit `0`).
+`UpdateCharacter` / `UpdateNPC` (CHP) unchanged.
 
 ## Tests
 

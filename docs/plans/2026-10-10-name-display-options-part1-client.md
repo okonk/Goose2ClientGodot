@@ -165,8 +165,8 @@ In `LoadSettings` (`Scripts/GameManager.cs:416`, after `CharacterSettings = new 
 - Important readers: `Character.ShouldShowNameOverhead` (this task) consumed by `WorldTextBridge` (Task 4) and the tooltip (Task 7).
 - Derived/cached state: none; `ShouldShowNameOverhead` is computed on read.
 - Propagation: `SetAppearance(MakeCharacterPacket)` sets `NameHiddenByServer`; the bridge reflects it on its next frame (no notify).
-- Invariants: a packet without the trailing field → `HideName == false` (backward compatible); the value is fixed at spawn (CHP does not carry it).
-- Observable proof: parse tests assert the final `HideName` value with and without the field, in both layered and monster branches; the existing `CharacterPacketInvisibleTests` / `CharacterPacketAppearanceTests` (no trailing field) must stay green.
+- Invariants: `HideName` is read at a fixed position (right after `Invisible`) in both branches; the value is fixed at spawn (CHP does not carry it). Client and server must deploy together — a new client against an old server (no field) would mis-parse later fields.
+- Observable proof: parse tests assert the final `HideName` value in both layered and monster branches; the updated `FaceId`/`MoveSpeed`/`IsGM` assertions in the existing fixtures prove the new token did not shift later fields.
 
 **Step 1: Write the failing test**
 
@@ -181,37 +181,31 @@ namespace Goose2Client.Network.Packets.Tests;
 
 public class CharacterPacketHideNameTests
 {
-    // Layered player MKC (reuses the appearance-test sample) with HideName=1 appended after mount.
+    // Layered player MKC (appearance-test sample) with HideName=1 inserted right after Invisible
+    // (the token between the hair-rgba "44,1" and FaceId 10002).
     [Fact]
-    public void LayeredMkc_TrailingHideName1_IsParsed()
+    public void LayeredMkc_HideNameAfterInvisible_IsParsed()
     {
         var raw = "MKC42,1,Asp,T1,S1,G1,10,20,2,75,10001,10,20,30,40,4,10070,"
             + "11,100,90,80,255,12,90,80,70,255,13,80,70,60,255,14,70,60,50,255,"
-            + "15,60,50,40,255,16,50,40,30,255,111,222,33,44,1,10002,123,1,10040,5,6,7,8,1";
+            + "15,60,50,40,255,16,50,40,30,255,111,222,33,44,1,1,10002,123,1,10040,5,6,7,8";
         var p = (MakeCharacterPacket)new MakeCharacterPacket().Parse(new PacketParser(raw, "MKC"));
+        Assert.Equal(1, p.Invisible);
         Assert.True(p.HideName);
+        Assert.Equal(10002, p.FaceId);      // guards correct token placement
+        Assert.Equal(123, p.MoveSpeed);
     }
 
+    // Monster (non-layered, body 150) MKC: Invisible=0, HideName=1, MoveSpeed=320, IsGM=0.
     [Fact]
-    public void MonsterMkc_TrailingHideName1_IsParsed()
+    public void MonsterMkc_HideNameAfterInvisible_IsParsed()
     {
-        // Known-good monster MKC from CharacterPacketInvisibleTests, with HideName=1 appended after IsGM.
-        var raw = "MKC7,1,Mon,,,0,3,4,1,50,255,0,0,255,0,1,999,1,1";
+        var raw = "MKC7,2,Mon,,,,1,1,1,100,150,0,0,0,0,3,0,1,320,0";
         var p = (MakeCharacterPacket)new MakeCharacterPacket().Parse(new PacketParser(raw, "MKC"));
-        Assert.Equal(999, p.MoveSpeed);
-        Assert.True(p.IsGM);
+        Assert.Equal(0, p.Invisible);
         Assert.True(p.HideName);
-    }
-
-    // Regression: an older server sends no trailing field -> defaults false, existing fields intact.
-    [Fact]
-    public void Mkc_NoTrailingHideName_DefaultsFalse()
-    {
-        var raw = "MKC7,1,Mon,,,0,3,4,1,50,255,0,0,255,0,1,999,1";   // identical to the invisible-test string
-        var p = (MakeCharacterPacket)new MakeCharacterPacket().Parse(new PacketParser(raw, "MKC"));
-        Assert.False(p.HideName);
-        Assert.Equal(999, p.MoveSpeed);
-        Assert.True(p.IsGM);
+        Assert.Equal(320, p.MoveSpeed);
+        Assert.False(p.IsGM);
     }
 }
 ```
@@ -220,10 +214,10 @@ public class CharacterPacketHideNameTests
 
 **Step 3: Implement**
 
-`MakeCharacterPacket.cs`: add property `public bool HideName { get; set; }` near `IsGM` (`:34`). Before `return packet` (`:95`), after the layered/non-layered `if/else`, add a single guarded read (both branches end immediately before the trailing field — layered after mount `:74`, non-layered after `IsGM` `:91`):
+`MakeCharacterPacket.cs`: add property `public bool HideName { get; set; }` near `IsGM` (`:34`). Read it immediately after `Invisible` in **both** branches — layered (`:68`) and monster (`:88`) — so the field sits at a fixed position and every later field stays aligned:
 
 ```csharp
-            if (p.LengthRemaining() > 0)
+                packet.Invisible = p.GetInt32();
                 packet.HideName = p.GetInt32() != 0;
 ```
 
@@ -241,9 +235,16 @@ In `SetAppearance(MakeCharacterPacket)` set it alongside `IsInvisible` (`Charact
             NameHiddenByServer = p.HideName;
 ```
 
-**Step 4: Run to verify it passes (green)** — `dotnet test tests/Goose2Client.Tests --filter "CharacterPacketHideNameTests|CharacterPacketInvisibleTests|CharacterPacketAppearanceTests"` (all pass; the no-field regression proves the guard).
+**Step 4: Update the existing MKC fixtures for the new field position**
 
-**Step 5: Commit** — `git commit -am "feat(names): parse MKC HideName into Character.NameHiddenByServer"`.
+The wire format changed, so the two existing MKC fixtures must carry the `HideName` token right after `Invisible` (CHP fixtures are unchanged — CHP does not carry the field):
+
+- `tests/Goose2Client.Tests/CharacterPacketAppearanceTests.cs:13` (layered MKC): insert `0` between the Invisible `1` and FaceId `10002` → `...,44,1,0,10002,...`. All existing field assertions must still pass.
+- `tests/Goose2Client.Tests/CharacterPacketInvisibleTests.cs:12` (monster MKC): insert `0` immediately before the MoveSpeed `999` (i.e. right after Invisible) → `...,0,1,0,999,1`. The existing `Invisible`/`MoveSpeed`/`IsGM` assertions guard correct placement.
+
+**Step 5: Run the full suite (green)** — `dotnet test tests/Goose2Client.Tests`. All 1552+ tests pass; the unchanged `FaceId`/`MoveSpeed`/`IsGM` assertions in the updated fixtures prove the new token did not shift anything.
+
+**Step 6: Commit** — `git commit -am "feat(names): parse MKC HideName after Invisible into Character.NameHiddenByServer"`.
 
 ---
 
@@ -494,8 +495,8 @@ In the exit branch (`:284`, alongside `NotifyMouseExited`):
 | PlayersOnly shows overhead only for `CharacterType.Player` | same theory, `PlayersOnly` rows |
 | Tooltip is the fallback (never when overhead shown) | `ShouldShowNameTooltip_MatchesTruthTable` |
 | Tooltip suppressed under roof / when hidden-from-viewer | same theory |
-| MKC without the trailing field defaults to not-hidden (old server) | `CharacterPacketHideNameTests.Mkc_NoTrailingHideName_DefaultsFalse` + existing invisible/appearance MKC tests stay green |
-| MKC trailing field parsed in layered and monster branches | `LayeredMkc_TrailingHideName1_IsParsed`, `MonsterMkc_TrailingHideName1_IsParsed` |
+| `HideName` read at fixed position (after `Invisible`) without shifting later fields | `LayeredMkc_HideNameAfterInvisible_IsParsed` (asserts `FaceId`/`MoveSpeed`), updated appearance/invisible fixtures |
+| MKC `HideName` parsed in layered and monster branches | `LayeredMkc_HideNameAfterInvisible_IsParsed`, `MonsterMkc_HideNameAfterInvisible_IsParsed` |
 | Live mode change reflects without relog | manual smoke (Task 5/7); bridge re-reads `ShouldShowNameOverhead` each frame (Task 4) |
 
 ## Deferred
