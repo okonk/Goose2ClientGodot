@@ -108,8 +108,9 @@ internal static class KeyBindingsSelfTest
         await Frame();
         gm.EnsureHud();
         await Frame();
+        var hud = gm.Hud!;
 
-        Assert(catalog.Count == 48, $"catalog must define 48 actions, found {catalog.Count}");
+        Assert(catalog.Count == 49, $"catalog must define 49 actions, found {catalog.Count}");
         var factory = service.FactoryDefaults;
         foreach (var action in catalog)
         {
@@ -127,7 +128,24 @@ internal static class KeyBindingsSelfTest
             "Hotkey1 factory default must be the physical 1 key");
         Assert(factory.GetBindings("ToggleFullscreen")[0] is InputBinding.Keyboard { PhysicalKey: Key.Enter, Alt: true },
             "ToggleFullscreen factory default must be the Alt+Enter chord");
-        GD.Print("[key_bindings_selftest] OK factory capture covers all 48 actions with physical-key defaults");
+        Assert(factory.GetBindings("CycleHotbarPageReverse")[0] is InputBinding.Keyboard { PhysicalKey: Key.Tab, Shift: true },
+            "CycleHotbarPageReverse factory default must be the Shift+Tab chord");
+        GD.Print("[key_bindings_selftest] OK factory capture covers all 49 actions with physical-key defaults");
+
+        Assert(!(tree.Root.GuiGetFocusOwner() is LineEdit), "no text field may hold focus for the hotbar dispatch check");
+        var hotbar = hud.Hotbar;
+        var hotbarPages = hotbar.GetNode<Control>("Content/Pages");
+        bool PageVisible(int index) => hotbarPages.GetNode<Control>($"Page{index}").Visible;
+        Assert(PageVisible(0) && !PageVisible(1) && !PageVisible(2), "the hotbar must start on page 0");
+        hud._UnhandledInput(new InputEventKey { PhysicalKeycode = Key.Tab, Pressed = true });
+        Assert(PageVisible(1), "Tab must cycle the hotbar forwards");
+        hud._UnhandledInput(new InputEventKey { PhysicalKeycode = Key.Tab, ShiftPressed = true, Pressed = true });
+        Assert(PageVisible(0), "Shift+Tab must cycle the hotbar backwards");
+        hud._UnhandledInput(new InputEventKey { PhysicalKeycode = Key.Tab, ShiftPressed = true, Pressed = true });
+        Assert(PageVisible(2), "Shift+Tab must wrap backwards from the first page");
+        hud._UnhandledInput(new InputEventKey { PhysicalKeycode = Key.Tab, Pressed = true });
+        Assert(PageVisible(0), "Tab must wrap forwards from the last page");
+        GD.Print("[key_bindings_selftest] OK Tab cycles the hotbar forwards and Shift+Tab backwards");
 
         var draft = new Dictionary<string, IReadOnlyList<InputBinding>>(catalog.Count);
         foreach (var action in catalog)
@@ -216,7 +234,6 @@ internal static class KeyBindingsSelfTest
         leaseSlot.Value = null;
         GD.Print("[key_bindings_selftest] OK wheel capture restores on the following process frame");
 
-        var hud = gm.Hud!;
         int windowCount = 0;
         foreach (var child in hud.GetChildren())
             if (child is KeyBindingsWindow) windowCount++;
@@ -286,18 +303,18 @@ internal static class KeyBindingsSelfTest
             return (rows, chips);
         }
 
-        Assert(CountRowsAndChips() == (48, expectedChips), "all 48 rows and every applied chip must be present at 1x");
+        Assert(CountRowsAndChips() == (49, expectedChips), "all 49 rows and every applied chip must be present at 1x");
         applier.Apply(2f, ApplyReason.UserCommit);
         await Frame();
         Assert(kb.Size == new Vector2(Canvas.X, Canvas.Y), $"2x size {kb.Size} must clamp to the canvas");
-        Assert(CountRowsAndChips() == (48, expectedChips), "rows and chips must survive 2x");
+        Assert(CountRowsAndChips() == (49, expectedChips), "rows and chips must survive 2x");
         Assert(kb.Position.X >= 0 && kb.Position.Y >= 0
             && kb.Position.X + kb.Size.X <= Canvas.X && kb.Position.Y + kb.Size.Y <= Canvas.Y,
             $"window rect {kb.Position}+{kb.Size} must stay within the root canvas at 2x");
         applier.Apply(1f, ApplyReason.UserCommit);
         await Frame();
         Assert(kb.Size == KeyBindingsLayout.DesignSize, $"1x size {kb.Size} must restore the design size");
-        Assert(CountRowsAndChips() == (48, expectedChips), "rows and chips must survive the 1x/2x/1x round trip");
+        Assert(CountRowsAndChips() == (49, expectedChips), "rows and chips must survive the 1x/2x/1x round trip");
         kb.GetNode<Button>("Content/RootBox/FooterRow/CancelButton").EmitSignal("pressed");
         Assert(!kb.Visible, "Cancel must close the window after the scale round trip");
         GD.Print("[key_bindings_selftest] OK dynamic rows/chips survive 1x/2x/1x and the window stays in the canvas");

@@ -151,6 +151,8 @@ public partial class GameHud : Control
             Character.Toggle();
         else if (@event.IsActionPressed("CycleHotbarPage", exactMatch: true))
             Hotbar.CyclePage();
+        else if (@event.IsActionPressed("CycleHotbarPageReverse", exactMatch: true))
+            Hotbar.CyclePageReverse();
         else if (@event.IsActionPressed("ToggleMount", exactMatch: true))
             Hotbar.ToggleMount();
         else if (@event.IsActionPressed("PickUp", exactMatch: true))

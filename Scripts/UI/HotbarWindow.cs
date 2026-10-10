@@ -317,6 +317,8 @@ public partial class HotbarWindow : BaseWindow, IWindow
 
     public void CyclePage() => OnNextClicked();
 
+    public void CyclePageReverse() => ChangePage((_pageIndex - 1 + PageCount) % PageCount);
+
     private void ChangePage(int newIndex)
     {
         if (_pageIndex == newIndex) return;

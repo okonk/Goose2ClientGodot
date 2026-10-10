@@ -62,7 +62,7 @@ public class KeyBindingInputContractTests
     {
         string hud = Read("Scripts/UI/GameHud.cs");
         AssertEveryLiteralCallIsExactAndCataloged(hud, "GameHud.cs");
-        foreach (var action in new[] { "ToggleInventory", "ToggleSpellbook", "CycleHotbarPage", "StartChat", "EmoteHeart", "EmoteDollar" })
+        foreach (var action in new[] { "ToggleInventory", "ToggleSpellbook", "CycleHotbarPage", "CycleHotbarPageReverse", "StartChat", "EmoteHeart", "EmoteDollar" })
             Assert.Contains($"IsActionPressed(\"{action}\", exactMatch: true)", hud);
     }
 

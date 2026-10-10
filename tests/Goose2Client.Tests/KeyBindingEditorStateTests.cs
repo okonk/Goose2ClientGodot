@@ -284,7 +284,7 @@ public class KeyBindingEditorStateTests : IDisposable
 
         var group = Assert.Single(editor.Groups);
         Assert.Equal("Hotbar", group.Category);
-        Assert.Equal(11, group.Rows.Count);
+        Assert.Equal(12, group.Rows.Count);
     }
 
     [Theory]

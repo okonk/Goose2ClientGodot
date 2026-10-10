@@ -15,7 +15,7 @@ public class InputActionCatalogTests
         "MoveUp", "MoveDown", "MoveLeft", "MoveRight",
         "Attack", "PickUp", "ToggleMount",
         "ToggleInventory", "ToggleSpellbook", "ToggleCharacterWindow", "ToggleChat",
-        "Hotkey1", "Hotkey2", "Hotkey3", "Hotkey4", "Hotkey5", "Hotkey6", "Hotkey7", "Hotkey8", "Hotkey9", "Hotkey0", "CycleHotbarPage",
+        "Hotkey1", "Hotkey2", "Hotkey3", "Hotkey4", "Hotkey5", "Hotkey6", "Hotkey7", "Hotkey8", "Hotkey9", "Hotkey0", "CycleHotbarPage", "CycleHotbarPageReverse",
         "StartChat", "SlashCommand", "GuildCommand", "TellCommand", "ReplyCommand", "ScrollChatUp", "ScrollChatDown",
         "TargetUp", "TargetDown", "ConfirmTarget", "TargetHome", "CancelTarget",
         "EmoteHeart", "EmoteQuestion", "EmoteDots", "EmotePoop", "EmoteSurprised", "EmoteSleep",
@@ -30,7 +30,7 @@ public class InputActionCatalogTests
         ["ToggleInventory"] = "Windows", ["ToggleSpellbook"] = "Windows", ["ToggleCharacterWindow"] = "Windows", ["ToggleChat"] = "Windows",
         ["Hotkey1"] = "Hotbar", ["Hotkey2"] = "Hotbar", ["Hotkey3"] = "Hotbar", ["Hotkey4"] = "Hotbar",
         ["Hotkey5"] = "Hotbar", ["Hotkey6"] = "Hotbar", ["Hotkey7"] = "Hotbar", ["Hotkey8"] = "Hotbar",
-        ["Hotkey9"] = "Hotbar", ["Hotkey0"] = "Hotbar", ["CycleHotbarPage"] = "Hotbar",
+        ["Hotkey9"] = "Hotbar", ["Hotkey0"] = "Hotbar", ["CycleHotbarPage"] = "Hotbar", ["CycleHotbarPageReverse"] = "Hotbar",
         ["StartChat"] = "Chat", ["SlashCommand"] = "Chat", ["GuildCommand"] = "Chat", ["TellCommand"] = "Chat", ["ReplyCommand"] = "Chat",
         ["ScrollChatUp"] = "Chat", ["ScrollChatDown"] = "Chat",
         ["TargetUp"] = "Targeting", ["TargetDown"] = "Targeting", ["ConfirmTarget"] = "Targeting",
@@ -43,11 +43,11 @@ public class InputActionCatalogTests
     };
 
     [Fact]
-    public void Catalog_ContainsExactlyThe48ApprovedActions_InDesignCategoryAndDisplayOrder()
+    public void Catalog_ContainsExactlyThe49ApprovedActions_InDesignCategoryAndDisplayOrder()
     {
         var actions = InputActionCatalog.Actions;
 
-        Assert.Equal(48, actions.Count);
+        Assert.Equal(49, actions.Count);
         Assert.Equal(ExpectedActions, actions.Select(a => a.Name).ToArray());
 
         foreach (var action in actions)

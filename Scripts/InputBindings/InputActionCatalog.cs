@@ -61,6 +61,8 @@ public static class InputActionCatalog
             [new(BindingContext.Normal, "HotbarSlot10"), new(BindingContext.Targeting, "TargetConfirm")]),
         new("CycleHotbarPage", "Cycle Hotbar Page", "Hotbar",
             [new(BindingContext.Normal, "CycleHotbarPage")]),
+        new("CycleHotbarPageReverse", "Reverse Hotbar Page", "Hotbar",
+            [new(BindingContext.Normal, "CycleHotbarPageReverse")]),
         new("StartChat", "Start Chat", "Chat",
             [new(BindingContext.Normal, "StartChat")]),
         new("SlashCommand", "Slash Command", "Chat",
