@@ -34,6 +34,7 @@ public partial class OptionsWindow : BaseWindow
     private Button _resetLayoutButton = null!;
     private Button _keyBindingsButton = null!;
     private OptionButton _nameDisplay = null!;
+    private CheckBox _combineBattleText = null!;
     private bool _dragging;
     private bool _initializing;
 
@@ -105,6 +106,11 @@ public partial class OptionsWindow : BaseWindow
         int nd = GameManager.Instance.CharacterSettings.GetOption<int>(Options.NameDisplay, (int)NameDisplayMode.PlayersOnly);
         _nameDisplay.Selected = System.Enum.IsDefined(typeof(NameDisplayMode), nd) ? nd : (int)NameDisplayMode.PlayersOnly;
         _nameDisplay.ItemSelected += OnNameDisplayChanged;
+
+        _combineBattleText = GetNode<CheckBox>("Content/CombineBattleTextCheck");
+        _combineBattleText.ButtonPressed = GameManager.Instance.CharacterSettings
+            .GetOption<bool>(Options.CombineBattleText, true);
+        _combineBattleText.Toggled += OnCombineBattleTextChanged;
 
         _initializing = true;
         _scaleAuto = GetNode<CheckBox>("Content/ScaleAutoCheck");
@@ -195,6 +201,14 @@ public partial class OptionsWindow : BaseWindow
         cs.Options[Options.NameDisplay] = (int)(NameDisplayMode)index;
         cs.Save();
         GameManager.Instance.NameDisplay = (NameDisplayMode)index;
+    }
+
+    private void OnCombineBattleTextChanged(bool pressed)
+    {
+        var cs = GameManager.Instance.CharacterSettings;
+        cs.Options[Options.CombineBattleText] = pressed;
+        cs.Save();
+        GameManager.Instance.CombineBattleText = pressed;
     }
 
     private void OnMinimapChanged(bool pressed)

@@ -57,6 +57,7 @@ namespace Goose2Client.Character
         private static readonly Color MpColor = new(0.1254902f, 0.23529412f, 0.5019608f);
         private const float BarWidth = 32f;
         private Goose2Client.Overlays.BattleText? _battleText;
+        private Overlays.BattleTextManager<Overlays.BattleTextLine>? _battleTextManager;
         private Overlays.ChatBubble? _chatBubble;
         private Overlays.EmoteAnimation? _emote;
         private readonly HealthBarAutoHide _healthBarAutoHide = new();
@@ -586,6 +587,9 @@ namespace Goose2Client.Character
             UpdateTileMovement(delta);
             TickAttackLock(delta);   // defined in Task 8
             ApplyBarVisibility();
+            if (_battleTextManager != null)
+                foreach (var (_, line) in _battleTextManager.Tick(delta))
+                    if (GodotObject.IsInstanceValid(line)) line.BeginRise();
         }
 
         /// <summary>Sole writer of the character's world position. Keeps the exact fractional
@@ -837,6 +841,33 @@ namespace Goose2Client.Character
                 _battleText = new Overlays.BattleText { Name = "BattleText", ZIndex = 20 };
                 _battleText.LocalOffsetWorld = new Vector2(0, -40);
                 bridge.Register(_battleText, this);
+            }
+            _battleTextManager ??= new();
+            if (GameManager.Instance.CombineBattleText && Overlays.BattleTextMergeRule.TryGet(type, text, out var key, out var value))
+            {
+                void SpawnStart(string displayText)
+                {
+                    var line = _battleText!.AddText(type, displayText, Height, bridge.DisplayScale, bridge.WorldScale, accumulating: true);
+                    if (line != null) _battleTextManager!.Attach(key, line);
+                    else _battleTextManager!.Cancel(key);
+                }
+
+                var result = _battleTextManager.OnPacket(key, value);
+                if (result.Action == Overlays.BattleTextMergeAction.Start)
+                {
+                    SpawnStart(result.DisplayText);
+                    return;
+                }
+                if (_battleTextManager.TryGetHandle(key, out var handle)
+                    && GodotObject.IsInstanceValid(handle) && handle.GetParent() == _battleText)
+                {
+                    handle.SetAccumulatedText(result.DisplayText);
+                    return;
+                }
+                // The handle may point into a previously freed container; the parent check verifies the line still belongs to the current one.
+                _battleTextManager.Cancel(key);
+                SpawnStart(_battleTextManager.OnPacket(key, value).DisplayText);
+                return;
             }
             _battleText.AddText(type, text, Height, bridge.DisplayScale, bridge.WorldScale);
         }

@@ -51,7 +51,7 @@ layout_mode = 3
 offset_left = 0.0
 offset_top = 0.0
 offset_right = 240.0
-offset_bottom = 372.0
+offset_bottom = 400.0
 WindowName = "Options"
 
 [node name="Background" type="Panel" parent="."]
@@ -288,13 +288,23 @@ offset_top = 312.0
 offset_right = 232.0
 offset_bottom = 336.0
 
-[node name="ResetLayoutButton" type="Button" parent="Content"]
+[node name="CombineBattleTextCheck" type="CheckBox" parent="Content"]
 layout_mode = 2
 anchors_preset = 0
 offset_left = 8.0
 offset_top = 340.0
-offset_right = 116.0
+offset_right = 232.0
 offset_bottom = 364.0
+mouse_filter = 1
+text = "Combine damage & heal numbers"
+
+[node name="ResetLayoutButton" type="Button" parent="Content"]
+layout_mode = 2
+anchors_preset = 0
+offset_left = 8.0
+offset_top = 368.0
+offset_right = 116.0
+offset_bottom = 392.0
 mouse_filter = 1
 text = "Reset UI Layout"
 
@@ -302,9 +312,9 @@ text = "Reset UI Layout"
 layout_mode = 2
 anchors_preset = 0
 offset_left = 124.0
-offset_top = 340.0
+offset_top = 368.0
 offset_right = 232.0
-offset_bottom = 364.0
+offset_bottom = 392.0
 mouse_filter = 1
 text = "Key Bindings"
 
