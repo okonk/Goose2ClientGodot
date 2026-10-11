@@ -12,6 +12,8 @@ public class BattleTextMergeRuleTests
     [InlineData(BattleTextType.Green8, "+456", 456L, "")]
     [InlineData(BattleTextType.Yellow60, "+1 234 XP", 1234L, "XP")]
     [InlineData(BattleTextType.Yellow60, "+1,234 XP", 1234L, "XP")]
+    [InlineData(BattleTextType.Yellow60, "+1 234 567 XP", 1234567L, "XP")]
+    [InlineData(BattleTextType.Yellow60, "1234 567", 1234L, "567")]
     [InlineData(BattleTextType.Yellow60, "123", 123L, "")]
     public void TryGet_ParsesValueAndSuffix(BattleTextType type, string text, long value, string suffix)
     {
@@ -37,6 +39,7 @@ public class BattleTextMergeRuleTests
     [InlineData(BattleTextType.Yellow60, "Fizzle")]
     [InlineData(BattleTextType.Yellow60, "+1,2,3")]
     [InlineData(BattleTextType.Yellow60, "+1,23")]
+    [InlineData(BattleTextType.Yellow60, "1234,567")]
     [InlineData(BattleTextType.Yellow60, "12KB")]
     [InlineData(BattleTextType.Yellow60, "5s ")]
     [InlineData(BattleTextType.Yellow60, "1m 5s ")]

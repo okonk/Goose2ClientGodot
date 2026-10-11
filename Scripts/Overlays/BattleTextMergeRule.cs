@@ -39,13 +39,14 @@ namespace Goose2Client.Overlays
 
             int firstGroup = 0;
             int digits = 0;
+            bool inFirstGroup = true;
             while (i < text.Length)
             {
                 char c = text[i];
                 if (c >= '0' && c <= '9')
                 {
                     digits++;
-                    if (firstGroup < 3)
+                    if (inFirstGroup)
                     {
                         firstGroup++;
                     }
@@ -63,7 +64,7 @@ namespace Goose2Client.Overlays
                     {
                         break;
                     }
-                    firstGroup = 3;
+                    inFirstGroup = false;
                     i += 4;
                     continue;
                 }
