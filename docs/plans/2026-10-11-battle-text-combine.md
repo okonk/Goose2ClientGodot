@@ -8,7 +8,7 @@
 
 Design doc: `docs/plans/2026-10-11-battle-text-combine-design.md`.
 
-**Comment policy:** per `AGENTS.md`, add no comments/doc strings unless the "why" is non-obvious.
+**Comment policy:** per `AGENTS.md`, no comments or doc strings in new/modified code **including tests**. The snippets below carry a few explanatory `//` marks for review; drop them when implementing, keeping at most the two non-obvious ones (the space-group-separator reason in the parse rule, the container-identity reason in the glue).
 
 ---
 
@@ -19,7 +19,13 @@ Design doc: `docs/plans/2026-10-11-battle-text-combine-design.md`.
 - `Character.AddBattleText` (container lazy-create) — `Scripts/Character/Character.cs:832-842`; `Character._Process` (unconditional) — `Character.cs:583-589`.
 - `BattleText.AddText(BattleTextType, string, int, float, float)` — `Scripts/Overlays/BattleText.cs:26-56`; 18-line cap at `BattleText.cs:28`; push-up via `CurrentScreenOffsetY()`/`PlanPushUps` at `BattleText.cs:36-49`.
 - `BattleTextLine` — `Scripts/Overlays/BattleTextLine.cs`: `LabelWidth=100`/`LabelHeight=16` (:7-8), `Initialize` (:15-32, sets `Lifetime` at :31, `AddChild(_label)` at :29 after `ApplyScale` at :28), `CurrentScreenOffsetY` dereferences `Lifetime` (:34-35), `ApplyScale` sets label `Size`/`Position` (:43-51), `Tick` writes `Position` (:53-58).
-- `WorldOverlay._Process` no-ops when `Lifetime == null` — `Scripts/Overlays/WorldOverlay.cs:9-15`.
+- `WorldOverlay._Process` no-ops when `Lifetime == null` — `Scripts/Overlays/WorldOverlay.cs:9-15` (guard at `:11`; `Tick` at `:13` is the only `Position` writer in `BattleTextLine`).
+- `PacketParser` splits every field on `,` — `Scripts/Network/PacketParser.cs:13` (`Delimeter`), `GetString()` → `GetNextToken()` `:35-61,78-80`. **BT text therefore cannot contain a comma.**
+- Server XP text uses a **space** group separator — `illutiagooseserver/Goose/Player.cs:1892-1893` (`NumberGroupSeparator = " "`), `:1942`. Real XP packets read `+1 234 XP`, never `+1,234 XP`.
+- Server cooldown text is `Utils.FormatDuration` — `illutiagooseserver/Goose/Utils.cs:7-35`, producing `5s `, `1m 5s `, `1.5s `, `500ms` (digits immediately followed by a letter).
+- `WorldTextBridge.Register` documents that `ApplyScale` runs before `AddChild` and font metrics are correct off-tree — `Scripts/WorldTextBridge.cs:38-45`.
+- `WorldTextBridge.Clear()` `QueueFree`s all elements — `Scripts/WorldTextBridge.cs:53-58`, called from `Scripts/GameManager.cs:542` during `ChangeMap` while characters are still alive for ~2 frames (`WorldTextBridge.cs:108-110`).
+- `Character.cs` has no `using Goose2Client.Overlays;` — `Scripts/Character/Character.cs:1-3`; overlay types are referenced qualified (`Overlays.BattleText`, `:59`, `:837`).
 - `OverlayLifetime(double durationSeconds, double risePixelsPerSecond = 0)` — `Scripts/Overlays/OverlayLifetime.cs:8`.
 - Bridge sweep `QueueFree`s elements whose `AnchorOwner` is invalid — `Scripts/WorldTextBridge.cs:99-105`; `DisplayScale`/`WorldScale` — `WorldTextBridge.cs:15,18`.
 - Font measurement pattern — `Scripts/Overlays/ChatBubble.cs:113-124` (`font.GetStringSize(text, HorizontalAlignment.Left, -1, fontSize)`).
@@ -27,7 +33,8 @@ Design doc: `docs/plans/2026-10-11-battle-text-combine-design.md`.
 - `GameManager.NameDisplay` cached-flag pattern — `Scripts/GameManager.cs:66-67`, read in `LoadSettings` — `GameManager.cs:418-423`.
 - `OptionsWindow` checkbox pattern — `Scripts/UI/OptionsWindow.cs:49-51` + handler `:147-150`; save+live pattern — `:200-205`.
 - Scene rows: root 240×372 — `Scenes/UI/OptionsWindow.tscn:47-54`; NameDisplay row y=312-336 (:272-289); ResetLayout/KeyBindings buttons y=340-364 (:291-307).
-- Existing tests that assert Options scene geometry — `tests/Goose2Client.Tests/KeyBindingsSceneTests.cs:100-118` (`Options_PlacesKeyBindingsBesideResetLayout`).
+- Existing tests that assert Options scene geometry — `tests/Goose2Client.Tests/KeyBindingsSceneTests.cs:98-119` (`Options_PlacesKeyBindingsBesideResetLayout`) and `tests/Goose2Client.Tests/TargetColorPickerSceneTests.cs:49-55` (`Options_ColorRowSitsAboveTheButtonRow`, asserts `offset_top = 340.0` on `ResetLayoutButton`).
+- Target frameworks: game is `net8.0` / `Godot.NET.Sdk/4.7.2` (`Goose2ClientGodot.csproj:1-3`); tests are `net10.0` / `GodotSharp 4.6.2` and compile `Scripts/**/*.cs` directly (`tests/Goose2Client.Tests/Goose2Client.Tests.csproj:3,8`) — Godot-API claims in Tasks 3-4 are validated against the 4.7.x runtime by smoke test, not by the test project.
 - Pure-rule test style — `tests/Goose2Client.Tests/BattleTextLayoutTests.cs`; scene-contract style — `KeyBindingsSceneTests.cs:12-33` (`RepositoryRoot`/`NodeBlock`).
 - Tests: `dotnet test tests/Goose2Client.Tests` (baseline 1580 passing).
 
@@ -73,7 +80,7 @@ git commit -m "feat(battle-text): CombineBattleText setting + cached flag"
 
 **Step 1: Write the failing tests**
 
-Adversarial cases matter most: grouping must key on (family, suffix) — a wrong implementation that keys on color family alone merges `+1,234 XP` with a bare yellow number, and one that keys on exact type splits `-123` (Red1) from a hypothetical Red2 damage. Malformed separators must not parse.
+Adversarial cases matter most: grouping must key on (family, suffix) — a wrong implementation that keys on color family alone merges `+1 234 XP` with a bare yellow number, and one that keys on exact type splits `-123` (Red1) from a hypothetical Red2 damage. Malformed separators must not parse.
 
 ```csharp
 using Goose2Client.Overlays;
@@ -84,10 +91,11 @@ public class BattleTextMergeRuleTests
 {
     [Theory]
     [InlineData(BattleTextType.Red1, "-123", -123L, "")]
-    [InlineData(BattleTextType.Red2, "-123", -123L, "")]   // family grouping, not exact type
+    [InlineData(BattleTextType.Red2, "-123", -123L, "")]
     [InlineData(BattleTextType.Red61, "-1", -1L, "")]
     [InlineData(BattleTextType.Green7, "+456", 456L, "")]
     [InlineData(BattleTextType.Green8, "+456", 456L, "")]
+    [InlineData(BattleTextType.Yellow60, "+1 234 XP", 1234L, "XP")]
     [InlineData(BattleTextType.Yellow60, "+1,234 XP", 1234L, "XP")]
     [InlineData(BattleTextType.Yellow60, "123", 123L, "")]
     public void TryGet_ParsesValueAndSuffix(BattleTextType type, string text, long value, string suffix)
@@ -115,6 +123,10 @@ public class BattleTextMergeRuleTests
     [InlineData(BattleTextType.Yellow60, "+1,2,3")]      // bad separator grouping
     [InlineData(BattleTextType.Yellow60, "+1,23")]       // short group
     [InlineData(BattleTextType.Yellow60, "12KB")]
+    [InlineData(BattleTextType.Yellow60, "5s ")]
+    [InlineData(BattleTextType.Yellow60, "1m 5s ")]
+    [InlineData(BattleTextType.Yellow60, "1.5s ")]
+    [InlineData(BattleTextType.Yellow60, "500ms")]
     [InlineData(BattleTextType.Yellow60, "")]
     [InlineData(BattleTextType.Stunned50, "")]
     [InlineData(BattleTextType.Miss21, "21")]            // keyword types never merge
@@ -126,7 +138,7 @@ public class BattleTextMergeRuleTests
     [Fact]
     public void TryGet_XpAndBareYellow_GetDifferentKeys()
     {
-        BattleTextMergeRule.TryGet(BattleTextType.Yellow60, "+1,234 XP", out var xp, out _);
+        BattleTextMergeRule.TryGet(BattleTextType.Yellow60, "+1 234 XP", out var xp, out _);
         BattleTextMergeRule.TryGet(BattleTextType.Yellow60, "+5", out var bare, out _);
         Assert.NotEqual(xp, bare);
     }
@@ -136,7 +148,7 @@ public class BattleTextMergeRuleTests
     [InlineData(-1234L, "", "-1,234")]
     [InlineData(120L, "", "+120")]
     [InlineData(1234567L, "XP", "+1,234,567 XP")]
-    [InlineData(0L, "", "0")]
+    [InlineData(0L, "", "+0")]
     public void Format_N0Signed(long total, string suffix, string expected)
     {
         var key = new BattleTextMergeKey(BattleTextFamily.Red, suffix);
@@ -154,9 +166,10 @@ public class BattleTextMergeRuleTests
 - `public static class BattleTextMergeRule`:
   - `TryGet(BattleTextType type, string? text, out BattleTextMergeKey key, out long value)`:
     - Family map: `Red1/Red2/Red4/Red5/Red61 → Red`, `Green7/Green8 → Green`, `Yellow60 → Yellow`; every other type (White, Stunned, Rooted, Dodge, Miss) → false.
-    - Parse with a manual scan (no regex needed): optional `+`/`-`; digits where every `,` must be followed by exactly three digits and preceded by a digit boundary (first group 1-3 digits); then optional whitespace + suffix (rest of string, trimmed). Require at least one digit. `long.TryParse` on the separator-stripped digits.
-    - The suffix is the exact remaining text (e.g. `"XP"`); empty string when the text was purely numeric.
-  - `Format(BattleTextMergeKey key, long total)` → `(total > 0 ? "+" : "") + total.ToString("N0", CultureInfo.InvariantCulture)` + `(key.Suffix.Length > 0 ? " " + key.Suffix : "")`.
+    - Parse with a manual scan (no regex needed): optional `+`/`-`; then digits where a group separator — **`,` or a single space** — must be followed by exactly three digits (first group 1-3 digits). Require at least one digit; `long.TryParse` on the separator-stripped digits. The space separator is what the server actually sends for XP (`Player.cs:1892-1893`); the comma form is accepted for robustness but can never arrive, since `,` is the packet field delimiter (`PacketParser.cs:13`).
+    - A non-empty suffix must be preceded by **at least one whitespace character**. Without that rule `Utils.FormatDuration` text (`5s `, `1m 5s `, `500ms`) and `12KB` would parse as numbers with suffixes and start summing seconds.
+    - The suffix is the remaining text trimmed (e.g. `"XP"`); empty when the text was purely numeric.
+  - `Format(BattleTextMergeKey key, long total)` → `(total >= 0 ? "+" : "") + total.ToString("N0", CultureInfo.InvariantCulture)` + `(key.Suffix.Length > 0 ? " " + key.Suffix : "")`. `>=` so a zero heal/XP keeps the `+` shape the server always emits (`Packets.cs:380`).
 
 **Step 4: Run to verify green** — same command, all pass.
 
@@ -166,6 +179,7 @@ public class BattleTextMergeRuleTests
 | Different suffix within a family ⇒ different keys | `TryGet_XpAndBareYellow_GetDifferentKeys` |
 | Keyword types never merge even with numeric text | `TryGet_PassThrough` (Miss21/Dodge20 cases) |
 | Malformed numbers pass through | `TryGet_PassThrough` separator cases |
+| Duration/cooldown text never becomes an accumulator | `TryGet_PassThrough` (`5s `, `1m 5s `, `500ms`) (adversarial: a whitespace-optional suffix rule fails) |
 
 **Step 5: Commit** `git commit -am "feat(battle-text): pure merge rule for damage/heal/XP totals"`
 
@@ -217,7 +231,7 @@ public class BattleTextManagerTests
         m.OnPacket(Damage, -10);
         Assert.Equal(BattleTextMergeAction.Start, m.OnPacket(Heal, 5).Action);
         Assert.Equal(BattleTextMergeAction.Start, m.OnPacket(Xp, 100).Action);
-        Assert.Equal("+100 XP", m.OnPacket(Xp, 50).DisplayText);
+        Assert.Equal("+150 XP", m.OnPacket(Xp, 50).DisplayText);
     }
 
     [Fact]
@@ -226,8 +240,8 @@ public class BattleTextManagerTests
         var m = new BattleTextManager<string>();
         m.OnPacket(Damage, -10);
         m.Attach(Damage, "line");
-        Assert.Empty(m.Tick(0.9));                // gap not yet reached
-        var finalized = m.Tick(0.15);             // sinceLast = 1.05 ≥ gap
+        Assert.Empty(m.Tick(0.9));
+        var finalized = m.Tick(0.15);
         Assert.Single(finalized);
         Assert.Equal(Damage, finalized[0].Key);
         Assert.Equal("line", finalized[0].Handle);
@@ -240,11 +254,14 @@ public class BattleTextManagerTests
         var m = new BattleTextManager<string>();
         m.OnPacket(Damage, -10);
         m.Attach(Damage, "line");
-        for (int i = 0; i < 40; i++)
+        for (int i = 1; i <= 8; i++)
         {
-            m.OnPacket(Damage, -1);               // resets gap every tick
-            var finalized = m.Tick(0.05);         // 40 × 0.05 = 2.0s → cap
-            if (finalized.Count > 0) return;      // pass
+            m.OnPacket(Damage, -1);
+            var finalized = m.Tick(0.25);
+            if (finalized.Count == 0) continue;
+            Assert.Equal(8, i);
+            Assert.True(m.FinalizedByCap);
+            return;
         }
         Assert.Fail("cap never finalized");
     }
@@ -254,6 +271,7 @@ public class BattleTextManagerTests
     {
         var m = new BattleTextManager<string>();
         m.OnPacket(Damage, -10);
+        m.Attach(Damage, "line");
         m.Cancel(Damage);
         Assert.Empty(m.Tick(5.0));
         Assert.Equal(BattleTextMergeAction.Start, m.OnPacket(Damage, -3).Action);
@@ -282,7 +300,9 @@ public class BattleTextManagerTests
   - Constants `GapSeconds = 1.0`, `CapSeconds = 2.0`.
   - `Dictionary<BattleTextMergeKey, Record> _open` where `Record` holds `long Total`, `double Age`, `double SinceLastHit`, `THandle Handle`.
   - `OnPacket(key, long value)` → if open: `Total += value`, `SinceLastHit = 0`, return `Accumulate(Format)`. Else: insert `Total = value`, return `Start(Format)`. Format via `BattleTextMergeRule.Format`.
-  - `Attach(key, handle)` / `TryGetHandle(key, out handle)` / `Cancel(key)` — record bookkeeping only; `Attach` on an unknown key is a no-op (the record was finalized or cancelled between `Start` and `Attach` — cannot happen in the glue's synchronous flow, but must not throw).
+  - `Attach(key, handle)` / `Cancel(key)` — record bookkeeping only; `Attach` on an unknown key is a no-op (the record was finalized or cancelled between `Start` and `Attach` — cannot happen in the glue's synchronous flow, but must not throw).
+  - `TryGetHandle(key, out THandle handle)` returns **false** when there is no open record *or* the record has not been attached yet (`EqualityComparer<THandle>.Default.Equals(record.Handle, default)`), so the glue never mistakes an unattached record for a live line.
+  - `bool FinalizedByCap` — true after the most recent `Tick` finalized at least one record by the cap rather than the gap (test observability only).
   - `IReadOnlyList<(BattleTextMergeKey Key, THandle Handle)> Tick(double delta)` — advance `Age`/`SinceLastHit` for all records, remove and return those with `SinceLastHit >= GapSeconds || Age >= CapSeconds`.
 
 **Step 4: Green**, then commit `git commit -am "feat(battle-text): per-character accumulator state machine"`.
@@ -290,7 +310,7 @@ public class BattleTextManagerTests
 | Invariant | Proved by |
 |---|---|
 | Gap closes a line ~1s after the last hit | `Gap_Finalizes_AndNextPacketStartsFresh` |
-| Endless hits still close at the cap | `Cap_FinalizesEvenWithoutGap` (adversarial: gap-only impl fails) |
+| Endless hits still close at the cap | `Cap_FinalizesEvenWithoutGap` (adversarial: gap-only impl fails; asserts `FinalizedByCap` so a gap bug cannot pass it) |
 | Categories never cross | `Keys_AreIsolated` |
 | Cancelled record emits no finalize | `Cancel_DropsRecordWithoutFinalizeSignal` |
 
@@ -301,37 +321,30 @@ public class BattleTextManagerTests
 **Files:**
 - Modify: `Scripts/Overlays/BattleTextLine.cs`
 
-This is Godot-node behavior (labels, tree) — no headless test surface exists for nodes in this repo; Tasks 1-2 cover the logic, Task 6 is the manual proof.
+Godot-node behavior with no headless test surface in this repo (no test instantiates a node). Tasks 1-2 cover the decision logic; Task 6 is the only proof for this task.
 
 **Step 1: Implement**
 
+Keep the existing `Initialize` order (`ApplyScale` at `:28` before `AddChild` at `:29`) — `WorldTextBridge.cs:38-39` records that font metrics are correct off-tree, so no reordering is needed.
+
 - `Initialize(Color, string, Vector2 baseOffset, float textScale, float worldScale, bool accumulating = false)`:
-  - `AddChild(_label)` **before** `ApplyScale` (measurement needs the label in-tree for theme resolution — see the `ChatBubble.cs:110-113` re-parent probe note).
-  - Set `Position = baseOffset * worldScale` once. Required: `Tick` (`:53-58`) is the only current writer of `Position` and does not run while `Lifetime == null` (`WorldOverlay.cs:12`).
-  - `Lifetime = accumulating ? null : new OverlayLifetime(1.0, risePixelsPerSecond: 32)`.
-- `CurrentScreenOffsetY()` (`:34-35`) must not dereference a null `Lifetime`: use `Lifetime?.RiseOffsetPixels ?? 0`. **Adversarial:** without this, opening a second accumulator (or any keyword line) while one is pinned throws inside `BattleText.AddText`'s push-up pass (`BattleText.cs:43`).
-- `SetAccumulatedText(string text)` — set `_label.Text`, then re-measure and re-center width (Step 2).
-- `BeginRise()` — `Lifetime = new OverlayLifetime(1.0, risePixelsPerSecond: 32)`; from here `Tick` drives it like any normal line.
+  - Assign `Lifetime = accumulating ? null : new OverlayLifetime(1.0, risePixelsPerSecond: 32)` **before** `ApplyScale`, so the null check inside `ApplyScale` (below) sees the right mode.
+  - Set `Position = baseOffset * worldScale` once. Required: `Tick` (`:53-58`) is the only current writer of `Position` and does not run while `Lifetime == null` (`WorldOverlay.cs:11`).
+- `CurrentScreenOffsetY()` (`:34-35`) must not dereference a null `Lifetime`: `(_baseOffset.Y - (float)(Lifetime?.RiseOffsetPixels ?? 0.0)) * _worldScale`. The `(float)` cast is required — `RiseOffsetPixels` is `double` (`OverlayLifetime.cs:12`), and without it the expression is `double` where the method returns `float` (CS0266). **Adversarial:** without the null check, opening a second accumulator (or any keyword line) while one is pinned throws inside `BattleText.AddText`'s push-up pass (`BattleText.cs:43`).
+- **`PushUpScreenPixels` (`:37-41`) must re-apply the position for pinned lines:** after mutating `_baseOffset.Y`, add `if (Lifetime == null) Position = _baseOffset * _worldScale;`. **This is the plan's most important fix.** `Tick` is the only other writer of `Position` and never runs while accumulating, so without it a push-up moves `_baseOffset` but the line keeps drawing at the anchor: the new line draws on top of the pinned one, the pinned line then *reports* an offset it never visually took (so `PlanPushUps` never pushes it again), `_baseOffset` drifts upward with every subsequent spawn, and `BeginRise()` teleports the line up by that phantom distance on its first `Tick`. Affects red-vs-green accumulators and every keyword/`Level Up!` line landing near a pinned one (smoke steps 2 and 4).
+- `SetAccumulatedText(string text)` — set `_label.Text`. No width handling: `Label.clip_text` defaults to `false` and the label is centered, so a long total overflows symmetrically and stays readable; resizing would also invalidate the hand-computed `BattleText.ScreenBounds` cull rect (`BattleText.cs:14-17`).
+- `BeginRise()` — `Lifetime = new OverlayLifetime(1.0, risePixelsPerSecond: 32)`; from here `Tick` drives it like any normal line. `Tick` dereferences `Lifetime` unguarded at `:57`, which stays safe because `WorldOverlay._Process` returns before calling it when null.
 - `ApplyScale` (`:43-51`) — after updating the label, also refresh `Position = _baseOffset * _worldScale` when `Lifetime == null`, so a UI/world-scale change (`WorldTextBridge.cs:86` calls `ApplyScale` on every element) doesn't leave a pinned line mispositioned.
 
-**Step 2: Label auto-width**
+**Step 2:** `dotnet test tests/Goose2Client.Tests` stays green. Note plainly: **nothing in the suite exercises `BattleTextLine` or `BattleText`** (`BattleTextLayoutTests` calls only the pure `ComputeSpreadOffset`/`PlanPushUps`/`Resolve`), so this task is verified by Task 6 smoke steps 2, 4, and 7 — not by tests. Commit `git commit -am "feat(battle-text): BattleTextLine accumulating mode"`.
 
-`LabelWidth` (100 px) clips long totals (`+12,345,678 XP`). In `ApplyScale` and `SetAccumulatedText`, size the label to `max(LabelWidth, measured) * scale`:
+**Invariant → proof (Task 3):**
 
-```csharp
-var font = _label.GetThemeFont("font") ?? _label.GetThemeDefaultFont();
-int fontSize = Mathf.Max(1, Mathf.RoundToInt(12f * _scale));
-float measured = font != null
-    ? font.GetStringSize(_label.Text, HorizontalAlignment.Left, -1, fontSize).X + 4f * _scale
-    : LabelWidth * _scale;
-float w = Mathf.Max(LabelWidth * _scale, measured);
-_label.Size = new Vector2(w, LabelHeight * _scale);
-_label.Position = new Vector2(-w / 2f, 0);
-```
-
-(Outline padding `4f * _scale` matches the `outline_size` override at `BattleTextLine.cs:48`; `GetStringSize` excludes outline.)
-
-**Step 3:** `dotnet test tests/Goose2Client.Tests` stays green (existing `BattleTextLayoutTests` must not change behavior for non-accumulating lines). Commit `git commit -am "feat(battle-text): BattleTextLine accumulating mode + auto-width"`.
+| Invariant | Proved by |
+|---|---|
+| A pinned line never overlaps a line spawned at the anchor | smoke 2, 4 (the `PushUpScreenPixels` fix above is what makes this true) |
+| A pinned line survives a scale change | smoke 7 |
+| Non-accumulating lines are unchanged | existing `BattleTextLayoutTests` + smoke 1 |
 
 ---
 
@@ -345,8 +358,9 @@ _label.Position = new Vector2(-w / 2f, 0);
 - Source of truth changed: `BattleText` child list (`BattleText.cs:26`) gains lines whose `Lifetime` is null; `Character` gains `_battleTextManager` state (`Character.cs:59` field region).
 - Important readers: `BattleText.ApplyScale` iterates children (`BattleText.cs:22-23` — unaffected, `BattleTextLine.ApplyScale` handles both modes); push-up pass reads `CurrentScreenOffsetY()` (`BattleText.cs:43` — fixed in Task 3); bridge `ApplyScale` sweep (`WorldTextBridge.cs:86`); bridge free-sweep (`WorldTextBridge.cs:99-105`) can free the container under the manager's handles.
 - Derived state: manager records must mirror live lines. Propagation: every record mutation happens synchronously inside `AddBattleText`/`_Process` on the main thread — no cross-thread marshalling exists in this codebase.
-- Invariants: every live record handle is either valid-and-pinned or invalid-and-dropped-on-next-touch; no record outlives its character; refused spawns (18-line cap) never leave a record.
-- Observable proof: Task 6 manual smoke (node lifecycle isn't headless-testable here); the decision logic behind each branch is covered by Tasks 1-2 unit tests.
+- Invariants: every record either names a line in the current container or is dropped on next touch; no record outlives its character; refused spawns (18-line cap) never leave a record.
+- **The dangling-handle path is `WorldTextBridge.Clear()` (`WorldTextBridge.cs:53-58`, called from `GameManager.cs:542` during `ChangeMap`), not the free-sweep at `:99-105`** — that sweep only frees elements whose `AnchorOwner` is already gone, i.e. the `Character` itself is freed and its manager died with it. `Clear()` frees the container while the character lives for ~2 more frames, and `GodotObject.IsInstanceValid` returns **true** for a `QueueFree`d-but-not-yet-freed object, so an `IsInstanceValid` check alone cannot detect it: the glue would keep rewriting a doomed label and silently drop packets until the gap closes. Detect staleness by container identity instead.
+- Observable proof: Task 6 manual smoke steps 2, 4, 8, 9 (node lifecycle isn't headless-testable here); the decision logic behind each branch is covered by Tasks 1-2 unit tests.
 
 **Step 1: `BattleText.AddText` returns the line**
 
@@ -365,21 +379,25 @@ Existing callers pass nothing new (default `false`).
 
 **Step 2: `Character` glue**
 
-Fields: `private BattleTextManager<BattleTextLine>? _battleTextManager;` (next to `_battleText`, `Character.cs:59`).
+Field (next to `_battleText`, `Character.cs:59`; `Character.cs` has no `using Goose2Client.Overlays`, so qualify the manager type — line handles live inside it, not as fields):
+
+```csharp
+private Overlays.BattleTextManager<BattleTextLine>? _battleTextManager;
+```
 
 `AddBattleText` sequence (after the existing container ensure, `Character.cs:834-840`):
 
-1. `_battleTextManager ??= new();` then, if `GameManager.Instance.CombineBattleText && BattleTextMergeRule.TryGet(type, text, out var key, out var value)`:
+1. `_battleTextManager ??= new();` then, if `GameManager.Instance.CombineBattleText && Overlays.BattleTextMergeRule.TryGet(type, text, out var key, out var value)`:
    `var result = _battleTextManager.OnPacket(key, value);`
-   - **Start** → `var line = _battleText.AddText(type, result.DisplayText, Height, bridge.DisplayScale, bridge.WorldScale, accumulating: true);` then `line != null ? manager.Attach(key, line) : manager.Cancel(key)` (cap-refused packets drop, matching today's cap behavior). Return.
-   - **Accumulate** → `manager.TryGetHandle(key, out var handle)`: if valid (`GodotObject.IsInstanceValid(handle)`) → `handle.SetAccumulatedText(result.DisplayText)`; else → `manager.Cancel(key)` and re-run `OnPacket` (now returns **Start**) and follow the Start branch. This is the bridge-sweep recovery.
+   - **Start** → `var line = _battleText.AddText(type, result.DisplayText, Height, bridge.DisplayScale, bridge.WorldScale, accumulating: true);` then `if (line != null) manager.Attach(key, line); else manager.Cancel(key);` (a conditional expression is not a statement in C#). Cap-refused packets drop, matching today's cap behavior. Return.
+   - **Accumulate** → `manager.TryGetHandle(key, out var handle)`: live when `GodotObject.IsInstanceValid(handle) && handle.GetParent() == _battleText` (the container-identity check is what catches the `Clear()` case that `IsInstanceValid` cannot) → `handle.SetAccumulatedText(result.DisplayText)`. Otherwise → `manager.Cancel(key)`, re-run `OnPacket` (now returns **Start**), and follow the Start branch. This is the stale-container recovery.
 2. Otherwise → `_battleText.AddText(type, text, Height, bridge.DisplayScale, bridge.WorldScale);` exactly as today (`Character.cs:841`).
 
-`_Process` (`Character.cs:583-589`): append
+`_Process` (`Character.cs:583-589`): append (`BeginRise` on a `QueueFree`d-but-not-yet-freed line is harmless — it never ticks before freeing)
 
 ```csharp
 if (_battleTextManager != null)
-    foreach (var (key, line) in _battleTextManager.Tick(delta))
+    foreach (var (_, line) in _battleTextManager.Tick(delta))
         if (GodotObject.IsInstanceValid(line)) line.BeginRise();
 ```
 
@@ -394,7 +412,8 @@ if (_battleTextManager != null)
 **Files:**
 - Modify: `Scenes/UI/OptionsWindow.tscn` (new checkbox at y=340-364; `ResetLayoutButton`/`KeyBindingsButton` shift to y=368-392; root `offset_bottom` 372→400)
 - Modify: `Scripts/UI/OptionsWindow.cs` (field + seed + handler, pattern of `:49-51`/`:200-205`)
-- Modify: `tests/Goose2Client.Tests/KeyBindingsSceneTests.cs:100-118` (geometry assertions)
+- Modify: `tests/Goose2Client.Tests/KeyBindingsSceneTests.cs:98-119` (root height + button row geometry)
+- Modify: `tests/Goose2Client.Tests/TargetColorPickerSceneTests.cs:49-55` (`Options_ColorRowSitsAboveTheButtonRow` asserts `offset_top = 340.0` on `ResetLayoutButton` → `368.0`)
 - Test: `tests/Goose2Client.Tests/CombineBattleTextSceneTests.cs`
 
 **Step 1: Write the failing scene/contract tests**
@@ -428,7 +447,7 @@ public class CombineBattleTextSceneTests
 }
 ```
 
-Update `Options_PlacesKeyBindingsBesideResetLayout`: root `offset_bottom = 400.0`, both buttons `offset_top = 368.0` / `offset_bottom = 392.0`.
+Update **both** existing geometry tests: `Options_PlacesKeyBindingsBesideResetLayout` (root `offset_bottom = 400.0`, both buttons `offset_top = 368.0` / `offset_bottom = 392.0`) and `Options_ColorRowSitsAboveTheButtonRow` (`ResetLayoutButton` `offset_top = 368.0`). `TargetColorSwatch` at y=284 is unchanged.
 
 **Step 2: Red** — `dotnet test tests/Goose2Client.Tests --filter CombineBattleText` → node not found.
 
@@ -455,7 +474,7 @@ private void OnCombineBattleTextChanged(bool pressed)
 
 ### Task 6: Manual smoke
 
-Run the client against the dev server (`./run.sh` from the worktree) and verify:
+`run.sh` is gitignored (`.gitignore:52`) and absent from the worktree — copy it from the main checkout (`cp ../../run.sh .`) or invoke the editor directly (`godot-mono --path .`). Then verify:
 
 1. Fighting a monster: one red line per target that grows in place, rising away ~1s after hits stop; no tall column.
 2. Healing: independent green accumulator; red and green never overlap (second Start pushes the pinned line up).
@@ -464,4 +483,6 @@ Run the client against the dev server (`./run.sh` from the worktree) and verify:
 5. Endless DoT (poison a target and watch): a fresh red line every ~2s, nothing pinned forever.
 6. Toggle the option off mid-fight: pinned lines finalize within ~2s; per-hit spam resumes. Toggle on: merging resumes.
 7. Change UI scale (Options → Scale) while a line is pinned: it stays centered on the character.
-8. Full `dotnet test tests/Goose2Client.Tests` green.
+8. Change maps (or log out/in) while a line is pinned: no frozen number left on screen, and merging resumes normally on the new map.
+9. Long totals: a merged line over 1,000,000 renders fully (labels are not clipped) and stays centered.
+10. Full `dotnet test tests/Goose2Client.Tests` green.

@@ -17,15 +17,18 @@ accumulation. With it off, behaviour is exactly today's.
 
 ### Merge rule
 
-A packet is mergeable when its text parses as a **signed number with an optional trailing
-suffix** (invariant culture, thousands separators allowed):
+A packet is mergeable when its text parses as a **signed number with an optional
+whitespace-separated trailing suffix**. Group separators may be `,` or a space; the server uses
+a **space** for XP (`Player.cs:1892-1893`, `NumberGroupSeparator = " "`) because `,` is the
+packet field delimiter (`PacketParser.cs:13`) and cannot appear in BT text at all:
 
 | Packet | Parse | Merge key |
 |---|---|---|
 | `Red1`, `-123` | −123, suffix "" | (Red, "") — damage |
 | `Green7`, `+456` | +456, suffix "" | (Green, "") — heal |
-| `Yellow60`, `+1,234 XP` | +1234, suffix "XP" | (Yellow, "XP") — XP |
+| `Yellow60`, `+1 234 XP` | +1234, suffix "XP" | (Yellow, "XP") — XP |
 | `Yellow60`, `Level Up!` / `Fizzle` | no parse | not mergeable |
+| `Yellow60`, `5s ` / `1m 5s ` / `500ms` | no parse (suffix must be whitespace-separated) | not mergeable |
 | `Stunned50` / `Miss21` / … | keyword, no parse | not mergeable |
 
 The merge key is **(color family, suffix)**: all `Red*` with the same suffix share one
@@ -48,9 +51,11 @@ Non-mergeable lines render exactly as today.
 
   On finalize the line starts its normal 1 s rise-and-fade and behaves like a plain line.
 
-Display format for merged totals: `(total > 0 ? "+" : "") + total.ToString("N0",
+Display format for merged totals: `(total >= 0 ? "+" : "") + total.ToString("N0",
 CultureInfo.InvariantCulture)` plus `" " + suffix` when the key has one — damage stays
-negative, heals/XP positive, XP keeps its separators and suffix.
+negative, heals/XP positive, XP keeps separators and suffix. Merged totals render with
+invariant `,` grouping even though the server sends XP with spaces: the client's rendering is
+its own choice, and the parse rule accepts both forms.
 
 Damage and heal accumulators are independent, so a character shows at most one red + one
 green accumulating line, plus keyword lines as before.
@@ -85,12 +90,18 @@ One instance per `Character`, created lazily beside the container. No Godot refe
 - `ApplyScale` recomputes `Position` from `_baseOffset` when `Lifetime == null`, so a UI/world
   scale change doesn't leave a pinned line mispositioned (`Tick` won't fix it because it
   doesn't run while accumulating).
-- Label auto-sizes its width to the text so long totals (`+12,345,678 XP`) don't clip.
+- `PushUpScreenPixels` likewise re-applies `Position` when `Lifetime == null`: `Tick` is the
+  only other writer, so without this a push-up moves `_baseOffset` while the pinned line keeps
+  drawing at the anchor — overlapping the new line, drifting upward unseen, and teleporting on
+  `BeginRise`.
+- No label resizing: `Label.clip_text` defaults to false and labels are centered, so long
+  totals overflow symmetrically and stay readable without touching the `ScreenBounds` cull rect.
 
 ### 4. `BattleText`
 
 `AddText` returns the created `BattleTextLine?` (null when the 18-line cap refuses it) so the
-caller can hold the handle. No other change — jitter, push-ups, and the cap work as today,
+caller can hold the handle. Pinned lines occupy cap slots that would otherwise expire, so
+keyword spam hits the 18-line ceiling slightly sooner than today. No other change — jitter, push-ups, and the cap work as today,
 and they run against pinned lines too (they read `CurrentScreenOffsetY()`), so a second
 simultaneous accumulator or a keyword line never overlaps a pinned one.
 
@@ -104,17 +115,20 @@ parses, consult the manager:
 - **Accumulate** → `line.SetAccumulatedText(display)` on the held handle.
 - **PassThrough**, option off, or unparseable → `container.AddText(...)` as today.
 
-`_Process` calls `manager.Tick(delta)` and `BeginRise()`s each finalized key's line. Held
-line refs are checked with `GodotObject.IsInstanceValid` first (the bridge sweep can free the
-container); an invalid handle drops the record so the next packet starts fresh. The manager
-dies with its `Character`.
+`_Process` calls `manager.Tick(delta)` and `BeginRise()`s each finalized key's line. Held line
+refs are checked with `GodotObject.IsInstanceValid` **and** against the current container
+(`handle.GetParent() == _battleText`): `WorldTextBridge.Clear()` frees the container during
+`ChangeMap` while the character lives for ~2 more frames, and `IsInstanceValid` still returns
+true for a `QueueFree`d-but-not-yet-freed object, so identity is the only reliable staleness
+check. A stale handle drops its record so the next packet starts fresh. The manager dies with
+its `Character`.
 
 ### 6. Setting
 
 - `Options.CombineBattleText = "CombineBattleText"` (`Scripts/Constants.cs`), bool, default
   `true`.
-- `GameManager.CombineBattleText` cached bool, read in `LoadCharacterSettings` beside the
-  `NameDisplay` line so the per-packet check is a field read.
+- `GameManager.CombineBattleText` cached bool, read in `LoadSettings` beside the `NameDisplay`
+  line so the per-packet check is a field read.
 - `Scenes/UI/OptionsWindow.tscn`: one new `CheckBox` row "Combine damage & heal numbers";
   wired in `Scripts/UI/OptionsWindow.cs` like `TargetFiltering` — seed from the setting, on
   `Toggled` write the option, `Save()`, update `GameManager.CombineBattleText`.
@@ -125,10 +139,12 @@ closes any pinned line within ≤2 s. Toggling **on** applies from the next pack
 ## Edge cases
 
 - **18-line cap:** refused spawn → no accumulator registered.
-- **Container freed under us / character despawn:** `IsInstanceValid` drop path; manager
-  lifetime is the character's.
-- **Mixed traffic:** keyword lines and unparseable yellows take the normal spawn path and
-  push pinned lines up like any other line.
+- **Container freed under us** (`WorldTextBridge.Clear()` on map change) **/ character
+  despawn:** container-identity + `IsInstanceValid` drop path; manager lifetime is the
+  character's.
+- **Mixed traffic:** keyword lines and unparseable yellows take the normal spawn path and push
+  pinned lines up like any other line — which requires the `PushUpScreenPixels` position
+  re-apply above, since a pinned line never ticks.
 - **Damage + heal simultaneously:** two independent accumulators; the second `Start` pushes
   the pinned first line up via the existing `PlanPushUps`.
 - **Toggle off mid-accumulation:** finalizes within ≤2 s via the cap.
