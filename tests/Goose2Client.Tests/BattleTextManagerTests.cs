@@ -61,7 +61,7 @@ public class BattleTextManagerTests
             m.OnPacket(Damage, -1);
             var finalized = m.Tick(0.25);
             if (finalized.Count == 0) continue;
-            Assert.Equal(8, i);
+            Assert.Equal(4, i);
             Assert.True(m.FinalizedByCap);
             return;
         }

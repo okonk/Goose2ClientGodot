@@ -6,6 +6,8 @@ namespace Goose2Client.Overlays
     {
         private const float LabelWidth = 100f;
         public const float LabelHeight = 16f;
+        private const double RisePixelsPerSecond = 32;
+        private const double RiseCapPixels = 48;
 
         private Label _label = null!;
         private Vector2 _baseOffset;
@@ -15,7 +17,9 @@ namespace Goose2Client.Overlays
         public void Initialize(Color color, string text, Vector2 baseOffset, float textScale, float worldScale, bool accumulating = false)
         {
             _baseOffset = baseOffset;
-            Lifetime = accumulating ? null! : new OverlayLifetime(1.0, risePixelsPerSecond: 32);
+            Lifetime = accumulating
+                ? new OverlayLifetime(double.PositiveInfinity, RisePixelsPerSecond)
+                : new OverlayLifetime(1.0, RisePixelsPerSecond);
             Position = _baseOffset * worldScale;
 
             _label = new Label
@@ -32,18 +36,22 @@ namespace Goose2Client.Overlays
         }
 
         public float CurrentScreenOffsetY() =>
-            (_baseOffset.Y - (float)(Lifetime?.RiseOffsetPixels ?? 0.0)) * _worldScale;
+            (_baseOffset.Y - (float)Lifetime.RiseOffsetPixels) * _worldScale;
 
         public void PushUpScreenPixels(float pixels)
         {
             if (_worldScale <= 0f) return;
             _baseOffset.Y -= pixels / _worldScale;
-            if (Lifetime == null) Position = _baseOffset * _worldScale;
         }
 
         public void SetAccumulatedText(string text) => _label.Text = text;
 
-        public void BeginRise() => Lifetime = new OverlayLifetime(1.0, risePixelsPerSecond: 32);
+        public void BeginRise()
+        {
+            double risen = Mathf.Min(Lifetime.RiseOffsetPixels, RiseCapPixels);
+            _baseOffset.Y -= (float)risen;
+            Lifetime = new OverlayLifetime(Mathf.Min(1.0, (RiseCapPixels - risen) / RisePixelsPerSecond), RisePixelsPerSecond);
+        }
 
         public void ApplyScale(float textScale, float worldScale)
         {
@@ -53,7 +61,6 @@ namespace Goose2Client.Overlays
             _label.AddThemeConstantOverride("outline_size", Mathf.RoundToInt(4f * textScale));
             _label.Size = new Vector2(LabelWidth, LabelHeight) * textScale;
             _label.Position = new Vector2(-_label.Size.X / 2f, 0);
-            if (Lifetime == null) Position = _baseOffset * _worldScale;
         }
 
         protected override void Tick(double delta)

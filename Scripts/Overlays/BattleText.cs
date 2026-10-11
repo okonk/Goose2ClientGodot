@@ -12,9 +12,10 @@ namespace Goose2Client.Overlays
         public Vector2 LocalOffsetWorld { get; set; }
 
         /// Cull rect sized to the actual line extent: spread x∈[−4,12], worst case 18 stacked lines
-        /// (17 × 16 push) + rise ≤ 32, 100×16 label, +4 outline → x∈[−58,66], y∈[−308,20], all × S —
+        /// (17 × 16 push) + rise ≤ 48 (RiseCapPixels: 32 while accumulating + 16 after finalize),
+        /// 100×16 label, +4 outline → x∈[−58,66], y∈[−324,20], all × S —
         /// oversized would under-cull (root-layer text is not clipped by the world blit).
-        public Rect2 ScreenBounds => new Rect2(-58f * _scale, -308f * _scale, 124f * _scale, 328f * _scale);
+        public Rect2 ScreenBounds => new Rect2(-58f * _scale, -324f * _scale, 124f * _scale, 344f * _scale);
 
         public void ApplyScale(float textScale, float worldScale)
         {

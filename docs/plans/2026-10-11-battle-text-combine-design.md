@@ -42,14 +42,16 @@ Non-mergeable lines render exactly as today.
 - **Start** — the first mergeable hit for a key spawns a normal line at the anchor (x jitter
   and push-ups still apply) and opens an accumulator holding the running total.
 - **Accumulate** — each later hit for the key adds to the total and rewrites the line's text
-  in place (`-12` → `-37` → `-85`). While accumulating the line is **pinned at the anchor**:
-  no rise, no expiry. Each hit resets the gap timer.
+  in place (`-12` → `-37` → `-85`). While accumulating the line **rises at the normal rate**
+  (32 px/s) but never expires. Each hit resets the gap timer.
 - **Finalize** — the accumulator closes when either comes first:
   - **Gap:** ~1.0 s with no hit for that key, or
-  - **Cap:** ~2.0 s total age (so endless spam produces a fresh line every ≤2 s instead of
-    pinning one growing number forever).
+  - **Cap:** ~1.0 s total age (so endless spam produces a fresh line every ≤1 s instead of
+    growing one number forever).
 
-  On finalize the line starts its normal 1 s rise-and-fade and behaves like a plain line.
+  On finalize the line keeps rising at the normal speed, but its total travel is capped at
+  48 px (`RiseCapPixels`, versus 32 px for a plain line): the remaining budget sets its
+  post-finalize lifetime (16 px = 0.5 s at the 1 s cap), then it fades like a plain line.
 
 Display format for merged totals: `(total >= 0 ? "+" : "") + total.ToString("N0",
 CultureInfo.InvariantCulture)` plus `" " + suffix` when the key has one — damage stays
@@ -77,33 +79,33 @@ One instance per `Character`, created lazily beside the container. No Godot refe
   **Start(displayText)**, **Accumulate(displayText)**, or **PassThrough**.
 - `Tick(delta)` advances age + since-last-hit per record and returns the keys that
   **Finalized**.
-- Records: key → (running total, age, since-last-hit). Constants: gap 1.0 s, cap 2.0 s.
+- Records: key → (running total, age, since-last-hit). Constants: gap 1.0 s, cap 1.0 s.
 
 ### 3. `BattleTextLine` — accumulating mode
 
-- `Initialize` gains an `accumulating` flag: sets `Position` once from `baseOffset` and
-  leaves `Lifetime = null` (`WorldOverlay._Process` already no-ops on null, so the line sits
-  at the anchor without rising or expiring). Non-accumulating lines keep starting the
-  1 s/32 px lifetime as today.
+- `Initialize` gains an `accumulating` flag: an accumulating line starts
+  `Lifetime = new OverlayLifetime(double.PositiveInfinity, risePixelsPerSecond: 32)` — it
+  rises like a plain line but never expires (the manager's cap always closes it).
+  Non-accumulating lines keep starting the 1 s/32 px lifetime as today. `Tick` runs in both
+  modes, so it stays the only per-frame writer of `Position`; push-ups and scale changes flow
+  through `_baseOffset`.
 - `SetAccumulatedText(string)` rewrites the label text.
-- `BeginRise()` sets `Lifetime = new OverlayLifetime(1.0, risePixelsPerSecond: 32)`.
-- `ApplyScale` recomputes `Position` from `_baseOffset` when `Lifetime == null`, so a UI/world
-  scale change doesn't leave a pinned line mispositioned (`Tick` won't fix it because it
-  doesn't run while accumulating).
-- `PushUpScreenPixels` likewise re-applies `Position` when `Lifetime == null`: `Tick` is the
-  only other writer, so without this a push-up moves `_baseOffset` while the pinned line keeps
-  drawing at the anchor — overlapping the new line, drifting upward unseen, and teleporting on
-  `BeginRise`.
+- `BeginRise()` folds the rise already travelled into `_baseOffset` (a fresh lifetime's
+  rise restarts from zero, so without this the line snaps back down) and sets a
+  `32 px/s` lifetime of `min(1.0, (RiseCapPixels − risen) / 32)` — the line ends at whichever
+  comes first, the 1 s readability window or the 48 px total-travel cap.
 - No label resizing: `Label.clip_text` defaults to false and labels are centered, so long
   totals overflow symmetrically and stay readable without touching the `ScreenBounds` cull rect.
 
 ### 4. `BattleText`
 
 `AddText` returns the created `BattleTextLine?` (null when the 18-line cap refuses it) so the
-caller can hold the handle. Pinned lines occupy cap slots that would otherwise expire, so
-keyword spam hits the 18-line ceiling slightly sooner than today. No other change — jitter, push-ups, and the cap work as today,
-and they run against pinned lines too (they read `CurrentScreenOffsetY()`), so a second
-simultaneous accumulator or a keyword line never overlaps a pinned one.
+caller can hold the handle. Accumulating lines occupy cap slots that would otherwise expire,
+so keyword spam hits the 18-line ceiling slightly sooner than today. Jitter, push-ups, and
+the cap work as today, and they run against accumulating lines too (they read
+`CurrentScreenOffsetY()`), so a second simultaneous accumulator or a keyword line never
+overlaps one. The one adjustment: `ScreenBounds` grows its worst-case vertical extent by the
+combined line's 48 px rise cap (`RiseCapPixels`) versus a plain line's 32 px.
 
 ### 5. `Character` glue
 
@@ -134,7 +136,7 @@ its `Character`.
   `Toggled` write the option, `Save()`, update `GameManager.CombineBattleText`.
 
 Toggling **off** needs no explicit finalize: the manager keeps ticking regardless, so the cap
-closes any pinned line within ≤2 s. Toggling **on** applies from the next packet.
+closes any accumulating line within ≤1 s. Toggling **on** applies from the next packet.
 
 ## Edge cases
 
@@ -143,11 +145,11 @@ closes any pinned line within ≤2 s. Toggling **on** applies from the next pack
   despawn:** container-identity + `IsInstanceValid` drop path; manager lifetime is the
   character's.
 - **Mixed traffic:** keyword lines and unparseable yellows take the normal spawn path and push
-  pinned lines up like any other line — which requires the `PushUpScreenPixels` position
-  re-apply above, since a pinned line never ticks.
+  accumulating lines up like any other line — accumulating lines tick, so `PlanPushUps` sees
+  their drifted position via `CurrentScreenOffsetY()`.
 - **Damage + heal simultaneously:** two independent accumulators; the second `Start` pushes
-  the pinned first line up via the existing `PlanPushUps`.
-- **Toggle off mid-accumulation:** finalizes within ≤2 s via the cap.
+  the first (slowly rising) line up via the existing `PlanPushUps`.
+- **Toggle off mid-accumulation:** finalizes within ≤1 s via the cap.
 
 ## Tests
 

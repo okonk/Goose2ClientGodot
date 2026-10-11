@@ -13,7 +13,7 @@ namespace Goose2Client.Overlays
     public sealed class BattleTextManager<THandle>
     {
         public const double GapSeconds = 1.0;
-        public const double CapSeconds = 2.0;
+        public const double CapSeconds = 1.0;
 
         private sealed class Record
         {
