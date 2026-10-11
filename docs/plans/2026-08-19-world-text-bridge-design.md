@@ -2,7 +2,7 @@
 
 **Goal:** Render in-world text (character names, chat bubbles, battle text) at native window resolution on a root-viewport `CanvasLayer`, so it is pixel-crisp at any integer scale (Unity SDF parity), replacing Stage 1's accepted soft 2×/3× upscaled in-world text (I5).
 
-**Scope (decided):** strictly the three text types. HP/MP bars and the spell reticle stay in-world — solid/shape graphics that upscale cleanly at integer scale.
+**Scope (decided):** strictly the three text types. The spell reticle stays in-world — solid/shape graphics that upscale cleanly at integer scale. (Later: the overhead HP/MP bars moved onto the bridge as `BridgedVitalsBars`, at `NamesZIndex`, because bridged battle text was covering them.)
 
 ## 1. Node structure & ownership
 
@@ -14,7 +14,7 @@
 - **Creation:** `Character.EnsureNameLabel` / `ShowChatBubble` / `AddBattleText` add the element to the bridge (guarded no-op if bridge/map missing) instead of `AddChild`. All layout math stays in `Character` / overlay classes; only the parent changes.
 - **Cleanup:** the bridge's per-frame projection pass drops any child whose owner fails `GodotObject.IsInstanceValid` → `QueueFree`. Covers character removal, map changes (all owners freed at once — no `ChangeMap` wiring needed), and the existing bubble-replacement `QueueFree` (elements are already bridge children and leave the tree themselves). ≤1 frame of orphaned elements, invisible (loading overlay covers transitions).
 - One bubble per character, one battle-text container per character: replacement logic unchanged.
-- **Z-ordering:** existing constants kept (`BattleText 20` < `NamesZIndex 100` < bubble `102`, `ZAsRelative = false`); they now sort within the bridge's own canvas — same relative stacking. In-world graphics (emotes, spell FX, HP bars) are always below all bridged text; the only real order change is text-vs-emote/spell flipping to text-on-top, covered by the plan's "text always above the world" acceptance (top-down).
+- **Z-ordering:** existing constants kept (`BattleText 20` < `NamesZIndex 100` < bubble `102`, `ZAsRelative = false`); they now sort within the bridge's own canvas — same relative stacking. In-world graphics (emotes, spell FX) are always below all bridged text; the only real order change is text-vs-emote/spell flipping to text-on-top, covered by the plan's "text always above the world" acceptance (top-down). (Later: the HP/MP bars joined the bridge at `NamesZIndex` so battle text no longer covers them; their auto-hide rides a `ShouldShowVitalsOverhead` check beside the name one.)
 
 ## 2. Projection & scaling
 
@@ -54,7 +54,7 @@ A 1-frame visual pop during a mid-flight resize (bubble re-measure, lines re-fon
 - **Name label:** created with `fontSize = 12S, outline = 4S`; added to the bridge; text updates (`SetAppearance`) unchanged. `RepositionOverlays` changes from setting `_nameLabel.Position` to pushing the recomputed world offset into the bridge element. (Only `Character.cs` touches `_nameLabel` — verified by grep in the plan.)
 - **Chat bubble:** `SetText(message)` measures at 12S with scaled `ChatBubbleLayout` constants; `BackgroundWidth` reported in **world units** (screenWidth / S) so `ShowChatBubble`'s centering/anchoring is untouched. Replacement `QueueFree` unchanged.
 - **Battle text:** container added to the bridge at world offset `(0,-40)`; `BattleTextLine.Initialize` scales font/outline/label box. Rise/spread unchanged.
-- **Untouched:** HP/MP bars, emotes, spell animations, reticle, `Height`.
+- **Untouched:** emotes, spell animations, reticle, `Height`. (HP/MP bars were later bridged — see Scope.)
 
 **Input parity (Stage 1 I6 must survive):** the bubble's `Panel` background defaults to `MouseFilter.Stop` — inert in the sub-viewport today, but would **swallow real root clicks** once in the root viewport. Set `MouseFilter.Ignore` on it (label already `Ignore`); all other bridged Controls get `Ignore` explicitly. Result: clicking a bubble still produces a world click, exactly as Stage 1 signed off.
 

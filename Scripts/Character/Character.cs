@@ -23,6 +23,7 @@ namespace Goose2Client.Character
         public bool NameHiddenByServer { get; private set; }
         public bool ShouldShowNameOverhead => NameDisplayRule.ShouldRenderNameOverhead(
             GameManager.Instance?.NameDisplay ?? NameDisplayMode.PlayersOnly, CharacterType, NameHiddenByServer);
+        public bool ShouldShowVitalsOverhead => _barsVisible;
         private bool _hiddenBeforeApply;
 
         public bool IsRoofOccluded
@@ -49,104 +50,47 @@ namespace Goose2Client.Character
         private Overlays.BridgedNameLabel? _nameLabel;
         private Sprite2D? _icon;
         private const float IconGap = 2f;
-        private ColorRect? _hpBarBackground;
-        private ColorRect? _hpBar;
-        private ColorRect? _mpBar;
-
-        // MP bar fill color, matching the Unity CharacterHealthBars prefab (RGB 32,60,128).
-        private static readonly Color MpColor = new(0.1254902f, 0.23529412f, 0.5019608f);
-        private const float BarWidth = 32f;
+        private Overlays.BridgedVitalsBars? _vitalsBars;
         private Goose2Client.Overlays.BattleText? _battleText;
         private Overlays.BattleTextManager<Overlays.BattleTextLine>? _battleTextManager;
         private Overlays.ChatBubble? _chatBubble;
         private Overlays.EmoteAnimation? _emote;
         private readonly HealthBarAutoHide _healthBarAutoHide = new();
-
-        private const double BarTweenSeconds = 0.25;
-        private const float HpBarHeight = 3f;
-        private const float MpBarHeight = 2f;
-        private Tween? _hpBarTween;
-        private Tween? _mpBarTween;
-        private bool _barsSeeded;
+        private bool _barsVisible = true;
 
         private void EnsureBars()
         {
-            if (_hpBar != null) return;
-            // Black full-width backing under the HP bar (Unity CharacterHealthBars "HP Background").
-            _hpBarBackground = new ColorRect
+            if (_vitalsBars != null && GodotObject.IsInstanceValid(_vitalsBars) && _vitalsBars.GetParent() != null) return;
+            if (GameManager.Instance?.WorldTextBridge is not { } bridge) return;   // defensive; can't happen pre-map
+            // On the bridge (not in-world) so battle text cannot cover the bars; names-z keeps
+            // them above it, below chat bubbles.
+            _vitalsBars = new Overlays.BridgedVitalsBars
             {
-                Position = new Vector2(-16, -56),
-                Size = new Vector2(BarWidth, 3),
-                Color = new Color(0, 0, 0),
-                ZIndex = 20,
+                ZIndex = Constants.NamesZIndex,
+                ZAsRelative = false,
             };
-            AddChild(_hpBarBackground);
-            // HP bar: 3px tall, centered 32px-wide bar, just below the name label.
-            _hpBar = new ColorRect
-            {
-                Position = new Vector2(-16, -56),
-                Size = new Vector2(BarWidth, 3),
-                Color = GameColors.HpGreen,
-                ZIndex = 20,
-            };
-            AddChild(_hpBar);
-            // MP bar: 2px tall, stacked directly under the HP bar (Unity stacks MP below HP).
-            _mpBar = new ColorRect
-            {
-                Position = new Vector2(-16, -53),
-                Size = new Vector2(BarWidth, 2),
-                Color = MpColor,
-                ZIndex = 20,
-            };
-            AddChild(_mpBar);
-            RepositionOverlays();
+            bridge.Register(_vitalsBars, this);
+            _vitalsBars.Layout(this);
         }
 
-        /// <summary>Update the HP and MP bars. hpPercent/mpPercent are 0..1. Bars resize left-aligned
-        /// (shrink from the right), matching the Unity CharacterHealthBar.</summary>
+        /// <summary>Update the overhead HP and MP bars. hpPercent/mpPercent are 0..1.</summary>
         public void SetVitals(float hpPercent, float mpPercent)
         {
             HPPercent = hpPercent;
             MPPercent = mpPercent;
             EnsureBars();
             var hpColor = hpPercent > 0.66f ? GameColors.HpGreen : hpPercent > 0.33f ? GameColors.HpOrange : GameColors.HpRed;
-            FillBar(_hpBar!, ref _hpBarTween, hpPercent, HpBarHeight, hpColor);
-            FillBar(_mpBar!, ref _mpBarTween, mpPercent, MpBarHeight, null);
-            _barsSeeded = true;
+            _vitalsBars?.SetVitals(hpPercent, mpPercent, hpColor);
 
             _healthBarAutoHide.OnVitalsChanged(hpPercent, mpPercent, Time.GetTicksMsec() / 1000.0);
             ApplyBarVisibility();
-        }
-
-        /// <summary>Animates a bar to its new fill. The first update after the character
-        /// spawns snaps, so a character walking into view does not sweep its bars up from zero.</summary>
-        private void FillBar(ColorRect bar, ref Tween? tween, float percent, float height, Color? color)
-        {
-            if (tween != null && tween.IsValid())
-                tween.Kill();
-
-            var size = new Vector2(BarWidth * Mathf.Clamp(percent, 0f, 1f), height);
-            if (!_barsSeeded || bar.Size == size)
-            {
-                bar.Size = size;
-                if (color.HasValue) bar.Color = color.Value;
-                return;
-            }
-
-            tween = CreateTween().SetParallel().SetTrans(Tween.TransitionType.Sine).SetEase(Tween.EaseType.Out);
-            tween.TweenProperty(bar, "size", size, BarTweenSeconds);
-            if (color.HasValue)
-                tween.TweenProperty(bar, "color", color.Value, BarTweenSeconds);
         }
 
         private void ApplyBarVisibility()
         {
             double now = Time.GetTicksMsec() / 1000.0;
             _healthBarAutoHide.Tick(now);
-            bool visible = _healthBarAutoHide.Visible;
-            if (_hpBarBackground != null) _hpBarBackground.Visible = visible;
-            if (_hpBar != null) _hpBar.Visible = visible;
-            if (_mpBar != null) _mpBar.Visible = visible;
+            _barsVisible = _healthBarAutoHide.Visible;
         }
 
         /// <summary>Distance from the head (resting-pose body height) to the top edge of the name
@@ -178,9 +122,7 @@ namespace Goose2Client.Character
         private void RepositionOverlays()
         {
             int h = Height <= 0 ? 48 : Height;
-            if (_hpBarBackground != null) _hpBarBackground.Position = new Vector2(-16, -(h + 8));
-            if (_hpBar != null) _hpBar.Position = new Vector2(-16, -(h + 8));
-            if (_mpBar != null) _mpBar.Position = new Vector2(-16, -(h + 5));
+            if (_vitalsBars != null && GodotObject.IsInstanceValid(_vitalsBars)) _vitalsBars.Layout(this);
             if (_icon is { Texture: not null } icon)
                 icon.Position = CharacterAnchor.IconPosition(h, icon.Texture.GetSize(), NameTopOffset, IconGap);
             LayoutNameLabel();
