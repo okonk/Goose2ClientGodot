@@ -23,9 +23,9 @@ namespace Goose2Client.Overlays
                 if (GetChild(i) is BattleTextLine line) line.ApplyScale(textScale, worldScale);
         }
 
-        public void AddText(BattleTextType type, string text, int characterHeight, float textScale, float worldScale)
+        public BattleTextLine? AddText(BattleTextType type, string text, int characterHeight, float textScale, float worldScale, bool accumulating = false)
         {
-            if (GetChildCount() >= 18) return;
+            if (GetChildCount() >= 18) return null;
 
             int childCount = GetChildCount();
             Vector2 offset = BattleTextLayout.ComputeSpreadOffset(type, childCount, ref _position);
@@ -52,7 +52,8 @@ namespace Goose2Client.Overlays
 
             var line = new BattleTextLine { Name = $"Line_{childCount}" };
             AddChild(line);
-            line.Initialize(color, displayText, offset, textScale, worldScale);
+            line.Initialize(color, displayText, offset, textScale, worldScale, accumulating);
+            return line;
         }
     }
 }
