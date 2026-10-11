@@ -17,7 +17,8 @@ namespace Goose2Client.UI
             if (c != null)
             {
                 _label.Text = c.FullName;
-                _label.AddThemeColorOverride("font_color", c.IsGM ? GameColors.Blue : new Color(1, 1, 1));
+                if (c.IsGM) _label.AddThemeColorOverride("font_color", GameColors.Blue);
+                else _label.RemoveThemeColorOverride("font_color");
             }
         }
 
@@ -32,12 +33,11 @@ namespace Goose2Client.UI
             if (!show) { Visible = false; return; }
             Visible = true;
 
-            var pad = TooltipMetrics.TextPad(UiScaleApplier.Instance!.Factor);
-            Size = _label.GetCombinedMinimumSize() + new Vector2(pad.W, pad.H);
-            _label.OffsetLeft = pad.W / 2;
-            _label.OffsetTop = pad.H / 2;
-            _label.OffsetRight = -pad.W / 2;
-            _label.OffsetBottom = -pad.H / 2;
+            var m = TooltipMetrics.MapItemMetrics(UiScaleApplier.Instance!.Factor);
+            Vector2 labelMin = _label.GetCombinedMinimumSize();
+            _label.Position = new Vector2(m.LeftMargin, m.TopMargin);
+            _label.Size = new Vector2(m.LabelWidth, labelMin.Y);
+            Size = new Vector2(labelMin.X + m.LeftMargin * 2f, m.TopMargin + labelMin.Y + m.BottomMargin);
 
             var mouse = GetGlobalMousePosition();
             var vp = GetViewportRect().Size;
