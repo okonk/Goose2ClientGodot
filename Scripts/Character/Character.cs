@@ -864,7 +864,7 @@ namespace Goose2Client.Character
                     handle.SetAccumulatedText(result.DisplayText);
                     return;
                 }
-                // IsInstanceValid stays true for a QueueFree'd-but-not-yet-freed container (WorldTextBridge.Clear), so check container identity.
+                // The handle may point into a previously freed container; the parent check verifies the line still belongs to the current one.
                 _battleTextManager.Cancel(key);
                 SpawnStart(_battleTextManager.OnPacket(key, value).DisplayText);
                 return;
