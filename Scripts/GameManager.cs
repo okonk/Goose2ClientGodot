@@ -66,6 +66,8 @@ namespace Goose2Client
         public Goose2Client.Character.NameDisplayMode NameDisplay { get; set; } =
             Goose2Client.Character.NameDisplayMode.PlayersOnly;
 
+        public bool CombineBattleText { get; set; } = true;
+
         private readonly HashSet<int> _partyIds = new();
         private readonly int[] _partySlots = new int[PartyWindow.MaxMembers];
 
@@ -421,6 +423,7 @@ namespace Goose2Client
             NameDisplay = System.Enum.IsDefined(typeof(Goose2Client.Character.NameDisplayMode), nd)
                 ? (Goose2Client.Character.NameDisplayMode)nd
                 : Goose2Client.Character.NameDisplayMode.PlayersOnly;
+            CombineBattleText = CharacterSettings.GetOption<bool>(Options.CombineBattleText, true);
             var applier = UiScaleApplier.Instance!;
             var mode = UiScale.NormalizeMode(CharacterSettings.GetOption<int>(Options.UiScaleMode, (int)UiScaleMode.Auto));
             var saved = CharacterSettings.GetOption<float>(Options.UiScaleValue, 1f);
