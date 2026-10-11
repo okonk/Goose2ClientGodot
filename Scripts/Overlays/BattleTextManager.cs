@@ -20,7 +20,7 @@ namespace Goose2Client.Overlays
             public long Total;
             public double Age;
             public double SinceLastHit;
-            public THandle Handle;
+            public THandle Handle = default!;
         }
 
         private readonly Dictionary<BattleTextMergeKey, Record> _open = new();
@@ -56,7 +56,7 @@ namespace Goose2Client.Overlays
 
         public bool TryGetHandle(BattleTextMergeKey key, out THandle handle)
         {
-            handle = default;
+            handle = default!;
             if (!_open.TryGetValue(key, out Record? r))
             {
                 return false;

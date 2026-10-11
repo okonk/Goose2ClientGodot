@@ -80,6 +80,21 @@ public class BattleTextManagerTests
     }
 
     [Fact]
+    public void Attach_UnknownKey_IsNoOp()
+    {
+        var m = new BattleTextManager<string>();
+        m.Attach(Heal, "x");
+        Assert.False(m.TryGetHandle(Heal, out _));
+    }
+
+    [Fact]
+    public void TryGetHandle_UnknownKey_ReturnsFalse()
+    {
+        var m = new BattleTextManager<string>();
+        Assert.False(m.TryGetHandle(Xp, out _));
+    }
+
+    [Fact]
     public void Attach_TryGetHandle_RoundTrips()
     {
         var m = new BattleTextManager<string>();
