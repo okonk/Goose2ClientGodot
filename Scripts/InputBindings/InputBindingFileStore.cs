@@ -51,9 +51,11 @@ public sealed class InputBindingFileStore
 
         try
         {
-            using var stream = new FileStream(tempPath, FileMode.CreateNew);
-            stream.Write(content);
-            stream.Flush(true);
+            using (var stream = new FileStream(tempPath, FileMode.CreateNew))
+            {
+                stream.Write(content);
+                stream.Flush(true);
+            }
 
             await PublishWithRetryAsync(tempPath, hadExisting, backupPath).ConfigureAwait(false);
         }

@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Threading;
 using Godot;
 using Goose2Client.Diagnostics;
 using Goose2Client.InputBindings;
@@ -120,7 +121,9 @@ namespace Goose2Client
                 : "user://input-bindings.json";
             InputBindings = new InputBindingService(
                 new GodotInputMapAdapter(new GodotInputMapSurface()),
-                new InputBindingFileStore(ProjectSettings.GlobalizePath(InputBindingsPath)));
+                new InputBindingFileStore(ProjectSettings.GlobalizePath(InputBindingsPath)),
+                SynchronizationContext.Current
+                    ?? throw new System.InvalidOperationException("Godot synchronization context is unavailable."));
             var bindingLoad = InputBindings.Initialize();
             if (bindingLoad.Warning is { } warning)
                 GD.PushWarning(warning);

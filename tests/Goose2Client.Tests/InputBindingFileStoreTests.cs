@@ -83,6 +83,23 @@ public class InputBindingFileStoreTests : IDisposable
     }
 
     [Fact]
+    public async Task Save_ClosesTempFileBeforePublish()
+    {
+        var exclusivelyOpened = false;
+        _store.FailBeforePublish = tempPath =>
+        {
+            using var probe = new FileStream(tempPath, FileMode.Open, FileAccess.ReadWrite, FileShare.None);
+            exclusivelyOpened = true;
+        };
+
+        var transaction = await _store.SaveAsync(Utf8("A"));
+
+        Assert.True(transaction.Complete());
+        Assert.True(exclusivelyOpened);
+        Assert.Equal(Utf8("A"), _store.Read());
+    }
+
+    [Fact]
     public async Task Save_ExistingFile_PublishesNewBytesAndLeavesNoTempOrBackupAfterComplete()
     {
         var first = await _store.SaveAsync(Utf8("A"));

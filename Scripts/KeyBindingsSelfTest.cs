@@ -181,7 +181,7 @@ internal static class KeyBindingsSelfTest
             var retryTransaction = await retryStore.SaveAsync([0x7B, 0x7D]);
             Assert(retryTransaction.Complete(), "a retried publish must still complete its transaction");
             Assert(retryAttempts == 2, $"a transient sharing violation must retry the publish, attempts={retryAttempts}");
-            Assert(OS.GetMainThreadId() == mainThread, "the retry continuation must resume on the main thread");
+            Assert(OS.GetThreadCallerId() == mainThread, "the retry continuation must resume on the main thread");
         }
         finally
         {

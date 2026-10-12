@@ -63,6 +63,31 @@ public class InputBindingSuppressionTests : IDisposable
     }
 
     [Fact]
+    public async Task BeginSuppression_WhileApplyIsInFlight_IsRejected()
+    {
+        var attempts = 0;
+        _store.FailBeforePublish = _ =>
+        {
+            if (++attempts == 1)
+                throw new IOException("sharing violation")
+                {
+                    HResult = unchecked((int)0x80070020)
+                };
+        };
+
+        var pending = _service.ApplyAsync(BuildDraft(
+            ("Attack", [new InputBinding.Keyboard(Key.E, false, false, false, false)])));
+
+        Assert.False(pending.IsCompleted);
+        var error = Assert.Throws<InvalidOperationException>(() => _service.BeginSuppression());
+        Assert.Contains("apply is in progress", error.Message, StringComparison.Ordinal);
+
+        var result = await pending;
+        Assert.True(result.Success);
+        Assert.False(_service.CaptureGateHeld);
+    }
+
+    [Fact]
     public void BeginSuppression_BeforeInitialize_Throws()
     {
         var service = new InputBindingService(

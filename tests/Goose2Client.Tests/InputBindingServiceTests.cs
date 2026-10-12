@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Goose2Client.InputBindings;
 using Godot;
@@ -305,6 +306,32 @@ public class InputBindingServiceTests : IDisposable
 
         Assert.True(result.Success);
         Assert.Equal(2, attempts);
+    }
+
+    [Fact]
+    public async Task Apply_OutsideConfiguredRuntimeContext_IsRejectedBeforeSaving()
+    {
+        var context = new SynchronizationContext();
+        var adapter = new FakeAdapter { Factory = _factory, FileProbe = _store };
+        var service = new InputBindingService(adapter, _store, context);
+        var previousContext = SynchronizationContext.Current;
+        try
+        {
+            SynchronizationContext.SetSynchronizationContext(context);
+            service.Initialize();
+        }
+        finally
+        {
+            SynchronizationContext.SetSynchronizationContext(previousContext);
+        }
+
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(() => Task.Run(() =>
+            service.ApplyAsync(BuildDraft(
+                ("Attack", [new InputBinding.Keyboard(Key.E, false, false, false, false)])))));
+
+        Assert.Contains("Godot synchronization context", error.Message, StringComparison.Ordinal);
+        Assert.Equal(["capture"], adapter.Operations);
+        Assert.Null(_store.Read());
     }
 
     [Fact]

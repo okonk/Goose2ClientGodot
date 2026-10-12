@@ -147,6 +147,45 @@ public class KeyBindingsWindowContractTests
     }
 
     [Fact]
+    public void ApplyInFlight_BlocksCloseAndEveryDraftMutation()
+    {
+        var src = WindowSource();
+        var close = MethodBody(src, "protected override void OnClosePressed()");
+        var resetAll = MethodBody(src, "private void OnResetAllPressed()");
+        var openCapture = MethodBody(src, "private void OpenCapturePrompt(string action, int index = -1)");
+        var remove = MethodBody(src, "private void RemoveBinding(string actionName, int index)");
+        var footer = MethodBody(src, "private void UpdateFooterButtons()");
+        var buildRows = MethodBody(src, "private void BuildRows()");
+        var rerender = MethodBody(src, "private void Rerender()");
+        var chips = MethodBody(src, "private void RebuildChips(RowShell shell, string actionName, List<KeyBindingEditorRow> rows)");
+
+        Assert.Contains("if (_applyInFlight)", close, StringComparison.Ordinal);
+        Assert.Contains("if (_applyInFlight)", resetAll, StringComparison.Ordinal);
+        Assert.Contains("if (_applyInFlight)", openCapture, StringComparison.Ordinal);
+        Assert.Contains("if (_applyInFlight)", remove, StringComparison.Ordinal);
+        Assert.Contains("if (_applyInFlight)", buildRows, StringComparison.Ordinal);
+        Assert.Contains("_cancel.Disabled = _footerLocked || _applyInFlight;", footer, StringComparison.Ordinal);
+        Assert.Contains("_resetAll.Disabled = _footerLocked || _applyInFlight", footer, StringComparison.Ordinal);
+        Assert.Contains("shell.ResetButton.Disabled = _applyInFlight;", rerender, StringComparison.Ordinal);
+        Assert.Equal(3, chips.Split("Disabled = _applyInFlight", StringSplitOptions.None).Length - 1);
+    }
+
+    [Fact]
+    public void ApplyInFlight_RerendersAtStartAndInFinally()
+    {
+        var apply = MethodBody(WindowSource(), "private async System.Threading.Tasks.Task ApplyDraftAsync()");
+        int set = apply.IndexOf("_applyInFlight = true", StringComparison.Ordinal);
+        int firstRender = apply.IndexOf("Rerender()", set, StringComparison.Ordinal);
+        int finallyBlock = apply.IndexOf("finally", firstRender, StringComparison.Ordinal);
+        int clear = apply.IndexOf("_applyInFlight = false", finallyBlock, StringComparison.Ordinal);
+        int finalRender = apply.IndexOf("Rerender()", clear, StringComparison.Ordinal);
+
+        Assert.True(set >= 0 && firstRender > set);
+        Assert.True(finallyBlock > firstRender && clear > finallyBlock);
+        Assert.True(finalRender > clear);
+    }
+
+    [Fact]
     public void Capture_SafeRestoreRequestedOnCloseTeardownAndHide()
     {
         var close = MethodBody(WindowSource(), "protected override void OnClosePressed()");

@@ -222,6 +222,9 @@ public partial class KeyBindingsWindow : BaseWindow
 
     protected override void OnClosePressed()
     {
+        if (_applyInFlight)
+            return;
+
         RequestSafeRestore();
         _editor?.Cancel();
         Rerender();
@@ -242,6 +245,9 @@ public partial class KeyBindingsWindow : BaseWindow
 
     private void OnResetAllPressed()
     {
+        if (_applyInFlight)
+            return;
+
         _editor!.ResetAll();
         Rerender();
     }
@@ -264,7 +270,7 @@ public partial class KeyBindingsWindow : BaseWindow
             return;
 
         _applyInFlight = true;
-        UpdateFooterButtons();
+        Rerender();
         try
         {
             // GodotSynchronizationContext resumes this on the main thread, which Rerender() below
@@ -274,10 +280,9 @@ public partial class KeyBindingsWindow : BaseWindow
         finally
         {
             _applyInFlight = false;
+            if (IsInstanceValid(this))
+                Rerender();
         }
-
-        if (IsInstanceValid(this))
-            Rerender();
     }
 
     private async void OnSuppressionRestored()
@@ -386,7 +391,8 @@ public partial class KeyBindingsWindow : BaseWindow
         if (_editor is null)
             return;
         _apply.Disabled = _footerLocked || _applyInFlight || !_editor.IsDirty;
-        _resetAll.Disabled = _footerLocked || InputActionCatalog.Actions.All(a => _editor.IsFactoryDefault(a.Name));
+        _cancel.Disabled = _footerLocked || _applyInFlight;
+        _resetAll.Disabled = _footerLocked || _applyInFlight || InputActionCatalog.Actions.All(a => _editor.IsFactoryDefault(a.Name));
     }
 
     private bool IsOverCancelCapture(Vector2 position) =>
@@ -444,6 +450,9 @@ public partial class KeyBindingsWindow : BaseWindow
             };
             reset.Pressed += () =>
             {
+                if (_applyInFlight)
+                    return;
+
                 _editor!.ResetAction(action.Name);
                 Rerender();
             };
@@ -585,6 +594,7 @@ public partial class KeyBindingsWindow : BaseWindow
                 else
                     shell.ActionLabel.RemoveThemeColorOverride("font_color");
                 shell.ResetButton.Visible = !_editor.IsFactoryDefault(actionName);
+                shell.ResetButton.Disabled = _applyInFlight;
                 RebuildChips(shell, actionName, rows);
             }
 
@@ -639,6 +649,7 @@ public partial class KeyBindingsWindow : BaseWindow
                 ClipText = true,
                 TextOverrunBehavior = TextServer.OverrunBehavior.TrimEllipsis,
                 CustomMinimumSize = slotSize,
+                Disabled = _applyInFlight,
                 TooltipText = conflicted
                     ? $"{text}\n{ConflictTooltip(actionName, rows[i].Conflicts)}"
                     : $"{text}\nClick to rebind, right-click to remove"
@@ -659,6 +670,7 @@ public partial class KeyBindingsWindow : BaseWindow
                 Name = $"Remove_{i}",
                 Text = "×",
                 FocusMode = FocusModeEnum.None,
+                Disabled = _applyInFlight,
                 TooltipText = "Remove binding"
             };
             remove.SetAnchorsPreset(LayoutPreset.RightWide);
@@ -685,6 +697,7 @@ public partial class KeyBindingsWindow : BaseWindow
             Name = "AddBindingButton",
             Text = "+",
             CustomMinimumSize = slotSize,
+            Disabled = _applyInFlight,
             TooltipText = "Add binding"
         };
         add.SetMeta(UiScaleLayout.SkipMeta, true);
@@ -699,6 +712,9 @@ public partial class KeyBindingsWindow : BaseWindow
 
     private void RemoveBinding(string actionName, int index)
     {
+        if (_applyInFlight)
+            return;
+
         _editor!.Remove(actionName, index);
         Rerender();
     }

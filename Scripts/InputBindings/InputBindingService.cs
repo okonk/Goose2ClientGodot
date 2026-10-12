@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Goose2Client.InputBindings;
@@ -52,26 +53,34 @@ public sealed class InputBindingSuppressionLease
 
 public sealed class InputBindingService
 {
+    private const int OperationIdle = 0;
+    private const int OperationApplying = 1;
+    private const int OperationSuppressing = 2;
     private static readonly InputBindingSet EmptySet = CreateEmptySet();
 
     private readonly IInputMapAdapter _adapter;
     private readonly InputBindingFileStore _store;
+    private readonly SynchronizationContext? _runtimeContext;
     private InputBindingSet? _factoryDefaults;
     private InputBindingSet? _active;
     private InputBindingSuppressionLease? _lease;
-    private bool _applying;
+    private int _operationState;
 
-    public InputBindingService(IInputMapAdapter adapter, InputBindingFileStore store)
+    public InputBindingService(
+        IInputMapAdapter adapter,
+        InputBindingFileStore store,
+        SynchronizationContext? runtimeContext = null)
     {
         _adapter = adapter;
         _store = store;
+        _runtimeContext = runtimeContext;
     }
 
     public bool IsInitialized => _active is not null;
 
     public string? StartupWarning { get; private set; }
 
-    public bool CaptureGateHeld => _lease is not null;
+    public bool CaptureGateHeld => Volatile.Read(ref _operationState) == OperationSuppressing;
 
     public event Action? CaptureGateReleased;
 
@@ -87,6 +96,7 @@ public sealed class InputBindingService
 
     public InputBindingInitializeResult Initialize()
     {
+        EnsureRuntimeContext();
         var result = InitializeCore();
         StartupWarning = result.Warning;
         return result;
@@ -161,28 +171,27 @@ public sealed class InputBindingService
 
     public async Task<InputBindingApplyResult> ApplyAsync(IReadOnlyDictionary<string, IReadOnlyList<InputBinding>> draft)
     {
-        if (_lease is not null)
+        EnsureRuntimeContext();
+        var previousState = Interlocked.CompareExchange(
+            ref _operationState,
+            OperationApplying,
+            OperationIdle);
+        if (previousState != OperationIdle)
             return new InputBindingApplyResult(
                 false,
-                "Input bindings cannot be applied while a key binding capture is in progress.",
+                previousState == OperationSuppressing
+                    ? "Input bindings cannot be applied while a key binding capture is in progress."
+                    : "Input bindings cannot be applied while another apply is in progress.",
                 null,
                 null);
 
-        if (_applying)
-            return new InputBindingApplyResult(
-                false,
-                "Input bindings cannot be applied while another apply is in progress.",
-                null,
-                null);
-
-        _applying = true;
         try
         {
             return await ApplyCoreAsync(draft).ConfigureAwait(true);
         }
         finally
         {
-            _applying = false;
+            Interlocked.Exchange(ref _operationState, OperationIdle);
         }
     }
 
@@ -252,20 +261,38 @@ public sealed class InputBindingService
 
     public InputBindingSuppressionLease BeginSuppression()
     {
+        EnsureRuntimeContext();
         if (_active is null)
             throw new InvalidOperationException("Initialize must be called before use.");
-        if (_lease is not null)
-            throw new InvalidOperationException("A suppression lease is already active.");
 
-        // A failed Replace rolls the runtime back to Active inside the adapter,
-        // so no lease is published on failure.
-        _adapter.Replace(_active, EmptySet);
-        _lease = new InputBindingSuppressionLease();
-        return _lease;
+        var previousState = Interlocked.CompareExchange(
+            ref _operationState,
+            OperationSuppressing,
+            OperationIdle);
+        if (previousState != OperationIdle)
+            throw new InvalidOperationException(
+                previousState == OperationApplying
+                    ? "Input bindings cannot be suppressed while an apply is in progress."
+                    : "A suppression lease is already active.");
+
+        try
+        {
+            // A failed Replace rolls the runtime back to Active inside the adapter,
+            // so no lease is published on failure.
+            _adapter.Replace(_active, EmptySet);
+            _lease = new InputBindingSuppressionLease();
+            return _lease;
+        }
+        catch
+        {
+            Interlocked.Exchange(ref _operationState, OperationIdle);
+            throw;
+        }
     }
 
     public void ProcessSuppression(IInputReleaseState input)
     {
+        EnsureRuntimeContext();
         ArgumentNullException.ThrowIfNull(input);
 
         var lease = _lease;
@@ -294,8 +321,15 @@ public sealed class InputBindingService
 
         lease.MarkRestored();
         _lease = null;
+        Interlocked.Exchange(ref _operationState, OperationIdle);
         SuppressionRestored?.Invoke();
         CaptureGateReleased?.Invoke();
+    }
+
+    private void EnsureRuntimeContext()
+    {
+        if (_runtimeContext is not null && !ReferenceEquals(SynchronizationContext.Current, _runtimeContext))
+            throw new InvalidOperationException("Input binding runtime operations must run on the Godot synchronization context.");
     }
 
     private static InputBindingSet CreateEmptySet()
