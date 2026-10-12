@@ -1,26 +1,55 @@
 using Goose2.AssetConverter.Png;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
+using SkiaSharp;
 using Xunit;
 
 namespace AssetConverter.Tests;
 
 public class PayloadDecoderTests
 {
-    private static byte[] BmpBytes(params Rgba32[] pixels)
+    private static byte[] BmpBytes(int width, params SKColor[] pixels)
     {
-        using var img = new Image<Rgba32>(pixels.Length, 1);
-        for (int i = 0; i < pixels.Length; i++) img[i, 0] = pixels[i];
-        using var ms = new MemoryStream();
-        img.SaveAsBmp(ms);
-        return ms.ToArray();
+        int height = pixels.Length / width;
+        int rowLength = (width * 3 + 3) & ~3;
+        using MemoryStream stream = new();
+        using BinaryWriter writer = new(stream);
+        writer.Write((byte)'B');
+        writer.Write((byte)'M');
+        writer.Write(54 + rowLength * height);
+        writer.Write(0);
+        writer.Write(54);
+        writer.Write(40);
+        writer.Write(width);
+        writer.Write(height);
+        writer.Write((ushort)1);
+        writer.Write((ushort)24);
+        writer.Write(0);
+        writer.Write(rowLength * height);
+        writer.Write(0);
+        writer.Write(0);
+        writer.Write(0);
+        writer.Write(0);
+        for (int y = height - 1; y >= 0; y--)
+        {
+            for (int x = 0; x < width; x++)
+            {
+                SKColor pixel = pixels[y * width + x];
+                writer.Write(pixel.Blue);
+                writer.Write(pixel.Green);
+                writer.Write(pixel.Red);
+            }
+
+            writer.Write(new byte[rowLength - width * 3]);
+        }
+
+        writer.Flush();
+        return stream.ToArray();
     }
 
     [Fact]
     public void Bmp_BlackAndNearBlackBecomeTransparent()
     {
         // black, near-black (1,0,0), and an opaque colour
-        var payload = BmpBytes(new Rgba32(0, 0, 0), new Rgba32(1, 0, 0), new Rgba32(200, 50, 50));
+        var payload = BmpBytes(3, new SKColor(0, 0, 0), new SKColor(1, 0, 0), new SKColor(200, 50, 50));
 
         var rgba = PayloadDecoder.ToRgba(payload, out int w, out int h);
 
@@ -29,6 +58,30 @@ public class PayloadDecoderTests
         Assert.Equal(0, rgba[7]);        // (1,0,0) -> alpha 0 (matches GifLoader.cs:100 rule)
         Assert.Equal(255, rgba[11]);     // colour stays opaque
         Assert.Equal(200, rgba[8]);      // rgb preserved
+    }
+
+    [Fact]
+    public void Bmp_ReturnsPixelsInTopDownRowOrder()
+    {
+        byte[] payload = BmpBytes(
+            2,
+            new SKColor(255, 0, 0),
+            new SKColor(0, 255, 0),
+            new SKColor(0, 0, 255),
+            new SKColor(255, 255, 255));
+
+        byte[] rgba = PayloadDecoder.ToRgba(payload, out int width, out int height);
+
+        Assert.Equal((2, 2), (width, height));
+        Assert.Equal(
+            new byte[]
+            {
+                255, 0, 0, 255,
+                0, 255, 0, 255,
+                0, 0, 255, 255,
+                255, 255, 255, 255,
+            },
+            rgba);
     }
 
     [Fact]

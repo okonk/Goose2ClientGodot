@@ -7,8 +7,7 @@ using Avalonia.Media.Imaging;
 using MapEditor.App.Rendering;
 using MapEditor.GameData.Rows;
 using MapEditor.Rendering;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
+using SkiaSharp;
 using Xunit;
 
 namespace MapEditor.App.Tests;
@@ -30,14 +29,13 @@ public class AvaloniaTintedSpriteCacheTests
             height = Math.Max(height, y + 1);
         }
 
-        using Image<Rgba32> image = new(width, height);
+        using SKBitmap image = new(new SKImageInfo(width, height, SKColorType.Rgba8888, SKAlphaType.Unpremul));
         foreach ((int x, int y, RgbaValue pixel) in pixels)
         {
-            image[x, y] = new Rgba32((byte)pixel.R, (byte)pixel.G, (byte)pixel.B, (byte)pixel.A);
+            image.SetPixel(x, y, new SKColor((byte)pixel.R, (byte)pixel.G, (byte)pixel.B, (byte)pixel.A));
         }
 
-        using MemoryStream encoded = new();
-        image.SaveAsPng(encoded);
+        using SKData encoded = image.Encode(SKEncodedImageFormat.Png, 100);
         return new Bitmap(new MemoryStream(encoded.ToArray()));
     }
 

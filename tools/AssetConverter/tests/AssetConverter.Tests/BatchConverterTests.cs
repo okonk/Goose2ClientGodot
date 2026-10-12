@@ -49,7 +49,6 @@ public class BatchConverterTests
     public void Convert_BmpPayload_4590_Succeeds()
     {
         // 4590.adf contains a BMP payload (starts with "BM"), not GIF.
-        // The batch converter must dispatch to ImageSharp for BMP payloads.
         var outDir = Path.Combine(Path.GetTempPath(), "ac_test_" + Guid.NewGuid().ToString("N"));
         try
         {
@@ -71,7 +70,7 @@ public class BatchConverterTests
     public void Convert_UnsupportedPayload_4589_ReportedAsFailure()
     {
         // 4589.adf is a graphic ADF whose decoded payload starts with 0xCD 0xCF 0xCC
-        // — not GIF, not BMP, not any format ImageSharp can decode.
+        // — not GIF or BMP.
         // It should fail with a clear unsupported-format message.
         var outDir = Path.Combine(Path.GetTempPath(), "ac_test_" + Guid.NewGuid().ToString("N"));
         try

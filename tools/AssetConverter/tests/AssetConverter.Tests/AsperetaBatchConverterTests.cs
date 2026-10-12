@@ -1,7 +1,6 @@
 using Goose2.AssetConverter;
 using Goose2.AssetConverter.Aspereta;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
+using SkiaSharp;
 using Xunit;
 
 namespace AssetConverter.Tests;
@@ -22,9 +21,9 @@ public class AsperetaBatchConverterTests
             Assert.True(File.Exists(Path.Combine(outDir, "20000.png")));
 
             var sheets = AsperetaSheets.Load(Paths.AsperetaData);
-            using var img = Image.Load<Rgba32>(
-                Path.Combine(outDir, $"{sheets[1].NewSheetNumber}.png"));
-            Assert.Equal(0, img[0, img.Height - 1].A);   // corner background pixel transparent
+            using SKBitmap img = SKBitmap.Decode(
+                Path.Combine(outDir, $"{sheets[1].NewSheetNumber}.png"))!;
+            Assert.Equal(0, img.GetPixel(0, img.Height - 1).Alpha);   // corner background pixel transparent
         }
         finally { Directory.Delete(outDir, recursive: true); }
     }

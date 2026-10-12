@@ -7,8 +7,6 @@ using Avalonia.Media.Imaging;
 using Avalonia.Platform;
 using MapEditor.GameData.Rows;
 using MapEditor.Rendering;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
 
 namespace MapEditor.App.Rendering;
 
@@ -61,7 +59,6 @@ internal sealed class AvaloniaTintedSpriteCache : IDisposable
         byte[] pixels = new byte[rowLength * rect.Height];
         try
         {
-            using Image<Bgra32> blended = new(rect.Width, rect.Height);
             for (int y = 0; y < rect.Height; y++)
             {
                 source.CopyPixels(new PixelRect(rect.X, rect.Y + y, rect.Width, 1), buffer, rowLength, rowLength);
@@ -70,20 +67,18 @@ internal sealed class AvaloniaTintedSpriteCache : IDisposable
                 for (int x = 0; x < rect.Width; x++)
                 {
                     int offset = x * 4;
+                    int output = outputOffset + offset;
                     int sourceAlpha = row[offset + 3];
                     // Skia decodes PNG sheets premultiplied; the client blend operates on straight RGB.
                     int b = Unpremultiply(row[offset], sourceAlpha);
                     int g = Unpremultiply(row[offset + 1], sourceAlpha);
                     int r = Unpremultiply(row[offset + 2], sourceAlpha);
-                    blended[x, y] = new Bgra32(
-                        (byte)Blend(r, tint.R, alpha, inverse),
-                        (byte)Blend(g, tint.G, alpha, inverse),
-                        (byte)Blend(b, tint.B, alpha, inverse),
-                        (byte)sourceAlpha);
+                    pixels[output] = (byte)Blend(b, tint.B, alpha, inverse);
+                    pixels[output + 1] = (byte)Blend(g, tint.G, alpha, inverse);
+                    pixels[output + 2] = (byte)Blend(r, tint.R, alpha, inverse);
+                    pixels[output + 3] = (byte)sourceAlpha;
                 }
             }
-
-            blended.CopyPixelDataTo(pixels.AsSpan());
             IntPtr data = Marshal.AllocHGlobal(pixels.Length);
             try
             {

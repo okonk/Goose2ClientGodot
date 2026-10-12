@@ -1,6 +1,4 @@
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
-using SixLabors.ImageSharp.Processing;
+using Goose2.AssetConverter.Png;
 
 namespace Goose2.AssetConverter.Manifest;
 
@@ -18,29 +16,40 @@ public static class CustomAssetSheet
 
     public static void Write(string sourceDir, string outputDir)
     {
-        using var exclamation = LoadIcon(sourceDir, "exclamation.png");
-        using var question = LoadIcon(sourceDir, "question.png");
-        using var sheet = new Image<Rgba32>(64, 32);
-        sheet.Mutate(context =>
+        byte[] exclamation = LoadIcon(sourceDir, "exclamation.png");
+        byte[] question = LoadIcon(sourceDir, "question.png");
+        byte[] sheet = new byte[64 * 32 * 4];
+        int iconRowLength = 32 * 4;
+        int sheetRowLength = 64 * 4;
+        for (int y = 0; y < 32; y++)
         {
-            context.DrawImage(exclamation, new Point(0, 0), 1f);
-            context.DrawImage(question, new Point(32, 0), 1f);
-        });
+            Buffer.BlockCopy(exclamation, y * iconRowLength, sheet, y * sheetRowLength, iconRowLength);
+            Buffer.BlockCopy(question, y * iconRowLength, sheet, y * sheetRowLength + iconRowLength, iconRowLength);
+        }
 
-        Directory.CreateDirectory(outputDir);
-        sheet.SaveAsPng(Path.Combine(outputDir, $"{SheetNumber}.png"));
+        // The source icons hide a magenta key colour under alpha 0; zero it so filtering can't bleed it.
+        for (int i = 0; i < sheet.Length; i += 4)
+        {
+            if (sheet[i + 3] == 0)
+            {
+                sheet[i] = 0;
+                sheet[i + 1] = 0;
+                sheet[i + 2] = 0;
+            }
+        }
+
+        PngWriter.Write(sheet, 64, 32, Path.Combine(outputDir, $"{SheetNumber}.png"));
     }
 
-    private static Image<Rgba32> LoadIcon(string sourceDir, string fileName)
+    private static byte[] LoadIcon(string sourceDir, string fileName)
     {
         string path = Path.Combine(sourceDir, fileName);
-        var image = Image.Load<Rgba32>(path);
-        if (image.Width == 32 && image.Height == 32)
+        byte[] image = SkiaImageCodec.DecodeRgba(File.ReadAllBytes(path), out int width, out int height);
+        if (width == 32 && height == 32)
         {
             return image;
         }
 
-        image.Dispose();
         throw new InvalidDataException($"{path} must be 32x32 pixels.");
     }
 }

@@ -1,7 +1,6 @@
 using Goose2.AssetConverter.Adf;
 using Goose2.AssetConverter.Gif;
 using Goose2.AssetConverter.Png;
-using SixLabors.ImageSharp;
 
 namespace Goose2.AssetConverter;
 
@@ -71,9 +70,8 @@ public static class BatchConverter
         // BMP: signature starts with "BM"
         if (payload[0] == 'B' && payload[1] == 'M')
         {
-            using var image = Image.Load(payload);
-            Directory.CreateDirectory(Path.GetDirectoryName(outPath)!);
-            image.SaveAsPng(outPath);
+            byte[] rgba = SkiaImageCodec.DecodeRgba(payload, out int w, out int h);
+            PngWriter.Write(rgba, w, h, outPath);
             return;
         }
 

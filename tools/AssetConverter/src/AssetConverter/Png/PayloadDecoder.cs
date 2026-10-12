@@ -1,6 +1,4 @@
 using Goose2.AssetConverter.Gif;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
 
 namespace Goose2.AssetConverter.Png;
 
@@ -17,11 +15,7 @@ public static class PayloadDecoder
 
         if (payload.Length >= 2 && payload[0] == 'B' && payload[1] == 'M')
         {
-            using var image = Image.Load<Rgba32>(payload);
-            width = image.Width;
-            height = image.Height;
-            var rgba = new byte[width * height * 4];
-            image.CopyPixelDataTo(rgba);
+            byte[] rgba = SkiaImageCodec.DecodeRgba(payload, out width, out height);
             for (int i = 0; i < rgba.Length; i += 4)
             {
                 if (rgba[i] <= 1 && rgba[i + 1] == 0 && rgba[i + 2] == 0)
