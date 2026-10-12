@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Threading.Tasks;
 using Goose2Client.InputBindings;
 using Xunit;
 
@@ -37,6 +38,13 @@ public class InputBindingFileStoreTests : IDisposable
 
     private static byte[] Utf8(string text) => Encoding.UTF8.GetBytes(text);
 
+    // The Windows error the game reports when another process holds input-bindings.json open.
+    private static IOException SharingViolation() =>
+        new IOException("The process cannot access the file because it is being used by another process.")
+        {
+            HResult = unchecked((int)0x80070020)
+        };
+
     private string[] FilesInDirectory() => Directory.GetFiles(_directory);
 
     [Fact]
@@ -64,10 +72,10 @@ public class InputBindingFileStoreTests : IDisposable
     }
 
     [Fact]
-    public void Save_FirstTime_CreatesDestinationAndLeavesNoTempFile()
+    public async Task Save_FirstTime_CreatesDestinationAndLeavesNoTempFile()
     {
         var content = Utf8("{\"version\":1,\"actions\":{}}");
-        var transaction = _store.Save(content);
+        var transaction = await _store.SaveAsync(content);
 
         Assert.True(transaction.Complete());
         Assert.Equal(content, _store.Read());
@@ -75,12 +83,12 @@ public class InputBindingFileStoreTests : IDisposable
     }
 
     [Fact]
-    public void Save_ExistingFile_PublishesNewBytesAndLeavesNoTempOrBackupAfterComplete()
+    public async Task Save_ExistingFile_PublishesNewBytesAndLeavesNoTempOrBackupAfterComplete()
     {
-        var first = _store.Save(Utf8("A"));
+        var first = await _store.SaveAsync(Utf8("A"));
         Assert.True(first.Complete());
 
-        var second = _store.Save(Utf8("B"));
+        var second = await _store.SaveAsync(Utf8("B"));
         Assert.True(second.Complete());
 
         Assert.Equal(Utf8("B"), _store.Read());
@@ -88,26 +96,84 @@ public class InputBindingFileStoreTests : IDisposable
     }
 
     [Fact]
-    public void Save_FailureBeforeRename_PreservesOldBytesAndCleansTemp()
+    public async Task Save_FailureBeforeRename_PreservesOldBytesAndCleansTemp()
     {
-        var first = _store.Save(Utf8("A"));
+        var first = await _store.SaveAsync(Utf8("A"));
         Assert.True(first.Complete());
 
         _store.FailBeforePublish = _ => throw new IOException("simulated write failure");
 
-        Assert.Throws<IOException>(() => _store.Save(Utf8("B")));
+        await Assert.ThrowsAsync<IOException>(() => _store.SaveAsync(Utf8("B")));
 
         Assert.Equal(Utf8("A"), _store.Read());
         Assert.Equal(new[] { _filePath }, FilesInDirectory());
     }
 
     [Fact]
-    public void Rollback_ExistingDestination_RestoresOldBytes()
+    public async Task Save_TransientSharingViolation_RetriesUntilPublishSucceeds()
     {
-        var first = _store.Save(Utf8("A"));
+        var first = await _store.SaveAsync(Utf8("A"));
         Assert.True(first.Complete());
 
-        var second = _store.Save(Utf8("B"));
+        var attempts = 0;
+        _store.FailBeforePublish = _ =>
+        {
+            if (++attempts <= 2)
+                throw SharingViolation();
+        };
+
+        var second = await _store.SaveAsync(Utf8("B"));
+        Assert.True(second.Complete());
+
+        Assert.Equal(3, attempts);
+        Assert.Equal(Utf8("B"), _store.Read());
+        Assert.Equal(new[] { _filePath }, FilesInDirectory());
+    }
+
+    [Fact]
+    public async Task Save_PersistentSharingViolation_ThrowsAfterBoundedAttemptsAndPreservesOldBytes()
+    {
+        var first = await _store.SaveAsync(Utf8("A"));
+        Assert.True(first.Complete());
+
+        var attempts = 0;
+        _store.FailBeforePublish = _ =>
+        {
+            attempts++;
+            throw SharingViolation();
+        };
+
+        var failure = await Assert.ThrowsAsync<IOException>(() => _store.SaveAsync(Utf8("B")));
+
+        Assert.Equal(5, attempts);
+        Assert.Equal(32, failure.HResult & 0xFFFF);
+        Assert.Equal(Utf8("A"), _store.Read());
+        Assert.Equal(new[] { _filePath }, FilesInDirectory());
+    }
+
+    [Fact]
+    public async Task Save_NonTransientFailure_IsNotRetried()
+    {
+        var attempts = 0;
+        _store.FailBeforePublish = _ =>
+        {
+            attempts++;
+            throw new IOException("simulated write failure");
+        };
+
+        await Assert.ThrowsAsync<IOException>(() => _store.SaveAsync(Utf8("A")));
+
+        Assert.Equal(1, attempts);
+        Assert.Empty(FilesInDirectory());
+    }
+
+    [Fact]
+    public async Task Rollback_ExistingDestination_RestoresOldBytes()
+    {
+        var first = await _store.SaveAsync(Utf8("A"));
+        Assert.True(first.Complete());
+
+        var second = await _store.SaveAsync(Utf8("B"));
         Assert.True(second.Rollback());
 
         Assert.Equal(Utf8("A"), _store.Read());
@@ -116,9 +182,9 @@ public class InputBindingFileStoreTests : IDisposable
     }
 
     [Fact]
-    public void Rollback_MissingDestination_DeletesPublishedFile()
+    public async Task Rollback_MissingDestination_DeletesPublishedFile()
     {
-        var transaction = _store.Save(Utf8("A"));
+        var transaction = await _store.SaveAsync(Utf8("A"));
 
         Assert.True(transaction.Rollback());
 
@@ -128,12 +194,12 @@ public class InputBindingFileStoreTests : IDisposable
     }
 
     [Fact]
-    public void Rollback_Failure_ReturnsFalseAndLeavesPublishedBytes()
+    public async Task Rollback_Failure_ReturnsFalseAndLeavesPublishedBytes()
     {
-        var first = _store.Save(Utf8("A"));
+        var first = await _store.SaveAsync(Utf8("A"));
         Assert.True(first.Complete());
 
-        var second = _store.Save(Utf8("B"));
+        var second = await _store.SaveAsync(Utf8("B"));
         _store.FailDuringRollback = _ => throw new IOException("simulated rollback failure");
 
         Assert.False(second.Rollback());
@@ -145,12 +211,12 @@ public class InputBindingFileStoreTests : IDisposable
     }
 
     [Fact]
-    public void Complete_CleanupFailure_LeavesDestinationIntactAndReportsSeparately()
+    public async Task Complete_CleanupFailure_LeavesDestinationIntactAndReportsSeparately()
     {
-        var first = _store.Save(Utf8("A"));
+        var first = await _store.SaveAsync(Utf8("A"));
         Assert.True(first.Complete());
 
-        var second = _store.Save(Utf8("B"));
+        var second = await _store.SaveAsync(Utf8("B"));
         _store.FailDuringCleanup = _ => throw new IOException("simulated cleanup failure");
 
         Assert.False(second.Complete());
@@ -164,12 +230,12 @@ public class InputBindingFileStoreTests : IDisposable
     }
 
     [Fact]
-    public void Complete_RealBackupDeletionFailure_ReportsFalseAndStaysRetryable()
+    public async Task Complete_RealBackupDeletionFailure_ReportsFalseAndStaysRetryable()
     {
-        var first = _store.Save(Utf8("A"));
+        var first = await _store.SaveAsync(Utf8("A"));
         Assert.True(first.Complete());
 
-        var second = _store.Save(Utf8("B"));
+        var second = await _store.SaveAsync(Utf8("B"));
         var backup = FilesInDirectory().Single(f => f.EndsWith(".bak"));
         File.Delete(backup);
         Directory.CreateDirectory(backup);

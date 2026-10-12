@@ -91,6 +91,10 @@ internal static class KeyBindingsSelfTest
 
         async System.Threading.Tasks.Task Frame() => await gm.ToSignal(tree, SceneTree.SignalName.ProcessFrame);
 
+        // The engine pumps Task.Delay continuations mid-frame, unlike a ProcessFrame await, so one
+        // idle frame after a retryable save re-aligns the frame-counting legs below.
+        async System.Threading.Tasks.Task RealignFrame() => await Frame();
+
         void Assert(bool cond, string msg)
         {
             if (!cond)
@@ -155,9 +159,38 @@ internal static class KeyBindingsSelfTest
         draft["CycleHotbarPage"] = [new InputBinding.Mouse(MouseButton.WheelUp, false, false, false, false)];
         draft["ToggleMount"] = [new InputBinding.JoypadButton(JoyButton.A)];
         draft["MoveLeft"] = [new InputBinding.JoypadAxis(JoyAxis.LeftX, -1), new InputBinding.JoypadAxis(JoyAxis.LeftX, 1)];
-        var applied = service.Apply(draft);
+        var applied = await service.ApplyAsync(draft);
         Assert(applied.Success, $"Apply failed: {applied.Error}");
         Assert(File.Exists(bindingPath), "Apply must write the temporary binding file");
+        await RealignFrame();
+
+        var retryPath = ProjectSettings.GlobalizePath($"user://input-bindings-selftest-retry-{OS.GetProcessId()}.json");
+        var retryStore = new InputBindingFileStore(retryPath);
+        var retryAttempts = 0;
+        retryStore.FailBeforePublish = _ =>
+        {
+            if (++retryAttempts == 1)
+                throw new IOException("The process cannot access the file because it is being used by another process.")
+                {
+                    HResult = unchecked((int)0x80070020)
+                };
+        };
+        try
+        {
+            var mainThread = OS.GetMainThreadId();
+            var retryTransaction = await retryStore.SaveAsync([0x7B, 0x7D]);
+            Assert(retryTransaction.Complete(), "a retried publish must still complete its transaction");
+            Assert(retryAttempts == 2, $"a transient sharing violation must retry the publish, attempts={retryAttempts}");
+            Assert(OS.GetMainThreadId() == mainThread, "the retry continuation must resume on the main thread");
+        }
+        finally
+        {
+            if (File.Exists(retryPath))
+                File.Delete(retryPath);
+        }
+
+        await RealignFrame();
+        GD.Print("[key_bindings_selftest] OK a transient sharing violation retries without leaving the main thread");
 
         var attackEvents = InputMap.ActionGetEvents("Attack");
         Assert(attackEvents.Count == 1 && attackEvents[0] is InputEventKey { PhysicalKeycode: Key.Space, CtrlPressed: true, ShiftPressed: false, AltPressed: false, MetaPressed: false },

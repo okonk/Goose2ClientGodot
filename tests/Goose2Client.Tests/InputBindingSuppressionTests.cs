@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 using Godot;
 using Goose2Client.InputBindings;
 using Xunit;
@@ -102,11 +103,11 @@ public class InputBindingSuppressionTests : IDisposable
     }
 
     [Fact]
-    public void Restore_RepublishesActiveNotFactory_WhenActiveDiffers()
+    public async Task Restore_RepublishesActiveNotFactory_WhenActiveDiffers()
     {
         var candidate = BuildSet(
             ("Attack", [new InputBinding.Keyboard(Key.E, false, false, false, false)]));
-        var applied = _service.Apply(BuildDraft(
+        var applied = await _service.ApplyAsync(BuildDraft(
             ("Attack", [new InputBinding.Keyboard(Key.E, false, false, false, false)])));
         Assert.True(applied.Success);
 
@@ -120,13 +121,13 @@ public class InputBindingSuppressionTests : IDisposable
     }
 
     [Fact]
-    public void Apply_IsRejectedWhileLeaseActiveAndSucceedsAfterRestore()
+    public async Task Apply_IsRejectedWhileLeaseActiveAndSucceedsAfterRestore()
     {
         var lease = _service.BeginSuppression();
         var draft = BuildDraft(
             ("Attack", [new InputBinding.Keyboard(Key.E, false, false, false, false)]));
 
-        var rejected = _service.Apply(draft);
+        var rejected = await _service.ApplyAsync(draft);
         Assert.False(rejected.Success);
         Assert.NotNull(rejected.Error);
         AssertSetEquals(EmptySet(), _adapter.Current!);
@@ -135,7 +136,7 @@ public class InputBindingSuppressionTests : IDisposable
         lease.RequestRestore(InputReleaseGate.Immediate);
         _service.ProcessSuppression(_input);
 
-        var applied = _service.Apply(draft);
+        var applied = await _service.ApplyAsync(draft);
         Assert.True(applied.Success);
         AssertSetEquals(_service.Active, _adapter.Current!);
         Assert.NotNull(_store.Read());

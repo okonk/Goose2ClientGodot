@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace Goose2Client.InputBindings;
 
@@ -58,6 +59,7 @@ public sealed class InputBindingService
     private InputBindingSet? _factoryDefaults;
     private InputBindingSet? _active;
     private InputBindingSuppressionLease? _lease;
+    private bool _applying;
 
     public InputBindingService(IInputMapAdapter adapter, InputBindingFileStore store)
     {
@@ -157,7 +159,7 @@ public sealed class InputBindingService
         return new InputBindingInitializeResult(true, null);
     }
 
-    public InputBindingApplyResult Apply(IReadOnlyDictionary<string, IReadOnlyList<InputBinding>> draft)
+    public async Task<InputBindingApplyResult> ApplyAsync(IReadOnlyDictionary<string, IReadOnlyList<InputBinding>> draft)
     {
         if (_lease is not null)
             return new InputBindingApplyResult(
@@ -166,6 +168,26 @@ public sealed class InputBindingService
                 null,
                 null);
 
+        if (_applying)
+            return new InputBindingApplyResult(
+                false,
+                "Input bindings cannot be applied while another apply is in progress.",
+                null,
+                null);
+
+        _applying = true;
+        try
+        {
+            return await ApplyCoreAsync(draft).ConfigureAwait(true);
+        }
+        finally
+        {
+            _applying = false;
+        }
+    }
+
+    private async Task<InputBindingApplyResult> ApplyCoreAsync(IReadOnlyDictionary<string, IReadOnlyList<InputBinding>> draft)
+    {
         var active = Active;
         var factory = FactoryDefaults;
 
@@ -176,7 +198,9 @@ public sealed class InputBindingService
         InputBindingFileStoreTransaction transaction;
         try
         {
-            transaction = _store.Save(InputBindingJson.Serialize(candidate, factory));
+            // Resuming on the Godot main thread matters: the adapter writes the InputMap here and
+            // the caller's UI continues in this continuation.
+            transaction = await _store.SaveAsync(InputBindingJson.Serialize(candidate, factory)).ConfigureAwait(true);
         }
         catch (Exception ex)
         {

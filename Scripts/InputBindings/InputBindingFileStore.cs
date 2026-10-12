@@ -1,10 +1,25 @@
 using System;
 using System.IO;
+using System.Threading.Tasks;
 
 namespace Goose2Client.InputBindings;
 
 public sealed class InputBindingFileStore
 {
+    // Publishing replaces the destination, so it fails while a scanner, an editor, or a second
+    // client holds input-bindings.json open without FILE_SHARE_DELETE. Those locks are transient.
+    private const int ErrorSharingViolation = 32;
+    private const int ErrorLockViolation = 33;
+    private const int Win32FacilityHResult = unchecked((int)0x80070000);
+
+    private static readonly TimeSpan[] PublishRetryDelays =
+    {
+        TimeSpan.FromMilliseconds(50),
+        TimeSpan.FromMilliseconds(100),
+        TimeSpan.FromMilliseconds(150),
+        TimeSpan.FromMilliseconds(200),
+    };
+
     private readonly string _path;
 
     public InputBindingFileStore(string absolutePath)
@@ -22,7 +37,7 @@ public sealed class InputBindingFileStore
         return File.Exists(_path) ? File.ReadAllBytes(_path) : null;
     }
 
-    public InputBindingFileStoreTransaction Save(byte[] content)
+    public async Task<InputBindingFileStoreTransaction> SaveAsync(byte[] content)
     {
         ArgumentNullException.ThrowIfNull(content);
 
@@ -40,12 +55,7 @@ public sealed class InputBindingFileStore
             stream.Write(content);
             stream.Flush(true);
 
-            if (hadExisting)
-                File.Copy(_path, backupPath!, overwrite: true);
-
-            FailBeforePublish?.Invoke(tempPath);
-
-            File.Move(tempPath, _path, overwrite: true);
+            await PublishWithRetryAsync(tempPath, hadExisting, backupPath).ConfigureAwait(false);
         }
         catch
         {
@@ -56,6 +66,35 @@ public sealed class InputBindingFileStore
         }
 
         return new InputBindingFileStoreTransaction(this, tempPath, backupPath, hadExisting);
+    }
+
+    private async Task PublishWithRetryAsync(string tempPath, bool hadExisting, string? backupPath)
+    {
+        for (var attempt = 0; ; attempt++)
+        {
+            try
+            {
+                if (hadExisting)
+                    File.Copy(_path, backupPath!, overwrite: true);
+
+                FailBeforePublish?.Invoke(tempPath);
+
+                File.Move(tempPath, _path, overwrite: true);
+                return;
+            }
+            catch (Exception ex) when (attempt < PublishRetryDelays.Length && IsTransientLock(ex))
+            {
+                await Task.Delay(PublishRetryDelays[attempt]).ConfigureAwait(false);
+            }
+        }
+    }
+
+    private static bool IsTransientLock(Exception ex)
+    {
+        if (ex is not IOException io || (io.HResult & Win32FacilityHResult) != Win32FacilityHResult)
+            return false;
+
+        return (io.HResult & 0xFFFF) is ErrorSharingViolation or ErrorLockViolation;
     }
 
     // Fault injection seams for tests; null in production.

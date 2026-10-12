@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace Goose2Client.InputBindings;
 
@@ -107,9 +108,9 @@ public sealed class KeyBindingEditorState
         Recompute();
     }
 
-    public InputBindingApplyResult Apply()
+    public async Task<InputBindingApplyResult> ApplyAsync()
     {
-        var result = _service.Apply(DraftView());
+        var result = await _service.ApplyAsync(DraftView()).ConfigureAwait(true);
         if (result.Success)
         {
             _baseline = _service.Active.Clone();

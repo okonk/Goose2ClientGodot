@@ -120,7 +120,7 @@ public class KeyBindingsWindowContractTests
         Assert.DoesNotContain("new InputBindingService(", src, StringComparison.Ordinal);
         Assert.DoesNotContain("InputBindings.Apply(", src, StringComparison.Ordinal);
         Assert.DoesNotContain("InputMap.", src, StringComparison.Ordinal);
-        Assert.Contains(".Apply();", src, StringComparison.Ordinal);
+        Assert.Contains(".ApplyAsync();", src, StringComparison.Ordinal);
         Assert.Contains(".Cancel();", src, StringComparison.Ordinal);
         Assert.Contains(".Search = ", src, StringComparison.Ordinal);
         Assert.Contains(".ResetAll();", src, StringComparison.Ordinal);
@@ -131,7 +131,7 @@ public class KeyBindingsWindowContractTests
     [Fact]
     public void Apply_LeavesWindowOpenAndCancel_DiscardsAndHides()
     {
-        var apply = MethodBody(WindowSource(), "private void OnApplyPressed()");
+        var apply = MethodBody(WindowSource(), "private async void OnApplyPressed()");
         Assert.DoesNotContain("Hide(", apply, StringComparison.Ordinal);
 
         var cancel = MethodBody(WindowSource(), "private void OnCancelPressed()");

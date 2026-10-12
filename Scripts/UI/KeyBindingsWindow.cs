@@ -56,6 +56,7 @@ public partial class KeyBindingsWindow : BaseWindow
     private int _capturingIndex = -1;
     private bool _candidateSaved;
     private bool _pendingApply;
+    private bool _applyInFlight;
     private bool _footerLocked;
     private float _stylesFactor = -1f;
     private readonly Dictionary<string, StyleBox> _styles = new();
@@ -245,7 +246,7 @@ public partial class KeyBindingsWindow : BaseWindow
         Rerender();
     }
 
-    private void OnApplyPressed()
+    private async void OnApplyPressed()
     {
         if (_capture is { IsActive: true })
         {
@@ -254,25 +255,45 @@ public partial class KeyBindingsWindow : BaseWindow
             return;
         }
 
-        _editor!.Apply();
-        Rerender();
+        await ApplyDraftAsync();
     }
 
-    private void OnCancelCapturePressed()
+    private async System.Threading.Tasks.Task ApplyDraftAsync()
     {
-        RequestSafeRestore();
+        if (_applyInFlight)
+            return;
+
+        _applyInFlight = true;
+        UpdateFooterButtons();
+        try
+        {
+            // GodotSynchronizationContext resumes this on the main thread, which Rerender() below
+            // and the service's InputMap writes both require.
+            await _editor!.ApplyAsync();
+        }
+        finally
+        {
+            _applyInFlight = false;
+        }
+
+        if (IsInstanceValid(this))
+            Rerender();
     }
 
-    private void OnSuppressionRestored()
+    private async void OnSuppressionRestored()
     {
         EndCaptureSession();
         _lease = null;
         if (_pendingApply)
         {
             _pendingApply = false;
-            _editor!.Apply();
-            Rerender();
+            await ApplyDraftAsync();
         }
+    }
+
+    private void OnCancelCapturePressed()
+    {
+        RequestSafeRestore();
     }
 
     private void RequestSafeRestore()
@@ -287,6 +308,8 @@ public partial class KeyBindingsWindow : BaseWindow
     private void OpenCapturePrompt(string action, int index = -1)
     {
         if (_capture is { IsActive: true })
+            return;
+        if (_applyInFlight)
             return;
 
         var service = GameManager.Instance.InputBindings;
@@ -362,7 +385,7 @@ public partial class KeyBindingsWindow : BaseWindow
     {
         if (_editor is null)
             return;
-        _apply.Disabled = _footerLocked || !_editor.IsDirty;
+        _apply.Disabled = _footerLocked || _applyInFlight || !_editor.IsDirty;
         _resetAll.Disabled = _footerLocked || InputActionCatalog.Actions.All(a => _editor.IsFactoryDefault(a.Name));
     }
 

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 using Goose2Client.InputBindings;
 using Godot;
 using Xunit;
@@ -43,11 +44,18 @@ public class InputBindingServiceTests : IDisposable
         }
     }
 
-    private void SeedFile(InputBindingSet set)
+    private async Task SeedFile(InputBindingSet set)
     {
-        var transaction = _store.Save(InputBindingJson.Serialize(set, _factory));
+        var transaction = await _store.SaveAsync(InputBindingJson.Serialize(set, _factory));
         Assert.True(transaction.Complete());
     }
+
+    // The Windows error the game reports when another process holds input-bindings.json open.
+    private static IOException SharingViolation() =>
+        new IOException("The process cannot access the file because it is being used by another process.")
+        {
+            HResult = unchecked((int)0x80070020)
+        };
 
     private void AssertObservableState(InputBindingSet active, byte[]? fileBytes, InputBindingSet? runtime)
     {
@@ -79,11 +87,11 @@ public class InputBindingServiceTests : IDisposable
     }
 
     [Fact]
-    public void Initialize_PartialOverrides_ResolveMissingActionsFromFactoryAndReplaceRuntime()
+    public async Task Initialize_PartialOverrides_ResolveMissingActionsFromFactoryAndReplaceRuntime()
     {
         var resolved = BuildSet(
             ("Attack", [new InputBinding.Keyboard(Key.E, true, false, false, false)]));
-        SeedFile(resolved);
+        await SeedFile(resolved);
         var expectedBytes = _store.Read()!;
 
         var result = _service.Initialize();
@@ -99,12 +107,12 @@ public class InputBindingServiceTests : IDisposable
     }
 
     [Fact]
-    public void Initialize_ValidOverrides_ReplacesRuntimeMapIncludingUnboundActionAndLeavesFileUntouched()
+    public async Task Initialize_ValidOverrides_ReplacesRuntimeMapIncludingUnboundActionAndLeavesFileUntouched()
     {
         var resolved = BuildSet(
             ("Attack", [new InputBinding.Keyboard(Key.B, false, false, false, false)]),
             ("PickUp", []));
-        SeedFile(resolved);
+        await SeedFile(resolved);
         var expectedBytes = _store.Read()!;
 
         var result = _service.Initialize();
@@ -117,9 +125,9 @@ public class InputBindingServiceTests : IDisposable
     }
 
     [Fact]
-    public void Initialize_OverridesIdenticalToFactory_SkipsReplace()
+    public async Task Initialize_OverridesIdenticalToFactory_SkipsReplace()
     {
-        SeedFile(_factory);
+        await SeedFile(_factory);
         var bytes = _store.Read()!;
 
         var result = _service.Initialize();
@@ -131,9 +139,9 @@ public class InputBindingServiceTests : IDisposable
     }
 
     [Fact]
-    public void Initialize_ReplaceFailure_RuntimeRestored_FallsBackToFactoryWithWarning()
+    public async Task Initialize_ReplaceFailure_RuntimeRestored_FallsBackToFactoryWithWarning()
     {
-        SeedFile(BuildSet(("Attack", [new InputBinding.Keyboard(Key.B, false, false, false, false)])));
+        await SeedFile(BuildSet(("Attack", [new InputBinding.Keyboard(Key.B, false, false, false, false)])));
         var bytes = _store.Read()!;
 
         _adapter.FailReplace = true;
@@ -147,9 +155,9 @@ public class InputBindingServiceTests : IDisposable
     }
 
     [Fact]
-    public void Initialize_ReplaceFailure_RuntimeNotRestored_RethrowsAndLeavesServiceUninitialized()
+    public async Task Initialize_ReplaceFailure_RuntimeNotRestored_RethrowsAndLeavesServiceUninitialized()
     {
-        SeedFile(BuildSet(("Attack", [new InputBinding.Keyboard(Key.B, false, false, false, false)])));
+        await SeedFile(BuildSet(("Attack", [new InputBinding.Keyboard(Key.B, false, false, false, false)])));
         var bytes = _store.Read()!;
 
         _adapter.FailReplace = true;
@@ -164,9 +172,9 @@ public class InputBindingServiceTests : IDisposable
     }
 
     [Fact]
-    public void Initialize_EmptyOverrideList_RemainsUnbound()
+    public async Task Initialize_EmptyOverrideList_RemainsUnbound()
     {
-        SeedFile(BuildSet(("Attack", [])));
+        await SeedFile(BuildSet(("Attack", [])));
 
         var result = _service.Initialize();
 
@@ -207,14 +215,14 @@ public class InputBindingServiceTests : IDisposable
     }
 
     [Fact]
-    public void Apply_Success_PublishesFileBeforeAdapterReplacement()
+    public async Task Apply_Success_PublishesFileBeforeAdapterReplacement()
     {
         _service.Initialize();
         var candidate = BuildSet(
             ("Attack", [new InputBinding.Keyboard(Key.E, false, false, false, false)]));
         var expectedBytes = InputBindingJson.Serialize(candidate, _factory);
 
-        var result = _service.Apply(BuildDraft(
+        var result = await _service.ApplyAsync(BuildDraft(
             ("Attack", [new InputBinding.Keyboard(Key.E, false, false, false, false)])));
 
         Assert.True(result.Success);
@@ -227,15 +235,15 @@ public class InputBindingServiceTests : IDisposable
     }
 
     [Fact]
-    public void Apply_Success_WithExistingFile_UpdatesFileRuntimeAndActiveTogether()
+    public async Task Apply_Success_WithExistingFile_UpdatesFileRuntimeAndActiveTogether()
     {
-        SeedFile(BuildSet(("Attack", [new InputBinding.Keyboard(Key.B, false, false, false, false)])));
+        await SeedFile(BuildSet(("Attack", [new InputBinding.Keyboard(Key.B, false, false, false, false)])));
         _service.Initialize();
         var candidate = BuildSet(
             ("Attack", [new InputBinding.Keyboard(Key.E, false, false, false, false)]));
         var expectedBytes = InputBindingJson.Serialize(candidate, _factory);
 
-        var result = _service.Apply(BuildDraft(
+        var result = await _service.ApplyAsync(BuildDraft(
             ("Attack", [new InputBinding.Keyboard(Key.E, false, false, false, false)])));
 
         Assert.True(result.Success);
@@ -246,13 +254,13 @@ public class InputBindingServiceTests : IDisposable
     }
 
     [Fact]
-    public void Apply_InvalidDraft_FailsWithoutTouchingFileOrRuntime()
+    public async Task Apply_InvalidDraft_FailsWithoutTouchingFileOrRuntime()
     {
         _service.Initialize();
         var draft = BuildDraft(("Attack", [new InputBinding.Keyboard(Key.E, false, false, false, false)]));
         draft.Remove("MoveUp");
 
-        var result = _service.Apply(draft);
+        var result = await _service.ApplyAsync(draft);
 
         Assert.False(result.Success);
         Assert.Contains("MoveUp", result.Error);
@@ -262,12 +270,12 @@ public class InputBindingServiceTests : IDisposable
     }
 
     [Fact]
-    public void Apply_PublishFailure_NeverReplacesRuntimeAndLeavesNoFile()
+    public async Task Apply_PublishFailure_NeverReplacesRuntimeAndLeavesNoFile()
     {
         _service.Initialize();
         _store.FailBeforePublish = _ => throw new IOException("injected publish failure");
 
-        var result = _service.Apply(BuildDraft(
+        var result = await _service.ApplyAsync(BuildDraft(
             ("Attack", [new InputBinding.Keyboard(Key.E, false, false, false, false)])));
 
         Assert.False(result.Success);
@@ -278,17 +286,73 @@ public class InputBindingServiceTests : IDisposable
     }
 
     [Fact]
-    public void Apply_AdapterFailure_RollsFileBackAndLeavesStateUnchanged()
+    public async Task Apply_TransientSharingViolation_SuspendsInsteadOfBlockingTheCaller()
+    {
+        _service.Initialize();
+        var attempts = 0;
+        _store.FailBeforePublish = _ =>
+        {
+            if (++attempts == 1)
+                throw SharingViolation();
+        };
+
+        var pending = _service.ApplyAsync(BuildDraft(
+            ("Attack", [new InputBinding.Keyboard(Key.E, false, false, false, false)])));
+
+        Assert.False(pending.IsCompleted);
+
+        var result = await pending;
+
+        Assert.True(result.Success);
+        Assert.Equal(2, attempts);
+    }
+
+    [Fact]
+    public async Task Apply_WhileAnotherApplyIsInFlight_IsRejectedWithoutInterleaving()
+    {
+        _service.Initialize();
+        var candidate = BuildSet(
+            ("Attack", [new InputBinding.Keyboard(Key.E, false, false, false, false)]));
+        var expectedBytes = InputBindingJson.Serialize(candidate, _factory);
+
+        InputBindingApplyResult? concurrent = null;
+        var attempts = 0;
+        _store.FailBeforePublish = _ =>
+        {
+            if (++attempts == 1)
+            {
+                // The guard rejects before any await, so awaiting it here cannot deadlock the retry.
+                concurrent = _service
+                    .ApplyAsync(BuildDraft(("Attack", [new InputBinding.Keyboard(Key.B, false, false, false, false)])))
+                    .GetAwaiter()
+                    .GetResult();
+                throw SharingViolation();
+            }
+        };
+
+        var result = await _service.ApplyAsync(BuildDraft(
+            ("Attack", [new InputBinding.Keyboard(Key.E, false, false, false, false)])));
+
+        Assert.True(result.Success);
+        Assert.NotNull(concurrent);
+        Assert.False(concurrent!.Success);
+        Assert.Contains("another apply", concurrent.Error);
+        Assert.Equal(["capture", "replace"], _adapter.Operations);
+        AssertObservableState(candidate, expectedBytes, candidate);
+    }
+
+    [Fact]
+    public async Task Apply_AdapterFailure_RollsFileBackAndLeavesStateUnchanged()
     {
         var initial = BuildSet(
             ("Attack", [new InputBinding.Keyboard(Key.B, false, false, false, false)]));
-        SeedFile(initial);
+        await SeedFile(initial);
         _service.Initialize();
         var initialBytes = _store.Read()!;
 
         _adapter.FailReplace = true;
         _adapter.RuntimeRestored = true;
-        var result = _service.Apply(BuildDraft(
+        var result = await _service.ApplyAsync(BuildDraft(
             ("Attack", [new InputBinding.Keyboard(Key.E, false, false, false, false)])));
 
         Assert.False(result.Success);
@@ -299,17 +363,17 @@ public class InputBindingServiceTests : IDisposable
     }
 
     [Fact]
-    public void Apply_UntypedAdapterFailure_RollsFileBackAndReportsRuntimeRecoveryRequired()
+    public async Task Apply_UntypedAdapterFailure_RollsFileBackAndReportsRuntimeRecoveryRequired()
     {
         var initial = BuildSet(
             ("Attack", [new InputBinding.Keyboard(Key.B, false, false, false, false)]));
-        SeedFile(initial);
+        await SeedFile(initial);
         _service.Initialize();
         var initialBytes = _store.Read()!;
         var injected = new InvalidOperationException("injected untyped adapter failure");
 
         _adapter.ReplaceThrows = injected;
-        var result = _service.Apply(BuildDraft(
+        var result = await _service.ApplyAsync(BuildDraft(
             ("Attack", [new InputBinding.Keyboard(Key.E, false, false, false, false)])));
 
         Assert.False(result.Success);
@@ -324,11 +388,11 @@ public class InputBindingServiceTests : IDisposable
     }
 
     [Fact]
-    public void Apply_AdapterRestorationFailure_ReturnsRecoveryRequiredEvenWhenFileRollsBack()
+    public async Task Apply_AdapterRestorationFailure_ReturnsRecoveryRequiredEvenWhenFileRollsBack()
     {
         var initial = BuildSet(
             ("Attack", [new InputBinding.Keyboard(Key.B, false, false, false, false)]));
-        SeedFile(initial);
+        await SeedFile(initial);
         _service.Initialize();
         var initialBytes = _store.Read()!;
         var partial = BuildSet(("Attack", []));
@@ -337,7 +401,7 @@ public class InputBindingServiceTests : IDisposable
         _adapter.RuntimeRestored = false;
         _adapter.RestorationFailure = new InvalidOperationException("injected restoration failure");
         _adapter.PartialRuntime = partial;
-        var result = _service.Apply(BuildDraft(
+        var result = await _service.ApplyAsync(BuildDraft(
             ("Attack", [new InputBinding.Keyboard(Key.E, false, false, false, false)])));
 
         Assert.False(result.Success);
@@ -352,11 +416,11 @@ public class InputBindingServiceTests : IDisposable
     }
 
     [Fact]
-    public void Apply_FileRollbackFailure_ReportsFileRecoveryWithoutClaimingUnchangedState()
+    public async Task Apply_FileRollbackFailure_ReportsFileRecoveryWithoutClaimingUnchangedState()
     {
         var initial = BuildSet(
             ("Attack", [new InputBinding.Keyboard(Key.B, false, false, false, false)]));
-        SeedFile(initial);
+        await SeedFile(initial);
         _service.Initialize();
         var candidate = BuildSet(
             ("Attack", [new InputBinding.Keyboard(Key.E, false, false, false, false)]));
@@ -365,7 +429,7 @@ public class InputBindingServiceTests : IDisposable
         _adapter.FailReplace = true;
         _adapter.RuntimeRestored = true;
         _store.FailDuringRollback = _ => throw new IOException("injected rollback failure");
-        var result = _service.Apply(BuildDraft(
+        var result = await _service.ApplyAsync(BuildDraft(
             ("Attack", [new InputBinding.Keyboard(Key.E, false, false, false, false)])));
 
         Assert.False(result.Success);
@@ -380,18 +444,18 @@ public class InputBindingServiceTests : IDisposable
     }
 
     [Fact]
-    public void Apply_CombinedRestorationAndRollbackFailure_ReportsBothDimensions()
+    public async Task Apply_CombinedRestorationAndRollbackFailure_ReportsBothDimensions()
     {
         var initial = BuildSet(
             ("Attack", [new InputBinding.Keyboard(Key.B, false, false, false, false)]));
-        SeedFile(initial);
+        await SeedFile(initial);
         _service.Initialize();
 
         _adapter.FailReplace = true;
         _adapter.RuntimeRestored = false;
         _adapter.RestorationFailure = new InvalidOperationException("injected restoration failure");
         _store.FailDuringRollback = _ => throw new IOException("injected rollback failure");
-        var result = _service.Apply(BuildDraft(
+        var result = await _service.ApplyAsync(BuildDraft(
             ("Attack", [new InputBinding.Keyboard(Key.E, false, false, false, false)])));
 
         Assert.False(result.Success);
@@ -406,18 +470,18 @@ public class InputBindingServiceTests : IDisposable
     }
 
     [Fact]
-    public void Apply_CleanupFailureAfterSuccess_KeepsPublishedStateAndReturnsSuccessWithWarning()
+    public async Task Apply_CleanupFailureAfterSuccess_KeepsPublishedStateAndReturnsSuccessWithWarning()
     {
         var initial = BuildSet(
             ("Attack", [new InputBinding.Keyboard(Key.B, false, false, false, false)]));
-        SeedFile(initial);
+        await SeedFile(initial);
         _service.Initialize();
         var candidate = BuildSet(
             ("Attack", [new InputBinding.Keyboard(Key.E, false, false, false, false)]));
         var expectedBytes = InputBindingJson.Serialize(candidate, _factory);
 
         _store.FailDuringCleanup = _ => throw new IOException("injected cleanup failure");
-        var result = _service.Apply(BuildDraft(
+        var result = await _service.ApplyAsync(BuildDraft(
             ("Attack", [new InputBinding.Keyboard(Key.E, false, false, false, false)])));
 
         Assert.True(result.Success);
@@ -427,7 +491,7 @@ public class InputBindingServiceTests : IDisposable
     }
 
     [Fact]
-    public void FactoryAndActive_AreImmutableUnderRepeatedAccess()
+    public async Task FactoryAndActive_AreImmutableUnderRepeatedAccess()
     {
         _service.Initialize();
         var draft = BuildDraft(
@@ -439,7 +503,7 @@ public class InputBindingServiceTests : IDisposable
             ]));
         var draftAttack = (List<InputBinding>)draft["Attack"];
 
-        var result = _service.Apply(draft);
+        var result = await _service.ApplyAsync(draft);
         Assert.True(result.Success);
 
         Assert.Equal(3, draftAttack.Count);
@@ -465,9 +529,9 @@ public class InputBindingServiceTests : IDisposable
     }
 
     [Fact]
-    public void Apply_BeforeInitialize_FailsClearly()
+    public async Task Apply_BeforeInitialize_FailsClearly()
     {
-        var ex = Assert.Throws<InvalidOperationException>(() => _service.Apply(BuildDraft()));
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => _service.ApplyAsync(BuildDraft()));
         Assert.Contains("Initialize", ex.Message);
         Assert.Throws<InvalidOperationException>(() => _service.Active);
         Assert.Throws<InvalidOperationException>(() => _service.FactoryDefaults);

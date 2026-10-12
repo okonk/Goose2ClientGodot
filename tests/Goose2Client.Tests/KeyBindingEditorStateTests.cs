@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 using Goose2Client.InputBindings;
 using Godot;
 using Xunit;
@@ -151,7 +152,7 @@ public class KeyBindingEditorStateTests : IDisposable
     }
 
     [Fact]
-    public void IsFactoryDefault_TracksDraftAgainstFactoryNotBaseline()
+    public async Task IsFactoryDefault_TracksDraftAgainstFactoryNotBaseline()
     {
         var editor = new KeyBindingEditorState(_service);
         Assert.True(editor.IsFactoryDefault("Attack"));
@@ -159,7 +160,7 @@ public class KeyBindingEditorStateTests : IDisposable
         editor.Add("Attack", new InputBinding.Keyboard(Key.B, false, false, false, false));
         Assert.False(editor.IsFactoryDefault("Attack"));
 
-        editor.Apply();
+        await editor.ApplyAsync();
         Assert.False(editor.IsDirty);
         Assert.False(editor.IsFactoryDefault("Attack"));
 
@@ -192,13 +193,13 @@ public class KeyBindingEditorStateTests : IDisposable
     }
 
     [Fact]
-    public void ApplySuccess_EstablishesReturnedActiveSnapshotAsNewBaseline()
+    public async Task ApplySuccess_EstablishesReturnedActiveSnapshotAsNewBaseline()
     {
         var editor = new KeyBindingEditorState(_service);
         var binding = new InputBinding.Keyboard(Key.B, false, false, false, false);
         editor.Add("MoveUp", binding);
 
-        var result = editor.Apply();
+        var result = await editor.ApplyAsync();
 
         Assert.True(result.Success);
         Assert.Null(result.Error);
@@ -215,12 +216,12 @@ public class KeyBindingEditorStateTests : IDisposable
     }
 
     [Fact]
-    public void Apply_EmptyActionList_PersistsIntentionallyUnboundState()
+    public async Task Apply_EmptyActionList_PersistsIntentionallyUnboundState()
     {
         var editor = new KeyBindingEditorState(_service);
         editor.Remove("Attack", 0);
 
-        var result = editor.Apply();
+        var result = await editor.ApplyAsync();
 
         Assert.True(result.Success);
         Assert.Empty(_service.Active.GetBindings("Attack"));
@@ -229,7 +230,7 @@ public class KeyBindingEditorStateTests : IDisposable
     }
 
     [Fact]
-    public void ApplyFailure_RetainsDraftAndBaselineAndPublishesSafeError()
+    public async Task ApplyFailure_RetainsDraftAndBaselineAndPublishesSafeError()
     {
         var editor = new KeyBindingEditorState(_service);
         var binding = new InputBinding.Keyboard(Key.B, false, false, false, false);
@@ -237,7 +238,7 @@ public class KeyBindingEditorStateTests : IDisposable
 
         _adapter.FailReplace = true;
         _adapter.RuntimeRestored = true;
-        var result = editor.Apply();
+        var result = await editor.ApplyAsync();
 
         Assert.False(result.Success);
         Assert.NotNull(result.Error);
@@ -323,7 +324,7 @@ public class KeyBindingEditorStateTests : IDisposable
     }
 
     [Fact]
-    public void Conflicts_AreProjectedOntoBothAffectedRows_WithoutBlockingApply()
+    public async Task Conflicts_AreProjectedOntoBothAffectedRows_WithoutBlockingApply()
     {
         var editor = new KeyBindingEditorState(_service);
         var binding = new InputBinding.Keyboard(Key.Up, false, false, false, false);
@@ -340,7 +341,7 @@ public class KeyBindingEditorStateTests : IDisposable
         Assert.Same(conflict, Assert.Single(targetRow.Conflicts));
         Assert.Empty(Row(editor, "TargetUp", 0).Conflicts);
 
-        var result = editor.Apply();
+        var result = await editor.ApplyAsync();
 
         Assert.True(result.Success);
         Assert.False(editor.IsDirty);
@@ -349,7 +350,7 @@ public class KeyBindingEditorStateTests : IDisposable
     }
 
     [Fact]
-    public void StartupWarning_RemainsVisibleUntilSuccessfulApply()
+    public async Task StartupWarning_RemainsVisibleUntilSuccessfulApply()
     {
         const string warning = "Input bindings file could not be loaded and factory defaults are active: bad json";
         var editor = new KeyBindingEditorState(_service, warning);
@@ -366,14 +367,14 @@ public class KeyBindingEditorStateTests : IDisposable
         Assert.Equal(warning, editor.StatusText);
 
         editor.Add("MoveUp", binding);
-        Assert.True(editor.Apply().Success);
+        Assert.True((await editor.ApplyAsync()).Success);
 
         Assert.Null(editor.StartupWarning);
         Assert.NotEqual(warning, editor.StatusText);
     }
 
     [Fact]
-    public void StatusText_PrefersErrorOverDirtyState()
+    public async Task StatusText_PrefersErrorOverDirtyState()
     {
         var editor = new KeyBindingEditorState(_service);
         var binding = new InputBinding.Keyboard(Key.B, false, false, false, false);
@@ -385,7 +386,7 @@ public class KeyBindingEditorStateTests : IDisposable
 
         _adapter.FailReplace = true;
         _adapter.RuntimeRestored = true;
-        var result = editor.Apply();
+        var result = await editor.ApplyAsync();
         Assert.False(result.Success);
         Assert.Equal(result.Error, editor.StatusText);
 
