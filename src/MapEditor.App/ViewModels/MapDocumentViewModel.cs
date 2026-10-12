@@ -972,10 +972,9 @@ internal sealed class MapDocumentViewModel : ViewModelBase, ITerrainDocumentReco
             return;
         }
 
-        int index = session.Edits.Spawns.Count;
         SpawnPropertiesJson.TryWrite(string.Empty, state.SelectedCanMove ?? SpawnMoveOverride.Default, out string properties);
         session.Edits.AddSpawn(new NpcSpawnRow(npcId, session.MapId, x, y, properties));
-        state.SelectedSpawn = index;
+        ClearGameDataSelection();
     }
 
     internal void AddWarpAt(int x, int y)
@@ -1003,9 +1002,19 @@ internal sealed class MapDocumentViewModel : ViewModelBase, ITerrainDocumentReco
             return;
         }
 
-        int index = session.Edits.Warps.Count;
         session.Edits.AddWarp(new WarpRow(session.MapId, x, y, mapId, destinationX, destinationY));
-        state.SelectedWarp = index;
+        ClearGameDataSelection();
+    }
+
+    internal void ClearGameDataSelection()
+    {
+        if (_gameData is not { } state)
+        {
+            return;
+        }
+
+        state.SelectedSpawn = null;
+        state.SelectedWarp = null;
     }
 
     internal void MoveSpawnTo(int index, int x, int y)
@@ -1058,7 +1067,6 @@ internal sealed class MapDocumentViewModel : ViewModelBase, ITerrainDocumentReco
                 return;
             }
 
-            state.SelectedCanMove = value;
             if (current == value)
             {
                 return;
@@ -1083,9 +1091,9 @@ internal sealed class MapDocumentViewModel : ViewModelBase, ITerrainDocumentReco
             return;
         }
 
-        state.SelectedNpcId = npcId;
         if (state.SelectedSpawn is not { } index || index >= session.Edits.Spawns.Count)
         {
+            state.SelectedNpcId = npcId;
             return;
         }
 
@@ -1110,9 +1118,9 @@ internal sealed class MapDocumentViewModel : ViewModelBase, ITerrainDocumentReco
             return;
         }
 
-        state.SelectedDestinationMapId = mapId;
         if (state.SelectedWarp is not { } index || index >= session.Edits.Warps.Count)
         {
+            state.SelectedDestinationMapId = mapId;
             return;
         }
 
@@ -1137,10 +1145,10 @@ internal sealed class MapDocumentViewModel : ViewModelBase, ITerrainDocumentReco
             return;
         }
 
-        state.PendingDestinationX = x;
-        state.PendingDestinationY = y;
         if (state.SelectedWarp is not { } index || index >= edits.Warps.Count)
         {
+            state.PendingDestinationX = x;
+            state.PendingDestinationY = y;
             return;
         }
 

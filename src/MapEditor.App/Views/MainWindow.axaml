@@ -239,6 +239,7 @@
         <TextBlock Text="SPAWN" Classes="section" Margin="2,0,0,6" />
         <Border Classes="card" Padding="10,8">
           <StackPanel Spacing="8">
+            <TextBlock x:Name="SpawnModeText" FontSize="11" TextWrapping="Wrap" Text="Placing new spawns" />
             <TextBlock Text="NPC" Classes="muted" FontSize="11" />
             <controls:SearchPickerControl x:Name="SpawnNpcPicker" x:TypeArguments="rows:NpcAppearance" />
             <TextBlock Text="Can move" Classes="muted" FontSize="11" />
@@ -255,6 +256,7 @@
         <TextBlock Text="WARP" Classes="section" Margin="2,0,0,6" />
         <Border Classes="card" Padding="10,8">
           <StackPanel Spacing="8">
+            <TextBlock x:Name="WarpModeText" FontSize="11" TextWrapping="Wrap" Text="Placing new warps" />
             <TextBlock Text="Destination map" Classes="muted" FontSize="11" />
             <controls:SearchPickerControl x:Name="WarpDestinationPicker" x:TypeArguments="rows:MapReference" />
             <StackPanel Orientation="Horizontal" Spacing="6">

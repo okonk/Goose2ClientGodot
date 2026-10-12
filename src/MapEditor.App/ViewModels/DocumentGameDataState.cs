@@ -166,8 +166,9 @@ internal sealed class DocumentGameDataState : IDisposable, INotifyPropertyChange
         DetachEdits();
         _session = session ?? throw new ArgumentNullException(nameof(session));
         _subscribedEdits = _session.Edits;
-        _subscribedEdits.HistoryChanged += OnEditsHistoryChanged;
+        // The timeline must see each edit before our Changed refresh reads its undo state.
         _document.AttachSheetSession(_subscribedEdits);
+        _subscribedEdits.HistoryChanged += OnEditsHistoryChanged;
         _selectedSpawn = null;
         _selectedWarp = null;
         _selectedNpcId = null;

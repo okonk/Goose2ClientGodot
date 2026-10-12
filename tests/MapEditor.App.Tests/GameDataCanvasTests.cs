@@ -43,7 +43,7 @@ public class GameDataCanvasTests
     private sealed record Harness(MapCanvas Canvas, MapDocumentViewModel ViewModel, Window Window, List<ErrorPresentation> Errors);
 
     [AvaloniaFact]
-    public async Task SpawnTool_ClickEmptyTile_AddsSpawnWithSelectedNpcAndSelectsIt()
+    public async Task SpawnTool_ClickEmptyTile_AddsSpawnWithSelectedNpcWithoutSelectingIt()
     {
         Harness harness = CreateHarness();
         MapDocumentViewModel viewModel = harness.ViewModel;
@@ -58,7 +58,7 @@ public class GameDataCanvasTests
         var spawns = viewModel.GameData.Session!.Edits.Spawns;
         Assert.Equal(2, spawns.Count);
         Assert.Equal(new NpcSpawnRow(2, 10, 2, 2), spawns[1]);
-        Assert.Equal(1, viewModel.GameData.SelectedSpawn);
+        Assert.Null(viewModel.GameData.SelectedSpawn);
         Assert.True(viewModel.Timeline.CanUndo);
         Assert.True(viewModel.Undo());
         Assert.Single(viewModel.GameData.Session.Edits.Spawns);
@@ -259,7 +259,7 @@ public class GameDataCanvasTests
         var warps = viewModel.GameData.Session!.Edits.Warps;
         Assert.Single(warps);
         Assert.Equal(new WarpRow(10, 1, 1, 20, 5, 6), warps[0]);
-        Assert.Equal(0, viewModel.GameData.SelectedWarp);
+        Assert.Null(viewModel.GameData.SelectedWarp);
     }
 
     [AvaloniaFact]

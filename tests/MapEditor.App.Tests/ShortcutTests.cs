@@ -489,7 +489,7 @@ public class ShortcutTests
         var spawns = vm.GameData.Session!.Edits.Spawns;
         Assert.Equal(2, spawns.Count);
         Assert.Equal(new NpcSpawnRow(1, 10, 5, 6), spawns[1]);
-        Assert.Equal(1, vm.GameData.SelectedSpawn);
+        Assert.Null(vm.GameData.SelectedSpawn);
         Assert.Equal(1, vm.FindSpawnAt(5, 6));
         Assert.True(vm.GameData.ShowSpawnOverlay);
         Assert.True(spawnPanel.IsVisible);

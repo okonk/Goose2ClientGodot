@@ -95,7 +95,7 @@ public class GameDataPropertiesTests
 
         NpcSpawnRow spawn = harness.ViewModel.GameData.Session!.Edits.Spawns[0];
         Assert.Equal(2, spawn.NpcId);
-        Assert.Equal(2, harness.ViewModel.GameData.SelectedNpcId);
+        Assert.Null(harness.ViewModel.GameData.SelectedNpcId);
         Assert.True(harness.ViewModel.Timeline.CanUndo);
         Assert.True(harness.ViewModel.Undo());
         Assert.Equal(1, harness.ViewModel.GameData.Session.Edits.Spawns[0].NpcId);
@@ -115,7 +115,7 @@ public class GameDataPropertiesTests
 
         WarpRow warp = harness.ViewModel.GameData.Session!.Edits.Warps[0];
         Assert.Equal(20, warp.WarpId);
-        Assert.Equal(20, harness.ViewModel.GameData.SelectedDestinationMapId);
+        Assert.Null(harness.ViewModel.GameData.SelectedDestinationMapId);
         Assert.True(harness.ViewModel.Timeline.CanUndo);
         Assert.True(harness.ViewModel.Undo());
         Assert.Equal(7, harness.ViewModel.GameData.Session.Edits.Warps[0].WarpId);
@@ -289,7 +289,7 @@ public class GameDataPropertiesTests
 
         NpcSpawnRow spawn = harness.ViewModel.GameData.Session!.Edits.Spawns[0];
         Assert.Equal("{\"canMove\":true}", spawn.Properties);
-        Assert.Equal(SpawnMoveOverride.Movable, harness.ViewModel.GameData.SelectedCanMove);
+        Assert.Null(harness.ViewModel.GameData.SelectedCanMove);
         Assert.True(harness.ViewModel.Timeline.CanUndo);
         Assert.True(harness.ViewModel.Undo());
         Assert.Equal("", harness.ViewModel.GameData.Session.Edits.Spawns[0].Properties);
@@ -334,7 +334,7 @@ public class GameDataPropertiesTests
         harness.ViewModel.CommitSpawnCanMove(SpawnMoveOverride.Default);
 
         Assert.Equal("{\"foo\": 1}", harness.ViewModel.GameData.Session!.Edits.Spawns[0].Properties);
-        Assert.Equal(SpawnMoveOverride.Default, harness.ViewModel.GameData.SelectedCanMove);
+        Assert.Null(harness.ViewModel.GameData.SelectedCanMove);
         Assert.False(harness.ViewModel.Timeline.CanUndo);
     }
 
@@ -477,6 +477,109 @@ public class GameDataPropertiesTests
         harness.ViewModel.GameData.SelectedCanMove = null;
         harness.ViewModel.AddSpawnAt(7, 8);
         Assert.Equal("", harness.ViewModel.GameData.Session.Edits.Spawns[2].Properties);
+    }
+
+    [AvaloniaFact]
+    public void SpawnNpcPicker_AfterPlacingASpawn_ChangesOnlyTheNextPlacement()
+    {
+        using MainWindowHarness harness = MainWindowHarness.Create();
+        harness.ViewModel.GameData!.AttachSession(Session());
+        Control<ToggleButton>(harness, "SpawnTool").IsChecked = true;
+        Dispatcher.UIThread.RunJobs();
+        SearchPickerControl<NpcAppearance> picker = Control<SearchPickerControl<NpcAppearance>>(harness, "SpawnNpcPicker");
+
+        picker.SelectedItem = Npc1;
+        Dispatcher.UIThread.RunJobs();
+        harness.ViewModel.AddSpawnAt(0, 0);
+        Dispatcher.UIThread.RunJobs();
+        picker.SelectedItem = Npc2;
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Equal(1, harness.ViewModel.GameData.Session!.Edits.Spawns[2].NpcId);
+        Assert.Null(harness.ViewModel.GameData.SelectedSpawn);
+        Assert.Equal(2, harness.ViewModel.GameData.SelectedNpcId);
+        Assert.Equal("Placing new spawns", Control<TextBlock>(harness, "SpawnModeText").Text);
+    }
+
+    [AvaloniaFact]
+    public void SpawnSelection_KeepsTheBrush_AndEscapeRestoresIt()
+    {
+        using MainWindowHarness harness = MainWindowHarness.Create();
+        harness.ViewModel.GameData!.AttachSession(Session());
+        Control<ToggleButton>(harness, "SpawnTool").IsChecked = true;
+        Dispatcher.UIThread.RunJobs();
+        SearchPickerControl<NpcAppearance> picker = Control<SearchPickerControl<NpcAppearance>>(harness, "SpawnNpcPicker");
+        TextBlock mode = Control<TextBlock>(harness, "SpawnModeText");
+        picker.SelectedItem = Npc1;
+        Dispatcher.UIThread.RunJobs();
+
+        harness.ViewModel.GameData.SelectedSpawn = 1;
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal(Npc2, picker.SelectedItem);
+        Assert.Equal(1, harness.ViewModel.GameData.SelectedNpcId);
+        Assert.Equal("Editing spawn at (7, 8) · Esc to deselect", mode.Text);
+
+        harness.Window.KeyPressQwerty(PhysicalKey.Escape, RawInputModifiers.None);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Null(harness.ViewModel.GameData.SelectedSpawn);
+        Assert.Equal(Npc1, picker.SelectedItem);
+        Assert.Equal("Placing new spawns", mode.Text);
+        Assert.False(harness.ViewModel.Timeline.CanUndo);
+    }
+
+    [AvaloniaFact]
+    public void WarpDestinationPicker_AfterPlacingAWarp_ChangesOnlyTheNextPlacement()
+    {
+        using MainWindowHarness harness = MainWindowHarness.Create();
+        harness.ViewModel.GameData!.AttachSession(Session());
+        Control<ToggleButton>(harness, "WarpTool").IsChecked = true;
+        Dispatcher.UIThread.RunJobs();
+        SearchPickerControl<MapReference> picker = Control<SearchPickerControl<MapReference>>(harness, "WarpDestinationPicker");
+        MapReference tower = new(30, "Tower", "tower.map");
+
+        picker.SelectedItem = Map20;
+        harness.ViewModel.CommitWarpDestinationCoordinates(1, 2);
+        harness.ViewModel.AddWarpAt(0, 0);
+        Dispatcher.UIThread.RunJobs();
+        picker.SelectedItem = tower;
+        harness.ViewModel.CommitWarpDestinationCoordinates(3, 3);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Equal(new WarpRow(10, 0, 0, 20, 1, 2), harness.ViewModel.GameData.Session!.Edits.Warps[1]);
+        Assert.Null(harness.ViewModel.GameData.SelectedWarp);
+        Assert.Equal(30, harness.ViewModel.GameData.SelectedDestinationMapId);
+        Assert.Equal((3, 3), (harness.ViewModel.GameData.PendingDestinationX, harness.ViewModel.GameData.PendingDestinationY));
+        Assert.Equal("Placing new warps", Control<TextBlock>(harness, "WarpModeText").Text);
+    }
+
+    [AvaloniaFact]
+    public void WarpSelection_KeepsTheBrush_AndEscapeRestoresIt()
+    {
+        using MainWindowHarness harness = MainWindowHarness.Create();
+        harness.ViewModel.GameData!.AttachSession(Session());
+        Control<ToggleButton>(harness, "WarpTool").IsChecked = true;
+        Dispatcher.UIThread.RunJobs();
+        SearchPickerControl<MapReference> picker = Control<SearchPickerControl<MapReference>>(harness, "WarpDestinationPicker");
+        TextBlock mode = Control<TextBlock>(harness, "WarpModeText");
+        picker.SelectedItem = Map20;
+        harness.ViewModel.CommitWarpDestinationCoordinates(1, 2);
+        Dispatcher.UIThread.RunJobs();
+
+        harness.ViewModel.GameData.SelectedWarp = 0;
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal("8", Control<TextBox>(harness, "WarpDestinationX").Text);
+        Assert.Equal("Editing warp at (5, 6) · Esc to deselect", mode.Text);
+
+        harness.Window.KeyPressQwerty(PhysicalKey.Escape, RawInputModifiers.None);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Null(harness.ViewModel.GameData.SelectedWarp);
+        Assert.Equal(Map20, picker.SelectedItem);
+        Assert.Equal("1", Control<TextBox>(harness, "WarpDestinationX").Text);
+        Assert.Equal("2", Control<TextBox>(harness, "WarpDestinationY").Text);
+        Assert.Equal("Placing new warps", mode.Text);
+        Assert.Equal(20, harness.ViewModel.GameData.SelectedDestinationMapId);
     }
 
     private static T Control<T>(MainWindowHarness harness, string name) where T : Control

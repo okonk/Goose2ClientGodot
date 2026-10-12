@@ -549,6 +549,7 @@ internal partial class MainWindow : Window
         {
             Canvas.FinishInteraction(commit: false);
             Document.CancelPasteMode();
+            Document.ClearGameDataSelection();
             e.Handled = true;
             return;
         }
@@ -901,7 +902,15 @@ internal partial class MainWindow : Window
     private MapDocumentViewModel? ResolveUseSelectedTileSource()
     {
         DocumentGameDataState state = Document.GameData!;
-        if (state.SelectedDestinationMapId is not { } mapId || state.Session is not { } session)
+        if (state.Session is not { } session)
+        {
+            return null;
+        }
+
+        int? destinationMapId = state.SelectedWarp is { } warpIndex && warpIndex < session.Edits.Warps.Count
+            ? session.Edits.Warps[warpIndex].WarpId
+            : state.SelectedDestinationMapId;
+        if (destinationMapId is not { } mapId)
         {
             return null;
         }
@@ -956,11 +965,13 @@ internal partial class MainWindow : Window
         }
 
         NpcAppearance selected = SpawnNpcPicker.SelectedItem;
-        int? npcId = selected == default ? null : selected.NpcId;
-        Document.GameData!.SelectedNpcId = npcId;
-        if (npcId is { } id)
+        if (selected != default)
         {
-            Document.CommitSpawnNpc(id);
+            Document.CommitSpawnNpc(selected.NpcId);
+        }
+        else if (Document.GameData!.SelectedSpawn is null)
+        {
+            Document.GameData.SelectedNpcId = null;
         }
     }
 
@@ -987,11 +998,13 @@ internal partial class MainWindow : Window
         }
 
         MapReference selected = WarpDestinationPicker.SelectedItem;
-        int? mapId = selected == default ? null : selected.MapId;
-        Document.GameData!.SelectedDestinationMapId = mapId;
-        if (mapId is { } id)
+        if (selected != default)
         {
-            Document.CommitWarpDestinationMap(id);
+            Document.CommitWarpDestinationMap(selected.MapId);
+        }
+        else if (Document.GameData!.SelectedWarp is null)
+        {
+            Document.GameData.SelectedDestinationMapId = null;
         }
 
         SyncUseSelectedTileButton();
@@ -1618,6 +1631,7 @@ internal partial class MainWindow : Window
         if (state.SelectedSpawn is { } index && state.Session is { } session && index < session.Edits.Spawns.Count)
         {
             NpcSpawnRow spawn = session.Edits.Spawns[index];
+            SpawnModeText.Text = $"Editing spawn at ({spawn.MapX}, {spawn.MapY}) · Esc to deselect";
             if (session.Npcs.TryGetValue(spawn.NpcId, out NpcAppearance npc))
             {
                 SpawnNpcPicker.SelectedItem = npc;
@@ -1630,6 +1644,18 @@ internal partial class MainWindow : Window
         }
         else
         {
+            SpawnModeText.Text = "Placing new spawns";
+            NpcAppearance brush = default;
+            if (state.SelectedNpcId is { } npcId && state.Session is { } brushSession)
+            {
+                brushSession.Npcs.TryGetValue(npcId, out brush);
+            }
+
+            if (SpawnNpcPicker.SelectedItem != brush)
+            {
+                SpawnNpcPicker.SelectedItem = brush;
+            }
+
             SpawnCanMoveCheck.IsEnabled = true;
             SpawnCanMoveWarning.IsVisible = false;
             SpawnCanMoveCheck.IsChecked = ToIsChecked(state.SelectedCanMove ?? SpawnMoveOverride.Default);
@@ -1645,6 +1671,9 @@ internal partial class MainWindow : Window
 
     private void SyncWarpProperties(DocumentGameDataState state, bool wasVisible)
     {
+        WarpModeText.Text = state.SelectedWarp is { } selected && state.Session is { } selectedSession && selected < selectedSession.Edits.Warps.Count
+            ? $"Editing warp at ({selectedSession.Edits.Warps[selected].MapX}, {selectedSession.Edits.Warps[selected].MapY}) · Esc to deselect"
+            : "Placing new warps";
         long version = state.Session?.Edits.HistoryVersion ?? -1;
         if (wasVisible && state.SelectedWarp == _warpPrefillSelection && version == _warpPrefillVersion)
         {
@@ -1667,6 +1696,14 @@ internal partial class MainWindow : Window
         }
         else
         {
+            MapReference brush = state.SelectedDestinationMapId is { } mapId && state.Session is { } brushSession
+                ? brushSession.Maps.FirstOrDefault(map => map.MapId == mapId)
+                : default;
+            if (WarpDestinationPicker.SelectedItem != brush)
+            {
+                WarpDestinationPicker.SelectedItem = brush;
+            }
+
             WarpDestinationX.Text = state.PendingDestinationX?.ToString() ?? string.Empty;
             WarpDestinationY.Text = state.PendingDestinationY?.ToString() ?? string.Empty;
             WarpDestinationX.BorderBrush = null;

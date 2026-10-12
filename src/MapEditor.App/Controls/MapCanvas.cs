@@ -437,6 +437,7 @@ internal sealed class MapCanvas : Control, ICustomHitTest
         {
             FinishInteraction(commit: false);
             _viewModel.CancelPasteMode();
+            _viewModel.ClearGameDataSelection();
             e.Handled = true;
         }
         else if (e.Key == Key.Space)
