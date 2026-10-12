@@ -338,7 +338,14 @@ public partial class MapManager : Node2D
             GameManager.Instance.NetworkClient.LeftClick(tx, ty);
         }
         else
+        {
+            // skipHidden, as in the targeting branch above: a purely geometric hit would let an
+            // invisible character swallow the cast meant for the visible one behind it.
+            var recastTarget = CharacterAt(worldPos, skipHidden: true);
+            if (GameManager.Instance.SpellTargetManager?.RecastLastSpellOn(recastTarget) == true)
+                return;
             GameManager.Instance.NetworkClient.RightClick(tx, ty);
+        }
     }
 
     // Hidden characters are hit too (skipHidden stays false): the name tooltip's own rule

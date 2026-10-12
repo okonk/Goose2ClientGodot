@@ -116,11 +116,7 @@ public partial class SpellbookWindow : BaseWindow, IWindow
         if (GameManager.Instance.IsLoadingMap) return;
 
         var lp = GameManager.Instance.CurrentMapManager?.LocalPlayer;
-        if (!CurrentMapFlags.Value.SpellsEnabled && lp?.IsGM != true)
-        {
-            GameManager.Instance.Hud?.Chat?.AddChatLine("You can't cast spells in this map.", ChatType.Server);
-            return;
-        }
+        if (!GameManager.Instance.CanCastSpellsHere()) return;
 
         if (GameManager.Instance.IsTargeting || (lp != null && lp.IsMounted)) return;
 

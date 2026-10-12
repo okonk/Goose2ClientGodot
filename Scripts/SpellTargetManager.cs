@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using Godot;
 
@@ -14,6 +15,8 @@ public partial class SpellTargetManager : Node
 
     /// <summary>Whether the player is currently in targeting mode.</summary>
     public bool IsTargeting { get; private set; }
+
+    public SpellInfo? LastTargetableSpell { get; private set; }
 
     // A hotkey press that confirmed a cast must not re-fire the hotbar's _Process poll on the
     // same frame (IsTargeting is already false by then, so its guard no longer applies).
@@ -135,10 +138,36 @@ public partial class SpellTargetManager : Node
             _target = mm.LocalPlayer;
         if (_target == null) return false;
 
+        LastTargetableSpell = info;
         GameManager.Instance.SpellCooldownManager.Cast(info.SlotNumber, info.Cooldown);
         GameManager.Instance.NetworkClient.CastSpell(info.SlotNumber, _target.LoginId);
         return true;
     }
+
+    public bool RecastLastSpellOn(Character.Character? target)
+    {
+        if (target == null || !GodotObject.IsInstanceValid(target)) return false;
+        var spell = LastTargetableSpell;
+        if (spell == null || GameManager.Instance.IsLoadingMap) return false;
+
+        var onCooldown = GameManager.Instance.SpellCooldownManager.GetCooldownRemaining(spell) > TimeSpan.Zero;
+        if (!SpellRecastRule.CanRecast(spell, target.CharacterType, onCooldown)) return false;
+
+        // The normal cast gates apply here too. Skipping them would stamp a client cooldown for a
+        // cast the server refuses while mounted, or send one on a map that charges the cost for an
+        // effect SpellEffect.CanCastSpell then discards.
+        var lp = GameManager.Instance.CurrentMapManager?.LocalPlayer;
+        if (!GameManager.Instance.CanCastSpellsHere()) return false;
+        if (lp != null && lp.IsMounted) return false;
+
+        // The spell's target type is deliberately not matched against the clicked character: the
+        // cast goes out and the server rejects it, as when a click confirms targeting mode.
+        GameManager.Instance.SpellCooldownManager.Cast(spell.SlotNumber, spell.Cooldown);
+        GameManager.Instance.NetworkClient.CastSpell(spell.SlotNumber, target.LoginId);
+        return true;
+    }
+
+    public void ClearLastSpell() => LastTargetableSpell = null;
 
     // A remembered target survives only while it is the same live character on this map, passes the
     // spell's target-type filter, and sits inside the view range.
@@ -320,6 +349,7 @@ public partial class SpellTargetManager : Node
         _pendingSpell = null;
         if (_target != null && spell != null && !GameManager.Instance.IsLoadingMap)
         {
+            LastTargetableSpell = spell;
             GameManager.Instance.SpellCooldownManager.Cast(spell.SlotNumber, spell.Cooldown);
             GameManager.Instance.NetworkClient.CastSpell(spell.SlotNumber, _target.LoginId);
         }

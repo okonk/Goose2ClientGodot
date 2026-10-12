@@ -61,6 +61,16 @@ namespace Goose2Client
 
         public bool IsLoadingMap => NetworkClient.LoadingMap;
 
+        /// <summary>Map spell gate. False also emits the rejection message, so callers that must
+        /// stay silent have to check CurrentMapFlags themselves.</summary>
+        public bool CanCastSpellsHere()
+        {
+            var lp = CurrentMapManager?.LocalPlayer;
+            if (CurrentMapFlags.Value.SpellsEnabled || lp?.IsGM == true) return true;
+            Hud?.Chat?.AddChatLine("You can't cast spells in this map.", ChatType.Server);
+            return false;
+        }
+
         public bool CanSeeInvisible { get; set; }
 
         public Goose2Client.Character.NameDisplayMode NameDisplay { get; set; } =
@@ -543,6 +553,7 @@ namespace Goose2Client
             SetPaused(false);
             WorldViewport.Detach();
             WorldTextBridge.Clear();
+            SpellTargetManager.ClearLastSpell();
             foreach (var child in UiLayer.GetChildren())
                 child.QueueFree();
             Hud = null;
