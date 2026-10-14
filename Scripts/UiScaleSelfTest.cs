@@ -148,6 +148,9 @@ internal static class UiScaleSelfTest
         Assert(effRow.OffsetTop > row0.GetNode<TextureProgressBar>("Content/MpBar").OffsetBottom,
             "effect row must begin below MP");
         Assert(row0.Size.X == 87, $"party frame width {row0.Size.X} != 87");
+        var nameText1x = row0.GetNode<Label>("Content/NameText");
+        Assert(nameText1x.GetThemeConstant("outline_size") == 4,
+            $"party name outline 1x {nameText1x.GetThemeConstant("outline_size")} != 4");
         var e6 = (PartyEffect)effRow.GetChild(5);
         Assert(e6.OffsetRight <= 87, $"sixth effect right {e6.OffsetRight} > 87 (must fit)");
         Assert(!effRow.ClipContents && !row0.GetNode<Control>("Content").ClipContents && !row0.ClipContents,
@@ -282,6 +285,9 @@ internal static class UiScaleSelfTest
         Assert(tile.CustomMinimumSize == new Vector2(174, 100), $"party tile min {tile.CustomMinimumSize} != (174, 100)");
         var nameOffset = tile.GetNode<Label>("Content/NameText").OffsetBottom;
         Assert(nameOffset == 22, $"party name offset {nameOffset} != 22");
+        var nameText2x = tile.GetNode<Label>("Content/NameText");
+        Assert(nameText2x.GetThemeConstant("outline_size") == 8,
+            $"party name outline 2x {nameText2x.GetThemeConstant("outline_size")} != 8");
         var effRow2 = tile.GetNode<HBoxContainer>("Content/EffectRow");
         var e2 = (PartyEffect)effRow2.GetChild(0);
         Assert(e2.Size == new Vector2(24, 24), $"effect size 2x {e2.Size} != (24, 24)");

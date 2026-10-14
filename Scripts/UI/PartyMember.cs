@@ -22,12 +22,15 @@ public partial class PartyMember : Control
     private Tween? _hpTween;
     private Tween? _mpTween;
     private bool _barsSeeded;
+    private int _nameOutlineBase;
 
     public int PlayerId { get; private set; }
 
     public override void _Ready()
     {
         _nameText = GetNode<Label>("Content/NameText");
+        // Base outline is the tscn's 1x value; Relayout scales it with the UI factor.
+        _nameOutlineBase = _nameText.GetThemeConstant("outline_size");
         _hpBar = GetNode<TextureProgressBar>("Content/HpBar");
         _mpBar = GetNode<TextureProgressBar>("Content/MpBar");
         _content = GetNode<Control>("Content");
@@ -124,8 +127,11 @@ public partial class PartyMember : Control
             }
     }
 
-    public void RelayoutEffects(float factor)
+    public void Relayout(float factor)
     {
+        if (_nameOutlineBase > 0)
+            _nameText.AddThemeConstantOverride("outline_size", UiScale.ScaleSize(_nameOutlineBase, factor));
+
         foreach (var node in _effectNodes.Values)
             if (GodotObject.IsInstanceValid(node))
                 node.Relayout(factor);

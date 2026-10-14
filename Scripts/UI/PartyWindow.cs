@@ -57,7 +57,7 @@ public partial class PartyWindow : Control, IScalableWindow
         foreach (var tile in _members)
         {
             tile.CustomMinimumSize = PartyMemberMetrics.MinSize(applier.Factor);
-            tile.RelayoutEffects(applier.Factor);
+            tile.Relayout(applier.Factor);
         }
         UpdateSize();
         HudWindowDrag.RepositionFromSaved(this, "Party");
