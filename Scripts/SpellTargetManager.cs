@@ -160,6 +160,9 @@ public partial class SpellTargetManager : Node
         if (!GameManager.Instance.CanCastSpellsHere()) return false;
         if (lp != null && lp.IsMounted) return false;
 
+        // Remembered so the next targeting session opens on the character just cast at.
+        _target = target;
+
         // The spell's target type is deliberately not matched against the clicked character: the
         // cast goes out and the server rejects it, as when a click confirms targeting mode.
         GameManager.Instance.SpellCooldownManager.Cast(spell.SlotNumber, spell.Cooldown);
