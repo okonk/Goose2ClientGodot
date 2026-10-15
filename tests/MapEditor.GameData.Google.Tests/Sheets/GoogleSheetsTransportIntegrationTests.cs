@@ -81,7 +81,7 @@ public class GoogleSheetsTransportIntegrationTests
         Assert.Contains("%27NPC", batchGet.RawQuery);
         var decodedQuery = Uri.UnescapeDataString(batchGet.RawQuery);
         Assert.Contains("ranges='Maps'!A1:Q", decodedQuery);
-        Assert.Contains("ranges='NPCs'!A1:BG", decodedQuery);
+        Assert.Contains("ranges='NPCs'!A1:BJ", decodedQuery);
         Assert.Contains("ranges='NPC Spawns'!A1:E", decodedQuery);
         Assert.Contains("ranges='Warptiles'!A1:F", decodedQuery);
     }
@@ -107,7 +107,7 @@ public class GoogleSheetsTransportIntegrationTests
         var batchGet = server.Requests.Single(request => request.Path.Contains("values:batchGet"));
         var decodedQuery = Uri.UnescapeDataString(batchGet.RawQuery);
         Assert.Contains("ranges='Maps'!A1:Q1", decodedQuery);
-        Assert.Contains("ranges='NPCs'!A1:BG1", decodedQuery);
+        Assert.Contains("ranges='NPCs'!A1:BJ1", decodedQuery);
     }
 
     [Fact]

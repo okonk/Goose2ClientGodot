@@ -24,7 +24,8 @@
             "Monster",
             "Vendor",
             "Banker",
-            "Quest"
+            "Quest",
+            "Ambient"
           ]
         },
         {
@@ -505,7 +506,8 @@
           "enumNames": [
             "DoNothing",
             "TeleportToAggro",
-            "TeleportAggro"
+            "TeleportAggro",
+            "TeleportAggroIfUnreachable"
           ]
         },
         {
@@ -550,6 +552,33 @@
           "kind": "Text",
           "sql": "TEXT",
           "default": "\u0027\u0027",
+          "required": false,
+          "pk": false
+        },
+        {
+          "name": "aggro_message",
+          "header": "aggro message",
+          "kind": "Text",
+          "sql": "TEXT",
+          "default": "\u0027\u0027",
+          "required": false,
+          "pk": false
+        },
+        {
+          "name": "stuck_message",
+          "header": "stuck message",
+          "kind": "Text",
+          "sql": "TEXT",
+          "default": "\u0027\u0027",
+          "required": false,
+          "pk": false
+        },
+        {
+          "name": "hide_name",
+          "header": "hide name (0)",
+          "kind": "Bool",
+          "sql": "CHAR(1)",
+          "default": "\u00270\u0027",
           "required": false,
           "pk": false
         }

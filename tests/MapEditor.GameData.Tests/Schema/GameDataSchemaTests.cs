@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Text.Json;
 using MapEditor.GameData.Schema;
 using Xunit;
 
@@ -10,6 +11,26 @@ namespace MapEditor.GameData.Tests.Schema;
 
 public class GameDataSchemaTests
 {
+    // ColumnSchema drops enumNames, so the npc_type member list is read straight from the artifact:
+    // npc_type rows are authored by name, and a type missing here cannot be picked.
+    [Fact]
+    public void EmbeddedSchema_OffersEveryNpcTypeIncludingAmbient()
+    {
+        using var stream = typeof(GameDataSchema).Assembly
+            .GetManifestResourceStream("MapEditor.GameData.game-data-schema.json");
+        Assert.NotNull(stream);
+
+        using var document = JsonDocument.Parse(stream!);
+        var npcType = document.RootElement.GetProperty("sheets").EnumerateArray()
+            .Single(s => s.GetProperty("sheet").GetString() == "NPCs")
+            .GetProperty("columns").EnumerateArray()
+            .Single(c => c.GetProperty("name").GetString() == "npc_type");
+
+        Assert.Equal("Enum", npcType.GetProperty("kind").GetString());
+        Assert.Equal(new[] { "Monster", "Vendor", "Banker", "Quest", "Ambient" },
+            npcType.GetProperty("enumNames").EnumerateArray().Select(n => n.GetString()).ToArray());
+    }
+
     [Fact]
     public void LoadEmbedded_ContainsRequiredSheetsInGeneratedOrder()
     {
