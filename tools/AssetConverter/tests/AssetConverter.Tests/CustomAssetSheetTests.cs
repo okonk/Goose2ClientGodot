@@ -21,7 +21,7 @@ public class CustomAssetSheetTests
     }
 
     [Fact]
-    public void Write_PacksQuestionAndExclamationIntoReservedSheet()
+    public void Write_PacksCustomIconsIntoReservedSheet()
     {
         string root = Path.Combine(Path.GetTempPath(), $"custom-assets-{Guid.NewGuid():N}");
         string source = Path.Combine(root, "source");
@@ -43,11 +43,15 @@ public class CustomAssetSheetTests
                 (31, 0, SKColors.Cyan),
                 (0, 31, SKColors.Black),
                 (31, 31, SKColors.White));
+            WriteIcon(
+                Path.Combine(source, "experience.png"),
+                (0, 0, SKColors.Green),
+                (31, 31, SKColors.Red));
 
             CustomAssetSheet.Write(source, output);
 
             using SKBitmap sheet = SKBitmap.Decode(Path.Combine(output, "30000.png"))!;
-            Assert.Equal(64, sheet.Width);
+            Assert.Equal(96, sheet.Width);
             Assert.Equal(32, sheet.Height);
             Assert.Equal(SKColors.Yellow, sheet.GetPixel(0, 0));
             Assert.Equal(translucentRed, sheet.GetPixel(31, 0));
@@ -57,6 +61,8 @@ public class CustomAssetSheetTests
             Assert.Equal(SKColors.Cyan, sheet.GetPixel(63, 0));
             Assert.Equal(SKColors.Black, sheet.GetPixel(32, 31));
             Assert.Equal(SKColors.White, sheet.GetPixel(63, 31));
+            Assert.Equal(SKColors.Green, sheet.GetPixel(64, 0));
+            Assert.Equal(SKColors.Red, sheet.GetPixel(95, 31));
         }
         finally
         {
@@ -73,7 +79,7 @@ public class CustomAssetSheetTests
         {
             CustomAssetSheet.Write(Goose2.AssetConverter.Paths.CustomAssetsDir, output);
 
-            SKImageInfo unpremul = new(64, 32, SKColorType.Rgba8888, SKAlphaType.Unpremul);
+            SKImageInfo unpremul = new(96, 32, SKColorType.Rgba8888, SKAlphaType.Unpremul);
             using SKBitmap sheet = SKBitmap.Decode(Path.Combine(output, "30000.png"), unpremul)!;
             ReadOnlySpan<byte> pixels = sheet.GetPixelSpan();
             for (int i = 0; i < pixels.Length; i += 4)
@@ -102,6 +108,7 @@ public class CustomAssetSheetTests
             var sheet = json.RootElement.GetProperty("sheets").GetProperty("30000");
             Assert.Equal(new[] { 0, 0, 32, 32 }, sheet.GetProperty("1").EnumerateArray().Select(x => x.GetInt32()));
             Assert.Equal(new[] { 32, 0, 32, 32 }, sheet.GetProperty("2").EnumerateArray().Select(x => x.GetInt32()));
+            Assert.Equal(new[] { 64, 0, 32, 32 }, sheet.GetProperty("3").EnumerateArray().Select(x => x.GetInt32()));
         }
         finally
         {

@@ -7,24 +7,34 @@ public static class CustomAssetSheet
     public const int SheetNumber = 30000;
     public const int ExclamationGraphic = 1;
     public const int QuestionGraphic = 2;
+    public const int ExperienceGraphic = 3;
 
-    public static Dictionary<string, int[]> CreateFrames() => new()
-    {
-        [ExclamationGraphic.ToString()] = new[] { 0, 0, 32, 32 },
-        [QuestionGraphic.ToString()] = new[] { 32, 0, 32, 32 },
-    };
+    private const int IconSize = 32;
+
+    private static readonly (int Graphic, string FileName)[] Icons =
+    [
+        (ExclamationGraphic, "exclamation.png"),
+        (QuestionGraphic, "question.png"),
+        (ExperienceGraphic, "experience.png"),
+    ];
+
+    public static Dictionary<string, int[]> CreateFrames() =>
+        Icons.ToDictionary(icon => icon.Graphic.ToString(), icon => new[] { (icon.Graphic - 1) * IconSize, 0, IconSize, IconSize });
 
     public static void Write(string sourceDir, string outputDir)
     {
-        byte[] exclamation = LoadIcon(sourceDir, "exclamation.png");
-        byte[] question = LoadIcon(sourceDir, "question.png");
-        byte[] sheet = new byte[64 * 32 * 4];
-        int iconRowLength = 32 * 4;
-        int sheetRowLength = 64 * 4;
-        for (int y = 0; y < 32; y++)
+        int sheetWidth = Icons.Length * IconSize;
+        byte[] sheet = new byte[sheetWidth * IconSize * 4];
+        int iconRowLength = IconSize * 4;
+        int sheetRowLength = sheetWidth * 4;
+        foreach ((int graphic, string fileName) in Icons)
         {
-            Buffer.BlockCopy(exclamation, y * iconRowLength, sheet, y * sheetRowLength, iconRowLength);
-            Buffer.BlockCopy(question, y * iconRowLength, sheet, y * sheetRowLength + iconRowLength, iconRowLength);
+            byte[] icon = LoadIcon(sourceDir, fileName);
+            int offset = (graphic - 1) * iconRowLength;
+            for (int y = 0; y < IconSize; y++)
+            {
+                Buffer.BlockCopy(icon, y * iconRowLength, sheet, y * sheetRowLength + offset, iconRowLength);
+            }
         }
 
         // The source icons hide a magenta key colour under alpha 0; zero it so filtering can't bleed it.
@@ -38,14 +48,14 @@ public static class CustomAssetSheet
             }
         }
 
-        PngWriter.Write(sheet, 64, 32, Path.Combine(outputDir, $"{SheetNumber}.png"));
+        PngWriter.Write(sheet, sheetWidth, IconSize, Path.Combine(outputDir, $"{SheetNumber}.png"));
     }
 
     private static byte[] LoadIcon(string sourceDir, string fileName)
     {
         string path = Path.Combine(sourceDir, fileName);
         byte[] image = SkiaImageCodec.DecodeRgba(File.ReadAllBytes(path), out int width, out int height);
-        if (width == 32 && height == 32)
+        if (width == IconSize && height == IconSize)
         {
             return image;
         }
