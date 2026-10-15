@@ -32,5 +32,6 @@ namespace Goose2Client
         Custom = 28,
         LogViewer = 29,
         GenericContainer = 30,
+        Amount = 31,
     }
 }

@@ -317,6 +317,8 @@ namespace Goose2Client.Network
             Send(CustomWindowGraphicPacket.FormatCwc(lookSlot, statsSlot, r, g, b, a, name));
         }
 
+        public void SubmitAmount(int windowId, long amount) => Send(AmountInfoPacket.FormatAmt(windowId, amount));
+
         public void VendorPurchaseItem(int npcId, int slotId)
         {
             Send($"VPI{npcId},{slotId + 1}");
