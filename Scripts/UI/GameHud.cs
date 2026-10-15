@@ -28,6 +28,7 @@ public partial class GameHud : Control
     public HairdyeWindow Hairdye { get; private set; } = null!;
     public LogViewerWindow LogViewer { get; private set; } = null!;
     public KeyBindingsWindow KeyBindings { get; private set; } = null!;
+    public AmountWindow Amount { get; private set; } = null!;
     public MinimapControl Minimap { get; private set; } = null!;
     public QuestWindowManager QuestWindows { get; private set; } = null!;
     public OptionListWindowManager OptionListWindows { get; private set; } = null!;
@@ -97,6 +98,7 @@ public partial class GameHud : Control
         Custom = Add<CustomWindow>("res://Scenes/UI/CustomWindow.tscn");
         Hairdye = Add<HairdyeWindow>("res://Scenes/UI/HairdyeWindow.tscn");
         LogViewer = Add<LogViewerWindow>("res://Scenes/UI/LogViewerWindow.tscn");
+        Amount = Add<AmountWindow>("res://Scenes/UI/AmountWindow.tscn");
 
         // The fixed party window overlaps the default chat spot; the chat's tab row must
         // win input there.

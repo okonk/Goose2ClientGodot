@@ -1,0 +1,114 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://Scripts/UI/AmountWindow.cs" id="1_aw"]
+[ext_resource type="Theme" path="res://Assets/UI/GameTheme.tres" id="theme"]
+
+[node name="AmountWindow" type="Control"]
+script = ExtResource("1_aw")
+theme = ExtResource("theme")
+layout_mode = 3
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 180.0
+offset_bottom = 156.0
+WindowName = "Amount"
+
+[node name="Background" type="TextureRect" parent="."]
+layout_mode = 2
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+
+[node name="TitleBar" type="Control" parent="."]
+layout_mode = 2
+anchors_preset = 10
+anchor_right = 0.0
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 180.0
+offset_bottom = 19.0
+mouse_filter = 0
+
+[node name="TitleLabel" type="Label" parent="TitleBar"]
+layout_mode = 2
+anchors_preset = 0
+offset_left = 6.0
+offset_top = 4.0
+offset_right = 157.0
+offset_bottom = 15.0
+mouse_filter = 2
+text = ""
+clip_text = true
+
+[node name="CloseButton" type="Button" parent="TitleBar"]
+layout_mode = 2
+anchors_preset = 0
+offset_left = 163.0
+offset_top = 2.0
+offset_right = 179.0
+offset_bottom = 18.0
+flat = true
+
+[node name="Content" type="Control" parent="."]
+layout_mode = 2
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 1
+
+[node name="Icon" type="TextureRect" parent="Content"]
+layout_mode = 2
+anchors_preset = 0
+offset_left = 8.0
+offset_top = 26.0
+offset_right = 48.0
+offset_bottom = 66.0
+mouse_filter = 2
+
+[node name="Prompt" type="Label" parent="Content"]
+layout_mode = 2
+anchors_preset = 0
+offset_left = 56.0
+offset_top = 26.0
+offset_right = 172.0
+offset_bottom = 92.0
+mouse_filter = 2
+text = ""
+autowrap_mode = 3
+
+[node name="AmountField" type="LineEdit" parent="Content"]
+layout_mode = 2
+anchors_preset = 0
+offset_left = 8.0
+offset_top = 98.0
+offset_right = 172.0
+offset_bottom = 122.0
+placeholder_text = "0"
+
+[node name="MaxButton" type="Button" parent="Content"]
+layout_mode = 2
+anchors_preset = 0
+offset_left = 8.0
+offset_top = 128.0
+offset_right = 58.0
+offset_bottom = 150.0
+text = "Max"
+
+[node name="DonateButton" type="Button" parent="Content"]
+layout_mode = 2
+anchors_preset = 0
+offset_left = 66.0
+offset_top = 128.0
+offset_right = 116.0
+offset_bottom = 150.0
+text = "Donate"
+
+[node name="CancelButton" type="Button" parent="Content"]
+layout_mode = 2
+anchors_preset = 0
+offset_left = 124.0
+offset_top = 128.0
+offset_right = 172.0
+offset_bottom = 150.0
+text = "Cancel"
