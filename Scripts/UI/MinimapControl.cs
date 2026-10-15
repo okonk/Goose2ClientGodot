@@ -176,7 +176,7 @@ public partial class MinimapControl : Control, IScalableWindow
         return c.CharacterType switch
         {
             CharacterType.Monster => GameColors.Red,
-            CharacterType.Vendor or CharacterType.Banker or CharacterType.Quest => GameColors.Green,
+            CharacterType.Vendor or CharacterType.Banker or CharacterType.Quest or CharacterType.Ambient => GameColors.Green,
             CharacterType.Pet => GameColors.Yellow,
             _ => GameColors.White,
         };

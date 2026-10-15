@@ -108,12 +108,12 @@ public partial class SpellTargetManager : Node
     /// <remarks>
     /// Deliberately unfiltered: the clicked character becomes the target whatever its type, so a
     /// player-target spell can be lined up on an NPC and rejected by the server instead of the client
-    /// silently ignoring the click.
+    /// silently ignoring the click. Ambient NPCs are the exception — scenery is not a target at all.
     /// </remarks>
     public void CastOnClickedTarget(Character.Character c)
     {
         if (!IsTargeting) return;
-        if (c == null || !GodotObject.IsInstanceValid(c) || c.IsHiddenFromViewer) return;
+        if (c == null || !GodotObject.IsInstanceValid(c) || c.IsHiddenFromViewer || c.IsAmbient) return;
         if (GameManager.Instance.CurrentMapManager?.GetCharacter(c.LoginId) != c) return;
 
         _target = c;

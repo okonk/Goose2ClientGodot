@@ -149,4 +149,43 @@ public class TargetCyclerTests
         };
         Assert.Equal(7, TargetCycler.Next(all, null, (5,5), 7, 100, (10,8), SpellTargetType.NPCPlayer, true, true)?.LoginId);
     }
+
+    [Fact] public void AmbientCharactersAreNeverCycledTo()
+    {
+        var all = new List<TargetCandidate>
+        {
+            C(1, 5, 5, CharacterType.Ambient),
+            C(2, 6, 5, CharacterType.Monster),
+            C(3, 7, 5, CharacterType.Player)
+        };
+        Assert.Equal(2, TargetCycler.Next(all, null, (5,5), 0, 100, (10,8), SpellTargetType.NPC, true, true)?.LoginId);
+        Assert.Equal(3, TargetCycler.Next(all, null, (5,5), 0, 100, (10,8), SpellTargetType.Player, true, true)?.LoginId);
+        Assert.Equal(2, TargetCycler.Next(all, null, (5,5), 0, 100, (10,8), SpellTargetType.NPCPlayer, true, true)?.LoginId);
+    }
+
+    [Fact] public void AmbientCharactersAreExcludedWithTargetFilteringDisabled()
+    {
+        var all = new List<TargetCandidate>{ C(1,5,5,CharacterType.Ambient), C(2,6,5,CharacterType.Monster) };
+        Assert.Equal(2, TargetCycler.Next(all, null, (5,5), 0, 100, (10,8), SpellTargetType.NPC, false, true)?.LoginId);
+    }
+
+    [Fact] public void AmbientCharactersAreSkippedWhenCyclingPastThem()
+    {
+        var all = new List<TargetCandidate>
+        {
+            C(1, 0, 0, CharacterType.Monster),
+            C(2, 0, 1, CharacterType.Ambient),
+            C(3, 0, 2, CharacterType.Monster)
+        };
+        Assert.Equal(3, TargetCycler.Next(all, C(1,0,0,CharacterType.Monster), (1,1), 0, 100, (10,8),
+            SpellTargetType.NPC, true, true)?.LoginId);
+        Assert.Equal(1, TargetCycler.Next(all, C(3,0,2,CharacterType.Monster), (1,1), 0, 100, (10,8),
+            SpellTargetType.NPC, true, false)?.LoginId);
+    }
+
+    [Fact] public void OnlyAmbientCharactersInRangeYieldsNoTarget()
+    {
+        var all = new List<TargetCandidate>{ C(1,5,5,CharacterType.Ambient) };
+        Assert.Null(TargetCycler.Next(all, null, (5,5), 0, 100, (10,8), SpellTargetType.NPC, true, true));
+    }
 }

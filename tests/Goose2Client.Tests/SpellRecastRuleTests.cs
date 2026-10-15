@@ -23,6 +23,7 @@ public class SpellRecastRuleTests
     [InlineData(CharacterType.Banker)]
     [InlineData(CharacterType.Quest)]
     [InlineData(CharacterType.Pet)]
+    [InlineData(CharacterType.Ambient)]
     public void OtherNpcTypesAreNotRecastTargets(CharacterType type)
     {
         Assert.False(SpellRecastRule.IsRecastTarget(type));

@@ -14,7 +14,7 @@ namespace Goose2Client
             (int x, int y) player, int playerLoginId, int mapWidth, (int x, int y) viewRange,
             SpellTargetType type, bool filteringEnabled, bool searchDown)
         {
-            var filtered = all.ToList();
+            var filtered = all.Where(c => c.Type != CharacterType.Ambient).ToList();
             
             if (filteringEnabled)
             {

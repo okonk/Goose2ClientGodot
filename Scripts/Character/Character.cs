@@ -37,6 +37,7 @@ namespace Goose2Client.Character
         public float HPPercent { get; private set; } = 1f;
         public float MPPercent { get; private set; } = 1f;
         public CharacterType CharacterType { get; private set; }
+        public bool IsAmbient => CharacterType == CharacterType.Ambient;
         // Server body state: 3 = unarmed (no-equip), 4=1hand, 5=staff, 6=2hand, 7=bow. Drives whether
         // slots play their -equip vs -no-equip idle/walk and which attack-<type> clip they swing.
         public int BodyState { get; private set; } = 3;
