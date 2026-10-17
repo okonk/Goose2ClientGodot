@@ -14,6 +14,11 @@ public static class MinimapColors
     /// <summary>Maps fill void with black-ish tiles; at or below this max channel a tile reads as empty.</summary>
     public const float NearBlackMax = 24f / 255f;
 
+    public static readonly Color Warp = new(120f / 255f, 200f / 255f, 1f);
+
+    public static Color PixelColor(MapTile tile, bool isWarp, Func<int, int, Color?> provider)
+        => isWarp ? Warp : PickColor(tile, provider) ?? Empty;
+
     public static Color? PickColor(MapTile tile, Func<int, int, Color?> provider)
     {
         foreach (int layer in LayerOrder)

@@ -97,6 +97,30 @@ public class MinimapColorsTests
     }
 
     [Fact]
+    public void PixelColor_WarpBeatsTileArt()
+    {
+        _colors = new Dictionary<(int, int), Color> { [(1, 10)] = new Color(1, 0, 0) };
+        var tile = Tile((0, 1, 10));
+        Assert.Equal(MinimapColors.Warp, MinimapColors.PixelColor(tile, true, Provider));
+    }
+
+    [Fact]
+    public void PixelColor_NonWarpUsesTileArt()
+    {
+        _colors = new Dictionary<(int, int), Color> { [(1, 10)] = new Color(1, 0, 0) };
+        var tile = Tile((0, 1, 10));
+        Assert.Equal(new Color(1, 0, 0), MinimapColors.PixelColor(tile, false, Provider));
+    }
+
+    [Fact]
+    public void PixelColor_NonWarpWithoutArtIsEmpty()
+    {
+        _colors = new Dictionary<(int, int), Color>();
+        var tile = Tile();
+        Assert.Equal(MinimapColors.Empty, MinimapColors.PixelColor(tile, false, Provider));
+    }
+
+    [Fact]
     public void Build_ProducesOneColorPerTile()
     {
         _colors = new Dictionary<(int, int), Color>
