@@ -30,6 +30,7 @@ public partial class GameHud : Control
     public KeyBindingsWindow KeyBindings { get; private set; } = null!;
     public AmountWindow Amount { get; private set; } = null!;
     public MinimapControl Minimap { get; private set; } = null!;
+    public NoticeFeed Notices { get; private set; } = null!;
     public QuestWindowManager QuestWindows { get; private set; } = null!;
     public OptionListWindowManager OptionListWindows { get; private set; } = null!;
 
@@ -77,6 +78,8 @@ public partial class GameHud : Control
         // Behind every window so debug/build-info overlays paint on top of it.
         Minimap = new MinimapControl();
         AddChild(Minimap);
+        Notices = new NoticeFeed { Minimap = Minimap };
+        AddChild(Notices);
 
         // 4. Instantiate each window scene.
         Vitals = Add<VitalsWindow>("res://Scenes/UI/VitalsWindow.tscn");

@@ -16,6 +16,8 @@ public partial class MinimapControl : Control, IScalableWindow
     private const int BaseCornerRadius = 3;
     private const int BaseNameHeight = 14;
     private const int BaseNameOutline = 3;
+    public const int BaseTop = 28;
+    public const int BaseFootprintBottom = BaseTop + BasePixels + 2 * BaseBorder + 2 + BaseNameHeight;
 
     private ImageTexture _bitmap = null!;
     private int _mapWidth;
@@ -60,9 +62,9 @@ public partial class MinimapControl : Control, IScalableWindow
         TextureFilter = TextureFilterEnum.Nearest;
         SetAnchorsPreset(LayoutPreset.TopRight);
         OffsetLeft = -BasePixels - 2 * BaseBorder - 8;
-        OffsetTop = 28;
+        OffsetTop = BaseTop;
         OffsetRight = -8;
-        OffsetBottom = 28 + BasePixels + 2 * BaseBorder;
+        OffsetBottom = BaseTop + BasePixels + 2 * BaseBorder;
         MouseFilter = MouseFilterEnum.Ignore;
 
         var panel = GetThemeStylebox("panel", "Panel") as StyleBoxFlat;
