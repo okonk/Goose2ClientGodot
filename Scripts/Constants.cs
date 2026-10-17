@@ -117,6 +117,14 @@ namespace Goose2Client
         Client = 8,
     }
 
+    public enum NoticeType
+    {
+        Info = 0,
+        Quest = 1,
+        BuffOn = 2,
+        BuffOff = 3,
+    }
+
     public enum SpellTargetType
     {
         None = 0,
