@@ -23,6 +23,8 @@ public partial class MapManager : Node2D
     private readonly System.Collections.Generic.Dictionary<int, Character.Character> _characters = new();
     private Image _minimapImage = null!;
     private ImageTexture _minimapTexture = null!;
+    private readonly System.Collections.Generic.HashSet<Vector2I> _warps = new();
+    private bool _minimapDirty;
     private readonly System.Collections.Generic.Dictionary<(int, int), Color?> _tileColorMemo = new();
     private readonly System.Collections.Generic.Dictionary<int, Image> _sheetImages = new();
     private Node2D _characterRoot = null!;
@@ -94,6 +96,7 @@ public partial class MapManager : Node2D
 
         var pm = GameManager.Instance.PacketManager;
         pm.Listen<TileUpdatePacket>(OnTileUpdate);
+        pm.Listen<MapWarpPacket>(OnMapWarp);
         pm.Listen<MapObjectPacket>(OnMapObject);
         pm.Listen<EraseObjectPacket>(OnEraseObject);
         pm.Listen<SetYourPositionPacket>(OnSetYourPosition);
@@ -134,6 +137,7 @@ public partial class MapManager : Node2D
         if (!_listenersRegistered) return;
         var pm = GameManager.Instance!.PacketManager;
         pm.Remove<TileUpdatePacket>(OnTileUpdate);
+        pm.Remove<MapWarpPacket>(OnMapWarp);
         pm.Remove<MapObjectPacket>(OnMapObject);
         pm.Remove<EraseObjectPacket>(OnEraseObject);
         pm.Remove<SetYourPositionPacket>(OnSetYourPosition);
@@ -277,6 +281,13 @@ public partial class MapManager : Node2D
 
     public override void _Process(double delta)
     {
+        if (_minimapDirty)
+        {
+            _minimapDirty = false;
+            _minimapTexture.Update(_minimapImage);
+            GameManager.Instance.Hud?.Minimap?.Invalidate();
+        }
+
         if (_localPlayer != null && GodotObject.IsInstanceValid(_localPlayer))
         {
             UpdateRoofVisibility(_localPlayer.X, _localPlayer.Y);   // roof toggle keyed on tile
@@ -447,9 +458,19 @@ public partial class MapManager : Node2D
             else _layers[layer].RefreshCell(p.X, p.Y);                 // TileMapLayer: update one cell
         });
 
-        _minimapImage.SetPixelv(new Vector2I(p.X, p.Y), MinimapColors.PickColor(_map[p.X, p.Y], TileColor) ?? MinimapColors.Empty);
-        _minimapTexture.Update(_minimapImage);
-        GameManager.Instance.Hud?.Minimap?.Invalidate();
+        _minimapImage.SetPixelv(new Vector2I(p.X, p.Y), MinimapColors.PixelColor(_map[p.X, p.Y], _warps.Contains(new Vector2I(p.X, p.Y)), TileColor));
+        _minimapDirty = true;
+    }
+
+    private void OnMapWarp(object packetObj)
+    {
+        var p = (MapWarpPacket)packetObj;
+        if (p.X < 0 || p.Y < 0 || p.X >= _map.Width || p.Y >= _map.Height) return;
+
+        var pos = new Vector2I(p.X, p.Y);
+        _warps.Add(pos);
+        _minimapImage.SetPixelv(pos, MinimapColors.PixelColor(_map[p.X, p.Y], true, TileColor));
+        _minimapDirty = true;
     }
 
     private Color? TileColor(int sheet, int graphic)
