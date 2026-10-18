@@ -126,7 +126,7 @@ if (args.Length >= 1 && args[0] == "batch")
         : Path.GetFullPath(Path.Combine("..", "..", "Assets", "Sprites", "sheets"));
 
     var result = BatchConverter.Convert(Paths.IllutiaData, outDir);
-    CustomAssetSheet.Write(Paths.CustomAssetsDir, outDir);
+    CustomAssetSheet.WriteAll(Paths.CustomAssetsDir, outDir);
     Console.WriteLine($"Converted {result.Succeeded} sheets, {result.Failed} failures -> {outDir}");
     foreach (var f in result.Failures) Console.WriteLine($"  SKIP {f}");
     return;
@@ -165,7 +165,7 @@ if (args.Length >= 1 && args[0] == "manifest")
     ManifestFileStore.Write(outPath,
         () => FrameManifestBuilder.Build(Paths.IllutiaData),
         () => AnimationManifestBuilder.Build(Paths.IllutiaData, Paths.CompiledEnc, Paths.ItemTileSheets));
-    CustomAssetSheet.Write(Paths.CustomAssetsDir,
+    CustomAssetSheet.WriteAll(Paths.CustomAssetsDir,
         Path.Combine(Path.GetDirectoryName(Path.GetFullPath(outPath))!, "sheets"));
     Console.WriteLine($"Wrote {outPath}");
     Console.WriteLine($"Wrote {Path.Combine(Path.GetDirectoryName(Path.GetFullPath(outPath))!, ManifestFileStore.AnimationFileName)}");
@@ -184,7 +184,7 @@ if (args.Length >= 1 && args[0] == "all")
 
     // Illutia sheets
     var sheets = BatchConverter.Convert(Paths.IllutiaData, sheetsDir);
-    CustomAssetSheet.Write(Paths.CustomAssetsDir, sheetsDir);
+    CustomAssetSheet.WriteAll(Paths.CustomAssetsDir, sheetsDir);
 
     var animations = AnimationBatchConverter.Convert(
         Paths.IllutiaData, Paths.CompiledEnc, repoRoot, includeEffects: true);

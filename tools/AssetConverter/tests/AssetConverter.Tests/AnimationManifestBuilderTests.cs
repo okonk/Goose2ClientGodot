@@ -126,7 +126,7 @@ public class AnimationManifestBuilderTests
             using var doc = JsonDocument.Parse(Build(root));
             var sheetKeys = doc.RootElement.GetProperty("sheets")
                 .EnumerateObject().Select(p => p.Name).ToArray();
-            Assert.Equal(new[] { "115" }, sheetKeys);
+            Assert.Equal(new[] { "115", "30001", "30002" }, sheetKeys);
             var categories = doc.RootElement.GetProperty("sheets").GetProperty("115").GetProperty("categories");
             Assert.Equal(1, categories.GetArrayLength());
             Assert.Equal("Body", categories[0].GetProperty("name").GetString());
@@ -275,7 +275,7 @@ public class AnimationManifestBuilderTests
             using var doc = JsonDocument.Parse(jsonA);
             var sheetKeys = doc.RootElement.GetProperty("sheets")
                 .EnumerateObject().Select(p => p.Name).ToArray();
-            Assert.Equal(new[] { "99", "1000" }, sheetKeys);
+            Assert.Equal(new[] { "99", "1000", "30001", "30002" }, sheetKeys);
             var ownerSheets = doc.RootElement.GetProperty("animations")
                 .EnumerateArray().Select(a => a.GetProperty("ownerSheet").GetInt32()).ToArray();
             Assert.Equal(new[] { 99, 1000 }, ownerSheets);
@@ -363,7 +363,7 @@ public class AnimationManifestBuilderTests
             using var doc = JsonDocument.Parse(Build(root, new[] { 300, 20107, 20444 }));
             var sheetKeys = doc.RootElement.GetProperty("sheets")
                 .EnumerateObject().Select(p => p.Name).ToArray();
-            Assert.Equal(new[] { "300" }, sheetKeys);
+            Assert.Equal(new[] { "300", "30001", "30002" }, sheetKeys);
             Assert.Equal(new[] { "ItemTiles", "Tiles" }, Names(doc.RootElement.GetProperty("sheets"), 300));
         }
         finally
@@ -446,7 +446,7 @@ public class AnimationManifestBuilderTests
             using var doc = JsonDocument.Parse(Build(root));
             var sheetKeys = doc.RootElement.GetProperty("sheets")
                 .EnumerateObject().Select(p => p.Name).ToArray();
-            Assert.Equal(new[] { "200" }, sheetKeys);
+            Assert.Equal(new[] { "200", "30001", "30002" }, sheetKeys);
         }
         finally
         {
@@ -536,7 +536,7 @@ public class AnimationManifestBuilderTests
             using var doc = JsonDocument.Parse(BuildCombined(root));
             var sheetKeys = doc.RootElement.GetProperty("sheets")
                 .EnumerateObject().Select(p => p.Name).ToArray();
-            Assert.Equal(new[] { "115", "20000", "20001", "20002" }, sheetKeys);
+            Assert.Equal(new[] { "115", "20000", "20001", "20002", "30001", "30002" }, sheetKeys);
 
             var category = doc.RootElement.GetProperty("sheets").GetProperty("20000").GetProperty("categories")[0];
             Assert.Equal("Tiles", category.GetProperty("name").GetString());

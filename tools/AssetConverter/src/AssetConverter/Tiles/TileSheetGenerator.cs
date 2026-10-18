@@ -2,6 +2,7 @@ using System.Buffers.Binary;
 using System.Linq;
 using System.Text.Json;
 using Goose2.AssetConverter.Adf;
+using Goose2.AssetConverter.Manifest;
 
 namespace Goose2.AssetConverter.Tiles;
 
@@ -9,7 +10,8 @@ namespace Goose2.AssetConverter.Tiles;
 /// Rule: static (animation-free) graphic sheets that are neither character-part sheets
 /// (compiled.enc) nor item-icon sheets (SpriteBundle iconSheets), plus every sheet the
 /// converted maps reference (sheets are dual-use: items may pull from tile sheets; this
-/// also covers Aspereta tile sheets, which have no ADF-based static/animated split here).</summary>
+/// also covers Aspereta tile sheets, which have no ADF-based static/animated split here),
+/// plus the custom tile sheets.</summary>
 public static class TileSheetGenerator
 {
     public const string OutputFileName = "tile-sheets.json";
@@ -48,6 +50,7 @@ public static class TileSheetGenerator
         }
 
         AddMapReferencedSheets(mapsDir, tiles);
+        tiles.UnionWith(CustomAssetSheet.TileSheetNumbers);
 
         return tiles.ToList();
     }

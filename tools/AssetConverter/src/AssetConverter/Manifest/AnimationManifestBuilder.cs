@@ -27,6 +27,7 @@ public static class AnimationManifestBuilder
 
         foreach (var sheet in sheetCategories.Keys.Where(s => !sheets.ContainsKey(s)).ToList())
             sheetCategories.Remove(sheet);
+        AddCustomTileSheets(sheets);
 
         return Serialize(sheets, animations, sheetCategories, animatedSheets, itemSheets);
     }
@@ -66,8 +67,16 @@ public static class AnimationManifestBuilder
 
         var animations = new List<AnimationManifestAnimation>(illutiaAnimations);
         animations.AddRange(asperetaAnimations);
+        AddCustomTileSheets(sheets);
 
         return Serialize(sheets, animations, categories, illutiaAnimated, itemSheets);
+    }
+
+    private static void AddCustomTileSheets(SortedDictionary<int, AnimationManifestSheet> sheets)
+    {
+        foreach (int sheet in CustomAssetSheet.TileSheetNumbers)
+            if (!sheets.TryAdd(sheet, new AnimationManifestSheet()))
+                throw new InvalidDataException($"Custom tile sheet {sheet} conflicts with a source sheet.");
     }
 
     private static HashSet<int> LoadItemTileSheets(string path)

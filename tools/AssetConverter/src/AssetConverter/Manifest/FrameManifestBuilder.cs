@@ -55,10 +55,13 @@ public static class FrameManifestBuilder
 
     private static void AddCustomAssets(SortedDictionary<string, Dictionary<string, int[]>> sheets)
     {
-        string key = CustomAssetSheet.SheetNumber.ToString();
-        if (!sheets.TryAdd(key, CustomAssetSheet.CreateFrames()))
+        foreach (CustomAssetSheet custom in CustomAssetSheet.All)
         {
-            throw new InvalidDataException($"Custom asset sheet {key} conflicts with a source sheet.");
+            string key = custom.SheetNumber.ToString();
+            if (!sheets.TryAdd(key, custom.CreateFrames()))
+            {
+                throw new InvalidDataException($"Custom asset sheet {key} conflicts with a source sheet.");
+            }
         }
     }
 

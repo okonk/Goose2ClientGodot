@@ -48,7 +48,7 @@ public class CustomAssetSheetTests
                 (0, 0, SKColors.Green),
                 (31, 31, SKColors.Red));
 
-            CustomAssetSheet.Write(source, output);
+            CustomAssetSheet.Icons.Write(source, output);
 
             using SKBitmap sheet = SKBitmap.Decode(Path.Combine(output, "30000.png"))!;
             Assert.Equal(96, sheet.Width);
@@ -77,16 +77,21 @@ public class CustomAssetSheetTests
 
         try
         {
-            CustomAssetSheet.Write(Goose2.AssetConverter.Paths.CustomAssetsDir, output);
+            CustomAssetSheet.WriteAll(Goose2.AssetConverter.Paths.CustomAssetsDir, output);
 
-            SKImageInfo unpremul = new(96, 32, SKColorType.Rgba8888, SKAlphaType.Unpremul);
-            using SKBitmap sheet = SKBitmap.Decode(Path.Combine(output, "30000.png"), unpremul)!;
-            ReadOnlySpan<byte> pixels = sheet.GetPixelSpan();
-            for (int i = 0; i < pixels.Length; i += 4)
+            foreach ((string file, int width, int height) in new[] { ("30000.png", 96, 32), ("30001.png", 32, 64), ("30002.png", 224, 40) })
             {
-                if (pixels[i + 3] == 0)
+                SKImageInfo unpremul = new(width, height, SKColorType.Rgba8888, SKAlphaType.Unpremul);
+                using SKBitmap sheet = SKBitmap.Decode(Path.Combine(output, file), unpremul)!;
+                Assert.Equal(width, sheet.Width);
+                Assert.Equal(height, sheet.Height);
+                ReadOnlySpan<byte> pixels = sheet.GetPixelSpan();
+                for (int i = 0; i < pixels.Length; i += 4)
                 {
-                    Assert.Equal(0, pixels[i] | pixels[i + 1] | pixels[i + 2]);
+                    if (pixels[i + 3] == 0)
+                    {
+                        Assert.Equal(0, pixels[i] | pixels[i + 1] | pixels[i + 2]);
+                    }
                 }
             }
         }
@@ -94,6 +99,32 @@ public class CustomAssetSheetTests
         {
             Directory.Delete(output, true);
         }
+    }
+
+    [Fact]
+    public void Write_RejectsTileOfWrongSize()
+    {
+        string root = Path.Combine(Path.GetTempPath(), $"custom-assets-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(root);
+
+        try
+        {
+            WriteIcon(Path.Combine(root, "grandfather-clock.png"));
+
+            var ex = Assert.Throws<InvalidDataException>(() => CustomAssetSheet.Tiles.Write(root, root));
+            Assert.Contains("32x64", ex.Message);
+        }
+        finally
+        {
+            Directory.Delete(root, true);
+        }
+    }
+
+    [Fact]
+    public void TileSheetNumbers_ExcludeIcons()
+    {
+        Assert.Equal(new[] { 30001, 30002 }, CustomAssetSheet.TileSheetNumbers);
+        Assert.False(CustomAssetSheet.Icons.IsTileSheet);
     }
 
     [Fact]
@@ -109,6 +140,16 @@ public class CustomAssetSheetTests
             Assert.Equal(new[] { 0, 0, 32, 32 }, sheet.GetProperty("1").EnumerateArray().Select(x => x.GetInt32()));
             Assert.Equal(new[] { 32, 0, 32, 32 }, sheet.GetProperty("2").EnumerateArray().Select(x => x.GetInt32()));
             Assert.Equal(new[] { 64, 0, 32, 32 }, sheet.GetProperty("3").EnumerateArray().Select(x => x.GetInt32()));
+            var tiles = json.RootElement.GetProperty("sheets").GetProperty("30001");
+            Assert.Equal(new[] { 0, 0, 32, 64 }, tiles.GetProperty("1").EnumerateArray().Select(x => x.GetInt32()));
+            var portraits = json.RootElement.GetProperty("sheets").GetProperty("30002");
+            Assert.Equal(new[] { 0, 0, 32, 40 }, portraits.GetProperty("1").EnumerateArray().Select(x => x.GetInt32()));
+            Assert.Equal(new[] { 32, 0, 32, 40 }, portraits.GetProperty("2").EnumerateArray().Select(x => x.GetInt32()));
+            Assert.Equal(new[] { 64, 0, 32, 40 }, portraits.GetProperty("3").EnumerateArray().Select(x => x.GetInt32()));
+            Assert.Equal(new[] { 96, 0, 32, 40 }, portraits.GetProperty("4").EnumerateArray().Select(x => x.GetInt32()));
+            Assert.Equal(new[] { 128, 0, 32, 40 }, portraits.GetProperty("5").EnumerateArray().Select(x => x.GetInt32()));
+            Assert.Equal(new[] { 160, 0, 32, 40 }, portraits.GetProperty("6").EnumerateArray().Select(x => x.GetInt32()));
+            Assert.Equal(new[] { 192, 0, 32, 40 }, portraits.GetProperty("7").EnumerateArray().Select(x => x.GetInt32()));
         }
         finally
         {
