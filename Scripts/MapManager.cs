@@ -273,6 +273,7 @@ public partial class MapManager : Node2D
         _localPlayer = c;
         c.IsLocalPlayer = true;
         c.ApplyInvisibility();
+        if (c.GetNodeOrNull<LocalPlayerLight>("Light") == null) c.AddChild(new LocalPlayerLight(Ambience));
         CenterCameraOn(c.X, c.Y);
     }
 
