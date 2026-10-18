@@ -20,8 +20,9 @@ public partial class AmbienceManager : Node2D
     public event Action? WeatherChanged;
     internal CanvasModulate TintNode { get; private set; } = null!;
 
-    private GpuParticles2D? _rain, _snow, _storm;
-    private ColorRect? _fog, _flash;
+    internal GpuParticles2D? _rain, _snow, _storm;
+    internal ColorRect? _fog;
+    private ColorRect? _flash;
     private Tween? _weatherTween, _flashTween;
     private float _lightningTimer;
     private const float LightningMinInterval = 5f;
