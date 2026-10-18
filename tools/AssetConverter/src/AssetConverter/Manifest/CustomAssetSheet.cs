@@ -84,7 +84,25 @@ public sealed class CustomAssetSheet
         "line-inner-corner-bottom-right.png",
     ]));
 
-    public static readonly IReadOnlyList<CustomAssetSheet> All = [Icons, Tiles, Portraits, Blood, WallLines];
+    public static readonly CustomAssetSheet WallCaps = new(30005, 32, 32, isTileSheet: true, Numbered(
+    [
+        "wall-cap-left-830743.png",
+        "wall-cap-right-830743.png",
+        "wall-cap-left-830743-top.png",
+        "wall-cap-right-830743-top.png",
+        "wall-cap-left-830772.png",
+        "wall-cap-right-830772.png",
+        "wall-cap-left-830772-top.png",
+        "wall-cap-right-830772-top.png",
+        "wall-cap-left-830776.png",
+        "wall-cap-right-830776.png",
+        "wall-cap-left-830666.png",
+        "wall-cap-right-830666.png",
+        "wall-cap-left-830646.png",
+        "wall-cap-right-830646.png",
+    ]));
+
+    public static readonly IReadOnlyList<CustomAssetSheet> All = [Icons, Tiles, Portraits, Blood, WallLines, WallCaps];
 
     private readonly (int Graphic, string FileName)[] _graphics;
 
