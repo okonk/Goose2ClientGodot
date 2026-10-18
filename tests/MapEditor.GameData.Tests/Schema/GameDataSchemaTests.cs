@@ -83,6 +83,35 @@ public class GameDataSchemaTests
     }
 
     [Fact]
+    public void Maps_HasWeatherAndLightingBeforeScriptPath()
+    {
+        var schema = GameDataSchema.LoadEmbedded();
+        var maps = schema.GetRequiredSheet("Maps");
+
+        var names = maps.Columns.Select(c => c.Name).ToArray();
+        var scriptPath = maps.GetColumnIndex("script_path");
+
+        Assert.Equal(new[] { "pets_enabled", "weather", "lighting" },
+            new[] { names[scriptPath - 3], names[scriptPath - 2], names[scriptPath - 1] });
+
+        var weather = maps.GetRequiredColumn("weather");
+        Assert.Equal("weather", weather.Header);
+        Assert.Equal("Text", weather.Kind);
+        Assert.Equal("TEXT", weather.Sql);
+        Assert.Equal("''", weather.Default);
+        Assert.False(weather.Required);
+        Assert.False(weather.IsPrimaryKey);
+
+        var lighting = maps.GetRequiredColumn("lighting");
+        Assert.Equal("lighting", lighting.Header);
+        Assert.Equal("Text", lighting.Kind);
+        Assert.Equal("TEXT", lighting.Sql);
+        Assert.Equal("''", lighting.Default);
+        Assert.False(lighting.Required);
+        Assert.False(lighting.IsPrimaryKey);
+    }
+
+    [Fact]
     public void LoadEmbedded_PublishesNonListCollections()
     {
         var schema = GameDataSchema.LoadEmbedded();

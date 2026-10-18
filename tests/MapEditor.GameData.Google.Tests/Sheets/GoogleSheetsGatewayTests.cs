@@ -79,7 +79,7 @@ public class GoogleSheetsGatewayTests
     }
 
     private static BatchGetValuesResponse FullValues() => Values(
-        ("'Maps'!A1:Q",
+        ("'Maps'!A1:S",
             new[]
             {
                 HeaderRow("Maps"),
@@ -114,7 +114,7 @@ public class GoogleSheetsGatewayTests
 
         Assert.Equal("sheets.properties(sheetId,title)", operations.GetFields.Single());
         Assert.Equal(
-            new[] { "'Maps'!A1:Q", "'NPCs'!A1:BJ", "'NPC Spawns'!A1:E", "'Warptiles'!A1:F" },
+            new[] { "'Maps'!A1:S", "'NPCs'!A1:BJ", "'NPC Spawns'!A1:E", "'Warptiles'!A1:F" },
             operations.BatchGetRanges.Single());
     }
 
@@ -153,7 +153,7 @@ public class GoogleSheetsGatewayTests
         {
             Metadata = ValidMetadata(),
             ValuesResponse = Values(
-                ("'Maps'!A1:Q", new[] { HeaderRow("Maps") }),
+                ("'Maps'!A1:S", new[] { HeaderRow("Maps") }),
                 ("'NPCs'!A1:BJ", new[] { HeaderRow("NPCs") }),
                 ("'NPC Spawns'!A1:E",
                     new[]
@@ -186,7 +186,7 @@ public class GoogleSheetsGatewayTests
         {
             Metadata = ValidMetadata(),
             ValuesResponse = Values(
-                ("'Maps'!A1:Q", mapsRows),
+                ("'Maps'!A1:S", mapsRows),
                 ("'NPCs'!A1:BJ", new[] { HeaderRow("NPCs") }),
                 ("'NPC Spawns'!A1:E", new[] { HeaderRow("NPC Spawns") }),
                 ("'Warptiles'!A1:F", new[] { HeaderRow("Warptiles") }))
@@ -210,7 +210,7 @@ public class GoogleSheetsGatewayTests
         {
             Metadata = ValidMetadata(),
             ValuesResponse = Values(
-                ("'Maps'!A1:Q1", new[] { HeaderRow("Maps") }),
+                ("'Maps'!A1:S1", new[] { HeaderRow("Maps") }),
                 ("'NPCs'!A1:BJ1", new[] { HeaderRow("NPCs") }),
                 ("'NPC Spawns'!A1:E",
                     new[]
@@ -233,7 +233,7 @@ public class GoogleSheetsGatewayTests
         var owned = await CreateGateway(operations).ReadOwnedRowsAsync(SpreadsheetId, 1, CancellationToken.None);
 
         Assert.Equal(
-            new[] { "'Maps'!A1:Q1", "'NPCs'!A1:BJ1", "'NPC Spawns'!A1:E", "'Warptiles'!A1:F" },
+            new[] { "'Maps'!A1:S1", "'NPCs'!A1:BJ1", "'NPC Spawns'!A1:E", "'Warptiles'!A1:F" },
             operations.BatchGetRanges.Single());
         Assert.Equal(
             new[]
@@ -254,7 +254,7 @@ public class GoogleSheetsGatewayTests
         {
             Metadata = ValidMetadata(),
             ValuesResponse = Values(
-                ("'Maps'!A1:Q",
+                ("'Maps'!A1:S",
                     new[]
                     {
                         HeaderRow("Maps"),
@@ -264,7 +264,7 @@ public class GoogleSheetsGatewayTests
 
         var maps = await CreateGateway(operations).ReadMapsAsync(SpreadsheetId, CancellationToken.None);
 
-        Assert.Equal(new[] { "'Maps'!A1:Q" }, operations.BatchGetRanges.Single());
+        Assert.Equal(new[] { "'Maps'!A1:S" }, operations.BatchGetRanges.Single());
         Assert.Equal(new[] { new MapReference(7, "Seven", "seven") }, maps);
     }
 
@@ -287,7 +287,7 @@ public class GoogleSheetsGatewayTests
         {
             Metadata = ValidMetadata(),
             ValuesResponse = Values(
-                ("'Maps'!A1:Q1", new[] { mapsHeader }),
+                ("'Maps'!A1:S1", new[] { mapsHeader }),
                 ("'NPCs'!A1:BJ1", new[] { npcsHeader }),
                 ("'NPC Spawns'!A1:E", new[] { HeaderRow("NPC Spawns") }),
                 ("'Warptiles'!A1:F", new[] { HeaderRow("Warptiles") }))
@@ -310,7 +310,7 @@ public class GoogleSheetsGatewayTests
         {
             Metadata = ValidMetadata(),
             ValuesResponse = Values(
-                ("'Maps'!A1:Q", new[] { HeaderRow("Maps") }),
+                ("'Maps'!A1:S", new[] { HeaderRow("Maps") }),
                 ("'NPCs'!A1:BJ", new[] { HeaderRow("NPCs") }),
                 ("'NPC Spawns'!A1:E", new[] { HeaderRow("NPC Spawns") }),
                 ("'Warptiles'!A1:F", new[] { warptilesHeader, Row("Warptiles", ("map_id", "1"), ("map_x", "1"), ("map_y", "1"), ("warp_id", "2"), ("warp_x", "2"), ("warp_y", "2")) }))
@@ -374,7 +374,7 @@ public class GoogleSheetsGatewayTests
             {
                 ValueRanges = new List<ValueRange>
                 {
-                    new() { Range = "'Maps'!A1:Q", Values = ToILists(new[] { HeaderRow("Maps") }) },
+                    new() { Range = "'Maps'!A1:S", Values = ToILists(new[] { HeaderRow("Maps") }) },
                     new() { Range = "'NPCs'!A1:BJ" },
                     new() { Range = "'NPC Spawns'!A1:E", Values = ToILists(new[] { HeaderRow("NPC Spawns") }) },
                     new() { Range = "'Warptiles'!A1:F", Values = ToILists(new[] { HeaderRow("Warptiles") }) }
@@ -397,7 +397,7 @@ public class GoogleSheetsGatewayTests
         {
             Metadata = ValidMetadata(),
             ValuesResponse = Values(
-                ("'Maps'!A1:Q", new[] { HeaderRow("Maps") }),
+                ("'Maps'!A1:S", new[] { HeaderRow("Maps") }),
                 ("'NPCs'!A1:BJ", new[] { HeaderRow("NPCs") }))
         };
 
@@ -415,7 +415,7 @@ public class GoogleSheetsGatewayTests
         {
             Metadata = ValidMetadata(),
             ValuesResponse = Values(
-                ("'Maps'!A1:Q", new[] { HeaderRow("Maps") }),
+                ("'Maps'!A1:S", new[] { HeaderRow("Maps") }),
                 ("'NPCs'!A1:BJ", new[] { HeaderRow("NPCs") }),
                 ("'NPC Spawns'!A1:E",
                     new[]
@@ -441,7 +441,7 @@ public class GoogleSheetsGatewayTests
         {
             Metadata = ValidMetadata(),
             ValuesResponse = Values(
-                ("'Maps'!A1:Q",
+                ("'Maps'!A1:S",
                     new[]
                     {
                         HeaderRow("Maps"),
@@ -468,7 +468,7 @@ public class GoogleSheetsGatewayTests
         {
             Metadata = ValidMetadata(),
             ValuesResponse = Values(
-                ("'Maps'!A1:Q", new[] { HeaderRow("Maps") }),
+                ("'Maps'!A1:S", new[] { HeaderRow("Maps") }),
                 ("'NPCs'!A1:BJ",
                     new[]
                     {
