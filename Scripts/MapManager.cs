@@ -30,6 +30,7 @@ public partial class MapManager : Node2D
     private Node2D _characterRoot = null!;
     private Character.Character? _localPlayer;
     private bool _listenersRegistered;
+    public AmbienceManager Ambience { get; private set; } = null!;
 
     // A fast double-click sends two LCs before the first MKW lands; the server treats the
     // second as a fresh open and strands the first window. Drop same-tile repeats.
@@ -71,6 +72,10 @@ public partial class MapManager : Node2D
         _objects = GetNode<Node2D>("Objects");
         _characterRoot = GetNode<Node2D>("Characters");
         _camera = GetNode<Camera2D>("Camera2D");
+
+        Ambience = new AmbienceManager { Name = "Ambience" };
+        AddChild(Ambience);
+        Ambience.Setup(_camera);
 
         if (map == null) { GD.PushError("MapManager: CurrentMap is null"); return; }
         _map = map;
