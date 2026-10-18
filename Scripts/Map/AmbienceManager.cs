@@ -149,9 +149,12 @@ public partial class AmbienceManager : Node2D
         _weatherTween = CreateTween();
         _weatherTween.TweenProperty(_fog, "color:a", weather == WeatherType.Fog ? 0.3f : 0f, 2.0f);
 
-        _rain.Emitting = weather == WeatherType.Rain;
-        _snow.Emitting = weather == WeatherType.Snow;
-        _storm.Emitting = weather == WeatherType.Storm;
+        var rain = _rain!;
+        var snow = _snow!;
+        var storm = _storm!;
+        rain.Emitting = weather == WeatherType.Rain;
+        snow.Emitting = weather == WeatherType.Snow;
+        storm.Emitting = weather == WeatherType.Storm;
 
         if (weather != WeatherType.Storm)
             _lightningTimer = (float)GD.RandRange(LightningMinInterval, LightningMaxInterval);
