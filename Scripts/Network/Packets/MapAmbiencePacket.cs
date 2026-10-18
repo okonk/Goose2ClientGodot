@@ -24,7 +24,7 @@ namespace Goose2Client.Network.Packets
             var fill = (uint)p.GetInt64();
             var elapsedMs = p.GetInt64();
             var durationMs = p.GetInt64();
-            var weather = (byte)p.GetInt32();
+            var weather = p.GetInt32();
 
             return new MapAmbiencePacket()
             {
@@ -34,7 +34,7 @@ namespace Goose2Client.Network.Packets
                 FillColor = fill,
                 ElapsedMs = elapsedMs,
                 DurationMs = durationMs,
-                Weather = Enum.IsDefined(typeof(WeatherType), weather) ? (WeatherType)weather : WeatherType.Clear
+                Weather = weather >= 0 && weather <= 255 && Enum.IsDefined(typeof(WeatherType), (byte)weather) ? (WeatherType)weather : WeatherType.Clear
             };
         }
     }
