@@ -20,7 +20,8 @@ public partial class AmbienceManager : Node2D
     public event Action? WeatherChanged;
     internal CanvasModulate TintNode { get; private set; } = null!;
 
-    internal GpuParticles2D? _rain, _snow, _storm;
+    internal GpuParticles2D? _rain, _snow;
+    private GpuParticles2D? _storm;
     internal ColorRect? _fog;
     private ColorRect? _flash;
     private Tween? _weatherTween, _flashTween;

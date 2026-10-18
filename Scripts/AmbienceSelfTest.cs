@@ -52,7 +52,7 @@ internal static class AmbienceSelfTest
         Assert(mm != null, "MapManager did not register");
         var amb = mm!.Ambience;
         Assert(amb != null, "AmbienceManager missing");
-        Assert(ReferenceEquals(amb.TintNode.GetViewport(), mapScene),
+        Assert(ReferenceEquals(amb!.TintNode.GetViewport(), mapScene),
             "tint CanvasModulate is not in the map SubViewport");
         GD.Print("[ambience_selftest] OK tint lives in the map SubViewport");
 
