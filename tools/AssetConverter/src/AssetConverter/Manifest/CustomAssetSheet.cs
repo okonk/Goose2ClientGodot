@@ -41,7 +41,46 @@ public sealed class CustomAssetSheet
         (CrocPortraitGraphic, "portrait-croc.png"),
     ]);
 
-    public static readonly IReadOnlyList<CustomAssetSheet> All = [Icons, Tiles, Portraits];
+    public static readonly CustomAssetSheet Blood = new(30003, 32, 32, isTileSheet: true, Numbered(
+    [
+        "blood-spots.png",
+        "blood-splat.png",
+        "blood-splat-small.png",
+        "blood-spray.png",
+        "blood-drips.png",
+        "blood-pool.png",
+        "blood-pool-small.png",
+        "blood-smear.png",
+        "blood-footprints.png",
+        "blood-handprint.png",
+        "blood-dried.png",
+        "blood-specks.png",
+    ]));
+
+    public static readonly CustomAssetSheet WallLines = new(30004, 32, 32, isTileSheet: true, Numbered(
+    [
+        "line-corner-top-left.png",
+        "line-corner-top-right.png",
+        "line-corner-bottom-left.png",
+        "line-corner-bottom-right.png",
+        "line-middle-horizontal.png",
+        "line-middle-vertical.png",
+        "line-middle-cross.png",
+        "line-middle-t-down.png",
+        "line-middle-t-up.png",
+        "line-middle-t-right.png",
+        "line-middle-t-left.png",
+        "line-middle-corner-top-left.png",
+        "line-middle-corner-top-right.png",
+        "line-middle-corner-bottom-left.png",
+        "line-middle-corner-bottom-right.png",
+        "line-middle-end-left.png",
+        "line-middle-end-right.png",
+        "line-middle-end-top.png",
+        "line-middle-end-bottom.png",
+    ]));
+
+    public static readonly IReadOnlyList<CustomAssetSheet> All = [Icons, Tiles, Portraits, Blood, WallLines];
 
     private readonly (int Graphic, string FileName)[] _graphics;
 
@@ -61,6 +100,9 @@ public sealed class CustomAssetSheet
     public bool IsTileSheet { get; }
 
     public static IEnumerable<int> TileSheetNumbers => All.Where(s => s.IsTileSheet).Select(s => s.SheetNumber);
+
+    private static (int Graphic, string FileName)[] Numbered(string[] fileNames) =>
+        fileNames.Select((fileName, i) => (i + 1, fileName)).ToArray();
 
     public static void WriteAll(string sourceDir, string outputDir)
     {
