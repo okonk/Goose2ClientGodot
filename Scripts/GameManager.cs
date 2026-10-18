@@ -264,6 +264,8 @@ namespace Goose2Client
                 _ = UiScaleSelfTest.Run(this);
             if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "+selftest=character_icon") >= 0)
                 _ = CharacterIconSelfTest.Run(this);
+            if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "+selftest=ambience") >= 0)
+                _ = AmbienceSelfTest.Run(this);
             if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "+selftest=drag_tint") >= 0)
                 _ = DragTintSelfTest.Run(this);
             if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "+selftest=log_viewer") >= 0)
