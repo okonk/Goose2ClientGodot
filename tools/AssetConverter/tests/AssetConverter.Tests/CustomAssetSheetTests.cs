@@ -79,7 +79,7 @@ public class CustomAssetSheetTests
         {
             CustomAssetSheet.WriteAll(Goose2.AssetConverter.Paths.CustomAssetsDir, output);
 
-            foreach ((string file, int width, int height) in new[] { ("30000.png", 96, 32), ("30001.png", 32, 64), ("30002.png", 224, 40), ("30003.png", 384, 32), ("30004.png", 608, 32) })
+            foreach ((string file, int width, int height) in new[] { ("30000.png", 96, 32), ("30001.png", 32, 64), ("30002.png", 224, 40), ("30003.png", 384, 32), ("30004.png", 736, 32) })
             {
                 SKImageInfo unpremul = new(width, height, SKColorType.Rgba8888, SKAlphaType.Unpremul);
                 using SKBitmap sheet = SKBitmap.Decode(Path.Combine(output, file), unpremul)!;
@@ -153,7 +153,7 @@ public class CustomAssetSheetTests
             var blood = json.RootElement.GetProperty("sheets").GetProperty("30003");
             Assert.Equal(new[] { 352, 0, 32, 32 }, blood.GetProperty("12").EnumerateArray().Select(x => x.GetInt32()));
             var wallLines = json.RootElement.GetProperty("sheets").GetProperty("30004");
-            Assert.Equal(new[] { 576, 0, 32, 32 }, wallLines.GetProperty("19").EnumerateArray().Select(x => x.GetInt32()));
+            Assert.Equal(new[] { 704, 0, 32, 32 }, wallLines.GetProperty("23").EnumerateArray().Select(x => x.GetInt32()));
         }
         finally
         {

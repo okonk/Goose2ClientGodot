@@ -78,6 +78,10 @@ public sealed class CustomAssetSheet
         "line-middle-end-right.png",
         "line-middle-end-top.png",
         "line-middle-end-bottom.png",
+        "line-inner-corner-top-left.png",
+        "line-inner-corner-top-right.png",
+        "line-inner-corner-bottom-left.png",
+        "line-inner-corner-bottom-right.png",
     ]));
 
     public static readonly IReadOnlyList<CustomAssetSheet> All = [Icons, Tiles, Portraits, Blood, WallLines];
