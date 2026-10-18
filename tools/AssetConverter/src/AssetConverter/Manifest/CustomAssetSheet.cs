@@ -100,6 +100,12 @@ public sealed class CustomAssetSheet
         "wall-cap-right-830666.png",
         "wall-cap-left-830646.png",
         "wall-cap-right-830646.png",
+        "wall-roof-corner-left.png",
+        "wall-roof-corner-right.png",
+        "wall-roof-edge-left.png",
+        "wall-roof-edge-right.png",
+        "wall-roof-bottom-corner-left.png",
+        "wall-roof-bottom-corner-right.png",
     ]));
 
     public static readonly IReadOnlyList<CustomAssetSheet> All = [Icons, Tiles, Portraits, Blood, WallLines, WallCaps];
