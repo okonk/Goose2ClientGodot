@@ -108,7 +108,34 @@ public sealed class CustomAssetSheet
         "wall-roof-bottom-corner-right.png",
     ]));
 
-    public static readonly IReadOnlyList<CustomAssetSheet> All = [Icons, Tiles, Portraits, Blood, WallLines, WallCaps];
+    public static readonly CustomAssetSheet Banners = new(30006, 32, 64, isTileSheet: true, Numbered(
+    [
+        "banner-original-purple.png",
+        "banner-original-red.png",
+        "banner-original-blue.png",
+        "banner-class-priest.png",
+        "banner-class-magus.png",
+        "banner-class-warrior.png",
+        "banner-class-rogue.png",
+        "banner-crescent-teal.png",
+        "banner-crown-black.png",
+        "banner-cross-ivory.png",
+        "banner-chevrons-orange.png",
+        "banner-stars-navy.png",
+        "banner-tree-green.png",
+        "banner-key-crimson.png",
+        "banner-tower-grey.png",
+        "banner-stripes-purple.png",
+        "banner-bars-teal.png",
+        "banner-bend-navy.png",
+        "banner-quarterly-crimson.png",
+        "banner-pale-green.png",
+        "banner-diamonds-black.png",
+        "banner-sun-gold.png",
+        "banner-plain-grey.png",
+    ]));
+
+    public static readonly IReadOnlyList<CustomAssetSheet> All = [Icons, Tiles, Portraits, Blood, WallLines, WallCaps, Banners];
 
     private readonly (int Graphic, string FileName)[] _graphics;
 
