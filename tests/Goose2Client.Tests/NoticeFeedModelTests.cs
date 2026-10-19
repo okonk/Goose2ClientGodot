@@ -40,7 +40,7 @@ public class NoticeFeedModelTests
         var model = new NoticeFeedModel();
         model.Add(NoticeType.Info, "x");
 
-        model.Tick(4.99);
+        model.Tick(9.99);
         Assert.Single(model.Entries);
 
         model.Tick(0.01);
@@ -52,7 +52,7 @@ public class NoticeFeedModelTests
     {
         var model = new NoticeFeedModel();
         model.Add(NoticeType.Info, "A");
-        model.Tick(3.0);
+        model.Tick(8.0);
         model.Add(NoticeType.Info, "B");
         model.Tick(2.5);
 
@@ -68,7 +68,7 @@ public class NoticeFeedModelTests
         var e = model.Add(NoticeType.Info, "x");
 
         Assert.Equal(1f, NoticeFeedModel.Alpha(e));
-        model.Tick(4.0);
+        model.Tick(9.0);
         Assert.Equal(1f, NoticeFeedModel.Alpha(e));
         model.Tick(0.5);
         Assert.Equal(0.5f, NoticeFeedModel.Alpha(e), 3);

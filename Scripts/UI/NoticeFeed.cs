@@ -101,7 +101,7 @@ public partial class NoticeFeed : Control, IScalableWindow
             var label = new Label
             {
                 Text = entry.Text,
-                HorizontalAlignment = HorizontalAlignment.Left,
+                HorizontalAlignment = HorizontalAlignment.Right,
                 AutowrapMode = TextServer.AutowrapMode.WordSmart,
                 MouseFilter = MouseFilterEnum.Ignore,
             };

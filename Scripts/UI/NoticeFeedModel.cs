@@ -20,7 +20,7 @@ namespace Goose2Client.UI
     public sealed class NoticeFeedModel
     {
         public const int MaxEntries = 6;
-        public const double Lifetime = 5.0;
+        public const double Lifetime = 10.0;
         public const double FadeDuration = 1.0;
 
         private readonly List<NoticeEntry> _entries = new();
