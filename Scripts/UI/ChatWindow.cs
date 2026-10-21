@@ -80,6 +80,7 @@ public partial class ChatWindow : BaseWindow
         GameManager.Instance.PacketManager.Listen<HashMessagePacket>(OnHashMessage);
         GameManager.Instance.PacketManager.Listen<ServerMessagePacket>(OnServerMessage);
         GameManager.Instance.PacketManager.Listen<TellPacket>(OnTell);
+        GameManager.Instance.PacketManager.Listen<NoticePacket>(OnNotice);
         _listenersRegistered = true;
 
         // Input signals
@@ -118,6 +119,7 @@ public partial class ChatWindow : BaseWindow
         GameManager.Instance.PacketManager.Remove<HashMessagePacket>(OnHashMessage);
         GameManager.Instance.PacketManager.Remove<ServerMessagePacket>(OnServerMessage);
         GameManager.Instance.PacketManager.Remove<TellPacket>(OnTell);
+        GameManager.Instance.PacketManager.Remove<NoticePacket>(OnNotice);
     }
 
     private void OnChat(object o)
@@ -146,6 +148,12 @@ public partial class ChatWindow : BaseWindow
         var p = (TellPacket)o;
         ReplyToName = p.Name;
         _log.Add($"[tell from] {p.Name}: {p.Message}", ChatType.Tell, p.Name);
+    }
+
+    private void OnNotice(object o)
+    {
+        var p = (NoticePacket)o;
+        _log.AddNotice(p.Text, p.Type);
     }
 
     private void OnCharacterUpdated(Character.Character c)

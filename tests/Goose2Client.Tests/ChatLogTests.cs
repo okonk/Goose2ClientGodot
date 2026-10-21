@@ -472,4 +472,23 @@ public class ChatLogTests
         var kinds = ChatLog.ParseKinds(new[] { "Group", "All", "Tell", "Bogus", "system" });
         Assert.Equal(new[] { ChatTabKind.Group, ChatTabKind.System }, kinds);
     }
+
+    [Fact]
+    public void AddNotice_GoesOnlyToNoticesTab()
+    {
+        var log = NewLog(ChatTabKind.System, ChatTabKind.Notices);
+        log.AddNotice("Quest updated", NoticeType.Quest);
+
+        Assert.Single(Tab(log, ChatTabKind.Notices).Lines);
+        Assert.Empty(Tab(log, ChatTabKind.All).Lines);
+        Assert.Empty(Tab(log, ChatTabKind.System).Lines);
+    }
+
+    [Fact]
+    public void AddNotice_NoticesTabDisabled_Dropped()
+    {
+        var log = NewLog();
+        log.AddNotice("Quest updated", NoticeType.Quest);
+        Assert.Equal(0, log.Tabs.Sum(t => t.Lines.Count));
+    }
 }

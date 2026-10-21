@@ -5,7 +5,7 @@ using Godot;
 
 namespace Goose2Client.UI;
 
-public enum ChatTabKind { All, Guild, Group, Chat, System, Tell }
+public enum ChatTabKind { All, Guild, Group, Chat, System, Notices, Tell }
 
 public sealed class ChatTab
 {
@@ -38,7 +38,7 @@ public sealed class ChatLog
     private const string WhoTerminatorPrefix = "[Matched ";
 
     public static readonly ChatTabKind[] OptionalKinds =
-        { ChatTabKind.Guild, ChatTabKind.Group, ChatTabKind.Chat, ChatTabKind.System };
+        { ChatTabKind.Guild, ChatTabKind.Group, ChatTabKind.Chat, ChatTabKind.System, ChatTabKind.Notices };
 
     private static readonly Dictionary<ChatType, Color> TypeColors = new()
     {
@@ -94,9 +94,11 @@ public sealed class ChatLog
     }
 
     public static string Format(string message, ChatType type)
+        => Format(message, TypeColors.TryGetValue(type, out var c) ? c : GameColors.White);
+
+    private static string Format(string message, Color color)
     {
         message = ChatText.ToDisplay(message.Replace("[", "[lb]"));
-        var color = TypeColors.TryGetValue(type, out var c) ? c : GameColors.White;
         return $"[color=#{color.ToHtml(false)}]{message}[/color]";
     }
 
@@ -113,6 +115,13 @@ public sealed class ChatLog
             Append(presence, line);
 
         AppendWhoEcho(message, type, line, target);
+    }
+
+    public void AddNotice(string message, NoticeType type)
+    {
+        var tab = _tabs.Find(t => t.Kind == ChatTabKind.Notices);
+        if (tab != null)
+            Append(tab, Format(message, NoticeColors.For(type)));
     }
 
     // Latches the tab that should mirror the reply to the /who the player is about to send.
