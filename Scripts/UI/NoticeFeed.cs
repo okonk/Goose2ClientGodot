@@ -8,7 +8,7 @@ namespace Goose2Client.UI;
 
 public partial class NoticeFeed : Control, IScalableWindow
 {
-    public const int BaseWidth = 240;
+    public const int BaseWidth = 312;
     private const int BaseRightMargin = 8;
     private const int BaseGap = 4;
     private const int BaseOutline = 3;
