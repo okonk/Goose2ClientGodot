@@ -380,6 +380,8 @@ namespace Goose2Client.Character
             return true;
         }
 
+        private const int ContentHeightBuffer = 4;
+
         /// <summary>
         /// Body height used for name, HP/MP bars, chat bubbles, and emotes.
         /// Always taken from the resting pose (idle, or mounted-idle when mounted) so taller
@@ -395,7 +397,9 @@ namespace Goose2Client.Character
                 // Resting pose only — ignore IsMoving / attack-lock so overlays stay fixed.
                 string motion = CharacterMotion.State(isMoving: false, lockedMotion: null, isMounted: IsMounted);
                 string clip = ResolveClip(b, motion, BodyState) ?? "idle-down";
-                return _heights.GetHeight($"Body-{b.GraphicId}-{clip}");
+                int h = _heights.GetHeight($"Body-{b.GraphicId}-{clip}");
+                int content = BodyContentHeight.Get(b.Sprite.SpriteFrames, clip, h);
+                return content > 0 ? System.Math.Min(h, content + ContentHeightBuffer) : h;
             }
         }
 

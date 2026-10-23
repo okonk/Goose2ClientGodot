@@ -27,6 +27,14 @@ public class CharacterAnchorTests
     }
 
     [Theory]
+    [InlineData(48, 48, 0, 48)]     // human body: art reaches the frame top
+    [InlineData(64, 64, 16, 40)]    // 64px frame overhangs 8px below the feet, plus 16px empty headroom
+    [InlineData(160, 160, 60, 44)]  // tall frame, short creature
+    [InlineData(32, 32, 4, 28)]     // short sprite feet-aligned to the tile bottom
+    public void ContentHeight_measures_from_feet_to_topmost_opaque_row(int anchorHeight, int frameHeight, int opaqueTop, int expected)
+        => Assert.Equal(expected, CharacterAnchor.ContentHeight(anchorHeight, frameHeight, opaqueTop));
+
+    [Theory]
     [InlineData("mounted-walk-down", new int[] { 16, 17, 16, 17, 16 }, new int[] { 16, 17, 16, 17, 16 }, 0)]
     [InlineData("mounted-walk-left", new int[] { 8, 9, 10, 9, 10 }, new int[] { 9, 10, 9, 10, 9 }, 1)]
     [InlineData("mounted-walk-right", new int[] { 8, 9, 10, 9, 10 }, new int[] { 9, 10, 9, 10, 9 }, 1)]
