@@ -734,8 +734,8 @@ namespace Goose2Client.Character
 
         /// <summary>Fan the current state out to every slot. The Mount slot itself always plays its
         /// own non-mounted pose (Unity forces the mount to BodyState 3); rider slots use mounted-*.
-        /// Slots with no matching clip (notably Shield/Weapon while mounted — Hands never ship
-        /// mounted art) are hidden, matching Unity's Blank override.</summary>
+        /// Slots with no matching clip are hidden, matching Unity's Blank override — except Body,
+        /// which keeps its current animation (if valid) so illusion sheets don't vanish.</summary>
         protected void PlayCurrent()
         {
             foreach (var (slot, s) in _slots)
@@ -746,7 +746,9 @@ namespace Goose2Client.Character
                 int state = slot == CharacterSlot.Mount ? 3 : BodyState;
                 if (ResolveClip(s, motion, state) is not { } clip)
                 {
-                    s.Sprite.Visible = false;
+                    // Illusion bodies (monster sheets) lack many player clips; equipment must still blank.
+                    if (slot != CharacterSlot.Body || s.Sprite.SpriteFrames?.HasAnimation(s.Sprite.Animation) != true)
+                        s.Sprite.Visible = false;
                     continue;
                 }
 
@@ -765,7 +767,7 @@ namespace Goose2Client.Character
         }
 
         /// <summary>First candidate clip (per BodyState/equip/weapon-type) that this slot's
-        /// SpriteFrames actually contains. Missing art returns null (Unity Blank / invisible) —
+        /// SpriteFrames actually contains. Missing art returns null —
         /// never substitutes a different motion (e.g. idle during attack) or an arbitrary first
         /// animation on the sheet.</summary>
         private string? ResolveClip(Slot s, string motion, int state)
@@ -775,7 +777,6 @@ namespace Goose2Client.Character
             foreach (var cand in AnimationNames.Candidates(motion, state, Facing))
                 if (frames.HasAnimation(cand)) return cand;
 
-            // Unity CharacterAnimation.SetGraphic: missing clip → Animations/Blank (invisible).
             return null;
         }
 
