@@ -38,11 +38,12 @@ public static class WindowPlacement
     /// logical px scaled by factor/savedFactor (≤ 0 → 1); no rounding — exact identity at marginScale 1.
     /// </summary>
     public static Vector2 ResolveScaled(Vector2 savedPos, Vector2 savedSize, float savedFactor, Vector2I savedCanvas,
-        Vector2 windowSize, float factor, Vector2I currentCanvas, int titleBarAllowance = TitleBarHeight)
+        Vector2 windowSize, float factor, Vector2I currentCanvas, int titleBarAllowance = TitleBarHeight,
+        bool centerAnchored = false)
     {
         float marginScale = factor / (savedFactor > 0f ? savedFactor : 1f);
-        float x = ResolveAxisScaled(savedPos.X, savedSize.X, windowSize.X, marginScale, savedCanvas.X, currentCanvas.X);
-        float y = ResolveAxisScaled(savedPos.Y, savedSize.Y, windowSize.Y, marginScale, savedCanvas.Y, currentCanvas.Y);
+        float x = ResolveAxisScaled(savedPos.X, savedSize.X, windowSize.X, marginScale, savedCanvas.X, currentCanvas.X, centerAnchored);
+        float y = ResolveAxisScaled(savedPos.Y, savedSize.Y, windowSize.Y, marginScale, savedCanvas.Y, currentCanvas.Y, centerAnchored);
         // Containment; max(0, ·) keeps the result ≥ 0 even for a window larger than the canvas.
         x = Mathf.Clamp(x, 0f, Mathf.Max(0f, currentCanvas.X - windowSize.X));
         y = Mathf.Clamp(y, 0f, Mathf.Max(0f, currentCanvas.Y - titleBarAllowance));
@@ -51,14 +52,18 @@ public static class WindowPlacement
 
     /// <summary>Per-axis edge-stick in the saved-canvas space, re-anchored to the current canvas.
     /// Offsets: <c>left = saved</c>, <c>right = savedEdge − (saved + savedSize)</c>.</summary>
-    private static float ResolveAxisScaled(float saved, float savedSize, float size, float marginScale, int savedEdge, int currentEdge)
+    private static float ResolveAxisScaled(float saved, float savedSize, float size, float marginScale, int savedEdge, int currentEdge,
+        bool centerAnchored)
     {
         float left = saved;
         float right = savedEdge - (saved + savedSize);
         // Middle-band: ≥ MiddleBandEdgeFraction of the saved canvas from both edges → parked in
         // the middle, keep the saved coordinate unscaled. Known limitation: band-keep does NOT
         // survive clamping onto a smaller canvas; a window dragged re-centers it.
-        if (left >= MiddleBandEdgeFraction * savedEdge && right >= MiddleBandEdgeFraction * savedEdge) return saved;
+        if (left >= MiddleBandEdgeFraction * savedEdge && right >= MiddleBandEdgeFraction * savedEdge)
+            return centerAnchored
+                ? currentEdge / 2f + (saved + savedSize / 2f - savedEdge / 2f) * marginScale - size / 2f
+                : saved;
         if (left < right) return left * marginScale;                 // closer to the leading edge
         if (right < left) return currentEdge - size - right * marginScale; // re-stick to the trailing edge
         // Equidistant: stays put. The band above intercepts this unless the window is wider

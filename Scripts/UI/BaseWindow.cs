@@ -416,7 +416,8 @@ public partial class BaseWindow : Control, IScalableWindow
         var applier = UiScaleApplier.Instance!;
         Position = WindowPlacement.ResolveScaled(pos, savedSize, savedFactor, savedCanvas, Size,
             applier != null ? applier.Factor : 1f, canvas,
-            applier != null ? applier.ScaleSize(24f) : WindowPlacement.TitleBarHeight);
+            applier != null ? applier.ScaleSize(24f) : WindowPlacement.TitleBarHeight,
+            DefaultWindowLayout.IsDialog(WindowName));
     }
 
     /// <summary>Makes a control a drag handle for this window (e.g. the hotbar's XP bar).

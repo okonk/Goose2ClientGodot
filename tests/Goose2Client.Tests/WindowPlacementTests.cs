@@ -71,6 +71,41 @@ public class WindowPlacementTests
     }
 
     [Fact]
+    public void CenterAnchored_MiddleBand_KeepsOffsetFromCanvasCenter()
+    {
+        var p = WindowPlacement.ResolveScaled(new Vector2(500, 260), new Vector2(300, 200), 1f, C720,
+            new Vector2(300, 200), 1f, C1080, WindowPlacement.TitleBarHeight, centerAnchored: true);
+        Assert.Equal(new Vector2(820, 440), p);
+    }
+
+    [Fact]
+    public void CenterAnchored_MiddleBand_ScalesOffsetWithFactor()
+    {
+        var p = WindowPlacement.ResolveScaled(new Vector2(540, 260), new Vector2(300, 200), 1f, C720,
+            new Vector2(600, 400), 2f, C1080, WindowPlacement.TitleBarHeight, centerAnchored: true);
+        Assert.Equal(new Vector2(760, 340), p);
+    }
+
+    [Theory]
+    [InlineData(500, 260)]
+    [InlineData(10, 10)]
+    [InlineData(970, 500)]
+    public void CenterAnchored_SameCanvas_IsIdentity(int px, int py)
+    {
+        var p = WindowPlacement.ResolveScaled(new Vector2(px, py), new Vector2(300, 200), 1f, C720,
+            new Vector2(300, 200), 1f, C720, WindowPlacement.TitleBarHeight, centerAnchored: true);
+        Assert.Equal(new Vector2(px, py), p);
+    }
+
+    [Fact]
+    public void CenterAnchored_EdgeParked_StillSticksToEdge()
+    {
+        var p = WindowPlacement.ResolveScaled(new Vector2(970, 10), new Vector2(300, 200), 1f, C720,
+            new Vector2(300, 200), 1f, C1080, WindowPlacement.TitleBarHeight, centerAnchored: true);
+        Assert.Equal(new Vector2(1610, 10), p);
+    }
+
+    [Fact]
     public void MiddleBand_WideWindowEquidistant_FallsThroughAndKeepsSaved()
     {
         // 351px hotbar on a 640px canvas: band threshold = 0.25*640 = 160, and the offsets

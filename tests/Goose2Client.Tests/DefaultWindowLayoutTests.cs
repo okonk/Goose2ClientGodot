@@ -27,7 +27,9 @@ public class DefaultWindowLayoutTests
     [InlineData("Character", false)]
     [InlineData("Spellbook", false)]
     [InlineData("Hotbar", false)]
-    [InlineData("Options", false)]
+    [InlineData("Options", true)]
+    [InlineData("Hairdye", true)]
+    [InlineData("Custom", true)]
     public void IsDialog_OnlyTransientDialogFamily(string name, bool expected)
         => Assert.Equal(expected, DefaultWindowLayout.IsDialog(name));
 

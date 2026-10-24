@@ -19,7 +19,6 @@ public static class DefaultWindowLayout
         ["Vendor"]    = new Vector2(300, 200),
         ["Bank"]      = new Vector2(300, 200),
         ["CombineBag"]= new Vector2(540, 220),
-        ["Options"]   = new Vector2(460, 260),
         ["Chat"]      = new Vector2(8, 507),
     };
 
@@ -31,7 +30,8 @@ public static class DefaultWindowLayout
     /// the right edge at larger canvases — it is top-center at 720p, so keeping it put matches
     /// the hotbar rationale.
     /// </summary>
-    public static bool IsDialog(string windowName) => windowName is "Quest" or "Vendor" or "Info" or "Bank" or "GenericContainer" or "CombineBag" or "OptionList" or "LogViewer" or "KeyBindings" or "Amount";
+    public static bool IsDialog(string windowName) => windowName is "Quest" or "Vendor" or "Info" or "Bank" or "GenericContainer" or "CombineBag" or "OptionList" or "LogViewer" or "KeyBindings" or "Amount"
+        or "Options" or "Hairdye" or "Custom";
 
     public static Vector2 For(string windowName)
         => windowName != null && Defaults.TryGetValue(windowName, out var p) ? p : new Vector2(100, 100);
