@@ -433,7 +433,7 @@ namespace Goose2Client.Character
                 MoveChild(ordered[i].Value.Sprite, i);   // lower SortOrder drawn first (behind)
         }
 
-        public void SetFacing(Direction d) { Facing = d; ApplyDrawOrder(); PlayState(); }
+        public void SetFacing(Direction d) { Facing = d; _lockedMotion = null; ApplyDrawOrder(); PlayState(); }
 
         protected void PlayState()
         {
@@ -506,6 +506,7 @@ namespace Goose2Client.Character
             X = x; Y = y;
             _targetPosition = Goose2Client.Map.MapCoords.TileBottomCenter(x, y);
             _moving = true;
+            _lockedMotion = null;
             ApplyDrawOrder();   // facing may have changed -> reorder shield/weapon
             PlayState();
         }
