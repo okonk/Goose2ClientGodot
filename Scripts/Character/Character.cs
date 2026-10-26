@@ -460,6 +460,7 @@ namespace Goose2Client.Character
 
         private void BeginLock(string motion)
         {
+            if (BodyLacksClip(motion)) return;
             _lockedMotion = motion;
             _attackTimer = LockDuration(motion);
             PlayCurrent();
@@ -734,10 +735,13 @@ namespace Goose2Client.Character
 
         /// <summary>Fan the current state out to every slot. The Mount slot itself always plays its
         /// own non-mounted pose (Unity forces the mount to BodyState 3); rider slots use mounted-*.
-        /// Slots with no matching clip are hidden, matching Unity's Blank override — except Body,
-        /// which keeps its current animation (if valid) so illusion sheets don't vanish.</summary>
+        /// Slots with no matching clip (notably Shield/Weapon while mounted — Hands never ship
+        /// mounted art) are hidden, matching Unity's Blank override. If the Body itself has no
+        /// clip (e.g. illusion sheets), nothing changes and every slot keeps its current animation.</summary>
         protected void PlayCurrent()
         {
+            if (BodyLacksClip(_lockedMotion)) return;
+
             foreach (var (slot, s) in _slots)
             {
                 bool slotMounted = IsMounted && slot != CharacterSlot.Mount;
@@ -746,9 +750,7 @@ namespace Goose2Client.Character
                 int state = slot == CharacterSlot.Mount ? 3 : BodyState;
                 if (ResolveClip(s, motion, state) is not { } clip)
                 {
-                    // Illusion bodies (monster sheets) lack many player clips; equipment must still blank.
-                    if (slot != CharacterSlot.Body || s.Sprite.SpriteFrames?.HasAnimation(s.Sprite.Animation) != true)
-                        s.Sprite.Visible = false;
+                    s.Sprite.Visible = false;
                     continue;
                 }
 
@@ -766,8 +768,12 @@ namespace Goose2Client.Character
             RepositionOverlays();
         }
 
+        private bool BodyLacksClip(string? lockedMotion) =>
+            _slots.TryGetValue(CharacterSlot.Body, out var b) && b.Sprite.SpriteFrames != null &&
+            ResolveClip(b, CharacterMotion.State(IsMoving, lockedMotion, IsMounted), BodyState) == null;
+
         /// <summary>First candidate clip (per BodyState/equip/weapon-type) that this slot's
-        /// SpriteFrames actually contains. Missing art returns null —
+        /// SpriteFrames actually contains. Missing art returns null (Unity Blank / invisible) —
         /// never substitutes a different motion (e.g. idle during attack) or an arbitrary first
         /// animation on the sheet.</summary>
         private string? ResolveClip(Slot s, string motion, int state)
@@ -777,6 +783,7 @@ namespace Goose2Client.Character
             foreach (var cand in AnimationNames.Candidates(motion, state, Facing))
                 if (frames.HasAnimation(cand)) return cand;
 
+            // Unity CharacterAnimation.SetGraphic: missing clip → Animations/Blank (invisible).
             return null;
         }
 
