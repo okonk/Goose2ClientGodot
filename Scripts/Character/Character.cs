@@ -460,6 +460,9 @@ namespace Goose2Client.Character
 
         private void BeginLock(string motion)
         {
+            if (_slots.TryGetValue(CharacterSlot.Body, out var body) && body.Sprite.SpriteFrames != null &&
+                ResolveClip(body, motion, BodyState) == null)
+                return;
             _lockedMotion = motion;
             _attackTimer = LockDuration(motion);
             PlayCurrent();
