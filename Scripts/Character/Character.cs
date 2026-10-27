@@ -433,7 +433,7 @@ namespace Goose2Client.Character
                 MoveChild(ordered[i].Value.Sprite, i);   // lower SortOrder drawn first (behind)
         }
 
-        public void SetFacing(Direction d) { Facing = d; _lockedMotion = null; ApplyDrawOrder(); PlayState(); }
+        public void SetFacing(Direction d) { Facing = d; ApplyDrawOrder(); PlayState(); }
 
         protected void PlayState()
         {
@@ -460,7 +460,6 @@ namespace Goose2Client.Character
 
         private void BeginLock(string motion)
         {
-            if (BodyLacksClip(motion)) return;
             _lockedMotion = motion;
             _attackTimer = LockDuration(motion);
             PlayCurrent();
@@ -506,7 +505,6 @@ namespace Goose2Client.Character
             X = x; Y = y;
             _targetPosition = Goose2Client.Map.MapCoords.TileBottomCenter(x, y);
             _moving = true;
-            _lockedMotion = null;
             ApplyDrawOrder();   // facing may have changed -> reorder shield/weapon
             PlayState();
         }
@@ -737,12 +735,9 @@ namespace Goose2Client.Character
         /// <summary>Fan the current state out to every slot. The Mount slot itself always plays its
         /// own non-mounted pose (Unity forces the mount to BodyState 3); rider slots use mounted-*.
         /// Slots with no matching clip (notably Shield/Weapon while mounted — Hands never ship
-        /// mounted art) are hidden, matching Unity's Blank override. If the Body itself has no
-        /// clip (e.g. illusion sheets), nothing changes and every slot keeps its current animation.</summary>
+        /// mounted art) are hidden, matching Unity's Blank override.</summary>
         protected void PlayCurrent()
         {
-            if (BodyLacksClip(_lockedMotion)) return;
-
             foreach (var (slot, s) in _slots)
             {
                 bool slotMounted = IsMounted && slot != CharacterSlot.Mount;
@@ -768,10 +763,6 @@ namespace Goose2Client.Character
             // Overlays use resting-pose Height; still refresh after mount/appearance-driven PlayCurrent.
             RepositionOverlays();
         }
-
-        private bool BodyLacksClip(string? lockedMotion) =>
-            _slots.TryGetValue(CharacterSlot.Body, out var b) && b.Sprite.SpriteFrames != null &&
-            ResolveClip(b, CharacterMotion.State(IsMoving, lockedMotion, IsMounted), BodyState) == null;
 
         /// <summary>First candidate clip (per BodyState/equip/weapon-type) that this slot's
         /// SpriteFrames actually contains. Missing art returns null (Unity Blank / invisible) —
