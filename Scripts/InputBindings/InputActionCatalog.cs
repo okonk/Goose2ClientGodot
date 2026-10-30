@@ -37,6 +37,8 @@ public static class InputActionCatalog
             [new(BindingContext.Normal, "ToggleSpellbook")]),
         new("ToggleCharacterWindow", "Character", "Windows",
             [new(BindingContext.Normal, "ToggleCharacterWindow")]),
+        new("ToggleBackpack", "Backpack", "Windows",
+            [new(BindingContext.Normal, "ToggleBackpack")]),
         new("ToggleChat", "Chat", "Windows",
             [new(BindingContext.Normal, "ToggleChat")]),
         new("Hotkey1", "Hotbar Slot 1", "Hotbar",

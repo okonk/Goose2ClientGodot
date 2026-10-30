@@ -155,6 +155,8 @@ public partial class GameHud : Control
             Spellbook.Toggle();
         else if (@event.IsActionPressed("ToggleCharacterWindow", exactMatch: true))
             Character.Toggle();
+        else if (@event.IsActionPressed("ToggleBackpack", exactMatch: true))
+            GameManager.Instance.NetworkClient.ToggleBackpack();
         else if (@event.IsActionPressed("CycleHotbarPage", exactMatch: true))
             Hotbar.CyclePage();
         else if (@event.IsActionPressed("CycleHotbarPageReverse", exactMatch: true))
