@@ -36,15 +36,36 @@ public class GridContainerMetricsTests
     [Fact]
     public void WindowSize()
     {
-        Assert.Equal(new Vector2(168, 221), GridContainerMetrics.WindowSize(30, 5, 1f));
-        Assert.Equal(new Vector2(336, 442), GridContainerMetrics.WindowSize(30, 5, 2f));
+        Assert.Equal(new Vector2(168, 221), GridContainerMetrics.WindowSize(30, 5, 1f, false));
+        Assert.Equal(new Vector2(336, 442), GridContainerMetrics.WindowSize(30, 5, 2f, false));
+    }
+
+    [Fact]
+    public void WindowSize_WithBottomButtons_AddsButtonRow()
+    {
+        Assert.Equal(new Vector2(168, 247), GridContainerMetrics.WindowSize(30, 5, 1f, true));
+        Assert.Equal(new Vector2(336, 494), GridContainerMetrics.WindowSize(30, 5, 2f, true));
+    }
+
+    [Fact]
+    public void BottomButtonY()
+    {
+        Assert.Equal(217f, GridContainerMetrics.BottomButtonY(247f, 1f));
+        Assert.Equal(434f, GridContainerMetrics.BottomButtonY(494f, 2f));
+    }
+
+    [Fact]
+    public void BottomButtonSize()
+    {
+        Assert.Equal(new Vector2(74, 26), GridContainerMetrics.BottomButtonSize(1f));
+        Assert.Equal(new Vector2(148, 52), GridContainerMetrics.BottomButtonSize(2f));
     }
 
     [Fact]
     public void WindowSize_MinimumTitleWidthAppliesForSingleColumn()
     {
-        Assert.Equal(new Vector2(100, 56), GridContainerMetrics.WindowSize(1, 1, 1f));
-        Assert.Equal(new Vector2(200, 112), GridContainerMetrics.WindowSize(1, 1, 2f));
+        Assert.Equal(new Vector2(100, 56), GridContainerMetrics.WindowSize(1, 1, 1f, false));
+        Assert.Equal(new Vector2(200, 112), GridContainerMetrics.WindowSize(1, 1, 2f, false));
     }
 
     [Fact]

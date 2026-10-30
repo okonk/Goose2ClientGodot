@@ -159,6 +159,14 @@ public class WindowPlacementTests
     }
 
     [Fact]
+    public void GridContainer_FirstRunPlacement_IsAuthoredDefault()
+    {
+        var p = WindowPlacement.ResolveScaled(new Vector2(740, 360), new Vector2(100, 56), 1f, C720,
+            new Vector2(100, 56), 1f, C720, WindowPlacement.TitleBarHeight, false);
+        Assert.Equal(new Vector2(740, 360), p);
+    }
+
+    [Fact]
     public void ChatDefault_StaysBottomLeftOn1080()
     {
         var size = new Vector2(500, 208);

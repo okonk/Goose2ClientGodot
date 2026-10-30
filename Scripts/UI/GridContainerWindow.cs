@@ -11,7 +11,6 @@ public partial class GridContainerWindow : BaseMultipleWindow
 
     private ItemSlot[] _slots = Array.Empty<ItemSlot>();
     private int _columns;
-    private const float TitleBarCloseRightMargin = 1f;
 
     public override WindowFrames WindowFrame => WindowFrames.GridContainer;
 
@@ -71,12 +70,34 @@ public partial class GridContainerWindow : BaseMultipleWindow
             _slots[i].Position = GridContainerMetrics.SlotPosition(i, _columns, factor);
             _slots[i].Size = new Vector2(slotSize, slotSize);
         }
-        Size = GridContainerMetrics.WindowSize(_slots.Length, _columns, factor);
+        Size = GridContainerMetrics.WindowSize(_slots.Length, _columns, factor, AnyBottomButtonVisible());
 
+        var margin = UiScale.ScaleSize(1f, factor);
         var titleBar = GetNode<Control>("TitleBar");
         titleBar.Size = new Vector2(Size.X, titleBar.Size.Y);
         var close = GetNode<Button>("TitleBar/CloseButton");
-        close.Position = new Vector2(Size.X - close.Size.X - TitleBarCloseRightMargin, close.Position.Y);
+        close.Position = new Vector2(Size.X - close.Size.X - margin, close.Position.Y);
+
+        PlaceBottomButtons(factor, margin);
+    }
+
+    private bool AnyBottomButtonVisible()
+        => _backButton.Visible || _nextButton.Visible || _closeButton.Visible
+            || (_okButton != null && _okButton.Visible);
+
+    private void PlaceBottomButtons(float factor, float margin)
+    {
+        var size = GridContainerMetrics.BottomButtonSize(factor);
+        var y = GridContainerMetrics.BottomButtonY(Size.Y, factor);
+        foreach (var b in new[] { _backButton, _nextButton, _okButton, _closeButton })
+        {
+            if (b == null || !b.Visible) continue;
+            var p = b.Position;
+            b.Position = new Vector2(p.X, y);
+            b.Size = size;
+        }
+        if (_closeButton.Visible)
+            _closeButton.Position = new Vector2(Size.X - _closeButton.Size.X - margin, _closeButton.Position.Y);
     }
 
     internal override void OnEndWindow()
