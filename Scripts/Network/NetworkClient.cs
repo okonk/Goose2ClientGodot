@@ -285,6 +285,8 @@ namespace Goose2Client.Network
             Send($"OCB");
         }
 
+        public void ToggleBackpack() => Send("OBP");
+
         public void WindowButtonClick(WindowButtons button, int windowId, int npcId, int unknownId1 = 0, int unknownId2 = 0)
         {
             Send($"WBC{(int)button},{windowId},{npcId},{unknownId1},{unknownId2}");

@@ -412,8 +412,8 @@ internal static class UiScaleSelfTest
             Title = "Welcome to my shop!",
             Buttons = new[] { false, true, false, false, false },
             NpcId = 1201,
-            Unknown1 = 0,
-            Unknown2 = 0,
+            FrameParam1 = 0,
+            FrameParam2 = 0,
         });
         info.OnWindowLine(new WindowLinePacket { WindowId = 1001, LineNumber = 0, Text = "line 0" });
         await Frame();

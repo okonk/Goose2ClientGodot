@@ -10,8 +10,9 @@ namespace Goose2Client.Network.Packets
         public string Title { get; set; } = null!;
         public bool[] Buttons { get; set; } = Array.Empty<bool>();
         public int NpcId { get; set; }
-        public int Unknown1 { get; set; }
-        public int Unknown2 { get; set; }
+        // For GridContainer, FrameParam1 is slot count and FrameParam2 is columns.
+        public int FrameParam1 { get; set; }
+        public int FrameParam2 { get; set; }
 
         public override string Prefix { get; } = "MKW";
 
@@ -25,8 +26,8 @@ namespace Goose2Client.Network.Packets
                 Title = p.GetString(),
                 Buttons = new bool[5] { p.GetBool(), p.GetBool(), p.GetBool(), p.GetBool(), p.GetBool() },
                 NpcId = p.GetInt32(),
-                Unknown1 = p.GetInt32(),
-                Unknown2 = p.GetInt32(),
+                FrameParam1 = p.GetInt32(),
+                FrameParam2 = p.GetInt32(),
             };
         }
     }
