@@ -30,8 +30,12 @@ public class DefaultWindowLayoutTests
     [InlineData("Options", true)]
     [InlineData("Hairdye", true)]
     [InlineData("Custom", true)]
+    [InlineData("GridContainer", false)]
     public void IsDialog_OnlyTransientDialogFamily(string name, bool expected)
         => Assert.Equal(expected, DefaultWindowLayout.IsDialog(name));
+
+    [Fact] public void GridContainer_DefaultPosition_IsLeftOfInventory()
+        => Assert.Equal(new Vector2(740, 360), DefaultWindowLayout.For("GridContainer"));
 
     [Fact] public void LegacySize_Options_Is240x112()
         => Assert.Equal(new Vector2(240, 112), DefaultWindowLayout.LegacySize("Options"));

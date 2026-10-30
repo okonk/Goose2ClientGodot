@@ -9,6 +9,7 @@ public static class DefaultWindowLayout
     private static readonly Dictionary<string, Vector2> Defaults = new()
     {
         ["Inventory"] = new Vector2(900, 360),
+        ["GridContainer"] = new Vector2(740, 360),
         ["Character"] = new Vector2(380, 120),
         ["Spellbook"] = new Vector2(700, 120),
         // 1x design-canvas reference for WindowPlacement.HotbarDefault (unplaced hotbars are

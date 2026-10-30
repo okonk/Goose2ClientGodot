@@ -18,6 +18,8 @@ public abstract partial class BaseMultipleWindowManager<T> : Node where T : Base
     public abstract string PrefabPath { get; }
     public abstract bool MatchesFrame(WindowFrames frame);
 
+    protected bool TryGetWindow(int windowId, out T window) => _windows.TryGetValue(windowId, out window!);
+
     public override void _Ready()
     {
         GameManager.Instance.PacketManager.Listen<MakeWindowPacket>(OnMakeWindow);

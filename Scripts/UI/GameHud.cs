@@ -113,6 +113,7 @@ public partial class GameHud : Control
         AddChild(new InfoWindowCreator());
         OptionListWindows = new OptionListWindowManager();
         AddChild(OptionListWindows);
+        AddChild(new GridContainerWindowManager());
 
         // 6. Wire cross-references (after AddChild so each node's _Ready has run).
         Hotbar.InventoryWindow = Inventory;
