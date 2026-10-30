@@ -53,14 +53,15 @@ public class CharacterEquipmentLayoutTests
     }
 
     [Fact]
-    public void SlotOffset_All14Distinct()
+    public void SlotOffset_All15Distinct()
     {
-        var positions = new Vector2[14];
-        for (int i = 0; i < 14; i++)
+        int count = CharacterEquipmentLayout.SlotCount;
+        var positions = new Vector2[count];
+        for (int i = 0; i < count; i++)
             positions[i] = CharacterEquipmentLayout.SlotOffset(i);
 
-        for (int i = 0; i < 14; i++)
-            for (int j = i + 1; j < 14; j++)
+        for (int i = 0; i < count; i++)
+            for (int j = i + 1; j < count; j++)
                 Assert.NotEqual(positions[i], positions[j]);
     }
 }

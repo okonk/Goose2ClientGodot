@@ -31,6 +31,8 @@ public static class CharacterEquipmentLayout
         new Vector2(152, 34),  // 14 Backpack
     };
 
+    public static int SlotCount => Slots.Length;
+
     /// <summary>Returns the top-left offset for the given equipment slot index (0–14).</summary>
     public static Vector2 SlotOffset(int slotIndex)
     {
