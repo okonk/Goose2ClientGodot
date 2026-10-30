@@ -41,6 +41,18 @@ public class CharacterEquipmentLayoutTests
     }
 
     [Fact]
+    public void SlotOffset_Index14_Backpack()
+    {
+        Assert.Equal(new Vector2(152, 34), CharacterEquipmentLayout.SlotOffset(14));
+    }
+
+    [Fact]
+    public void SlotOffset_Index15_Throws()
+    {
+        Assert.Throws<System.ArgumentOutOfRangeException>(() => CharacterEquipmentLayout.SlotOffset(15));
+    }
+
+    [Fact]
     public void SlotOffset_All14Distinct()
     {
         var positions = new Vector2[14];

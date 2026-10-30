@@ -5,14 +5,14 @@ using Goose2Client.Network.Packets;
 namespace Goose2Client.UI;
 
 /// <summary>
-/// Character window — 14 equipped-item slots plus stat/level/XP readout.
+/// Character window — 15 equipped-item slots plus stat/level/XP readout.
 /// Mirrors Unity CharacterWindow with Godot-specific layout.
 /// </summary>
 public partial class CharacterWindow : BaseWindow, IWindow
 {
     protected override bool DefaultVisible => false;
 
-    public const int EquippedSlotCount = 14;
+    public const int EquippedSlotCount = 15;
     private const int FirstSlotNumber = 31;
 
     private static readonly PackedScene SlotScene = GD.Load<PackedScene>("res://Scenes/UI/ItemSlot.tscn");
@@ -65,7 +65,7 @@ public partial class CharacterWindow : BaseWindow, IWindow
         _airResistText = GetNode<Label>("Content/AirResistText");
         _spiritResistText = GetNode<Label>("Content/SpiritResistText");
 
-        // Create 14 equipped slots — anatomical layout via CharacterEquipmentLayout
+        // Create 15 equipped slots — anatomical layout via CharacterEquipmentLayout
         _slots = new ItemSlot[EquippedSlotCount];
         var slotGrid = GetNode<Control>("Content/SlotGrid");
 

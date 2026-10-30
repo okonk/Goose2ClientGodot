@@ -8,7 +8,7 @@ namespace Goose2Client.UI;
 /// Positions are taken from the Unity serialized <c>slots[]</c> array order
 /// (which differs from the GameObject child order in the prefab).
 /// Each slot is 32×32; the returned Vector2 is the top-left offset in panel coords.
-/// Indices 0..13 are valid; out-of-range throws <see cref="ArgumentOutOfRangeException"/>.
+/// Indices 0..14 are valid; out-of-range throws <see cref="ArgumentOutOfRangeException"/>.
 /// </summary>
 public static class CharacterEquipmentLayout
 {
@@ -28,9 +28,10 @@ public static class CharacterEquipmentLayout
         new Vector2(50, 104),  // 11 Ring1
         new Vector2(118, 104), // 12 Ring2
         new Vector2(152, 174), // 13 Mount
+        new Vector2(152, 34),  // 14 Backpack
     };
 
-    /// <summary>Returns the top-left offset for the given equipment slot index (0–13).</summary>
+    /// <summary>Returns the top-left offset for the given equipment slot index (0–14).</summary>
     public static Vector2 SlotOffset(int slotIndex)
     {
         if (slotIndex < 0 || slotIndex >= Slots.Length)
