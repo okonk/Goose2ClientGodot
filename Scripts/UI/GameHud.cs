@@ -25,6 +25,7 @@ public partial class GameHud : Control
     public GenericContainerWindow Generic { get; private set; } = null!;
     public CombineBagContainerWindow CombineBag { get; private set; } = null!;
     public CustomWindow Custom { get; private set; } = null!;
+    public EnchantWindow Enchant { get; private set; } = null!;
     public HairdyeWindow Hairdye { get; private set; } = null!;
     public LogViewerWindow LogViewer { get; private set; } = null!;
     public KeyBindingsWindow KeyBindings { get; private set; } = null!;
@@ -99,6 +100,7 @@ public partial class GameHud : Control
         Generic = Add<GenericContainerWindow>("res://Scenes/UI/GenericContainerWindow.tscn");
         CombineBag = Add<CombineBagContainerWindow>("res://Scenes/UI/CombineBagContainerWindow.tscn");
         Custom = Add<CustomWindow>("res://Scenes/UI/CustomWindow.tscn");
+        Enchant = Add<EnchantWindow>("res://Scenes/UI/EnchantWindow.tscn");
         Hairdye = Add<HairdyeWindow>("res://Scenes/UI/HairdyeWindow.tscn");
         LogViewer = Add<LogViewerWindow>("res://Scenes/UI/LogViewerWindow.tscn");
         Amount = Add<AmountWindow>("res://Scenes/UI/AmountWindow.tscn");
