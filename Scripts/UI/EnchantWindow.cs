@@ -61,9 +61,9 @@ public partial class EnchantWindow : BaseWindow, IWindow
     {
         var p = (MakeWindowPacket)o;
         if (p.WindowFrame != WindowFrames.Enchant) return;
-        _mkwButtons = p.Buttons;
         if (p.WindowId != WindowId)
             ResetAll();
+        _mkwButtons = p.Buttons;
         Visible = true;
         Title = p.Title;
         WindowId = p.WindowId;
