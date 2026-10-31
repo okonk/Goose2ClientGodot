@@ -26,6 +26,13 @@
             "Banker",
             "Quest",
             "Ambient"
+          ],
+          "enumValues": [
+            2,
+            10,
+            11,
+            12,
+            14
           ]
         },
         {
@@ -66,11 +73,23 @@
         {
           "name": "npc_facing",
           "header": "facing (3)",
-          "kind": "Int",
+          "kind": "Enum",
           "sql": "SMALLINT",
           "default": "3",
           "required": false,
-          "pk": false
+          "pk": false,
+          "enumNames": [
+            "Up",
+            "Right",
+            "Down",
+            "Left"
+          ],
+          "enumValues": [
+            1,
+            2,
+            3,
+            4
+          ]
         },
         {
           "name": "npc_level",
@@ -508,6 +527,12 @@
             "TeleportToAggro",
             "TeleportAggro",
             "TeleportAggroIfUnreachable"
+          ],
+          "enumValues": [
+            0,
+            1,
+            2,
+            3
           ]
         },
         {
