@@ -79,7 +79,7 @@ public class CustomAssetSheetTests
         {
             CustomAssetSheet.WriteAll(Goose2.AssetConverter.Paths.CustomAssetsDir, output);
 
-            foreach ((string file, int width, int height) in new[] { ("30000.png", 96, 32), ("30001.png", 32, 64), ("30002.png", 224, 40), ("30003.png", 384, 32), ("30004.png", 736, 32), ("30005.png", 640, 32), ("30006.png", 736, 64) })
+            foreach ((string file, int width, int height) in new[] { ("30000.png", 96, 32), ("30001.png", 32, 64), ("30002.png", 224, 40), ("30003.png", 384, 32), ("30004.png", 736, 32), ("30005.png", 640, 32), ("30006.png", 736, 64), ("30007.png", 6912, 32), ("30008.png", 288, 32), ("30009.png", 512, 32), ("30010.png", 544, 32), ("30015.png", 2688, 32), ("30011.png", 768, 32), ("30014.png", 11776, 32), ("30013.png", 15008, 32), ("30012.png", 5472, 32) })
             {
                 SKImageInfo unpremul = new(width, height, SKColorType.Rgba8888, SKAlphaType.Unpremul);
                 using SKBitmap sheet = SKBitmap.Decode(Path.Combine(output, file), unpremul)!;
@@ -123,7 +123,7 @@ public class CustomAssetSheetTests
     [Fact]
     public void TileSheetNumbers_ExcludeIcons()
     {
-        Assert.Equal(new[] { 30001, 30002, 30003, 30004, 30005, 30006 }, CustomAssetSheet.TileSheetNumbers);
+        Assert.Equal(new[] { 30001, 30002, 30003, 30004, 30005, 30006, 30007, 30008, 30009, 30010, 30011, 30012, 30013, 30014, 30015 }, CustomAssetSheet.TileSheetNumbers);
         Assert.False(CustomAssetSheet.Icons.IsTileSheet);
     }
 
@@ -158,6 +158,24 @@ public class CustomAssetSheetTests
             Assert.Equal(new[] { 608, 0, 32, 32 }, wallCaps.GetProperty("20").EnumerateArray().Select(x => x.GetInt32()));
             var banners = json.RootElement.GetProperty("sheets").GetProperty("30006");
             Assert.Equal(new[] { 704, 0, 32, 64 }, banners.GetProperty("23").EnumerateArray().Select(x => x.GetInt32()));
+            var arena = json.RootElement.GetProperty("sheets").GetProperty("30007");
+            Assert.Equal(new[] { 6880, 0, 32, 32 }, arena.GetProperty("216").EnumerateArray().Select(x => x.GetInt32()));
+            var arenaSand = json.RootElement.GetProperty("sheets").GetProperty("30008");
+            Assert.Equal(new[] { 256, 0, 32, 32 }, arenaSand.GetProperty("9").EnumerateArray().Select(x => x.GetInt32()));
+            var arenaWear = json.RootElement.GetProperty("sheets").GetProperty("30010");
+            Assert.Equal(new[] { 512, 0, 32, 32 }, arenaWear.GetProperty("17").EnumerateArray().Select(x => x.GetInt32()));
+            var corpses = json.RootElement.GetProperty("sheets").GetProperty("30011");
+            Assert.Equal(new[] { 704, 0, 64, 32 }, corpses.GetProperty("12").EnumerateArray().Select(x => x.GetInt32()));
+            var arenaStands = json.RootElement.GetProperty("sheets").GetProperty("30012");
+            Assert.Equal(new[] { 5440, 0, 32, 32 }, arenaStands.GetProperty("171").EnumerateArray().Select(x => x.GetInt32()));
+            var arenaFacade = json.RootElement.GetProperty("sheets").GetProperty("30013");
+            Assert.Equal(new[] { 14976, 0, 32, 32 }, arenaFacade.GetProperty("469").EnumerateArray().Select(x => x.GetInt32()));
+            var arenaFacadeNorth = json.RootElement.GetProperty("sheets").GetProperty("30014");
+            Assert.Equal(new[] { 11744, 0, 32, 32 }, arenaFacadeNorth.GetProperty("368").EnumerateArray().Select(x => x.GetInt32()));
+            var battleGear = json.RootElement.GetProperty("sheets").GetProperty("30015");
+            Assert.Equal(new[] { 2656, 0, 32, 32 }, battleGear.GetProperty("84").EnumerateArray().Select(x => x.GetInt32()));
+            var battleProps = json.RootElement.GetProperty("sheets").GetProperty("30009");
+            Assert.Equal(new[] { 480, 0, 32, 32 }, battleProps.GetProperty("16").EnumerateArray().Select(x => x.GetInt32()));
         }
         finally
         {

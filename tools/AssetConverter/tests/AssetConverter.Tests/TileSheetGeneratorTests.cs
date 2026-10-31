@@ -45,7 +45,7 @@ public class TileSheetGeneratorTests : IDisposable
 
         IReadOnlyList<int> tiles = TileSheetGenerator.Generate(_dir, icons, mapsDir);
 
-        Assert.Equal(new[] { 10, 13, 30001, 30002, 30003, 30004, 30005, 30006 }, tiles);
+        Assert.Equal(new[] { 10, 13, 30001, 30002, 30003, 30004, 30005, 30006, 30007, 30008, 30009, 30010, 30011, 30012, 30013, 30014, 30015 }, tiles);
     }
 
     [Fact]
@@ -63,7 +63,7 @@ public class TileSheetGeneratorTests : IDisposable
 
         IReadOnlyList<int> tiles = TileSheetGenerator.Generate(_dir, icons, mapsDir);
 
-        Assert.Equal(new[] { 11, 30001, 30002, 30003, 30004, 30005, 30006 }, tiles);
+        Assert.Equal(new[] { 11, 30001, 30002, 30003, 30004, 30005, 30006, 30007, 30008, 30009, 30010, 30011, 30012, 30013, 30014, 30015 }, tiles);
     }
 
     [Fact]
