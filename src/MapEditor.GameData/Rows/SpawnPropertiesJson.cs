@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Text;
 using System.Text.Encodings.Web;
@@ -7,11 +9,59 @@ namespace MapEditor.GameData.Rows;
 
 public enum SpawnMoveOverride { Default, Movable, Stationary }
 
+// Values match the server's Goose.Direction, which is what the "facing" key holds.
+public enum SpawnFacingOverride { Default = 0, Up = 1, Right = 2, Down = 3, Left = 4 }
+
 public static class SpawnPropertiesJson
 {
-    public static bool TryRead(string properties, out SpawnMoveOverride value)
+    private const string CanMoveKey = "canMove";
+    private const string FacingKey = "facing";
+
+    private delegate bool ValueParser<T>(JsonElement element, out T value);
+
+    public static bool TryRead(string properties, out SpawnMoveOverride value) =>
+        TryReadKey(properties, CanMoveKey, TryParseCanMove, out value);
+
+    public static bool TryReadFacing(string properties, out SpawnFacingOverride value) =>
+        TryReadKey(properties, FacingKey, TryParseFacing, out value);
+
+    public static bool TryWrite(string properties, SpawnMoveOverride value, out string result) =>
+        TryWriteKey(properties, CanMoveKey, TryParseCanMove, value,
+            writer => writer.WriteBooleanValue(value == SpawnMoveOverride.Movable), out result);
+
+    public static bool TryWriteFacing(string properties, SpawnFacingOverride value, out string result) =>
+        TryWriteKey(properties, FacingKey, TryParseFacing, value,
+            writer => writer.WriteNumberValue((int)value), out result);
+
+    private static bool TryParseCanMove(JsonElement element, out SpawnMoveOverride value)
     {
-        value = SpawnMoveOverride.Default;
+        // The server crashes on startup for non-boolean canMove values (e.g. {"canMove":1});
+        // refuse to treat them as editable.
+        value = element.ValueKind switch
+        {
+            JsonValueKind.True => SpawnMoveOverride.Movable,
+            JsonValueKind.False => SpawnMoveOverride.Stationary,
+            _ => SpawnMoveOverride.Default,
+        };
+        return value != SpawnMoveOverride.Default;
+    }
+
+    private static bool TryParseFacing(JsonElement element, out SpawnFacingOverride value)
+    {
+        value = SpawnFacingOverride.Default;
+        if (element.ValueKind != JsonValueKind.Number || !element.TryGetInt32(out int number) || number is < 1 or > 4)
+        {
+            return false;
+        }
+
+        value = (SpawnFacingOverride)number;
+        return true;
+    }
+
+    private static bool TryReadKey<T>(string properties, string key, ValueParser<T> parse, out T value)
+        where T : struct, Enum
+    {
+        value = default;
         if (string.IsNullOrWhiteSpace(properties))
         {
             return true;
@@ -24,46 +74,31 @@ public static class SpawnPropertiesJson
 
         using (document)
         {
-            return TryReadValue(document.RootElement, out value);
+            return TryReadValue(document.RootElement, key, parse, out value);
         }
     }
 
-    private static bool TryReadValue(JsonElement root, out SpawnMoveOverride value)
+    private static bool TryReadValue<T>(JsonElement root, string key, ValueParser<T> parse, out T value)
+        where T : struct, Enum
     {
-        value = SpawnMoveOverride.Default;
-        if (!root.TryGetProperty("canMove", out var canMove))
-        {
-            return true;
-        }
-
-        // The server crashes on startup for non-boolean canMove values (e.g. {"canMove":1});
-        // refuse to treat them as editable.
-        if (canMove.ValueKind == JsonValueKind.True)
-        {
-            value = SpawnMoveOverride.Movable;
-            return true;
-        }
-
-        if (canMove.ValueKind == JsonValueKind.False)
-        {
-            value = SpawnMoveOverride.Stationary;
-            return true;
-        }
-
-        return false;
+        value = default;
+        return !root.TryGetProperty(key, out var element) || parse(element, out value);
     }
 
-    public static bool TryWrite(string properties, SpawnMoveOverride value, out string result)
+    private static bool TryWriteKey<T>(string properties, string key, ValueParser<T> parse, T value,
+        Action<Utf8JsonWriter> writeValue, out string result)
+        where T : struct, Enum
     {
         result = "";
+        Action<Utf8JsonWriter>? write = EqualityComparer<T>.Default.Equals(value, default) ? null : writeValue;
         if (string.IsNullOrWhiteSpace(properties))
         {
-            if (value == SpawnMoveOverride.Default)
+            if (write is null)
             {
                 return true;
             }
 
-            return Write(value, null, ref result);
+            return Write(key, write, null, ref result);
         }
 
         if (!TryGetObject(properties, out var document))
@@ -73,12 +108,12 @@ public static class SpawnPropertiesJson
 
         using (document)
         {
-            if (!TryReadValue(document.RootElement, out _))
+            if (!TryReadValue(document.RootElement, key, parse, out _))
             {
                 return false;
             }
 
-            return Write(value, document.RootElement, ref result);
+            return Write(key, write, document.RootElement, ref result);
         }
     }
 
@@ -104,7 +139,7 @@ public static class SpawnPropertiesJson
         return true;
     }
 
-    private static bool Write(SpawnMoveOverride value, JsonElement? root, ref string result)
+    private static bool Write(string key, Action<Utf8JsonWriter>? writeValue, JsonElement? root, ref string result)
     {
         using var stream = new MemoryStream();
         using (var writer = new Utf8JsonWriter(stream, new JsonWriterOptions
@@ -113,39 +148,33 @@ public static class SpawnPropertiesJson
         }))
         {
             writer.WriteStartObject();
-            var wroteCanMove = false;
+            var wroteKey = false;
             if (root is { } objectRoot)
             {
                 foreach (var property in objectRoot.EnumerateObject())
                 {
-                    if (property.Name != "canMove")
+                    if (property.Name != key)
                     {
                         writer.WritePropertyName(property.Name);
                         property.Value.WriteTo(writer);
                         continue;
                     }
 
-                    if (value == SpawnMoveOverride.Default)
+                    if (writeValue is null)
                     {
                         continue;
                     }
 
-                    writer.WriteBoolean("canMove", value == SpawnMoveOverride.Movable);
-                    wroteCanMove = true;
+                    writer.WritePropertyName(key);
+                    writeValue(writer);
+                    wroteKey = true;
                 }
             }
 
-            if (!wroteCanMove)
+            if (!wroteKey && writeValue is not null)
             {
-                switch (value)
-                {
-                    case SpawnMoveOverride.Movable:
-                        writer.WriteBoolean("canMove", true);
-                        break;
-                    case SpawnMoveOverride.Stationary:
-                        writer.WriteBoolean("canMove", false);
-                        break;
-                }
+                writer.WritePropertyName(key);
+                writeValue(writer);
             }
 
             writer.WriteEndObject();

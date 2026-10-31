@@ -973,6 +973,7 @@ internal sealed class MapDocumentViewModel : ViewModelBase, ITerrainDocumentReco
         }
 
         SpawnPropertiesJson.TryWrite(string.Empty, state.SelectedCanMove ?? SpawnMoveOverride.Default, out string properties);
+        SpawnPropertiesJson.TryWriteFacing(properties, state.SelectedFacing ?? SpawnFacingOverride.Default, out properties);
         session.Edits.AddSpawn(new NpcSpawnRow(npcId, session.MapId, x, y, properties));
         ClearGameDataSelection();
     }
@@ -1082,6 +1083,38 @@ internal sealed class MapDocumentViewModel : ViewModelBase, ITerrainDocumentReco
         }
 
         state.SelectedCanMove = value;
+    }
+
+    internal void CommitSpawnFacing(SpawnFacingOverride value)
+    {
+        if (_gameData is not { } state)
+        {
+            return;
+        }
+
+        if (state.SelectedSpawn is { } index && state.Session is { } session && index < session.Edits.Spawns.Count)
+        {
+            NpcSpawnRow row = session.Edits.Spawns[index];
+            if (!SpawnPropertiesJson.TryReadFacing(row.Properties, out SpawnFacingOverride current))
+            {
+                return;
+            }
+
+            if (current == value)
+            {
+                return;
+            }
+
+            if (!SpawnPropertiesJson.TryWriteFacing(row.Properties, value, out string result))
+            {
+                return;
+            }
+
+            session.Edits.UpdateSpawn(index, row with { Properties = result });
+            return;
+        }
+
+        state.SelectedFacing = value;
     }
 
     internal void CommitSpawnNpc(int npcId)

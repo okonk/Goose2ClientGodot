@@ -95,6 +95,7 @@ internal partial class MainWindow : Window
         WarpDestinationPicker.ItemText = map => $"{map.MapId}  {map.MapName}  {map.MapFilename}";
         SpawnNpcPicker.PropertyChanged += OnSpawnNpcPickerChanged;
         SpawnCanMoveCheck.PropertyChanged += OnSpawnCanMoveCheckChanged;
+        SpawnFacingCombo.SelectionChanged += OnSpawnFacingComboChanged;
         WarpDestinationPicker.PropertyChanged += OnWarpDestinationPickerChanged;
         WarpDestinationX.LostFocus += OnWarpDestinationFieldLostFocus;
         WarpDestinationY.LostFocus += OnWarpDestinationFieldLostFocus;
@@ -990,6 +991,16 @@ internal partial class MainWindow : Window
         });
     }
 
+    private void OnSpawnFacingComboChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        if (SpawnFacingCombo.SelectedIndex < 0)
+        {
+            return;
+        }
+
+        Document.CommitSpawnFacing((SpawnFacingOverride)SpawnFacingCombo.SelectedIndex);
+    }
+
     private void OnWarpDestinationPickerChanged(object? sender, AvaloniaPropertyChangedEventArgs e)
     {
         if (e.Property != SearchPickerControl<MapReference>.SelectedItemProperty)
@@ -1641,6 +1652,11 @@ internal partial class MainWindow : Window
             SpawnCanMoveCheck.IsEnabled = editable;
             SpawnCanMoveWarning.IsVisible = !editable;
             SpawnCanMoveCheck.IsChecked = editable ? ToIsChecked(move) : null;
+
+            bool facingEditable = SpawnPropertiesJson.TryReadFacing(spawn.Properties, out SpawnFacingOverride facing);
+            SpawnFacingCombo.IsEnabled = facingEditable;
+            SpawnFacingWarning.IsVisible = !facingEditable;
+            SpawnFacingCombo.SelectedIndex = (int)facing;
         }
         else
         {
@@ -1659,6 +1675,10 @@ internal partial class MainWindow : Window
             SpawnCanMoveCheck.IsEnabled = true;
             SpawnCanMoveWarning.IsVisible = false;
             SpawnCanMoveCheck.IsChecked = ToIsChecked(state.SelectedCanMove ?? SpawnMoveOverride.Default);
+
+            SpawnFacingCombo.IsEnabled = true;
+            SpawnFacingWarning.IsVisible = false;
+            SpawnFacingCombo.SelectedIndex = (int)(state.SelectedFacing ?? SpawnFacingOverride.Default);
         }
     }
 

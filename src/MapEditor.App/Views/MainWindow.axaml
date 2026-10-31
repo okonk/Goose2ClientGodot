@@ -249,6 +249,19 @@
                          TextWrapping="Wrap" VerticalAlignment="Center"
                          Text="Invalid properties value — edit in the sheet to fix." />
             </StackPanel>
+            <TextBlock Text="Facing" Classes="muted" FontSize="11" />
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <ComboBox x:Name="SpawnFacingCombo" Width="110" SelectedIndex="0" VerticalAlignment="Center">
+                <ComboBoxItem Content="Template" />
+                <ComboBoxItem Content="Up" />
+                <ComboBoxItem Content="Right" />
+                <ComboBoxItem Content="Down" />
+                <ComboBoxItem Content="Left" />
+              </ComboBox>
+              <TextBlock x:Name="SpawnFacingWarning" Classes="muted" IsVisible="False" MaxWidth="180"
+                         TextWrapping="Wrap" VerticalAlignment="Center"
+                         Text="Invalid properties value — edit in the sheet to fix." />
+            </StackPanel>
           </StackPanel>
         </Border>
       </StackPanel>

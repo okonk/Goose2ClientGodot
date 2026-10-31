@@ -129,4 +129,54 @@ public class SpawnPropertiesJsonTests
         Assert.True(SpawnPropertiesJson.TryRead(written, out var read));
         Assert.Equal(value, read);
     }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("{}")]
+    [InlineData("{\"canMove\":true}")]
+    public void TryReadFacing_NoFacing_ReturnsDefault(string properties)
+    {
+        Assert.True(SpawnPropertiesJson.TryReadFacing(properties, out var value));
+        Assert.Equal(SpawnFacingOverride.Default, value);
+    }
+
+    [Fact]
+    public void TryReadFacing_Number_ReturnsDirection()
+    {
+        Assert.True(SpawnPropertiesJson.TryReadFacing("{\"facing\":4}", out var value));
+        Assert.Equal(SpawnFacingOverride.Left, value);
+    }
+
+    [Theory]
+    [InlineData("{\"facing\":0}")]
+    [InlineData("{\"facing\":5}")]
+    [InlineData("{\"facing\":2.5}")]
+    [InlineData("{\"facing\":\"Down\"}")]
+    [InlineData("{\"facing\":")]
+    public void TryReadFacing_Invalid_ReturnsFalse(string properties)
+    {
+        Assert.False(SpawnPropertiesJson.TryReadFacing(properties, out var value));
+        Assert.Equal(SpawnFacingOverride.Default, value);
+    }
+
+    [Fact]
+    public void TryWriteFacing_KeepsCanMove_AndAppendsFacing()
+    {
+        Assert.True(SpawnPropertiesJson.TryWriteFacing("{\"canMove\":false}", SpawnFacingOverride.Right, out var result));
+        Assert.Equal("{\"canMove\":false,\"facing\":2}", result);
+    }
+
+    [Fact]
+    public void TryWriteFacing_DefaultRemovesFacing()
+    {
+        Assert.True(SpawnPropertiesJson.TryWriteFacing("{\"facing\":1}", SpawnFacingOverride.Default, out var result));
+        Assert.Equal("", result);
+    }
+
+    [Fact]
+    public void TryWriteFacing_InvalidFacing_ReturnsFalse()
+    {
+        Assert.False(SpawnPropertiesJson.TryWriteFacing("{\"facing\":\"Down\"}", SpawnFacingOverride.Up, out var result));
+        Assert.Equal("", result);
+    }
 }

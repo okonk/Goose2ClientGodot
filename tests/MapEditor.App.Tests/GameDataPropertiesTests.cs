@@ -480,6 +480,74 @@ public class GameDataPropertiesTests
     }
 
     [AvaloniaFact]
+    public void CommitSpawnFacing_WithSelectedSpawn_WritesRow_AndUndoRestores()
+    {
+        using MainWindowHarness harness = MainWindowHarness.Create();
+        harness.ViewModel.GameData!.AttachSession(SessionWithSpawnProperties("{\"canMove\":true}"));
+        harness.ViewModel.GameData.SelectedSpawn = 0;
+
+        harness.ViewModel.CommitSpawnFacing(SpawnFacingOverride.Left);
+
+        Assert.Equal("{\"canMove\":true,\"facing\":4}", harness.ViewModel.GameData.Session!.Edits.Spawns[0].Properties);
+        Assert.Null(harness.ViewModel.GameData.SelectedFacing);
+        Assert.True(harness.ViewModel.Undo());
+        Assert.Equal("{\"canMove\":true}", harness.ViewModel.GameData.Session.Edits.Spawns[0].Properties);
+    }
+
+    [AvaloniaFact]
+    public void SpawnFacingCombo_ReflectsSelectedRow_AndFlagsInvalidValues()
+    {
+        using MainWindowHarness harness = MainWindowHarness.Create();
+        harness.ViewModel.GameData!.AttachSession(SessionWithSpawnProperties("{\"facing\":2}", "{\"facing\":\"Down\"}"));
+        Control<ToggleButton>(harness, "SpawnTool").IsChecked = true;
+        Dispatcher.UIThread.RunJobs();
+
+        ComboBox combo = Control<ComboBox>(harness, "SpawnFacingCombo");
+        TextBlock warning = Control<TextBlock>(harness, "SpawnFacingWarning");
+
+        harness.ViewModel.GameData.SelectedSpawn = 0;
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal((int)SpawnFacingOverride.Right, combo.SelectedIndex);
+        Assert.True(combo.IsEnabled);
+        Assert.False(warning.IsVisible);
+
+        harness.ViewModel.GameData.SelectedSpawn = 1;
+        Dispatcher.UIThread.RunJobs();
+        Assert.False(combo.IsEnabled);
+        Assert.True(warning.IsVisible);
+        Assert.Equal("{\"facing\":\"Down\"}", harness.ViewModel.GameData.Session!.Edits.Spawns[1].Properties);
+        Assert.False(harness.ViewModel.Timeline.CanUndo);
+    }
+
+    [AvaloniaFact]
+    public void SpawnFacingCombo_NoSelection_StampsTheNextPlacement()
+    {
+        using MainWindowHarness harness = MainWindowHarness.Create();
+        harness.ViewModel.GameData!.AttachSession(SessionWithSpawn(3, 4));
+        Control<ToggleButton>(harness, "SpawnTool").IsChecked = true;
+        Dispatcher.UIThread.RunJobs();
+
+        Control<CheckBox>(harness, "SpawnCanMoveCheck").IsChecked = false;
+        Control<ComboBox>(harness, "SpawnFacingCombo").SelectedIndex = (int)SpawnFacingOverride.Up;
+        harness.ViewModel.GameData.SelectedNpcId = 1;
+        harness.ViewModel.AddSpawnAt(5, 6);
+
+        Assert.Equal("{\"canMove\":false,\"facing\":1}", harness.ViewModel.GameData.Session!.Edits.Spawns[1].Properties);
+    }
+
+    [AvaloniaFact]
+    public void SessionReplacement_ClearsThePendingFacingOverride()
+    {
+        using MainWindowHarness harness = MainWindowHarness.Create();
+        harness.ViewModel.GameData!.AttachSession(SessionWithSpawn(3, 4));
+        harness.ViewModel.GameData.SelectedFacing = SpawnFacingOverride.Left;
+
+        harness.ViewModel.GameData.AttachSession(SessionWithSpawn(9, 9));
+
+        Assert.Null(harness.ViewModel.GameData.SelectedFacing);
+    }
+
+    [AvaloniaFact]
     public void SpawnNpcPicker_AfterPlacingASpawn_ChangesOnlyTheNextPlacement()
     {
         using MainWindowHarness harness = MainWindowHarness.Create();

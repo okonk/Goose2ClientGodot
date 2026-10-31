@@ -31,6 +31,7 @@ internal sealed class DocumentGameDataState : IDisposable, INotifyPropertyChange
     private int? _selectedWarp;
     private int? _selectedNpcId;
     private SpawnMoveOverride? _selectedCanMove;
+    private SpawnFacingOverride? _selectedFacing;
     private int? _selectedDestinationMapId;
     private int? _pendingDestinationX;
     private int? _pendingDestinationY;
@@ -138,6 +139,12 @@ internal sealed class DocumentGameDataState : IDisposable, INotifyPropertyChange
         set => SetField(ref _selectedCanMove, value);
     }
 
+    public SpawnFacingOverride? SelectedFacing
+    {
+        get => _selectedFacing;
+        set => SetField(ref _selectedFacing, value);
+    }
+
     public int? SelectedDestinationMapId
     {
         get => _selectedDestinationMapId;
@@ -173,6 +180,7 @@ internal sealed class DocumentGameDataState : IDisposable, INotifyPropertyChange
         _selectedWarp = null;
         _selectedNpcId = null;
         _selectedCanMove = null;
+        _selectedFacing = null;
         _selectedDestinationMapId = null;
         _pendingDestinationX = null;
         _pendingDestinationY = null;
