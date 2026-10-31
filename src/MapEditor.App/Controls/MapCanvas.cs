@@ -848,7 +848,13 @@ internal sealed class MapCanvas : Control, ICustomHitTest
             string name = appearance is { NpcName: { } npcName } && !string.IsNullOrWhiteSpace(npcName)
                 ? npcName
                 : spawn.NpcId.ToString();
-            groups[i] = composer.Compose(appearance ?? default, i, tile.X, tile.Y) with { Name = name };
+            NpcAppearance shown = appearance ?? default;
+            if (SpawnPropertiesJson.TryReadFacing(spawn.Properties, out SpawnFacingOverride facing) && facing != SpawnFacingOverride.Default)
+            {
+                shown = shown with { Facing = (NpcFacing)facing };
+            }
+
+            groups[i] = composer.Compose(shown, i, tile.X, tile.Y) with { Name = name };
         }
 
         return groups;

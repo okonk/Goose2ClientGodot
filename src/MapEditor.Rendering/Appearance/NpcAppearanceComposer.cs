@@ -66,32 +66,47 @@ public sealed class NpcAppearanceComposer
         }
 
         List<NpcPartDrawOperation> parts = new(9);
-        parts.Add(BuildPart(NpcPartSlot.Body, AppearancePartKind.Body, appearance.BodyId, appearance.BodyTint, appearance.BodyState, anchorX, anchorY));
+        parts.Add(BuildPart(NpcPartSlot.Body, AppearancePartKind.Body, appearance.BodyId, appearance.BodyTint, appearance.BodyState, appearance.Facing, anchorX, anchorY));
 
         if (humanoid)
         {
-            AddPart(parts, NpcPartSlot.Eyes, AppearancePartKind.Eyes, appearance.FaceId, NoTint, appearance.BodyState, anchorX, anchorY);
-            AddPart(parts, NpcPartSlot.Feet, AppearancePartKind.Feet, equipment.Feet.Id, equipment.Feet.Tint, appearance.BodyState, anchorX, anchorY);
-            AddPart(parts, NpcPartSlot.Legs, AppearancePartKind.Legs, legsId, legsTint, appearance.BodyState, anchorX, anchorY);
-            AddPart(parts, NpcPartSlot.Chest, AppearancePartKind.Chest, chestId, chestTint, appearance.BodyState, anchorX, anchorY);
-            AddPart(parts, NpcPartSlot.Hair, AppearancePartKind.Hair, appearance.HairId, appearance.HairTint, appearance.BodyState, anchorX, anchorY);
-            AddPart(parts, NpcPartSlot.Helm, AppearancePartKind.Helm, equipment.Helm.Id, equipment.Helm.Tint, appearance.BodyState, anchorX, anchorY);
-            AddPart(parts, NpcPartSlot.Shield, AppearancePartKind.Hand, equipment.Shield.Id, equipment.Shield.Tint, appearance.BodyState, anchorX, anchorY);
-            AddPart(parts, NpcPartSlot.Weapon, AppearancePartKind.Hand, equipment.Weapon.Id, equipment.Weapon.Tint, appearance.BodyState, anchorX, anchorY);
+            AddPart(parts, NpcPartSlot.Eyes, AppearancePartKind.Eyes, appearance.FaceId, NoTint, appearance.BodyState, appearance.Facing, anchorX, anchorY);
+            AddPart(parts, NpcPartSlot.Feet, AppearancePartKind.Feet, equipment.Feet.Id, equipment.Feet.Tint, appearance.BodyState, appearance.Facing, anchorX, anchorY);
+            AddPart(parts, NpcPartSlot.Legs, AppearancePartKind.Legs, legsId, legsTint, appearance.BodyState, appearance.Facing, anchorX, anchorY);
+            AddPart(parts, NpcPartSlot.Chest, AppearancePartKind.Chest, chestId, chestTint, appearance.BodyState, appearance.Facing, anchorX, anchorY);
+            AddPart(parts, NpcPartSlot.Hair, AppearancePartKind.Hair, appearance.HairId, appearance.HairTint, appearance.BodyState, appearance.Facing, anchorX, anchorY);
+            AddPart(parts, NpcPartSlot.Helm, AppearancePartKind.Helm, equipment.Helm.Id, equipment.Helm.Tint, appearance.BodyState, appearance.Facing, anchorX, anchorY);
+            AddPart(parts, NpcPartSlot.Shield, AppearancePartKind.Hand, equipment.Shield.Id, equipment.Shield.Tint, appearance.BodyState, appearance.Facing, anchorX, anchorY);
+            AddPart(parts, NpcPartSlot.Weapon, AppearancePartKind.Hand, equipment.Weapon.Id, equipment.Weapon.Tint, appearance.BodyState, appearance.Facing, anchorX, anchorY);
         }
 
+        parts.Sort((a, b) => SortOrder(a.Slot, appearance.Facing).CompareTo(SortOrder(b.Slot, appearance.Facing)));
         return new NpcAppearanceGroup(occurrenceIndex, tileX, tileY, anchorX, anchorY, parts.AsReadOnly(), equipmentDiagnostic);
     }
 
-    private void AddPart(List<NpcPartDrawOperation> parts, NpcPartSlot slot, AppearancePartKind kind, int id, RgbaValue tint, int bodyState, int anchorX, int anchorY)
+    // Mirrors the live client's per-facing draw order (Scripts/Character/CharacterLayout.cs SortOrder):
+    // shield and weapon move behind the body for some facings.
+    private static int SortOrder(NpcPartSlot slot, NpcFacing facing)
+    {
+        int order = (int)slot + 3;
+        return slot switch
+        {
+            NpcPartSlot.Shield when facing is NpcFacing.Right or NpcFacing.Up => 0,
+            NpcPartSlot.Weapon when facing is NpcFacing.Up => 1,
+            NpcPartSlot.Weapon when facing is NpcFacing.Left => 0,
+            _ => order,
+        };
+    }
+
+    private void AddPart(List<NpcPartDrawOperation> parts, NpcPartSlot slot, AppearancePartKind kind, int id, RgbaValue tint, int bodyState, NpcFacing facing, int anchorX, int anchorY)
     {
         if (id > 0)
         {
-            parts.Add(BuildPart(slot, kind, id, tint, bodyState, anchorX, anchorY));
+            parts.Add(BuildPart(slot, kind, id, tint, bodyState, facing, anchorX, anchorY));
         }
     }
 
-    private NpcPartDrawOperation BuildPart(NpcPartSlot slot, AppearancePartKind kind, int id, RgbaValue tint, int bodyState, int anchorX, int anchorY)
+    private NpcPartDrawOperation BuildPart(NpcPartSlot slot, AppearancePartKind kind, int id, RgbaValue tint, int bodyState, NpcFacing facing, int anchorX, int anchorY)
     {
         if (id <= 0)
         {
@@ -107,7 +122,7 @@ public sealed class NpcAppearanceComposer
                 new NpcPartDestination(anchorX, anchorY, 0, 0));
         }
 
-        _catalog.TryResolve(kind, id, bodyState, out SpriteResolution resolution);
+        _catalog.TryResolve(kind, id, bodyState, facing, out SpriteResolution resolution);
 
         NpcPartDestination destination = resolution.Status == SpriteResolutionStatus.Ready
             ? ComputeDestination(anchorX, anchorY, resolution.SourceRect.Width, resolution.SourceRect.Height)

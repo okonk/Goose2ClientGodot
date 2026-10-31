@@ -36,7 +36,7 @@ public class AnimationBatchConverterTests
             var manifestPath = Path.Combine(outRoot, "Assets/Sprites/appearance-manifest.json");
             Assert.True(File.Exists(manifestPath));
             using var manifest = System.Text.Json.JsonDocument.Parse(File.ReadAllText(manifestPath));
-            Assert.Equal(1, manifest.RootElement.GetProperty("version").GetInt32());
+            Assert.Equal(2, manifest.RootElement.GetProperty("version").GetInt32());
             var body1 = manifest.RootElement.GetProperty("parts").GetProperty("Body").GetProperty("1");
             Assert.Equal(115, body1.GetProperty("noEquip")[0].GetInt32());
             Assert.Equal(3205, body1.GetProperty("noEquip")[1].GetInt32());

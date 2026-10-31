@@ -29,6 +29,7 @@ public sealed class SheetRowMapper
     private readonly Field _hairB;
     private readonly Field _hairA;
     private readonly Field _equippedItems;
+    private readonly Field? _facing;
 
     private readonly Field _spawnNpcId;
     private readonly Field _spawnMapId;
@@ -69,6 +70,7 @@ public sealed class SheetRowMapper
         _hairB = Resolve(npcs, "hair_b");
         _hairA = Resolve(npcs, "hair_a");
         _equippedItems = Resolve(npcs, "equipped_items");
+        _facing = ResolveOptional(npcs, "npc_facing");
 
         _spawnNpcId = Resolve(spawns, "npc_id");
         _spawnMapId = Resolve(spawns, "map_id");
@@ -111,7 +113,8 @@ public sealed class SheetRowMapper
                 ReadInt(_hairG, cells),
                 ReadInt(_hairB, cells),
                 ReadInt(_hairA, cells)),
-            ReadText(_equippedItems, cells));
+            ReadText(_equippedItems, cells),
+            ReadFacing(_facing, cells));
     }
 
     public NpcSpawnRow MapSpawn(IReadOnlyList<string?> cells)
@@ -165,6 +168,19 @@ public sealed class SheetRowMapper
         return new Field(sheet, column, sheet.GetColumnIndex(name));
     }
 
+    private static Field? ResolveOptional(SheetSchema sheet, string name)
+    {
+        foreach (var column in sheet.Columns)
+        {
+            if (column.Name == name)
+            {
+                return Resolve(sheet, name);
+            }
+        }
+
+        return null;
+    }
+
     private static string Format(int value) => value.ToString(CultureInfo.InvariantCulture);
 
     private static string? Cell(IReadOnlyList<string?> cells, int index) =>
@@ -188,6 +204,21 @@ public sealed class SheetRowMapper
         }
         throw new FormatException(
             $"Sheet '{field.Sheet.Sheet}' column '{field.Column.Name}' has a malformed integer value: '{raw}'.");
+    }
+
+    // The data editor writes the enum name ("Down"); older rows hold the number. Both import.
+    // Anything else only affects the preview, so it falls back to the server default.
+    private static NpcFacing ReadFacing(Field? field, IReadOnlyList<string?> cells)
+    {
+        var raw = field is null ? null : Cell(cells, field.Index)?.Trim();
+        if (!string.IsNullOrEmpty(raw)
+            && Enum.TryParse(raw, ignoreCase: true, out NpcFacing facing)
+            && Enum.IsDefined(facing))
+        {
+            return facing;
+        }
+
+        return NpcFacing.Down;
     }
 
     private static string ReadText(Field field, IReadOnlyList<string?> cells)

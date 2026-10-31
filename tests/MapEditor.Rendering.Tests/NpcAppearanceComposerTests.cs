@@ -24,10 +24,10 @@ public class NpcAppearanceComposerTests
         """;
 
     private const string AppearanceManifestJson = """
-        { "version": 1, "parts": {
+        { "version": 2, "parts": {
           "Body": {
             "1": { "noEquip": [1000, 108760], "equip": [1000, 108761] },
-            "2": { "noEquip": [1000, 108761] },
+            "2": { "noEquip": [1000, 108761], "noEquipLeft": [1000, 108762] },
             "11": { "noEquip": [1000, 108761] },
             "99": { "noEquip": [1000, 108761] },
             "100": { "noEquip": [1000, 108762] },
@@ -351,6 +351,35 @@ public class NpcAppearanceComposerTests
         Assert.Equal(64, atFarTile.Destination.Height);
         Assert.Equal(3192, atFarTile.Destination.X);
         Assert.Equal(3176, atFarTile.Destination.Y);
+    }
+
+    [Fact]
+    public void Compose_UsesTheFacingFrame_AndFallsBackToDown()
+    {
+        using Fixture fixture = new();
+        NpcAppearanceComposer composer = fixture.CreateComposer();
+
+        NpcAppearanceGroup left = composer.Compose(Humanoid(2, NpcEquipmentParser.DefaultEquippedItems) with { Facing = NpcFacing.Left }, 0, 0, 0);
+        NpcAppearanceGroup up = composer.Compose(Humanoid(2, NpcEquipmentParser.DefaultEquippedItems) with { Facing = NpcFacing.Up }, 0, 0, 0);
+
+        Assert.Equal(new SpriteReference(1000, 108762), left.Parts.Single(p => p.Slot == NpcPartSlot.Body).Reference);
+        Assert.Equal(new SpriteReference(1000, 108761), up.Parts.Single(p => p.Slot == NpcPartSlot.Body).Reference);
+    }
+
+    [Theory]
+    [InlineData(NpcFacing.Down, new[] { NpcPartSlot.Body, NpcPartSlot.Shield, NpcPartSlot.Weapon })]
+    [InlineData(NpcFacing.Up, new[] { NpcPartSlot.Shield, NpcPartSlot.Weapon, NpcPartSlot.Body })]
+    [InlineData(NpcFacing.Right, new[] { NpcPartSlot.Shield, NpcPartSlot.Body, NpcPartSlot.Weapon })]
+    [InlineData(NpcFacing.Left, new[] { NpcPartSlot.Weapon, NpcPartSlot.Body, NpcPartSlot.Shield })]
+    public void Compose_OrdersShieldAndWeaponLikeTheClient(NpcFacing facing, NpcPartSlot[] expected)
+    {
+        using Fixture fixture = new();
+        NpcAppearanceComposer composer = fixture.CreateComposer();
+
+        NpcAppearanceGroup group = composer.Compose(
+            Humanoid(1, "5,*,9,*,3,*,4,*,6,*,7,100,110,120,130") with { Facing = facing }, 0, 0, 0);
+
+        Assert.Equal(expected, group.Parts.Select(p => p.Slot).Where(expected.Contains).ToArray());
     }
 
     private sealed class Fixture : IDisposable

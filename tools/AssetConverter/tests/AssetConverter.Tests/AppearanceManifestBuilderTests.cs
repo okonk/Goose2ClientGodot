@@ -8,7 +8,7 @@ namespace AssetConverter.Tests;
 public class AppearanceManifestBuilderTests
 {
     private const string LockedEmpty =
-        "{\"version\":1,\"parts\":{\"Body\":{},\"Hair\":{},\"Eyes\":{},\"Chest\":{},\"Helm\":{},\"Legs\":{},\"Feet\":{},\"Hand\":{}}}";
+        "{\"version\":2,\"parts\":{\"Body\":{},\"Hair\":{},\"Eyes\":{},\"Chest\":{},\"Helm\":{},\"Legs\":{},\"Feet\":{},\"Hand\":{}}}";
 
     private static Frame Frame(int index) => new(index, 0, 0, 48, 64);
 
@@ -23,7 +23,7 @@ public class AppearanceManifestBuilderTests
             Array.Empty<string>());
 
     [Fact]
-    public void Build_NoResources_EmitsLockedV1Shape()
+    public void Build_NoResources_EmitsLockedV2Shape()
     {
         string json = AppearanceManifestBuilder.Build(Array.Empty<CompiledSpriteFramesResource>());
         Assert.Equal(LockedEmpty, json);
@@ -39,7 +39,7 @@ public class AppearanceManifestBuilderTests
         string json = AppearanceManifestBuilder.Build(new[] { body });
 
         Assert.Equal(
-            "{\"version\":1,\"parts\":{\"Body\":{\"1\":{\"noEquip\":[1000,108760],\"equip\":[1001,108900]}},\"Hair\":{},\"Eyes\":{},\"Chest\":{},\"Helm\":{},\"Legs\":{},\"Feet\":{},\"Hand\":{}}}",
+            "{\"version\":2,\"parts\":{\"Body\":{\"1\":{\"noEquip\":[1000,108760],\"equip\":[1001,108900]}},\"Hair\":{},\"Eyes\":{},\"Chest\":{},\"Helm\":{},\"Legs\":{},\"Feet\":{},\"Hand\":{}}}",
             json);
     }
 
@@ -58,7 +58,7 @@ public class AppearanceManifestBuilderTests
         string json = AppearanceManifestBuilder.Build(resources);
 
         Assert.Equal(
-            "{\"version\":1,\"parts\":{\"Body\":{\"2\":{\"noEquip\":[6,60]},\"10\":{\"equip\":[4,40]}},\"Hair\":{\"3\":{\"equip\":[7,70]}},\"Eyes\":{},\"Chest\":{},\"Helm\":{},\"Legs\":{},\"Feet\":{\"1\":{\"noEquip\":[5,50]}},\"Hand\":{\"10\":{\"noEquip\":[3,30]}}}}",
+            "{\"version\":2,\"parts\":{\"Body\":{\"2\":{\"noEquip\":[6,60]},\"10\":{\"equip\":[4,40]}},\"Hair\":{\"3\":{\"equip\":[7,70]}},\"Eyes\":{},\"Chest\":{},\"Helm\":{},\"Legs\":{},\"Feet\":{\"1\":{\"noEquip\":[5,50]}},\"Hand\":{\"10\":{\"noEquip\":[3,30]}}}}",
             json);
     }
 
@@ -74,7 +74,7 @@ public class AppearanceManifestBuilderTests
     }
 
     [Fact]
-    public void Build_NonDownAndAttackClips_AreIgnored()
+    public void Build_PartWithoutDownIdle_IsOmitted()
     {
         var body = Resource(AnimationType.Body, 1,
             Spec("idle-no-equip-up", 1, 10),
@@ -87,6 +87,24 @@ public class AppearanceManifestBuilderTests
         string json = AppearanceManifestBuilder.Build(new[] { body });
 
         Assert.Equal(LockedEmpty, json);
+    }
+
+    [Fact]
+    public void Build_OtherFacings_EmitSuffixedVariantsAfterDown()
+    {
+        var body = Resource(AnimationType.Body, 1,
+            Spec("idle-no-equip-down", 1, 10),
+            Spec("idle-equip-down", 1, 11),
+            Spec("idle-no-equip-up", 1, 20),
+            Spec("idle-equip-right", 1, 31),
+            Spec("idle-no-equip-left", 1, 40),
+            Spec("attack-no-equip-left", 1, 99));
+
+        string json = AppearanceManifestBuilder.Build(new[] { body });
+
+        Assert.Contains(
+            "\"Body\":{\"1\":{\"noEquip\":[1,10],\"equip\":[1,11],\"noEquipUp\":[1,20],\"equipRight\":[1,31],\"noEquipLeft\":[1,40]}}",
+            json);
     }
 
     [Fact]
@@ -154,7 +172,7 @@ public class AppearanceManifestBuilderTests
         string json = AppearanceManifestBuilder.Build(resources);
 
         Assert.Equal(
-            "{\"version\":1,\"parts\":{\"Body\":{\"1\":{\"noEquip\":[1,10]}},\"Hair\":{\"1\":{\"noEquip\":[2,20]}},\"Eyes\":{\"1\":{\"noEquip\":[3,30]}},\"Chest\":{\"1\":{\"noEquip\":[4,40]}},\"Helm\":{\"1\":{\"noEquip\":[5,50]}},\"Legs\":{\"1\":{\"noEquip\":[6,60]}},\"Feet\":{\"1\":{\"noEquip\":[7,70]}},\"Hand\":{\"1\":{\"noEquip\":[8,80]},\"2\":{\"noEquip\":[9,90]}}}}",
+            "{\"version\":2,\"parts\":{\"Body\":{\"1\":{\"noEquip\":[1,10]}},\"Hair\":{\"1\":{\"noEquip\":[2,20]}},\"Eyes\":{\"1\":{\"noEquip\":[3,30]}},\"Chest\":{\"1\":{\"noEquip\":[4,40]}},\"Helm\":{\"1\":{\"noEquip\":[5,50]}},\"Legs\":{\"1\":{\"noEquip\":[6,60]}},\"Feet\":{\"1\":{\"noEquip\":[7,70]}},\"Hand\":{\"1\":{\"noEquip\":[8,80]},\"2\":{\"noEquip\":[9,90]}}}}",
             json);
     }
 

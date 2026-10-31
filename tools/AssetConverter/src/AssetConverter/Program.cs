@@ -217,6 +217,20 @@ if (args.Length >= 1 && args[0] == "all")
     return;
 }
 
+if (args.Length >= 1 && args[0] == "appearance-manifest")
+{
+    string repoRoot = args.Length >= 2
+        ? Path.GetFullPath(args[1])
+        : Path.GetFullPath(Path.Combine("..", ".."));
+
+    var aspCatalog = AsperetaAnimationCatalog.Load(Paths.AsperetaData, Paths.AsperetaCompiledEnc);
+    var aspBuild = AsperetaAnimationResourceBuilder.Build(aspCatalog);
+    PublishIfChanged(Path.Combine(repoRoot, AppearanceManifestFileStore.RelativePath),
+        AsperetaConversionPipeline.BuildCombinedAppearanceManifest(
+            Paths.IllutiaData, Paths.CompiledEnc, aspBuild.Resources));
+    return;
+}
+
 if (args.Length >= 2 && args[0] == "aspereta-body")
 {
     int bodyId = int.Parse(args[1]);
@@ -286,4 +300,4 @@ if (args.Length >= 1 && args[0] == "tiles")
     return;
 }
 
-Console.WriteLine("Usage: AssetConverter batch [outDir] | frames <id> | animations [repoRoot] | maps [outDir] | manifest [outPath] | aspereta-mapping [outPath] | aspereta [repoRoot] | aspereta-body <id> [repoRoot] | tiles [repoRoot] | all [repoRoot]");
+Console.WriteLine("Usage: AssetConverter batch [outDir] | frames <id> | animations [repoRoot] | maps [outDir] | manifest [outPath] | aspereta-mapping [outPath] | aspereta [repoRoot] | aspereta-body <id> [repoRoot] | appearance-manifest [repoRoot] | tiles [repoRoot] | all [repoRoot]");

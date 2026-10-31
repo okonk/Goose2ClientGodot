@@ -1,4 +1,5 @@
 using System;
+using MapEditor.GameData.Rows;
 
 namespace MapEditor.Rendering;
 
@@ -24,8 +25,11 @@ public sealed class AppearanceAssetCatalog
     public SpriteAssetCache Cache => _cache;
 
     public bool TryResolve(AppearancePartKind kind, int id, int bodyState, out SpriteResolution resolution)
+        => TryResolve(kind, id, bodyState, NpcFacing.Down, out resolution);
+
+    public bool TryResolve(AppearancePartKind kind, int id, int bodyState, NpcFacing facing, out SpriteResolution resolution)
     {
-        if (_manifest.TryGetReference(kind, id, bodyState, out SpriteReference reference))
+        if (_manifest.TryGetReference(kind, id, bodyState, facing, out SpriteReference reference))
         {
             resolution = _cache.Resolve(reference);
             return resolution.Status is SpriteResolutionStatus.Ready;

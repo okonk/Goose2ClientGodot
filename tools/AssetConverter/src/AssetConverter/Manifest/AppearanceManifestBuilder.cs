@@ -8,8 +8,18 @@ namespace Goose2.AssetConverter.Manifest;
 
 public static class AppearanceManifestBuilder
 {
-    private const string NoEquipClip = "idle-no-equip-down";
-    private const string EquipClip = "idle-equip-down";
+    // Down keeps the original unsuffixed variant names so the map editor can fall back to it.
+    private static readonly (string Variant, string Clip)[] Variants =
+    {
+        ("noEquip", "idle-no-equip-down"),
+        ("equip", "idle-equip-down"),
+        ("noEquipUp", "idle-no-equip-up"),
+        ("equipUp", "idle-equip-up"),
+        ("noEquipRight", "idle-no-equip-right"),
+        ("equipRight", "idle-equip-right"),
+        ("noEquipLeft", "idle-no-equip-left"),
+        ("equipLeft", "idle-equip-left"),
+    };
 
     private static readonly AnimationType[] KindOrder =
     {
@@ -19,59 +29,53 @@ public static class AppearanceManifestBuilder
 
     public static string Build(IEnumerable<CompiledSpriteFramesResource> resources)
     {
-        var parts = new Dictionary<AnimationType, SortedDictionary<int, (int[]? NoEquip, int[]? Equip)>>();
+        var parts = new Dictionary<AnimationType, SortedDictionary<int, int[]?[]>>();
         foreach (AnimationType kind in KindOrder)
-            parts[kind] = new SortedDictionary<int, (int[]? NoEquip, int[]? Equip)>();
+            parts[kind] = new SortedDictionary<int, int[]?[]>();
 
         foreach (var resource in resources)
         {
-            int[]? noEquip = FirstFrame(resource, NoEquipClip);
-            int[]? equip = FirstFrame(resource, EquipClip);
-            if (noEquip is null && equip is null)
+            var frames = Variants.Select(v => FirstFrame(resource, v.Clip)).ToArray();
+            if (frames[0] is null && frames[1] is null)
                 continue;
 
             var ids = parts[resource.Type];
-            if (!ids.TryGetValue(resource.Id, out var existing))
+            if (!ids.TryGetValue(resource.Id, out var merged))
             {
-                ids[resource.Id] = (noEquip, equip);
+                ids[resource.Id] = frames;
                 continue;
             }
 
-            var merged = existing;
-            if (noEquip is not null)
+            for (int i = 0; i < frames.Length; i++)
             {
-                if (merged.NoEquip is not null && !merged.NoEquip.SequenceEqual(noEquip))
+                if (frames[i] is not { } frame)
+                    continue;
+                if (merged[i] is not null && !merged[i]!.SequenceEqual(frame))
                     throw new InvalidOperationException($"Conflicting appearance entries for {resource.Type}-{resource.Id}");
-                merged.NoEquip = noEquip;
+                merged[i] = frame;
             }
-            if (equip is not null)
-            {
-                if (merged.Equip is not null && !merged.Equip.SequenceEqual(equip))
-                    throw new InvalidOperationException($"Conflicting appearance entries for {resource.Type}-{resource.Id}");
-                merged.Equip = equip;
-            }
-            ids[resource.Id] = merged;
         }
 
         var buffer = new MemoryStream();
         using (var writer = new Utf8JsonWriter(buffer))
         {
             writer.WriteStartObject();
-            writer.WriteNumber("version", 1);
+            writer.WriteNumber("version", 2);
             writer.WritePropertyName("parts");
             writer.WriteStartObject();
             foreach (AnimationType kind in KindOrder)
             {
                 writer.WritePropertyName(kind.ToString());
                 writer.WriteStartObject();
-                foreach (var (id, entry) in parts[kind])
+                foreach (var (id, frames) in parts[kind])
                 {
                     writer.WritePropertyName(id.ToString());
                     writer.WriteStartObject();
-                    if (entry.NoEquip is not null)
-                        WriteFrame(writer, "noEquip", entry.NoEquip);
-                    if (entry.Equip is not null)
-                        WriteFrame(writer, "equip", entry.Equip);
+                    for (int i = 0; i < Variants.Length; i++)
+                    {
+                        if (frames[i] is { } frame)
+                            WriteFrame(writer, Variants[i].Variant, frame);
+                    }
                     writer.WriteEndObject();
                 }
                 writer.WriteEndObject();

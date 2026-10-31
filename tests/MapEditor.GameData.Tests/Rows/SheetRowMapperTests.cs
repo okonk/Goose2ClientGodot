@@ -62,6 +62,24 @@ public class SheetRowMapperTests
             "1,*,2,*,0,*,0,*,0,*,0,*"), npc);
     }
 
+    [Theory]
+    [InlineData("Left", NpcFacing.Left)]
+    [InlineData("up", NpcFacing.Up)]
+    [InlineData("2", NpcFacing.Right)]
+    [InlineData("", NpcFacing.Down)]
+    [InlineData("9", NpcFacing.Down)]
+    [InlineData("sideways", NpcFacing.Down)]
+    public void MapNpc_ReadsFacingAsNameOrNumber(string cell, NpcFacing expected)
+    {
+        var schema = GameDataSchema.LoadEmbedded();
+        var mapper = new SheetRowMapper(schema);
+        var npcs = schema.GetRequiredSheet("NPCs");
+
+        var npc = mapper.MapNpc(Row(npcs, ("npc_id", "7"), ("npc_name", "Goblin"), ("npc_facing", cell)));
+
+        Assert.Equal(expected, npc.Facing);
+    }
+
     [Fact]
     public void MapSpawn_ReadsRequiredColumns()
     {

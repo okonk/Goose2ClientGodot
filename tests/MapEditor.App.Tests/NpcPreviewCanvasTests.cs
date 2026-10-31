@@ -51,8 +51,8 @@ public class NpcPreviewCanvasTests
         """;
 
     private static readonly string AppearanceManifestJson = """
-        { "version": 1, "parts": {
-          "Body": { "1": { "noEquip": [1000, 100] }, "2": { "noEquip": [1000, 200] } },
+        { "version": 2, "parts": {
+          "Body": { "1": { "noEquip": [1000, 100], "noEquipLeft": [1000, 300] }, "2": { "noEquip": [1000, 200] } },
           "Hair": { "5": { "noEquip": [1000, 300] } },
           "Eyes": {}, "Helm": {}, "Feet": {}, "Hand": {},
           "Legs": { "3": { "noEquip": [1000, 100] }, "4": { "noEquip": [1000, 200] } },
@@ -88,6 +88,26 @@ public class NpcPreviewCanvasTests
         Assert.Contains(target.Images, draw => ReferenceEquals(draw.Image, sheet1000) && draw.Source == new Rect(32, 0, 32, 32));
         Assert.Contains(target.Images, draw => ReferenceEquals(draw.Image, sheet1000) && draw.Source == new Rect(64, 0, 32, 32));
         Assert.Single(target.Images, draw => !ReferenceEquals(draw.Image, sheet1000) && draw.Source == new Rect(0, 0, 32, 32));
+    }
+
+    [AvaloniaFact]
+    public void PreviewMode_DrawsTheTemplateFacing_UnlessTheSpawnOverridesIt()
+    {
+        Harness harness = CreateHarness();
+        MapDocumentViewModel viewModel = harness.ViewModel;
+        var npcs = new Dictionary<int, NpcAppearance> { [1] = Npc1 with { BodyTint = new RgbaValue(0, 0, 0, 0), Facing = NpcFacing.Left } };
+        viewModel.GameData!.AttachSession(Session(npcs, new[]
+        {
+            new NpcSpawnRow(1, 10, 1, 1),
+            new NpcSpawnRow(1, 10, 3, 1, "{\"facing\":3}"),
+        }));
+        viewModel.GameData.PreviewMode = true;
+
+        RecordingMapDrawTarget target = new();
+        harness.Canvas.RenderMap(target);
+
+        var turned = Assert.Single(target.Images, draw => draw.Source == new Rect(64, 0, 32, 32));
+        Assert.Equal(1 * Cell, turned.Destination.X);
     }
 
     [AvaloniaFact]

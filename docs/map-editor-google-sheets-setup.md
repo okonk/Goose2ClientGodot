@@ -161,9 +161,11 @@ failure case, confirm the map is still fully editable and that **Save**, **Pull*
 undo/redo, and the dirty indicator behave exactly as before the failure.
 
 1. **Converter generation.** From `tools/AssetConverter/src/AssetConverter` run
-   `dotnet run -- all` (or `dotnet run -- animations` to regenerate only the appearance
-   sidecar). It writes `Assets/Sprites/appearance-manifest.json` next to `manifest.json`
-   and the sheet PNGs.
+   `dotnet run -- all` (or `dotnet run -- appearance-manifest` to regenerate only the
+   appearance sidecar). It writes `Assets/Sprites/appearance-manifest.json` next to
+   `manifest.json` and the sheet PNGs. The sidecar holds an idle frame per facing, so the
+   preview turns each NPC the way its spawn's `facing` property, or else the NPC's
+   `npc_facing`, says.
 2. **Asset-directory open.** Launch the editor and open the `Assets/Sprites` directory.
    Map tiles, palette, and previews all come from this one directory; a single shared
    appearance catalog is used by every open tab.

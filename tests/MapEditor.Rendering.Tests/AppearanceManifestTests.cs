@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using MapEditor.GameData.Rows;
 using MapEditor.Rendering;
 using Xunit;
 
@@ -79,6 +80,22 @@ public class AppearanceManifestTests
     }
 
     [Fact]
+    public void Parse_FacingVariantsResolvePerFacing_AndFallBackToDown()
+    {
+        AppearanceManifest manifest = AppearanceManifest.Parse(
+            """{ "version": 2, "parts": { "Body": { "1": { "noEquip": [1, 10], "equip": [1, 11], "noEquipLeft": [1, 40], "equipUp": [1, 21] } } } }""");
+
+        Assert.True(manifest.TryGetReference(AppearancePartKind.Body, 1, 3, NpcFacing.Left, out SpriteReference left));
+        Assert.Equal(new SpriteReference(1, 40), left);
+        Assert.True(manifest.TryGetReference(AppearancePartKind.Body, 1, 0, NpcFacing.Up, out SpriteReference upEquip));
+        Assert.Equal(new SpriteReference(1, 21), upEquip);
+        Assert.True(manifest.TryGetReference(AppearancePartKind.Body, 1, 3, NpcFacing.Right, out SpriteReference right));
+        Assert.Equal(new SpriteReference(1, 10), right);
+        Assert.True(manifest.TryGetReference(AppearancePartKind.Body, 1, 3, NpcFacing.Down, out SpriteReference down));
+        Assert.Equal(new SpriteReference(1, 10), down);
+    }
+
+    [Fact]
     public void Parse_AllowsUnknownRootProperties()
     {
         AppearanceManifest manifest = AppearanceManifest.Parse(
@@ -96,7 +113,7 @@ public class AppearanceManifestTests
     [InlineData("""{ "parts": {} }""", AppearanceManifestError.MissingVersion)]
     [InlineData("""{ "version": "1", "parts": {} }""", AppearanceManifestError.MissingVersion)]
     [InlineData("""{ "version": 1.5, "parts": {} }""", AppearanceManifestError.MissingVersion)]
-    [InlineData("""{ "version": 2, "parts": {} }""", AppearanceManifestError.UnsupportedVersion)]
+    [InlineData("""{ "version": 3, "parts": {} }""", AppearanceManifestError.UnsupportedVersion)]
     [InlineData("""{ "version": 0, "parts": {} }""", AppearanceManifestError.UnsupportedVersion)]
     [InlineData("""{ "version": 1, "version": 1, "parts": {} }""", AppearanceManifestError.InvalidRoot)]
     [InlineData("""{ "version": 1, "parts": {}, "parts": {} }""", AppearanceManifestError.InvalidRoot)]
@@ -157,6 +174,7 @@ public class AppearanceManifestTests
     [Theory]
     [InlineData("""{ "version": 1, "parts": { "Body": { "1": { "cape": [1, 2] } } } }""", "cape")]
     [InlineData("""{ "version": 1, "parts": { "Body": { "1": { "NoEquip": [1, 2] } } } }""", "NoEquip")]
+    [InlineData("""{ "version": 2, "parts": { "Body": { "1": { "noEquipDown": [1, 2] } } } }""", "noEquipDown")]
     public void Parse_UnknownVariantPropertiesAreRejected(string json, string messageFragment)
     {
         AssertParseError(json, AppearanceManifestError.InvalidVariant, messageFragment);
@@ -165,6 +183,7 @@ public class AppearanceManifestTests
     [Theory]
     [InlineData("""{ "version": 1, "parts": { "Body": { "1": { "noEquip": [1, 2], "noEquip": [3, 4] } } } }""", "noEquip")]
     [InlineData("""{ "version": 1, "parts": { "Body": { "1": { "equip": [1, 2], "equip": [3, 4] } } } }""", "equip")]
+    [InlineData("""{ "version": 2, "parts": { "Body": { "1": { "equipLeft": [1, 2], "equipLeft": [3, 4] } } } }""", "equipLeft")]
     public void Parse_DuplicateVariantPropertiesAreRejected(string json, string messageFragment)
     {
         AssertParseError(json, AppearanceManifestError.DuplicateVariant, messageFragment);

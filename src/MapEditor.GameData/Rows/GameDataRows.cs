@@ -4,6 +4,8 @@ public readonly record struct MapReference(int MapId, string MapName, string Map
 
 public readonly record struct RgbaValue(int R, int G, int B, int A);
 
+public enum NpcFacing { Up = 1, Right = 2, Down = 3, Left = 4 }
+
 public readonly record struct NpcAppearance(
     int NpcId,
     string NpcName,
@@ -13,7 +15,8 @@ public readonly record struct NpcAppearance(
     int FaceId,
     int HairId,
     RgbaValue HairTint,
-    string EquippedItems);
+    string EquippedItems,
+    NpcFacing Facing = NpcFacing.Down);
 
 public readonly record struct NpcSpawnRow(int NpcId, int MapId, int MapX, int MapY,
                                           string Properties = "");

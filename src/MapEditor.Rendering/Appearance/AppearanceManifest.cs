@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Text.Json;
+using MapEditor.GameData.Rows;
 
 namespace MapEditor.Rendering;
 
@@ -10,20 +11,42 @@ public readonly record struct AppearancePartEntry(SpriteReference? NoEquip, Spri
 
 public sealed class AppearanceManifest
 {
-    public const int RequiredVersion = 1;
+    public const int MinimumVersion = 1;
+    public const int CurrentVersion = 2;
+
+    // Down uses the unsuffixed names, so a version 1 manifest is a down-only version 2 one.
+    private static readonly (NpcFacing Facing, string NoEquip, string Equip)[] VariantNames =
+    {
+        (NpcFacing.Down, "noEquip", "equip"),
+        (NpcFacing.Up, "noEquipUp", "equipUp"),
+        (NpcFacing.Right, "noEquipRight", "equipRight"),
+        (NpcFacing.Left, "noEquipLeft", "equipLeft"),
+    };
 
     private readonly IReadOnlyDictionary<AppearancePartKind, IReadOnlyDictionary<int, AppearancePartEntry>> _parts;
+    private readonly IReadOnlyDictionary<(AppearancePartKind, int, NpcFacing), AppearancePartEntry> _turned;
 
-    private AppearanceManifest(IReadOnlyDictionary<AppearancePartKind, IReadOnlyDictionary<int, AppearancePartEntry>> parts)
+    private AppearanceManifest(
+        IReadOnlyDictionary<AppearancePartKind, IReadOnlyDictionary<int, AppearancePartEntry>> parts,
+        IReadOnlyDictionary<(AppearancePartKind, int, NpcFacing), AppearancePartEntry> turned)
     {
         _parts = parts;
+        _turned = turned;
     }
 
     public bool TryGetReference(AppearancePartKind kind, int id, int bodyState, out SpriteReference reference)
+        => TryGetReference(kind, id, bodyState, NpcFacing.Down, out reference);
+
+    public bool TryGetReference(AppearancePartKind kind, int id, int bodyState, NpcFacing facing, out SpriteReference reference)
     {
         if (_parts.TryGetValue(kind, out IReadOnlyDictionary<int, AppearancePartEntry>? entries)
             && entries.TryGetValue(id, out AppearancePartEntry entry))
         {
+            if (_turned.TryGetValue((kind, id, facing), out AppearancePartEntry turned))
+            {
+                entry = turned;
+            }
+
             // BodyState 3 is the live client's idle candidate, which prefers the no-equip clip.
             SpriteReference? preferred = bodyState == 3 ? entry.NoEquip : entry.Equip;
             SpriteReference? fallback = bodyState == 3 ? entry.Equip : entry.NoEquip;
@@ -148,9 +171,9 @@ public sealed class AppearanceManifest
             throw Fail(AppearanceManifestError.MissingVersion, sourcePath, "Required integer root property 'version' is missing.");
         }
 
-        if (version != RequiredVersion)
+        if (version is < MinimumVersion or > CurrentVersion)
         {
-            throw Fail(AppearanceManifestError.UnsupportedVersion, sourcePath, $"Root property 'version' must be {RequiredVersion}, got {version.Value}.");
+            throw Fail(AppearanceManifestError.UnsupportedVersion, sourcePath, $"Root property 'version' must be {MinimumVersion}-{CurrentVersion}, got {version.Value}.");
         }
 
         if (parts is null)
@@ -159,6 +182,7 @@ public sealed class AppearanceManifest
         }
 
         Dictionary<AppearancePartKind, Dictionary<int, AppearancePartEntry>> partsMap = new();
+        Dictionary<(AppearancePartKind, int, NpcFacing), AppearancePartEntry> turned = new();
 
         foreach (JsonProperty kindProperty in parts.Value.EnumerateObject())
         {
@@ -184,10 +208,19 @@ public sealed class AppearanceManifest
                     throw Fail(AppearanceManifestError.InvalidPartId, sourcePath, $"Invalid {kind} part id '{idProperty.Name}'.");
                 }
 
-                AppearancePartEntry entry = ParseEntry(idProperty.Value, kind, id, sourcePath);
+                Dictionary<NpcFacing, AppearancePartEntry> entries = ParseEntry(idProperty.Value, kind, id, sourcePath);
+                entries.TryGetValue(NpcFacing.Down, out AppearancePartEntry entry);
                 if (!partsMap[kind].TryAdd(id, entry))
                 {
                     throw Fail(AppearanceManifestError.DuplicatePartId, sourcePath, $"Duplicate {kind} part id '{idProperty.Name}'.");
+                }
+
+                foreach ((NpcFacing facing, AppearancePartEntry facingEntry) in entries)
+                {
+                    if (facing != NpcFacing.Down)
+                    {
+                        turned[(kind, id, facing)] = facingEntry;
+                    }
                 }
             }
         }
@@ -198,55 +231,57 @@ public sealed class AppearanceManifest
             published[kind] = entries;
         }
 
-        return new AppearanceManifest(published);
+        return new AppearanceManifest(published, turned);
     }
 
-    private static AppearancePartEntry ParseEntry(JsonElement element, AppearancePartKind kind, int id, string sourcePath)
+    private static Dictionary<NpcFacing, AppearancePartEntry> ParseEntry(JsonElement element, AppearancePartKind kind, int id, string sourcePath)
     {
         if (element.ValueKind != JsonValueKind.Object)
         {
             throw Fail(AppearanceManifestError.InvalidPartEntry, sourcePath, $"{kind} part {id} must be a JSON object of variant references.");
         }
 
-        SpriteReference? noEquip = null;
-        SpriteReference? equip = null;
-        int noEquipCount = 0;
-        int equipCount = 0;
-
+        Dictionary<string, SpriteReference> references = new(StringComparer.Ordinal);
         foreach (JsonProperty property in element.EnumerateObject())
         {
-            switch (property.Name)
+            if (!IsVariantName(property.Name))
             {
-                case "noEquip":
-                    noEquipCount++;
-                    if (noEquipCount == 1)
-                    {
-                        noEquip = ParseReference(property.Value, kind, id, "noEquip", sourcePath);
-                    }
-                    break;
-                case "equip":
-                    equipCount++;
-                    if (equipCount == 1)
-                    {
-                        equip = ParseReference(property.Value, kind, id, "equip", sourcePath);
-                    }
-                    break;
-                default:
-                    throw Fail(AppearanceManifestError.InvalidVariant, sourcePath, $"Unknown variant property '{property.Name}' for {kind} part {id}. Expected 'noEquip' or 'equip'.");
+                throw Fail(AppearanceManifestError.InvalidVariant, sourcePath, $"Unknown variant property '{property.Name}' for {kind} part {id}. Expected 'noEquip' or 'equip', optionally suffixed with Up, Right or Left.");
+            }
+
+            if (references.ContainsKey(property.Name))
+            {
+                throw Fail(AppearanceManifestError.DuplicateVariant, sourcePath, $"Duplicate variant property '{property.Name}' for {kind} part {id}.");
+            }
+
+            references[property.Name] = ParseReference(property.Value, kind, id, property.Name, sourcePath);
+        }
+
+        Dictionary<NpcFacing, AppearancePartEntry> entries = new();
+        foreach ((NpcFacing facing, string noEquipName, string equipName) in VariantNames)
+        {
+            SpriteReference? noEquip = references.TryGetValue(noEquipName, out SpriteReference n) ? n : null;
+            SpriteReference? equip = references.TryGetValue(equipName, out SpriteReference e) ? e : null;
+            if (facing == NpcFacing.Down || noEquip is not null || equip is not null)
+            {
+                entries[facing] = new AppearancePartEntry(noEquip, equip);
             }
         }
 
-        if (noEquipCount > 1)
+        return entries;
+    }
+
+    private static bool IsVariantName(string name)
+    {
+        foreach ((_, string noEquipName, string equipName) in VariantNames)
         {
-            throw Fail(AppearanceManifestError.DuplicateVariant, sourcePath, $"Duplicate variant property 'noEquip' for {kind} part {id}.");
+            if (name == noEquipName || name == equipName)
+            {
+                return true;
+            }
         }
 
-        if (equipCount > 1)
-        {
-            throw Fail(AppearanceManifestError.DuplicateVariant, sourcePath, $"Duplicate variant property 'equip' for {kind} part {id}.");
-        }
-
-        return new AppearancePartEntry(noEquip, equip);
+        return false;
     }
 
     private static SpriteReference ParseReference(JsonElement element, AppearancePartKind kind, int id, string variant, string sourcePath)
