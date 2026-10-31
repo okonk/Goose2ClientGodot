@@ -34,5 +34,6 @@ namespace Goose2Client
         GenericContainer = 30,
         Amount = 31,
         GridContainer = 32,
+        Enchant = 33,
     }
 }

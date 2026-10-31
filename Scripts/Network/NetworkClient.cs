@@ -319,6 +319,16 @@ namespace Goose2Client.Network
             Send(CustomWindowGraphicPacket.FormatCwc(lookSlot, statsSlot, r, g, b, a, name));
         }
 
+        public void EnchantWindowSlots(int itemSlot, int essenceSlot, int protectionSlot)
+        {
+            Send(EnchantPreviewPacket.FormatEws(itemSlot, essenceSlot, protectionSlot));
+        }
+
+        public void EnchantWindowConfirm(int itemSlot, int essenceSlot, int protectionSlot)
+        {
+            Send(EnchantPreviewPacket.FormatEwc(itemSlot, essenceSlot, protectionSlot));
+        }
+
         public void SubmitAmount(int windowId, long amount) => Send(AmountInfoPacket.FormatAmt(windowId, amount));
 
         public void VendorPurchaseItem(int npcId, int slotId)
