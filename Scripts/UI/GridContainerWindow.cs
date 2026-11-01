@@ -19,6 +19,7 @@ public partial class GridContainerWindow : BaseMultipleWindow
     public override void OnMakeWindow(MakeWindowPacket packet)
     {
         base.OnMakeWindow(packet);
+        _closeButton.Visible = false;
         var (slots, cols) = GridContainerMetrics.Sanitize(packet.FrameParam1, packet.FrameParam2);
         if (_slots.Length != slots || _columns != cols)
             RebuildSlots(slots, cols);
@@ -69,6 +70,7 @@ public partial class GridContainerWindow : BaseMultipleWindow
         {
             _slots[i].Position = GridContainerMetrics.SlotPosition(i, _columns, factor);
             _slots[i].Size = new Vector2(slotSize, slotSize);
+            LayoutSlotChildren(_slots[i], slotSize, factor);
         }
         Size = GridContainerMetrics.WindowSize(_slots.Length, _columns, factor, AnyBottomButtonVisible());
 
@@ -79,6 +81,19 @@ public partial class GridContainerWindow : BaseMultipleWindow
         close.Position = new Vector2(Size.X - close.Size.X - margin, close.Position.Y);
 
         PlaceBottomButtons(factor, margin);
+    }
+
+    private static void LayoutSlotChildren(ItemSlot slot, float slotSize, float factor)
+    {
+        var icon = slot.GetNode<Control>("Icon");
+        icon.Position = Vector2.Zero;
+        icon.Size = new Vector2(slotSize, slotSize);
+
+        var count = slot.GetNode<Control>("Count");
+        count.OffsetLeft = -UiScale.ScaleSize(30f, factor);
+        count.OffsetRight = -UiScale.ScaleSize(2f, factor);
+        count.OffsetTop = 0;
+        count.OffsetBottom = UiScale.ScaleSize(12f, factor);
     }
 
     private bool AnyBottomButtonVisible()

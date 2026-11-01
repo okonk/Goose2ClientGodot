@@ -10,7 +10,7 @@ layout_mode = 3
 offset_left = 0.0
 offset_top = 0.0
 offset_right = 100.0
-offset_bottom = 56.0
+offset_bottom = 54.0
 WindowName = "GridContainer"
 
 [node name="Background" type="TextureRect" parent="."]

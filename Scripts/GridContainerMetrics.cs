@@ -10,7 +10,7 @@ public static class GridContainerMetrics
     public const int Left = 2;
     public const int Top = 20;
     public const int Right = 2;
-    public const int Bottom = 4;
+    public const int Bottom = 2;
     public const int BottomButtonRowHeight = 26;
     public const int BottomButtonWidth = 74;
     private const int MinWidth = 100;

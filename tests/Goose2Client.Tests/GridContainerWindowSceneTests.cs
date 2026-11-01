@@ -60,6 +60,6 @@ public class GridContainerWindowSceneTests
         // Placement fallback uses the tscn size, so it must equal the live empty-grid size.
         var s = Scene();
         Assert.Contains("offset_right = 100.0", s);
-        Assert.Contains("offset_bottom = 56.0", s);
+        Assert.Contains("offset_bottom = 54.0", s);
     }
 }
