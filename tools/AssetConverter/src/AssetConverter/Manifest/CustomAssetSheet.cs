@@ -1546,7 +1546,16 @@ public sealed class CustomAssetSheet
         "body-rune-table-8.png",
     ]));
 
-    public static readonly IReadOnlyList<CustomAssetSheet> All = [Icons, Tiles, Portraits, Blood, WallLines, WallCaps, Banners, Arena, ArenaSand, BattleProps, ArenaWear, Corpses, ArenaStands, ArenaFacade, ArenaFacadeNorth, BattleGear, RuneTableBody];
+    public static readonly CustomAssetSheet Backpacks = new(30017, 32, 32, isTileSheet: false, Numbered(
+    [
+        "backpack-trapper.png",
+        "backpack-tailored.png",
+        "backpack-mama.png",
+        "backpack-ancient.png",
+        "backpack-royal.png",
+    ]));
+
+    public static readonly IReadOnlyList<CustomAssetSheet> All = [Icons, Tiles, Portraits, Blood, WallLines, WallCaps, Banners, Arena, ArenaSand, BattleProps, ArenaWear, Corpses, ArenaStands, ArenaFacade, ArenaFacadeNorth, BattleGear, RuneTableBody, Backpacks];
 
     private readonly (int Graphic, string FileName)[] _graphics;
 
