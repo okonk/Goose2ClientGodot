@@ -95,7 +95,7 @@ public static class AppearanceManifestBuilder
             var frame = spec.Frames[0];
             // The sprite manifest keys Aspereta graphics as GraphicBase + frame index,
             // not the raw ADF index, so the reference must match that space.
-            int graphic = frame.SheetNumber >= AsperetaSheets.SheetBase
+            int graphic = frame.SheetNumber >= AsperetaSheets.SheetBase && !CustomAssetSheet.IsCustomSheet(frame.SheetNumber)
                 ? AsperetaSheets.GraphicBase + frame.Frame.Index
                 : frame.Frame.Index;
             return new[] { frame.SheetNumber, graphic };

@@ -174,7 +174,7 @@ public static class AnimationBatchConverter
         {
             try
             {
-                AppearanceManifestFileStore.Write(outRoot, AppearanceManifestBuilder.Build(allResources));
+                AppearanceManifestFileStore.Write(outRoot, AppearanceManifestBuilder.Build(allResources.Concat(CustomBody.BuildResources())));
             }
             catch (Exception ex)
             {

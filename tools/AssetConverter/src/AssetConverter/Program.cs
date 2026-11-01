@@ -77,6 +77,7 @@ if (args.Length >= 1 && args[0] == "aspereta")
     var maps = AsperetaMapConverter.Convert(
         Paths.AsperetaMaps, Path.Combine(repoRoot, "Assets", "Maps"), mapping);
     var asp = AsperetaConversionPipeline.Convert(Paths.AsperetaData, Paths.AsperetaCompiledEnc, repoRoot);
+    CustomBody.WriteAll(repoRoot);
     WriteAsperetaManifests(repoRoot, asp);
 
     Console.WriteLine($"Aspereta sheets: {sheets.Succeeded} ok, {sheets.Failed} failed");
@@ -111,6 +112,7 @@ if (args.Length >= 1 && args[0] == "animations")
 
     var result = AnimationBatchConverter.Convert(
         Paths.IllutiaData, Paths.CompiledEnc, outRoot, includeEffects: true);
+    CustomBody.WriteAll(outRoot);
 
     Console.WriteLine($"Wrote {result.ResourcesWritten} animation resources, {result.Failed} failures -> {outRoot}");
     Console.WriteLine($"Appearance manifest: {Path.Combine(outRoot, AppearanceManifestFileStore.RelativePath)}");
@@ -190,6 +192,7 @@ if (args.Length >= 1 && args[0] == "all")
         Paths.IllutiaData, Paths.CompiledEnc, repoRoot, includeEffects: true);
 
     var asp = AsperetaConversionPipeline.Convert(Paths.AsperetaData, Paths.AsperetaCompiledEnc, repoRoot);
+    int customBodies = CustomBody.WriteAll(repoRoot);
 
     // Illutia maps
     var maps = MapCopyConverter.Convert(Paths.IllutiaMaps, mapsDir);
@@ -205,6 +208,7 @@ if (args.Length >= 1 && args[0] == "all")
     Console.WriteLine($"Animations: {animations.ResourcesWritten} character, {animations.EffectsWritten} effects, {animations.Failed} failed");
     Console.WriteLine($"Aspereta animations: {asp.ResourcesWritten} resources, {asp.EffectsWritten} effects, {asp.Failed} failed, {asp.Diagnostics.Count} diagnostics");
     foreach (var e in asp.Diagnostics) Console.WriteLine($"  ASPERETA {e}");
+    Console.WriteLine($"Custom bodies: {customBodies}");
     Console.WriteLine($"Maps: {maps.Copied} copied, {maps.Failures.Count} failed");
     Console.WriteLine($"Aspereta sheets: {aspBatch.Succeeded} ok, {aspBatch.Failed} failed");
     Console.WriteLine($"Aspereta maps: {aspMaps.Converted} converted, {aspMaps.Failures.Count} failed, {aspMaps.Warnings.Count} warnings");
@@ -287,6 +291,28 @@ if (args.Length >= 2 && args[0] == "aspereta-body")
     return;
 }
 
+if (args.Length >= 1 && args[0] == "custom-bodies")
+{
+    string repoRoot = args.Length >= 2
+        ? Path.GetFullPath(args[1])
+        : Path.GetFullPath(Path.Combine("..", ".."));
+
+    CustomAssetSheet.WriteAll(Paths.CustomAssetsDir, Path.Combine(repoRoot, "Assets", "Sprites", "sheets"));
+    int written = CustomBody.WriteAll(repoRoot);
+
+    var aspCatalog = AsperetaAnimationCatalog.Load(Paths.AsperetaData, Paths.AsperetaCompiledEnc);
+    var aspBuild = AsperetaAnimationResourceBuilder.Build(aspCatalog);
+    PublishIfChanged(Path.Combine(repoRoot, AppearanceManifestFileStore.RelativePath),
+        AsperetaConversionPipeline.BuildCombinedAppearanceManifest(
+            Paths.IllutiaData, Paths.CompiledEnc, aspBuild.Resources));
+    ManifestFileStore.WriteCombined(repoRoot,
+        () => FrameManifestBuilder.BuildCombined(Paths.IllutiaData, aspCatalog),
+        () => AnimationManifestBuilder.BuildCombined(
+            Paths.IllutiaData, Paths.CompiledEnc, aspCatalog, Paths.ItemTileSheets));
+    Console.WriteLine($"Custom bodies: {written} written -> {repoRoot}");
+    return;
+}
+
 if (args.Length >= 1 && args[0] == "tiles")
 {
     string repoRoot = args.Length >= 2
@@ -300,4 +326,4 @@ if (args.Length >= 1 && args[0] == "tiles")
     return;
 }
 
-Console.WriteLine("Usage: AssetConverter batch [outDir] | frames <id> | animations [repoRoot] | maps [outDir] | manifest [outPath] | aspereta-mapping [outPath] | aspereta [repoRoot] | aspereta-body <id> [repoRoot] | appearance-manifest [repoRoot] | tiles [repoRoot] | all [repoRoot]");
+Console.WriteLine("Usage: AssetConverter batch [outDir] | frames <id> | animations [repoRoot] | maps [outDir] | manifest [outPath] | aspereta-mapping [outPath] | aspereta [repoRoot] | aspereta-body <id> [repoRoot] | appearance-manifest [repoRoot] | custom-bodies [repoRoot] | tiles [repoRoot] | all [repoRoot]");

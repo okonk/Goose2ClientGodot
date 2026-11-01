@@ -93,6 +93,7 @@ public static class AsperetaConversionPipeline
             }
         }
         appearance.AddRange(asperetaResources);
+        appearance.AddRange(CustomBody.BuildResources());
         return AppearanceManifestBuilder.Build(appearance);
     }
 

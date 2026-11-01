@@ -1,3 +1,4 @@
+using Goose2.AssetConverter.Adf;
 using Goose2.AssetConverter.Png;
 
 namespace Goose2.AssetConverter.Manifest;
@@ -1533,7 +1534,19 @@ public sealed class CustomAssetSheet
         "gear-coral-sword-buried.png",
     ]));
 
-    public static readonly IReadOnlyList<CustomAssetSheet> All = [Icons, Tiles, Portraits, Blood, WallLines, WallCaps, Banners, Arena, ArenaSand, BattleProps, ArenaWear, Corpses, ArenaStands, ArenaFacade, ArenaFacadeNorth, BattleGear];
+    public static readonly CustomAssetSheet RuneTableBody = new(30016, 64, 48, isTileSheet: false, Numbered(
+    [
+        "body-rune-table-1.png",
+        "body-rune-table-2.png",
+        "body-rune-table-3.png",
+        "body-rune-table-4.png",
+        "body-rune-table-5.png",
+        "body-rune-table-6.png",
+        "body-rune-table-7.png",
+        "body-rune-table-8.png",
+    ]));
+
+    public static readonly IReadOnlyList<CustomAssetSheet> All = [Icons, Tiles, Portraits, Blood, WallLines, WallCaps, Banners, Arena, ArenaSand, BattleProps, ArenaWear, Corpses, ArenaStands, ArenaFacade, ArenaFacadeNorth, BattleGear, RuneTableBody];
 
     private readonly (int Graphic, string FileName)[] _graphics;
 
@@ -1551,6 +1564,12 @@ public sealed class CustomAssetSheet
     public int CellWidth { get; }
     public int CellHeight { get; }
     public bool IsTileSheet { get; }
+
+    public int GraphicCount => _graphics.Length;
+
+    public static bool IsCustomSheet(int sheetNumber) => All.Any(s => s.SheetNumber == sheetNumber);
+
+    public Frame CreateFrame(int graphic) => new(graphic, (graphic - 1) * CellWidth, 0, CellWidth, CellHeight);
 
     public static IEnumerable<int> TileSheetNumbers => All.Where(s => s.IsTileSheet).Select(s => s.SheetNumber);
 

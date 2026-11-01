@@ -28,6 +28,7 @@ public static class AnimationManifestBuilder
         foreach (var sheet in sheetCategories.Keys.Where(s => !sheets.ContainsKey(s)).ToList())
             sheetCategories.Remove(sheet);
         AddCustomTileSheets(sheets);
+        CustomBody.AddManifestSheets(sheets, sheetCategories);
 
         return Serialize(sheets, animations, sheetCategories, animatedSheets, itemSheets);
     }
@@ -68,6 +69,7 @@ public static class AnimationManifestBuilder
         var animations = new List<AnimationManifestAnimation>(illutiaAnimations);
         animations.AddRange(asperetaAnimations);
         AddCustomTileSheets(sheets);
+        CustomBody.AddManifestSheets(sheets, categories);
 
         return Serialize(sheets, animations, categories, illutiaAnimated, itemSheets);
     }
