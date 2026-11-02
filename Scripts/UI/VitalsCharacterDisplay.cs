@@ -19,6 +19,18 @@ public partial class VitalsCharacterDisplay : Control
         if (c == GameManager.Instance.CurrentMapManager?.LocalPlayer) Refresh();
     }
 
+    public override void _GuiInput(InputEvent e)
+    {
+        if (e is not InputEventMouseButton { Pressed: true } mb) return;
+        var localPlayer = GameManager.Instance.CurrentMapManager?.LocalPlayer;
+        if (localPlayer == null) return;
+        bool targeting = GameManager.Instance.IsTargeting;
+        if (mb.ButtonIndex == MouseButton.Left && targeting)
+            GameManager.Instance.SpellTargetManager?.CastOnClickedTarget(localPlayer);
+        else if (mb.ButtonIndex == MouseButton.Right && !targeting)
+            GameManager.Instance.SpellTargetManager?.RecastLastSpellOn(localPlayer);
+    }
+
     public void Refresh()
     {
         var localPlayer = GameManager.Instance.CurrentMapManager?.LocalPlayer;
