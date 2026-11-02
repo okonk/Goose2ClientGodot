@@ -28,6 +28,7 @@ public partial class MapManager : Node2D
     private readonly System.Collections.Generic.Dictionary<(int, int), Color?> _tileColorMemo = new();
     private readonly System.Collections.Generic.Dictionary<int, Image> _sheetImages = new();
     private Node2D _characterRoot = null!;
+    private Node2D _effects = null!;
     private Character.Character? _localPlayer;
     private bool _listenersRegistered;
     public AmbienceManager Ambience { get; private set; } = null!;
@@ -71,6 +72,7 @@ public partial class MapManager : Node2D
         _tileCatalog = new MapTileCatalog(_cache);
         _objects = GetNode<Node2D>("Objects");
         _characterRoot = GetNode<Node2D>("Characters");
+        _effects = GetNode<Node2D>("Effects");
         _camera = GetNode<Camera2D>("Camera2D");
 
         Ambience = new AmbienceManager { Name = "Ambience" };
@@ -440,12 +442,11 @@ public partial class MapManager : Node2D
     private void OnSpellTile(object packetObj)
     {
         var p = (SpellTilePacket)packetObj;
-        // Absolute z 20: above characters/Objects1 (15), below Objects2 (30) — Unity puts spell
-        // effects on sorting layer "Objects 1" order 100. Relative z would land at 14+20=34.
-        var s = new Goose2Client.Overlays.SpellAnimation { Name = $"SpellTile({p.AnimationId})", ZIndex = 20, ZAsRelative = false };
-        _objects.AddChild(s);
-        if (!s.Setup(p.AnimationId)) { s.QueueFree(); return; }
-        s.Position = MapCoords.TileCenter(p.TileX, p.TileY);   // centered on the tile cell
+        // Effects is placed after Characters so a spell wins the Y-sort tie with a character on its own tile.
+        var s = new Goose2Client.Overlays.SpellAnimation { Name = $"SpellTile({p.AnimationId})" };
+        _effects.AddChild(s);
+        if (!s.Setup(p.AnimationId, new Vector2(0, -MapCoords.TileSize / 2f))) { s.QueueFree(); return; }
+        s.Position = MapCoords.TileBottomCenter(p.TileX, p.TileY);
     }
 
     private void OnCast(object packetObj)

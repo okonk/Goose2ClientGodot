@@ -6,7 +6,7 @@ namespace Goose2Client.Overlays
     /// Spells stack (no replacement) and are positioned by the caller.</summary>
     public partial class SpellAnimation : WorldOverlay
     {
-        public bool Setup(int animationId)
+        public bool Setup(int animationId, Vector2 spriteOffset = default)
         {
             var path = $"res://Assets/Sprites/Effects/{animationId}/animations.tres";
             if (!ResourceLoader.Exists(path)) return false;
@@ -14,6 +14,7 @@ namespace Goose2Client.Overlays
             var sprite = new AnimatedSprite2D
             {
                 TextureFilter = CanvasItem.TextureFilterEnum.Nearest,
+                Position = spriteOffset,
             };
             var frames = GD.Load<SpriteFrames>(path);
             if (frames == null) return false;

@@ -22,3 +22,7 @@ y_sort_enabled = true
 [node name="Characters" type="Node2D" parent="World"]
 z_index = 15
 y_sort_enabled = true
+
+[node name="Effects" type="Node2D" parent="World"]
+z_index = 15
+y_sort_enabled = true
