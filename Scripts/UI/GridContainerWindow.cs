@@ -118,11 +118,14 @@ public partial class GridContainerWindow : BaseMultipleWindow
     internal override void OnEndWindow()
     {
         base.OnEndWindow();
-        // The snapshot apply inside Relayout resets the root rect to the tscn rect, which
-        // drops the manager-set position; restore it afterwards.
+        // Initial placement ran at the empty-grid size; re-resolve at the real size so an
+        // edge-stuck saved position stays on screen, keeping the manager's cascade offset.
         var pos = Position;
+        RepositionFromSaved();
+        var cascade = pos - Position;
         Relayout();
-        Position = pos;
+        RepositionFromSaved();
+        Position += cascade;
     }
 
     private void DropItem(IWindow fromWindow, int fromSlot, int toSlot)
