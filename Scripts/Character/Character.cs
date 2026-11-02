@@ -45,6 +45,11 @@ namespace Goose2Client.Character
         // Per-slot live sprite + the graphic id it was built from (needed for the height lookup).
         private sealed class Slot { public AnimatedSprite2D Sprite = null!; public int GraphicId; public int AnchorHeight; }
         private readonly Dictionary<CharacterSlot, Slot> _slots = new();
+        // Slot sprites and spells live under _visual; _sortAnchor carries the Y-sort key, and _visual
+        // cancels its offset so the art stays at the character's position.
+        private readonly Node2D _sortAnchor = new() { Name = "SortAnchor" };
+        private readonly Node2D _visual = new() { Name = "Visual" };
+        private float _moveFromY;
         private static AnimationHeights _heights = null!;
         private AppearanceData _appearance;
 
@@ -152,6 +157,13 @@ namespace Goose2Client.Character
             CharacterSlot.Shield or CharacterSlot.Weapon => "Hand",
             _ => "Body",
         };
+
+        public Character()
+        {
+            YSortEnabled = true;
+            _sortAnchor.AddChild(_visual);
+            AddChild(_sortAnchor);
+        }
 
         public override void _Ready() => EnsureHeights();
 
@@ -329,7 +341,7 @@ namespace Goose2Client.Character
                     Name = slot.ToString(),
                     TextureFilter = CanvasItem.TextureFilterEnum.Nearest,
                 } };
-                AddChild(s.Sprite);
+                _visual.AddChild(s.Sprite);
                 s.Sprite.FrameChanged += () => AlignSlotSprite(slot, s);
                 _slots[slot] = s;
             }
@@ -430,7 +442,7 @@ namespace Goose2Client.Character
             ordered.Sort((a, b) =>
                 CharacterLayout.SortOrder(a.Key, Facing).CompareTo(CharacterLayout.SortOrder(b.Key, Facing)));
             for (int i = 0; i < ordered.Count; i++)
-                MoveChild(ordered[i].Value.Sprite, i);   // lower SortOrder drawn first (behind)
+                _visual.MoveChild(ordered[i].Value.Sprite, i);   // lower SortOrder drawn first (behind)
         }
 
         public void SetFacing(Direction d) { Facing = d; ApplyDrawOrder(); PlayState(); }
@@ -502,12 +514,14 @@ namespace Goose2Client.Character
 
             // Snap to previous target if a chained packet arrives mid-move
             if (_moving) SetWorldPosition(_targetPosition);
+            _moveFromY = _exactPosition.Y;
 
             ApplyDeltaFacing(x - X, y - Y);
 
             X = x; Y = y;
             _targetPosition = Goose2Client.Map.MapCoords.TileBottomCenter(x, y);
             _moving = true;
+            UpdateSortAnchor();
             ApplyDrawOrder();   // facing may have changed -> reorder shield/weapon
             PlayState();
         }
@@ -528,6 +542,7 @@ namespace Goose2Client.Character
             SetWorldPosition(Goose2Client.Map.MapCoords.TileBottomCenter(x, y));
             _targetPosition = _exactPosition;
             _moving = false;
+            UpdateSortAnchor();
             PlayState();   // walk -> idle, matching Unity SetMoving(false)
         }
 
@@ -535,6 +550,7 @@ namespace Goose2Client.Character
         {
             ProcessLocalInput(delta);
             UpdateTileMovement(delta);
+            UpdateSortAnchor();
             TickAttackLock(delta);   // defined in Task 8
             ApplyBarVisibility();
             if (_battleTextManager != null)
@@ -552,6 +568,13 @@ namespace Goose2Client.Character
         {
             _exactPosition = exact;
             Position = CharacterMotion.SnapToPixel(exact);
+        }
+
+        private void UpdateSortAnchor()
+        {
+            float dy = CharacterMotion.SortOffsetY(_moving, _moveFromY, _targetPosition.Y, Position.Y);
+            _sortAnchor.Position = new Vector2(0, dy);
+            _visual.Position = new Vector2(0, -dy);
         }
 
         /// <summary>Lerp toward the current tile target. On arrival, local players may chain the
@@ -842,7 +865,7 @@ namespace Goose2Client.Character
         public void ShowSpell(int animationId)
         {
             var s = new Overlays.SpellAnimation { Name = "Spell" };
-            AddChild(s);
+            _visual.AddChild(s);
             if (!s.Setup(animationId)) { s.QueueFree(); return; }   // discard orphan on missing asset
             // Node origin is the feet (tile bottom edge); lift to the tile-cell center so the
             // effect is centered on the character's tile.

@@ -87,4 +87,20 @@ public class CharacterMotionTests
         Assert.Equal(128f, CharacterMotion.SnapToPixel(exact).X, 2);      // snapping the total is free
         Assert.Equal(120f, fedBack.X, 2);                                 // feeding it back loses ~6%
     }
+
+    [Fact]
+    public void SortOffsetY_zero_when_still()
+        => Assert.Equal(0f, CharacterMotion.SortOffsetY(moving: false, fromY: 64f, targetY: 96f, renderY: 80f));
+
+    [Fact]
+    public void SortOffsetY_moving_down_sorts_at_destination()
+        => Assert.Equal(16f, CharacterMotion.SortOffsetY(moving: true, fromY: 64f, targetY: 96f, renderY: 80f));
+
+    [Fact]
+    public void SortOffsetY_moving_up_sorts_at_origin()
+        => Assert.Equal(16f, CharacterMotion.SortOffsetY(moving: true, fromY: 96f, targetY: 64f, renderY: 80f));
+
+    [Fact]
+    public void SortOffsetY_moving_sideways_is_zero()
+        => Assert.Equal(0f, CharacterMotion.SortOffsetY(moving: true, fromY: 64f, targetY: 64f, renderY: 64f));
 }

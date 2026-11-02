@@ -26,6 +26,11 @@ namespace Goose2Client.Character
         /// measurably slows the character (~6% at the default MoveSpeed's 2.13 px/frame).</summary>
         public static Vector2 SnapToPixel(Vector2 exact) => exact.Round();
 
+        // Mid-step the character Y-sorts as if on the lower (front-most) of its two tiles, so a wall
+        // on either row stays behind it instead of clipping wide equipment until the step lands.
+        public static float SortOffsetY(bool moving, float fromY, float targetY, float renderY)
+            => moving ? Mathf.Max(0f, Mathf.Max(fromY, targetY) - renderY) : 0f;
+
         /// <summary>After a tile step finishes: only return to idle when the next step was not
         /// chained in the same frame (key still held + valid tile).</summary>
         public static bool ShouldPlayIdleAfterStep(bool chainedNextStep) => !chainedNextStep;
