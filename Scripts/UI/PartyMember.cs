@@ -91,11 +91,17 @@ public partial class PartyMember : Control
     // MouseFilter.Stop and consume their own clicks. Same path as a world click on a character.
     private void OnContentGuiInput(InputEvent e)
     {
-        if (e is not InputEventMouseButton { Pressed: true, ButtonIndex: MouseButton.Left }) return;
-        if (!GameManager.Instance.IsTargeting) return;
+        if (e is not InputEventMouseButton { Pressed: true } mb) return;
+        bool targeting = GameManager.Instance.IsTargeting;
+        bool cast = mb.ButtonIndex == MouseButton.Left && targeting;
+        bool recast = mb.ButtonIndex == MouseButton.Right && !targeting;
+        if (!cast && !recast) return;
         var character = GameManager.Instance.CurrentMapManager?.GetCharacter(PlayerId);
         if (character == null) return;
-        GameManager.Instance.SpellTargetManager?.CastOnClickedTarget(character);
+        if (cast)
+            GameManager.Instance.SpellTargetManager?.CastOnClickedTarget(character);
+        else
+            GameManager.Instance.SpellTargetManager?.RecastLastSpellOn(character);
     }
 
     public void ReconcileEffects(IReadOnlyList<PartyMemberEffect> effects)
