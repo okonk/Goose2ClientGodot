@@ -28,6 +28,9 @@ public class UiScale
         return Math.Clamp(snapped, MinFactor, MaxFactor);
     }
 
+    public static int AutoFactor(Vector2I canvas)
+        => AutoFactor(Math.Min(canvas.X, canvas.Y));
+
     public static int AutoFactor(int windowHeightPx)
         => windowHeightPx < 1080 ? 1 : windowHeightPx < 2160 ? 2 : 3;
 

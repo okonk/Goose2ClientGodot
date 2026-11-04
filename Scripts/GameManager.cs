@@ -113,6 +113,8 @@ namespace Goose2Client
         {
             instance = this;
             GetWindow().Title = "Goose2 Client";
+            UI.TouchControls.Configure();
+            ScreenOrientationSetting.Apply(ScreenOrientationSetting.Load());
 
             // The self-test must never read or write the user's production binding file,
             // so it is pointed at a process-unique temporary path chosen before the service exists.
@@ -204,7 +206,7 @@ namespace Goose2Client
 
             UiScaleApplier.Instance = new UiScaleApplier();
             var startupCanvas = (Vector2I)GetTree().Root.GetVisibleRect().Size;
-            UiScaleApplier.Instance.Apply(UiScale.AutoFactor(startupCanvas.Y), ApplyReason.Startup);
+            UiScaleApplier.Instance.Apply(UiScale.AutoFactor(startupCanvas), ApplyReason.Startup);
 
             // World sub-viewport display — must be added before UiLayer so the root Controls of
             // Login/LoadingMap scenes draw above the world texture (tree order).
@@ -444,7 +446,7 @@ namespace Goose2Client
             var saved = CharacterSettings.GetOption<float>(Options.UiScaleValue, 1f);
             var canvas = (Vector2I)GetTree().Root.GetVisibleRect().Size;
             applier.Mode = mode;
-            applier.Apply(UiScale.Resolve(mode, saved, canvas.Y), ApplyReason.Startup);
+            applier.Apply(UiScale.Resolve(mode, saved, Mathf.Min(canvas.X, canvas.Y)), ApplyReason.Startup);
         }
 
         private void OnDisconnected()
@@ -593,7 +595,7 @@ namespace Goose2Client
             var applier = UiScaleApplier.Instance!;
             if (applier != null && applier.Mode == UiScaleMode.Auto)
             {
-                var f = UiScale.AutoFactor(canvas.Y);
+                var f = UiScale.AutoFactor(canvas);
                 if (f != applier.Factor)
                 {
                     applier.Apply(f, ApplyReason.AutoResize);

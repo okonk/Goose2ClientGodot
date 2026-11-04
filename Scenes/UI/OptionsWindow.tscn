@@ -298,6 +298,27 @@ offset_bottom = 364.0
 mouse_filter = 1
 text = "Combine damage & heal numbers"
 
+[node name="OrientationLabel" type="Label" parent="Content"]
+visible = false
+layout_mode = 2
+anchors_preset = 0
+offset_left = 8.0
+offset_top = 368.0
+offset_right = 96.0
+offset_bottom = 392.0
+mouse_filter = 1
+text = "Orientation"
+vertical_alignment = 1
+
+[node name="OrientationOption" type="OptionButton" parent="Content"]
+visible = false
+layout_mode = 2
+anchors_preset = 0
+offset_left = 100.0
+offset_top = 368.0
+offset_right = 232.0
+offset_bottom = 392.0
+
 [node name="ResetLayoutButton" type="Button" parent="Content"]
 layout_mode = 2
 anchors_preset = 0

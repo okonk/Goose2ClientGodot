@@ -42,4 +42,10 @@ public class DefaultWindowLayoutTests
 
     [Fact] public void LegacySize_UnlistedWindow_IsNull()
         => Assert.Null(DefaultWindowLayout.LegacySize("Hotbar"));
+
+    [Fact] public void Chat_LeftInset_ShiftsRight()
+        => Assert.Equal(new Vector2(178, 507), DefaultWindowLayout.For("Chat", 170f));
+
+    [Fact] public void NonChat_LeftInset_Ignored()
+        => Assert.Equal(new Vector2(900, 360), DefaultWindowLayout.For("Inventory", 170f));
 }

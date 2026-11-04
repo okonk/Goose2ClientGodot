@@ -34,8 +34,11 @@ public static class DefaultWindowLayout
     public static bool IsDialog(string windowName) => windowName is "Quest" or "Vendor" or "Info" or "Bank" or "GenericContainer" or "CombineBag" or "OptionList" or "LogViewer" or "KeyBindings" or "Amount"
         or "Options" or "Hairdye" or "Custom" or "Enchant";
 
-    public static Vector2 For(string windowName)
-        => windowName != null && Defaults.TryGetValue(windowName, out var p) ? p : new Vector2(100, 100);
+    public static Vector2 For(string windowName, float leftInset = 0f)
+    {
+        var p = windowName != null && Defaults.TryGetValue(windowName, out var d) ? d : new Vector2(100, 100);
+        return windowName == "Chat" ? p + new Vector2(leftInset, 0) : p;
+    }
 
     /// <summary>
     /// Pre-feature tscn size: legacy saves predate the Size key, and the live tscn size would

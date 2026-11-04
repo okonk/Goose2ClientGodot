@@ -144,4 +144,12 @@ public class UiScaleTests
     {
         Assert.Equal(UiScale.AutoFactor(1080), UiScale.Resolve((UiScaleMode)99, 2.5f, 1080));
     }
+
+    [Theory]
+    [InlineData(1920, 1080, 2)]
+    [InlineData(1080, 2400, 2)]
+    [InlineData(1280, 720, 1)]
+    [InlineData(720, 1600, 1)]
+    public void AutoFactor_Canvas_UsesShorterSide(int width, int height, int expected)
+        => Assert.Equal(expected, UiScale.AutoFactor(new Vector2I(width, height)));
 }

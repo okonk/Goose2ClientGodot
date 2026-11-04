@@ -127,6 +127,9 @@ public partial class GameHud : Control
             optionsBtn.OnOptions = Options.ToggleWindow;
 
         Options.OpenKeyBindings = KeyBindings.Open;
+
+        if (TouchControls.Enabled)
+            AddChild(new TouchControls());
     }
 
     public override void _UnhandledInput(InputEvent @event)

@@ -400,7 +400,7 @@ public partial class BaseWindow : Control, IScalableWindow
         {
             var ap = UiScaleApplier.Instance;
             Position = WindowPlacement.HotbarDefault(canvas, Size,
-                ap != null ? ap.Factor : 1f, DefaultWindowLayout.For(WindowName), _tscnSize);
+                ap != null ? ap.Factor : 1f, DefaultWindowLayout.For(WindowName), _tscnSize, TouchControls.ActiveLeftInset);
             return;
         }
         if (!placed && !legacy && DefaultWindowLayout.IsDialog(WindowName))
@@ -408,7 +408,7 @@ public partial class BaseWindow : Control, IScalableWindow
             Position = WindowPlacement.Center(canvas, Size);
             return;
         }
-        var pos = placed || legacy ? ws!.Position : DefaultWindowLayout.For(WindowName); // (c) unplaced non-dialog → default layout
+        var pos = placed || legacy ? ws!.Position : DefaultWindowLayout.For(WindowName, TouchControls.ActiveLeftInset); // (c) unplaced non-dialog → default layout
         var savedCanvas = ws != null && ws.CanvasSize != default ? ws.CanvasSize : WindowPlacement.LegacyCanvas;
         var savedSize = placed && ws!.Size == default ? (DefaultWindowLayout.LegacySize(WindowName) ?? _tscnSize)   // defensive: Placed is written with Size
             : (!placed ? (DefaultWindowLayout.LegacySize(WindowName) ?? _tscnSize) : ws!.Size);

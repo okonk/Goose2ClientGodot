@@ -312,6 +312,14 @@ public class WindowPlacementTests
     }
 
     [Fact]
+    public void HotbarDefault_LeftInset_ClearsShiftedChat()
+    {
+        var pos = WindowPlacement.HotbarDefault(C720, new Vector2(351, 36), 1f,
+            new Vector2(520, 679), new Vector2(351, 36), leftInset: 170f);
+        Assert.Equal(new Vector2(690, 679), pos);
+    }
+
+    [Fact]
     public void HotbarDefault_WideCanvas2xClearsChat()
     {
         // 2x on 2560px: centered 984.5 would overlap the chat window (right edge 1016 at 2x);

@@ -35,6 +35,7 @@ public partial class OptionsWindow : BaseWindow
     private Button _keyBindingsButton = null!;
     private OptionButton _nameDisplay = null!;
     private CheckBox _combineBattleText = null!;
+    private OptionButton _orientation = null!;
     private bool _dragging;
     private bool _initializing;
 
@@ -42,6 +43,9 @@ public partial class OptionsWindow : BaseWindow
 
     public override void _Ready()
     {
+        // Before base._Ready: it captures the tscn size as the 1x base for placement and scaling.
+        if (TouchControls.Enabled)
+            ShowOrientationRow();
         base._Ready();
 
         // Opened from the Toolbar — hidden until toggled.
@@ -138,6 +142,12 @@ public partial class OptionsWindow : BaseWindow
         _scaleSlider.DragEnded += OnScaleDragEnded;
         _scaleSlider.ValueChanged += OnScaleValueChanged;
 
+        _orientation = GetNode<OptionButton>("Content/OrientationOption");
+        foreach (var (label, _) in ScreenOrientationSetting.Choices)
+            _orientation.AddItem(label);
+        _orientation.Selected = ScreenOrientationSetting.IndexOf(ScreenOrientationSetting.Load());
+        _orientation.ItemSelected += OnOrientationChanged;
+
         _resetLayoutButton = GetNode<Button>("Content/ResetLayoutButton");
         _resetLayoutButton.Pressed += OnResetLayoutPressed;
 
@@ -209,6 +219,28 @@ public partial class OptionsWindow : BaseWindow
         cs.Options[Options.CombineBattleText] = pressed;
         cs.Save();
         GameManager.Instance.CombineBattleText = pressed;
+    }
+
+    private void ShowOrientationRow()
+    {
+        const float rowHeight = 28f;
+        GetNode<Control>("Content/OrientationLabel").Visible = true;
+        GetNode<Control>("Content/OrientationOption").Visible = true;
+        foreach (var name in new[] { "Content/ResetLayoutButton", "Content/KeyBindingsButton" })
+        {
+            // Offsets, not Position: Position re-derives them from the min-size-inflated size.
+            var button = GetNode<Control>(name);
+            button.OffsetTop += rowHeight;
+            button.OffsetBottom += rowHeight;
+        }
+        OffsetBottom += rowHeight;
+    }
+
+    private void OnOrientationChanged(long index)
+    {
+        var orientation = ScreenOrientationSetting.Choices[index].Orientation;
+        ScreenOrientationSetting.Save(orientation);
+        ScreenOrientationSetting.Apply(orientation);
     }
 
     private void OnMinimapChanged(bool pressed)
@@ -364,8 +396,7 @@ public partial class OptionsWindow : BaseWindow
         var cs = GameManager.Instance.CharacterSettings;
         cs.Options[Options.UiScaleMode] = (int)UiScaleMode.Auto;
         cs.Save();
-        int canvasY = (int)GetTree().Root.GetVisibleRect().Size.Y;
-        applier.Apply(UiScale.AutoFactor(canvasY), ApplyReason.UserCommit);
+        applier.Apply(UiScale.AutoFactor((Vector2I)GetTree().Root.GetVisibleRect().Size), ApplyReason.UserCommit);
     }
 
     private void RefreshScaleLabel()

@@ -79,12 +79,12 @@ public static class WindowPlacement
     /// canvas, so it replaces the authored default there.
     /// </summary>
     public static Vector2 HotbarDefault(Vector2I canvas, Vector2 liveSize, float factor,
-        Vector2 designPos, Vector2 designSize)
+        Vector2 designPos, Vector2 designSize, float leftInset = 0f)
     {
         float bottomMargin = LegacyCanvas.Y - (designPos.Y + designSize.Y);
         float centerOffset = designPos.X + designSize.X / 2f - LegacyCanvas.X / 2f;
         float x = (canvas.X - liveSize.X) / 2f + centerOffset;
-        x = Mathf.Max(x, ChatClearanceX * factor);
+        x = Mathf.Max(x, (ChatClearanceX + leftInset) * factor);
         float y = canvas.Y - liveSize.Y - bottomMargin * factor;
         return new Vector2(
             Mathf.Clamp(x, 0f, Mathf.Max(0f, canvas.X - liveSize.X)),

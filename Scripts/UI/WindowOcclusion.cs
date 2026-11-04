@@ -36,7 +36,7 @@ public static class WindowOcclusion
     {
         foreach (var child in root.GetChildren())
         {
-            if (child is BaseWindow or VitalsWindow or PartyWindow or BuffEffectsWindow or MinimapControl)
+            if (child is BaseWindow or VitalsWindow or PartyWindow or BuffEffectsWindow or MinimapControl or TouchButton or TouchJoystick)
             {
                 if (child is Control w && w.IsVisibleInTree())
                     yield return w;
