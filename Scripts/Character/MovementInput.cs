@@ -28,6 +28,9 @@ namespace Goose2Client.Character
         public static double HeldTime(int mask, int previousMask, double previous, double delta)
             => mask == previousMask ? previous + delta : 0;
 
+        public static bool LatchHold(bool wasHeld, bool exactPressed, bool anyPressed)
+            => exactPressed || (wasHeld && anyPressed);
+
         public static Direction? Resolve(bool up, bool down, bool left, bool right, ref bool wasMovingVertical)
         {
             bool hasVertical = up || down;

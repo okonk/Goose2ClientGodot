@@ -620,6 +620,20 @@ namespace Goose2Client.Character
         private int _heldMask;
         private bool _wasMovingVertical;
         private Direction? _heldDir;
+        private readonly HashSet<string> _latchedHolds = new();
+
+        // Exact-match to start a hold so modifier chords stay exclusive, but keep it held once
+        // started so pressing Ctrl/Shift mid-walk (e.g. Ctrl-click to split a stack) doesn't stop it.
+        private bool IsHeld(string action)
+        {
+            bool held = MovementInput.LatchHold(
+                _latchedHolds.Contains(action),
+                Input.IsActionPressed(action, exactMatch: true),
+                Input.IsActionPressed(action, exactMatch: false));
+            if (held) _latchedHolds.Add(action);
+            else _latchedHolds.Remove(action);
+            return held;
+        }
 
         private void ProcessLocalInput(double delta)
         {
@@ -631,7 +645,7 @@ namespace Goose2Client.Character
             if (GetTree().Root.GuiGetFocusOwner() is LineEdit) return;   // ignore movement/attack while typing in chat
 
             // Unity suppresses attacks entirely while mounted; gate input before AttackGate.
-            if (!IsMounted && Input.IsActionPressed("Attack", exactMatch: true))
+            if (!IsMounted && IsHeld("Attack"))
             {
                 int ws = GameManager.Instance.CurrentMapManager?.WeaponSpeed ?? 0;
                 if (_attackGate.TryAttack(Time.GetTicksMsec() / 1000.0, ws))
@@ -641,10 +655,10 @@ namespace Goose2Client.Character
                 }
             }
 
-            bool up = Input.IsActionPressed("MoveUp", exactMatch: true);
-            bool down = Input.IsActionPressed("MoveDown", exactMatch: true);
-            bool left = Input.IsActionPressed("MoveLeft", exactMatch: true);
-            bool right = Input.IsActionPressed("MoveRight", exactMatch: true);
+            bool up = IsHeld("MoveUp");
+            bool down = IsHeld("MoveDown");
+            bool left = IsHeld("MoveLeft");
+            bool right = IsHeld("MoveRight");
 
             // Resolve currently held movement actions through MovementInput.
             // Use a local copy so diagonal direction stays stable while waiting for the hold
@@ -697,10 +711,10 @@ namespace Goose2Client.Character
 
             bool nextWasMovingVertical = _wasMovingVertical;
             Direction? dir = MovementInput.Resolve(
-                Input.IsActionPressed("MoveUp", exactMatch: true),
-                Input.IsActionPressed("MoveDown", exactMatch: true),
-                Input.IsActionPressed("MoveLeft", exactMatch: true),
-                Input.IsActionPressed("MoveRight", exactMatch: true),
+                IsHeld("MoveUp"),
+                IsHeld("MoveDown"),
+                IsHeld("MoveLeft"),
+                IsHeld("MoveRight"),
                 ref nextWasMovingVertical);
 
             if (dir == null)

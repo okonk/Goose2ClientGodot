@@ -194,4 +194,13 @@ public class MovementInputTests
 
         Assert.True(held >= 0.1);
     }
+
+    [Theory]
+    [InlineData(false, true, true, true)]
+    [InlineData(false, false, true, false)]
+    [InlineData(true, false, true, true)]
+    [InlineData(true, false, false, false)]
+    [InlineData(false, false, false, false)]
+    public void LatchHold_starts_exact_and_survives_added_modifiers(bool wasHeld, bool exact, bool any, bool expected)
+        => Assert.Equal(expected, MovementInput.LatchHold(wasHeld, exact, any));
 }

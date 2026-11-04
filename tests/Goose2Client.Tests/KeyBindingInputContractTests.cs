@@ -134,17 +134,19 @@ public class KeyBindingInputContractTests
     }
 
     [Fact]
-    public void Character_HeldMovementAndAttackPollsAreExact()
+    public void Character_HeldMovementAndAttackStartExactAndLatchThroughModifiers()
     {
         string c = Read("Scripts/Character/Character.cs");
-        AssertEveryLiteralCallIsExactAndCataloged(c, "Character.cs");
+        Assert.DoesNotMatch(@"Input\.IsActionPressed\(""(Attack|MoveUp|MoveDown|MoveLeft|MoveRight)""", c);
         foreach (var action in new[] { "Attack", "MoveUp", "MoveDown", "MoveLeft", "MoveRight" })
-        {
-            int total = Regex.Matches(c, $"Input\\.IsActionPressed\\(\"{action}\"").Count;
-            int exact = Regex.Matches(c, $"Input\\.IsActionPressed\\(\"{action}\", exactMatch: true\\)").Count;
-            Assert.True(total > 0, $"Character must poll {action}");
-            Assert.Equal(total, exact);
-        }
+            Assert.Contains($"IsHeld(\"{action}\")", c);
+
+        int helper = c.IndexOf("private bool IsHeld(string action)", StringComparison.Ordinal);
+        Assert.True(helper >= 0, "Character must define IsHeld");
+        string body = c.Substring(helper, c.IndexOf("return held;", helper, StringComparison.Ordinal) - helper);
+        Assert.Contains("MovementInput.LatchHold(", body);
+        Assert.Contains("Input.IsActionPressed(action, exactMatch: true)", body);
+        Assert.Contains("Input.IsActionPressed(action, exactMatch: false)", body);
     }
 
     [Fact]
