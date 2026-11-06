@@ -797,7 +797,15 @@ namespace Goose2Client.Character
                 s.AnchorHeight = h;
                 // Keep an already-playing walk cycle running across chained tiles; restarting
                 // every step is what made high move-speed look jittery.
-                if (s.Sprite.Animation != clip || !s.Sprite.IsPlaying())
+                // Single-frame clips (every idle) are shown stopped: a playing one still loops at the
+                // clip fps, firing FrameChanged into managed code per slot, which dominates crowded maps.
+                if (s.Sprite.SpriteFrames.GetFrameCount(clip) <= 1)
+                {
+                    if (s.Sprite.IsPlaying()) s.Sprite.Stop();
+                    s.Sprite.Animation = clip;
+                    s.Sprite.Frame = 0;
+                }
+                else if (s.Sprite.Animation != clip || !s.Sprite.IsPlaying())
                     s.Sprite.Play(clip);
                 AlignSlotSprite(slot, s);
             }
