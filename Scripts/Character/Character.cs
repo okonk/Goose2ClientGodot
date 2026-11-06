@@ -620,18 +620,20 @@ namespace Goose2Client.Character
         private int _heldMask;
         private bool _wasMovingVertical;
         private Direction? _heldDir;
-        private readonly HashSet<string> _latchedHolds = new();
+        // Static: the local Character is recreated on every map load, and Godot's exact flag for a
+        // held key stays stale after a modifier until that key's next event, so a fresh latch would stop the walk.
+        private static readonly HashSet<string> LatchedHolds = new();
 
         // Exact-match to start a hold so modifier chords stay exclusive, but keep it held once
         // started so pressing Ctrl/Shift mid-walk (e.g. Ctrl-click to split a stack) doesn't stop it.
         private bool IsHeld(string action)
         {
             bool held = MovementInput.LatchHold(
-                _latchedHolds.Contains(action),
+                LatchedHolds.Contains(action),
                 Input.IsActionPressed(action, exactMatch: true),
                 Input.IsActionPressed(action, exactMatch: false));
-            if (held) _latchedHolds.Add(action);
-            else _latchedHolds.Remove(action);
+            if (held) LatchedHolds.Add(action);
+            else LatchedHolds.Remove(action);
             return held;
         }
 
