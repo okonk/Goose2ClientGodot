@@ -21,6 +21,16 @@ namespace Goose2Client
         private float _uiFactor = 1f;
         private float _worldScale = 1f;
 
+        // Mirrors the bridge-owned Position/Visible so unchanged values are never written back to the engine.
+        private sealed class Entry
+        {
+            public CanvasItem Item = null!;
+            public IBridgedText Element = null!;
+            public Vector2 Position;
+            public bool Visible;
+        }
+        private readonly System.Collections.Generic.List<Entry> _entries = new();
+
         public override void _EnterTree() => ProcessPriority = ProjectionProcessPriority;   // before the first _Process
 
         public void Attach(WorldViewport worldViewport)
@@ -43,6 +53,12 @@ namespace Goose2Client
             element.ApplyScale(DisplayScale, _worldScale);
             element.Visible = false;   // no (0,0) flash before the first projection
             AddChild(element);
+            _entries.Add(new Entry { Item = element, Element = element, Position = element switch
+            {
+                Node2D n => n.Position,
+                Control c => c.Position,
+                _ => Vector2.Zero,
+            } });
         }
 
         public override void _Process(double delta) => UpdateProjection();
@@ -55,6 +71,7 @@ namespace Goose2Client
             Visible = false;
             for (int i = GetChildCount() - 1; i >= 0; i--)
                 GetChild(i).QueueFree();
+            _entries.Clear();
         }
 
         public override void _ExitTree()
@@ -96,24 +113,37 @@ namespace Goose2Client
             var s = _worldViewport.Layout.DisplaySize;
             // No Rect2(Vector2I, …) ctor in GodotSharp — construct from component casts.
             var display = new Rect2(new Vector2((float)o.X, (float)o.Y), new Vector2((float)s.X, (float)s.Y));
-            for (int i = GetChildCount() - 1; i >= 0; i--)   // backwards: pass may QueueFree
+            var current = _worldViewport.Current;
+            for (int i = _entries.Count - 1; i >= 0; i--)   // backwards: pass may remove entries
             {
-                var child = GetChild(i);
-                if (child is not CanvasItem item || child is not IBridgedText element) continue;
+                var entry = _entries[i];
+                var item = entry.Item;
+                var element = entry.Element;
+                if (!GodotObject.IsInstanceValid(item))
+                {
+                    _entries.RemoveAt(i);
+                    continue;
+                }
                 if (element.AnchorOwner == null || !GodotObject.IsInstanceValid(element.AnchorOwner))
                 {
                     item.QueueFree();
+                    _entries.RemoveAt(i);
                     continue;
                 }
-                // Post-transition overlap: for ~2 frames the NEW map is Current while OLD-map characters
-                // are still alive (queued free) — don't project them through the new map's canvas transform.
-                if (element.AnchorOwner.GetViewport() != _worldViewport.Current) { item.Visible = false; continue; }
-                if (element.AnchorOwner.IsHiddenFromViewer) { item.Visible = false; continue; }
-                // Roof band must draw above overhead text: the bridge's CanvasLayer can't be z-sorted
-                // under it, so hide the element when a visible roof tile covers the anchor's tile.
-                if (element.AnchorOwner.IsRoofOccluded) { item.Visible = false; continue; }
-                if (element is Goose2Client.Overlays.BridgedNameLabel && !element.AnchorOwner.ShouldShowNameOverhead) { item.Visible = false; continue; }
-                if (element is Goose2Client.Overlays.BridgedVitalsBars && !element.AnchorOwner.ShouldShowVitalsOverhead) { item.Visible = false; continue; }
+                // Managed-only checks run before the engine calls below.
+                if (element.AnchorOwner.IsHiddenFromViewer
+                    // Roof band must draw above overhead text: the bridge's CanvasLayer can't be z-sorted
+                    // under it, so hide the element when a visible roof tile covers the anchor's tile.
+                    || element.AnchorOwner.IsRoofOccluded
+                    || (element is Goose2Client.Overlays.BridgedNameLabel && !element.AnchorOwner.ShouldShowNameOverhead)
+                    || (element is Goose2Client.Overlays.BridgedVitalsBars && !element.AnchorOwner.ShouldShowVitalsOverhead)
+                    // Post-transition overlap: for ~2 frames the NEW map is Current while OLD-map characters
+                    // are still alive (queued free) — don't project them through the new map's canvas transform.
+                    || element.AnchorOwner.GetViewport() != current)
+                {
+                    SetVisible(entry, false);
+                    continue;
+                }
                 var pos = _worldViewport.WorldToWindow(element.AnchorOwner.GlobalPosition)   // calls the shared forward transform (lockstep with WindowToWorld)
                     + element.LocalOffsetWorld * _worldScale;
                 // Whole window pixels: the anchor projects integrally (snapped character, snapped
@@ -121,12 +151,24 @@ namespace Goose2Client
                 // -w/2 lands on a half pixel for any odd label width, which rasterizes the glyphs
                 // softly and asymmetrically. Rounding here covers every element's offset at once.
                 pos = pos.Round();
-                // No Position on CanvasItem — branch on the concrete base (elements are always one or the other):
-                if (item is Node2D n) n.Position = pos;
-                else if (item is Control c) c.Position = pos;
-                item.Visible = !WorldTextProjection.IsCulled(
-                    new Rect2(pos + element.ScreenBounds.Position, element.ScreenBounds.Size), display);
+                var bounds = element.ScreenBounds;
+                bool visible = !WorldTextProjection.IsCulled(new Rect2(pos + bounds.Position, bounds.Size), display);
+                if (visible && pos != entry.Position)
+                {
+                    entry.Position = pos;
+                    // No Position on CanvasItem — branch on the concrete base (elements are always one or the other):
+                    if (item is Node2D n) n.Position = pos;
+                    else if (item is Control c) c.Position = pos;
+                }
+                SetVisible(entry, visible);
             }
+        }
+
+        private static void SetVisible(Entry entry, bool visible)
+        {
+            if (entry.Visible == visible) return;
+            entry.Visible = visible;
+            entry.Item.Visible = visible;
         }
     }
 }
