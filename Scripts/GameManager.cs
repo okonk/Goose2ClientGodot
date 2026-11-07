@@ -274,6 +274,8 @@ namespace Goose2Client
                 _ = LogViewerSelfTest.Run(this);
             if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), KeyBindingsSelfTestArg) >= 0)
                 _ = KeyBindingsSelfTest.Run(this);
+            if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "+selftest=crowd") >= 0)
+                _ = CrowdBenchSelfTest.Run(this);
         }
 
         public void HandlePacket(string packet)
