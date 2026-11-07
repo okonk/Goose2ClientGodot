@@ -545,11 +545,11 @@
           "pk": false
         },
         {
-          "name": "credit_dealer",
-          "header": "credit dealer (0)",
-          "kind": "Bool",
-          "sql": "CHAR(1)",
-          "default": "\u00270\u0027",
+          "name": "currency_id",
+          "header": "currency id",
+          "kind": "Text",
+          "sql": "TEXT",
+          "default": "\u0027\u0027",
           "required": false,
           "pk": false
         },
