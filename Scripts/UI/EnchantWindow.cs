@@ -15,6 +15,7 @@ public partial class EnchantWindow : BaseWindow, IWindow
     private CustomWindowSlot _essenceSlot = null!;
     private CustomWindowSlot _protectionSlot = null!;
     private VBoxContainer _lines = null!;
+    private Label _placeholder = null!;
     private Button _enchantButton = null!;
     private bool _listenersRegistered;
     private bool[]? _mkwButtons;
@@ -33,7 +34,8 @@ public partial class EnchantWindow : BaseWindow, IWindow
         _essenceSlot.OnDrop = d => OnSlotDrop(_essenceSlot, EnchantSlotRole.Essence, d);
         _protectionSlot.OnDrop = d => OnSlotDrop(_protectionSlot, EnchantSlotRole.Protection, d);
 
-        _lines = GetNode<VBoxContainer>("Content/Lines");
+        _lines = GetNode<VBoxContainer>("Content/InfoPanel/Scroll/Lines");
+        _placeholder = GetNode<Label>("Content/InfoPanel/Placeholder");
 
         _enchantButton = GetNode<Button>("Content/EnchantButton");
         _enchantButton.Visible = false;
@@ -176,6 +178,7 @@ public partial class EnchantWindow : BaseWindow, IWindow
                 Text = line,
                 AutowrapMode = TextServer.AutowrapMode.WordSmart
             });
+        _placeholder.Visible = _state.Lines.Length == 0;
     }
 
     private void Refresh()
