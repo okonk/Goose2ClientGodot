@@ -32,7 +32,7 @@ public static class DefaultWindowLayout
     /// the hotbar rationale.
     /// </summary>
     public static bool IsDialog(string windowName) => windowName is "Quest" or "Vendor" or "Info" or "Bank" or "GenericContainer" or "CombineBag" or "OptionList" or "LogViewer" or "KeyBindings" or "Amount"
-        or "Options" or "Hairdye" or "Custom" or "Enchant";
+        or "Options" or "Hairdye" or "Custom" or "Enchant" or "Confirm";
 
     public static Vector2 For(string windowName, float leftInset = 0f)
     {

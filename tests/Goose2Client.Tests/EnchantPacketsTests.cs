@@ -43,6 +43,17 @@ public class EnchantPacketsTests
     }
 
     [Fact]
+    public void Ewp_ParsesBreakPercentAndDefaultsToZeroWhenAbsent()
+    {
+        var risky = (EnchantPreviewPacket)new EnchantPreviewPacket().Parse(new PacketParser("EWP1,5,3,0,1,30|Line", "EWP"));
+        Assert.Equal(30, risky.BreakPercent);
+        Assert.Equal(new[] { "Line" }, risky.Lines);
+
+        var old = (EnchantPreviewPacket)new EnchantPreviewPacket().Parse(new PacketParser("EWP1,5,3,0,1|Line", "EWP"));
+        Assert.Equal(0, old.BreakPercent);
+    }
+
+    [Fact]
     public void FormatEws_FormatsSlots()
     {
         Assert.Equal("EWS5,0,7", EnchantPreviewPacket.FormatEws(5, 0, 7));

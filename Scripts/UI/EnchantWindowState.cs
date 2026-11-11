@@ -20,6 +20,7 @@ public class EnchantWindowState
     public int EssenceSlot { get; private set; }
     public int ProtectionSlot { get; private set; }
     public bool CanEnchant { get; private set; }
+    public int BreakPercent { get; private set; }
     public string[] Lines { get; private set; } = Array.Empty<string>();
     public bool Pending { get; private set; }
 
@@ -64,6 +65,7 @@ public class EnchantWindowState
         EssenceSlot = p.EssenceSlot;
         ProtectionSlot = p.ProtectionSlot;
         CanEnchant = p.CanEnchant;
+        BreakPercent = p.BreakPercent;
         Lines = p.Lines;
         Pending = false;
         return cleared.ToArray();
@@ -76,6 +78,7 @@ public class EnchantWindowState
         EssenceSlot = 0;
         ProtectionSlot = 0;
         CanEnchant = false;
+        BreakPercent = 0;
         Lines = Array.Empty<string>();
         Pending = false;
     }

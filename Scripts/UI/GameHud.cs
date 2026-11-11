@@ -30,6 +30,7 @@ public partial class GameHud : Control
     public LogViewerWindow LogViewer { get; private set; } = null!;
     public KeyBindingsWindow KeyBindings { get; private set; } = null!;
     public AmountWindow Amount { get; private set; } = null!;
+    public ConfirmWindow Confirm { get; private set; } = null!;
     public MinimapControl Minimap { get; private set; } = null!;
     public NoticeFeed Notices { get; private set; } = null!;
     public QuestWindowManager QuestWindows { get; private set; } = null!;
@@ -104,6 +105,7 @@ public partial class GameHud : Control
         Hairdye = Add<HairdyeWindow>("res://Scenes/UI/HairdyeWindow.tscn");
         LogViewer = Add<LogViewerWindow>("res://Scenes/UI/LogViewerWindow.tscn");
         Amount = Add<AmountWindow>("res://Scenes/UI/AmountWindow.tscn");
+        Confirm = Add<ConfirmWindow>("res://Scenes/UI/ConfirmWindow.tscn");
 
         // The fixed party window overlaps the default chat spot; the chat's tab row must
         // win input there.

@@ -73,6 +73,19 @@ public class EnchantWindowStateTests
     }
 
     [Fact]
+    public void Apply_AdoptsBreakPercentAndResetClearsIt()
+    {
+        var state = new EnchantWindowState { WindowId = 1 };
+        var ewp = Ewp(1, 5, 3, 0, true, "a");
+        ewp.BreakPercent = 40;
+        state.Apply(ewp);
+        Assert.Equal(40, state.BreakPercent);
+
+        state.Reset();
+        Assert.Equal(0, state.BreakPercent);
+    }
+
+    [Fact]
     public void Apply_StaleWindowId_Ignored()
     {
         var state = new EnchantWindowState { WindowId = 1 };

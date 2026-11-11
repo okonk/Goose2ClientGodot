@@ -1,0 +1,87 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://Scripts/UI/ConfirmWindow.cs" id="1_cw"]
+[ext_resource type="Theme" path="res://Assets/UI/GameTheme.tres" id="theme"]
+
+[node name="ConfirmWindow" type="Control"]
+script = ExtResource("1_cw")
+theme = ExtResource("theme")
+layout_mode = 3
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 220.0
+offset_bottom = 132.0
+WindowName = "Confirm"
+
+[node name="Background" type="TextureRect" parent="."]
+layout_mode = 2
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+
+[node name="TitleBar" type="Control" parent="."]
+layout_mode = 2
+anchors_preset = 10
+anchor_right = 0.0
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 220.0
+offset_bottom = 19.0
+mouse_filter = 0
+
+[node name="TitleLabel" type="Label" parent="TitleBar"]
+layout_mode = 2
+anchors_preset = 0
+offset_left = 6.0
+offset_top = 4.0
+offset_right = 197.0
+offset_bottom = 15.0
+mouse_filter = 2
+text = ""
+clip_text = true
+
+[node name="CloseButton" type="Button" parent="TitleBar"]
+layout_mode = 2
+anchors_preset = 0
+offset_left = 203.0
+offset_top = 2.0
+offset_right = 219.0
+offset_bottom = 18.0
+flat = true
+
+[node name="Content" type="Control" parent="."]
+layout_mode = 2
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 1
+
+[node name="Prompt" type="Label" parent="Content"]
+layout_mode = 2
+anchors_preset = 0
+offset_left = 8.0
+offset_top = 26.0
+offset_right = 212.0
+offset_bottom = 98.0
+mouse_filter = 2
+text = ""
+autowrap_mode = 3
+
+[node name="OkButton" type="Button" parent="Content"]
+layout_mode = 2
+anchors_preset = 0
+offset_left = 56.0
+offset_top = 104.0
+offset_right = 132.0
+offset_bottom = 126.0
+text = "OK"
+
+[node name="CancelButton" type="Button" parent="Content"]
+layout_mode = 2
+anchors_preset = 0
+offset_left = 140.0
+offset_top = 104.0
+offset_right = 212.0
+offset_bottom = 126.0
+text = "Cancel"

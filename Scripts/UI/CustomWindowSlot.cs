@@ -12,6 +12,7 @@ public partial class CustomWindowSlot : Panel
     public bool HasItem => Stats != null;
     public int SlotId { get; set; }
     public Action<Godot.Collections.Dictionary>? OnDrop { get; set; }
+    public Action? OnRightClick { get; set; }
 
     public override void _Ready()
     {
@@ -49,6 +50,15 @@ public partial class CustomWindowSlot : Panel
     private void OnMouseExited()
     {
         TooltipManager.Instance.HideItemTooltip();
+    }
+
+    public override void _GuiInput(InputEvent @event)
+    {
+        if (@event is InputEventMouseButton { ButtonIndex: MouseButton.Right, Pressed: true } && HasItem && OnRightClick != null)
+        {
+            OnRightClick();
+            AcceptEvent();
+        }
     }
 
     public override Variant _GetDragData(Vector2 atPosition)

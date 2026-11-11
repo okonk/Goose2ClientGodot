@@ -33,6 +33,9 @@ public partial class EnchantWindow : BaseWindow, IWindow
         _itemSlot.OnDrop = d => OnSlotDrop(_itemSlot, EnchantSlotRole.Item, d);
         _essenceSlot.OnDrop = d => OnSlotDrop(_essenceSlot, EnchantSlotRole.Essence, d);
         _protectionSlot.OnDrop = d => OnSlotDrop(_protectionSlot, EnchantSlotRole.Protection, d);
+        _itemSlot.OnRightClick = () => ClearRole(EnchantSlotRole.Item);
+        _essenceSlot.OnRightClick = () => ClearRole(EnchantSlotRole.Essence);
+        _protectionSlot.OnRightClick = () => ClearRole(EnchantSlotRole.Protection);
 
         _lines = GetNode<VBoxContainer>("Content/InfoPanel/Scroll/Lines");
         _placeholder = GetNode<Label>("Content/InfoPanel/Placeholder");
@@ -130,8 +133,28 @@ public partial class EnchantWindow : BaseWindow, IWindow
         }
     }
 
+    private void ClearRole(EnchantSlotRole role)
+    {
+        SendTriple(_state.Clear(role));
+        SyncIcons();
+        Refresh();
+    }
+
     private void EnchantPressed()
     {
+        if (_state.BreakPercent > 0 && GameManager.Instance.Hud?.Confirm is { } confirm)
+        {
+            confirm.Open("No Protection",
+                $"{_state.BreakPercent}% chance to fail. Without protection the item will be destroyed.\n\nEnchant anyway?",
+                "Enchant", SendConfirm);
+            return;
+        }
+        SendConfirm();
+    }
+
+    private void SendConfirm()
+    {
+        if (!_state.CanConfirm) return;
         var triple = _state.ConfirmTriple();
         GameManager.Instance.NetworkClient.EnchantWindowConfirm(triple.Item, triple.Essence, triple.Protection);
         Refresh();

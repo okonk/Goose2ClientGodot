@@ -9,6 +9,7 @@ namespace Goose2Client.Network.Packets
         public int EssenceSlot { get; set; }
         public int ProtectionSlot { get; set; }
         public bool CanEnchant { get; set; }
+        public int BreakPercent { get; set; }
         public string[] Lines { get; set; } = Array.Empty<string>();
 
         public override string Prefix { get; } = "EWP";
@@ -24,6 +25,7 @@ namespace Goose2Client.Network.Packets
                 EssenceSlot = int.Parse(h[2]),
                 ProtectionSlot = int.Parse(h[3]),
                 CanEnchant = h[4] != "0",
+                BreakPercent = h.Length > 5 ? int.Parse(h[5]) : 0,
                 Lines = parts[1..],
             };
         }
