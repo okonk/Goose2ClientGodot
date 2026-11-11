@@ -1,4 +1,4 @@
-[gd_resource type="Theme" load_steps=43 format=3]
+[gd_resource type="Theme" load_steps=44 format=3]
 
 [ext_resource type="FontFile" path="res://Assets/UI/Fonts/LiberationSans.ttf" id="font"]
 [ext_resource type="Texture2D" path="res://Assets/UI/checkbox-off.svg" id="check_off"]
@@ -352,6 +352,13 @@ corner_radius_top_right = 2
 corner_radius_bottom_right = 2
 corner_radius_bottom_left = 2
 
+[sub_resource type="StyleBoxFlat" id="inline_icon_hover"]
+bg_color = Color(0.145098, 0.196078, 0.321569, 0.95)
+corner_radius_top_left = 2
+corner_radius_top_right = 2
+corner_radius_bottom_right = 2
+corner_radius_bottom_left = 2
+
 [sub_resource type="StyleBoxFlat" id="toolbar_normal"]
 content_margin_left = 3.0
 content_margin_top = 3.0
@@ -548,6 +555,14 @@ SectionHeader/base_type = &"Label"
 SectionHeader/colors/font_color = Color(0.494118, 0.541176, 0.65098, 1)
 StatValue/base_type = &"Label"
 StatValue/colors/font_color = Color(0.949020, 0.929412, 0.858824, 1)
+InlineIconButton/base_type = &"Button"
+InlineIconButton/colors/icon_normal_color = Color(0.905882, 0.905882, 0.905882, 1)
+InlineIconButton/colors/icon_hover_color = Color(1, 1, 1, 1)
+InlineIconButton/colors/icon_pressed_color = Color(1, 1, 1, 1)
+InlineIconButton/styles/normal = SubResource("empty")
+InlineIconButton/styles/hover = SubResource("inline_icon_hover")
+InlineIconButton/styles/pressed = SubResource("inline_icon_hover")
+InlineIconButton/styles/focus = SubResource("empty")
 ToolbarButton/base_type = &"Button"
 ToolbarButton/colors/icon_normal_color = Color(0.905882, 0.905882, 0.905882, 1)
 ToolbarButton/colors/icon_hover_color = Color(1, 1, 1, 1)

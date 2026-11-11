@@ -26,6 +26,7 @@ public partial class InventoryWindow : BaseWindow, IWindow
         base._Ready();
 
         _goldText = GetNode<Label>("Content/GoldText");
+        GetNode<Button>("Content/WalletButton").Pressed += () => GameManager.Instance.NetworkClient.Command("/wallet");
 
         _slots = new ItemSlot[InventorySize];
         var grid = GetNode<GridContainer>("Content/SlotGrid");
