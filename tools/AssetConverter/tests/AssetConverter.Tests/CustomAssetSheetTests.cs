@@ -79,7 +79,7 @@ public class CustomAssetSheetTests
         {
             CustomAssetSheet.WriteAll(Goose2.AssetConverter.Paths.CustomAssetsDir, output);
 
-            foreach ((string file, int width, int height) in new[] { ("30000.png", 96, 32), ("30001.png", 32, 64), ("30002.png", 224, 40), ("30003.png", 384, 32), ("30004.png", 736, 32), ("30005.png", 640, 32), ("30006.png", 736, 64), ("30007.png", 6912, 32), ("30008.png", 288, 32), ("30009.png", 512, 32), ("30010.png", 544, 32), ("30015.png", 2688, 32), ("30011.png", 768, 32), ("30014.png", 11776, 32), ("30013.png", 15008, 32), ("30012.png", 5472, 32), ("30016.png", 512, 48), ("30017.png", 160, 32), ("30018.png", 160, 50), ("30019.png", 64, 80) })
+            foreach ((string file, int width, int height) in new[] { ("30000.png", 96, 32), ("30001.png", 32, 64), ("30002.png", 224, 40), ("30003.png", 384, 32), ("30004.png", 736, 32), ("30005.png", 640, 32), ("30006.png", 736, 64), ("30007.png", 6912, 32), ("30008.png", 288, 32), ("30009.png", 512, 32), ("30010.png", 544, 32), ("30015.png", 2688, 32), ("30011.png", 768, 32), ("30014.png", 11776, 32), ("30013.png", 15008, 32), ("30012.png", 5472, 32), ("30016.png", 512, 48), ("30017.png", 160, 32), ("30018.png", 160, 50), ("30019.png", 64, 80), ("30020.png", 160, 224), ("30021.png", 256, 160) })
             {
                 SKImageInfo unpremul = new(width, height, SKColorType.Rgba8888, SKAlphaType.Unpremul);
                 using SKBitmap sheet = SKBitmap.Decode(Path.Combine(output, file), unpremul)!;
@@ -121,9 +121,22 @@ public class CustomAssetSheetTests
     }
 
     [Fact]
+    public void CreateFrames_GridSheetKeepsCellPositionsAndSkipsGaps()
+    {
+        Dictionary<string, int[]> frames = CustomAssetSheet.CaveStone.CreateFrames();
+
+        Assert.Equal(31, frames.Count);
+        Assert.False(frames.ContainsKey("1"));
+        Assert.False(frames.ContainsKey("21"));
+        Assert.Equal(new[] { 32, 0, 32, 32 }, frames["2"]);
+        Assert.Equal(new[] { 0, 32, 32, 32 }, frames["6"]);
+        Assert.Equal(new[] { 128, 192, 32, 32 }, frames["35"]);
+    }
+
+    [Fact]
     public void TileSheetNumbers_ExcludeIcons()
     {
-        Assert.Equal(new[] { 30001, 30002, 30003, 30004, 30005, 30006, 30007, 30008, 30009, 30010, 30011, 30012, 30013, 30014, 30015, 30018, 30019 }, CustomAssetSheet.TileSheetNumbers);
+        Assert.Equal(new[] { 30001, 30002, 30003, 30004, 30005, 30006, 30007, 30008, 30009, 30010, 30011, 30012, 30013, 30014, 30015, 30018, 30019, 30020, 30021 }, CustomAssetSheet.TileSheetNumbers);
         Assert.False(CustomAssetSheet.Icons.IsTileSheet);
     }
 

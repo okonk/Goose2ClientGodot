@@ -1568,35 +1568,124 @@ public sealed class CustomAssetSheet
         "statue-doomslayer.png",
     ]));
 
-    public static readonly IReadOnlyList<CustomAssetSheet> All = [Icons, Tiles, Portraits, Blood, WallLines, WallCaps, Banners, Arena, ArenaSand, BattleProps, ArenaWear, Corpses, ArenaStands, ArenaFacade, ArenaFacadeNorth, BattleGear, RuneTableBody, Backpacks, WantedPosters, Statues];
+    public static readonly CustomAssetSheet CaveStone = new(30020, 32, 32, isTileSheet: true, Numbered(
+    [
+        null,
+        "cave-stone-02.png",
+        "cave-stone-03.png",
+        "cave-stone-04.png",
+        null,
+        "cave-stone-06.png",
+        "cave-stone-07.png",
+        "cave-stone-08.png",
+        "cave-stone-09.png",
+        "cave-stone-10.png",
+        "cave-stone-11.png",
+        "cave-stone-12.png",
+        "cave-stone-13.png",
+        "cave-stone-14.png",
+        "cave-stone-15.png",
+        "cave-stone-16.png",
+        "cave-stone-17.png",
+        "cave-stone-18.png",
+        "cave-stone-19.png",
+        "cave-stone-20.png",
+        null,
+        "cave-stone-22.png",
+        "cave-stone-23.png",
+        "cave-stone-24.png",
+        null,
+        "cave-stone-26.png",
+        "cave-stone-27.png",
+        "cave-stone-28.png",
+        "cave-stone-29.png",
+        "cave-stone-30.png",
+        "cave-stone-31.png",
+        "cave-stone-32.png",
+        "cave-stone-33.png",
+        "cave-stone-34.png",
+        "cave-stone-35.png",
+    ]), columns: 5);
+
+    public static readonly CustomAssetSheet CaveScenery = new(30021, 32, 32, isTileSheet: true, Numbered(
+    [
+        "cave-rock-small.png",
+        "cave-rock-medium.png",
+        "cave-rock-pair.png",
+        "cave-rock-cluster.png",
+        "cave-pebbles-1.png",
+        "cave-pebbles-2.png",
+        "cave-stalagmite.png",
+        "cave-stalagmite-pair.png",
+        "cave-crack-1.png",
+        "cave-crack-2.png",
+        "cave-crack-lava-1.png",
+        "cave-crack-lava-2.png",
+        "cave-lava-pool.png",
+        "cave-lava-puddle.png",
+        "cave-lava-pool-rock.png",
+        "cave-lava-pool-rocks.png",
+        "cave-patch-sunk.png",
+        "cave-patch-sunk-small.png",
+        "cave-patch-raised.png",
+        "cave-gravel.png",
+        "cave-pit.png",
+        "cave-lava-pool-island.png",
+        "cave-rubble.png",
+        "cave-rock-lava-vent.png",
+        "cave-lava-lake-top-left.png",
+        "cave-lava-lake-top-right.png",
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        "cave-lava-lake-bottom-left.png",
+        "cave-lava-lake-bottom-right.png",
+    ]), columns: 8);
+
+    public static readonly IReadOnlyList<CustomAssetSheet> All = [Icons, Tiles, Portraits, Blood, WallLines, WallCaps, Banners, Arena, ArenaSand, BattleProps, ArenaWear, Corpses, ArenaStands, ArenaFacade, ArenaFacadeNorth, BattleGear, RuneTableBody, Backpacks, WantedPosters, Statues, CaveStone, CaveScenery];
 
     private readonly (int Graphic, string FileName)[] _graphics;
 
     private CustomAssetSheet(int sheetNumber, int cellWidth, int cellHeight, bool isTileSheet,
-        (int Graphic, string FileName)[] graphics)
+        (int Graphic, string FileName)[] graphics, int? columns = null)
     {
         SheetNumber = sheetNumber;
         CellWidth = cellWidth;
         CellHeight = cellHeight;
         IsTileSheet = isTileSheet;
         _graphics = graphics;
+        int lastGraphic = graphics.Max(g => g.Graphic);
+        Columns = columns ?? lastGraphic;
+        Rows = (lastGraphic + Columns - 1) / Columns;
     }
 
     public int SheetNumber { get; }
     public int CellWidth { get; }
     public int CellHeight { get; }
     public bool IsTileSheet { get; }
+    public int Columns { get; }
+    public int Rows { get; }
 
     public int GraphicCount => _graphics.Length;
 
     public static bool IsCustomSheet(int sheetNumber) => All.Any(s => s.SheetNumber == sheetNumber);
 
-    public Frame CreateFrame(int graphic) => new(graphic, (graphic - 1) * CellWidth, 0, CellWidth, CellHeight);
+    public Frame CreateFrame(int graphic) => new(graphic, CellX(graphic), CellY(graphic), CellWidth, CellHeight);
 
     public static IEnumerable<int> TileSheetNumbers => All.Where(s => s.IsTileSheet).Select(s => s.SheetNumber);
 
-    private static (int Graphic, string FileName)[] Numbered(string[] fileNames) =>
-        fileNames.Select((fileName, i) => (i + 1, fileName)).ToArray();
+    private int CellX(int graphic) => (graphic - 1) % Columns * CellWidth;
+
+    private int CellY(int graphic) => (graphic - 1) / Columns * CellHeight;
+
+    private static (int Graphic, string FileName)[] Numbered(string?[] fileNames) =>
+        fileNames.Select((fileName, i) => (Graphic: i + 1, FileName: fileName))
+            .Where(g => g.FileName is not null)
+            .Select(g => (g.Graphic, g.FileName!))
+            .ToArray();
 
     public static void WriteAll(string sourceDir, string outputDir)
     {
@@ -1607,21 +1696,22 @@ public sealed class CustomAssetSheet
     }
 
     public Dictionary<string, int[]> CreateFrames() =>
-        _graphics.ToDictionary(g => g.Graphic.ToString(), g => new[] { (g.Graphic - 1) * CellWidth, 0, CellWidth, CellHeight });
+        _graphics.ToDictionary(g => g.Graphic.ToString(), g => new[] { CellX(g.Graphic), CellY(g.Graphic), CellWidth, CellHeight });
 
     public void Write(string sourceDir, string outputDir)
     {
-        int sheetWidth = _graphics.Length * CellWidth;
-        byte[] sheet = new byte[sheetWidth * CellHeight * 4];
+        int sheetWidth = Columns * CellWidth;
+        int sheetHeight = Rows * CellHeight;
+        byte[] sheet = new byte[sheetWidth * sheetHeight * 4];
         int cellRowLength = CellWidth * 4;
         int sheetRowLength = sheetWidth * 4;
         foreach ((int graphic, string fileName) in _graphics)
         {
             byte[] cell = LoadCell(sourceDir, fileName);
-            int offset = (graphic - 1) * cellRowLength;
+            int offset = CellY(graphic) * sheetRowLength + CellX(graphic) * 4;
             for (int y = 0; y < CellHeight; y++)
             {
-                Buffer.BlockCopy(cell, y * cellRowLength, sheet, y * sheetRowLength + offset, cellRowLength);
+                Buffer.BlockCopy(cell, y * cellRowLength, sheet, offset + y * sheetRowLength, cellRowLength);
             }
         }
 
@@ -1636,7 +1726,7 @@ public sealed class CustomAssetSheet
             }
         }
 
-        PngWriter.Write(sheet, sheetWidth, CellHeight, Path.Combine(outputDir, $"{SheetNumber}.png"));
+        PngWriter.Write(sheet, sheetWidth, sheetHeight, Path.Combine(outputDir, $"{SheetNumber}.png"));
     }
 
     private byte[] LoadCell(string sourceDir, string fileName)
