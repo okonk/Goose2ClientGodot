@@ -47,11 +47,15 @@ public class CustomAssetSheetTests
                 Path.Combine(source, "experience.png"),
                 (0, 0, SKColors.Green),
                 (31, 31, SKColors.Red));
+            WriteIcon(
+                Path.Combine(source, "arena-coin.png"),
+                (0, 0, SKColors.Orange),
+                (31, 31, SKColors.Purple));
 
             CustomAssetSheet.Icons.Write(source, output);
 
             using SKBitmap sheet = SKBitmap.Decode(Path.Combine(output, "30000.png"))!;
-            Assert.Equal(96, sheet.Width);
+            Assert.Equal(128, sheet.Width);
             Assert.Equal(32, sheet.Height);
             Assert.Equal(SKColors.Yellow, sheet.GetPixel(0, 0));
             Assert.Equal(translucentRed, sheet.GetPixel(31, 0));
@@ -63,6 +67,8 @@ public class CustomAssetSheetTests
             Assert.Equal(SKColors.White, sheet.GetPixel(63, 31));
             Assert.Equal(SKColors.Green, sheet.GetPixel(64, 0));
             Assert.Equal(SKColors.Red, sheet.GetPixel(95, 31));
+            Assert.Equal(SKColors.Orange, sheet.GetPixel(96, 0));
+            Assert.Equal(SKColors.Purple, sheet.GetPixel(127, 31));
         }
         finally
         {
@@ -79,7 +85,7 @@ public class CustomAssetSheetTests
         {
             CustomAssetSheet.WriteAll(Goose2.AssetConverter.Paths.CustomAssetsDir, output);
 
-            foreach ((string file, int width, int height) in new[] { ("30000.png", 96, 32), ("30001.png", 32, 64), ("30002.png", 224, 40), ("30003.png", 384, 32), ("30004.png", 736, 32), ("30005.png", 640, 32), ("30006.png", 736, 64), ("30007.png", 6912, 32), ("30008.png", 288, 32), ("30009.png", 512, 32), ("30010.png", 544, 32), ("30015.png", 2688, 32), ("30011.png", 768, 32), ("30014.png", 11776, 32), ("30013.png", 15008, 32), ("30012.png", 5472, 32), ("30016.png", 512, 48), ("30017.png", 160, 32), ("30018.png", 160, 50), ("30019.png", 64, 80), ("30020.png", 160, 224), ("30021.png", 256, 160) })
+            foreach ((string file, int width, int height) in new[] { ("30000.png", 128, 32), ("30001.png", 32, 64), ("30002.png", 224, 40), ("30003.png", 384, 32), ("30004.png", 736, 32), ("30005.png", 640, 32), ("30006.png", 736, 64), ("30007.png", 6912, 32), ("30008.png", 288, 32), ("30009.png", 512, 32), ("30010.png", 544, 32), ("30015.png", 2688, 32), ("30011.png", 768, 32), ("30014.png", 11776, 32), ("30013.png", 15008, 32), ("30012.png", 5472, 32), ("30016.png", 512, 48), ("30017.png", 160, 32), ("30018.png", 160, 50), ("30019.png", 64, 80), ("30020.png", 160, 224), ("30021.png", 256, 160) })
             {
                 SKImageInfo unpremul = new(width, height, SKColorType.Rgba8888, SKAlphaType.Unpremul);
                 using SKBitmap sheet = SKBitmap.Decode(Path.Combine(output, file), unpremul)!;
@@ -153,6 +159,7 @@ public class CustomAssetSheetTests
             Assert.Equal(new[] { 0, 0, 32, 32 }, sheet.GetProperty("1").EnumerateArray().Select(x => x.GetInt32()));
             Assert.Equal(new[] { 32, 0, 32, 32 }, sheet.GetProperty("2").EnumerateArray().Select(x => x.GetInt32()));
             Assert.Equal(new[] { 64, 0, 32, 32 }, sheet.GetProperty("3").EnumerateArray().Select(x => x.GetInt32()));
+            Assert.Equal(new[] { 96, 0, 32, 32 }, sheet.GetProperty("4").EnumerateArray().Select(x => x.GetInt32()));
             var tiles = json.RootElement.GetProperty("sheets").GetProperty("30001");
             Assert.Equal(new[] { 0, 0, 32, 64 }, tiles.GetProperty("1").EnumerateArray().Select(x => x.GetInt32()));
             var portraits = json.RootElement.GetProperty("sheets").GetProperty("30002");
