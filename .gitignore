@@ -34,7 +34,8 @@ mono_crash.*
 !/Assets/UI/**
 
 # ---- Local editor/agent config ----
-.claude/
+.claude/*
+!.claude/skills/
 *.csproj.old
 *.csproj.old.*
 
