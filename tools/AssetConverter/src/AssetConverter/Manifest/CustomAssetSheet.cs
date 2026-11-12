@@ -1572,42 +1572,14 @@ public sealed class CustomAssetSheet
 
     public static readonly CustomAssetSheet CaveStone = new(30020, 32, 32, isTileSheet: true, Numbered(
     [
-        null,
-        "cave-stone-02.png",
-        "cave-stone-03.png",
-        "cave-stone-04.png",
-        null,
-        "cave-stone-06.png",
-        "cave-stone-07.png",
-        "cave-stone-08.png",
-        "cave-stone-09.png",
-        "cave-stone-10.png",
-        "cave-stone-11.png",
-        "cave-stone-12.png",
-        "cave-stone-13.png",
-        "cave-stone-14.png",
-        "cave-stone-15.png",
-        "cave-stone-16.png",
-        "cave-stone-17.png",
-        "cave-stone-18.png",
-        "cave-stone-19.png",
-        "cave-stone-20.png",
-        null,
-        "cave-stone-22.png",
-        "cave-stone-23.png",
-        "cave-stone-24.png",
-        null,
-        "cave-stone-26.png",
-        "cave-stone-27.png",
-        "cave-stone-28.png",
-        "cave-stone-29.png",
-        "cave-stone-30.png",
-        "cave-stone-31.png",
-        "cave-stone-32.png",
-        "cave-stone-33.png",
-        "cave-stone-34.png",
-        "cave-stone-35.png",
-    ]), columns: 5);
+        null, "cave-stone-02.png", "cave-stone-03.png", "cave-stone-04.png", null, null, null, null, null, null,
+        "cave-stone-06.png", "cave-stone-07.png", "cave-stone-08.png", "cave-stone-09.png", "cave-stone-10.png", null, null, null, null, null,
+        "cave-stone-11.png", "cave-stone-12.png", "cave-stone-13.png", "cave-stone-14.png", "cave-stone-15.png", null, null, null, null, null,
+        "cave-stone-16.png", "cave-stone-17.png", "cave-stone-18.png", "cave-stone-19.png", "cave-stone-20.png", null, null, null, null, null,
+        null, "cave-stone-22.png", "cave-stone-23.png", "cave-stone-24.png", null, null, null, null, null, null,
+        "cave-stone-26.png", "cave-stone-27.png", "cave-stone-28.png", "cave-stone-29.png", "cave-stone-30.png", null, null, null, null, null,
+        "cave-stone-31.png", "cave-stone-32.png", "cave-stone-33.png", "cave-stone-34.png", "cave-stone-35.png", null, null, null, null, null,
+    ]), columns: 10);
 
     public static readonly CustomAssetSheet CaveScenery = new(30021, 32, 32, isTileSheet: true, Numbered(
     [
@@ -1649,10 +1621,10 @@ public sealed class CustomAssetSheet
 
     public static readonly IReadOnlyList<CustomAssetSheet> All = [Icons, Tiles, Portraits, Blood, WallLines, WallCaps, Banners, Arena, ArenaSand, BattleProps, ArenaWear, Corpses, ArenaStands, ArenaFacade, ArenaFacadeNorth, BattleGear, RuneTableBody, Backpacks, WantedPosters, Statues, CaveStone, CaveScenery];
 
-    private readonly (int Graphic, string FileName)[] _graphics;
+    private readonly (int Graphic, string? FileName)[] _graphics;
 
     private CustomAssetSheet(int sheetNumber, int cellWidth, int cellHeight, bool isTileSheet,
-        (int Graphic, string FileName)[] graphics, int? columns = null)
+        (int Graphic, string? FileName)[] graphics, int? columns = null)
     {
         SheetNumber = sheetNumber;
         CellWidth = cellWidth;
@@ -1683,11 +1655,10 @@ public sealed class CustomAssetSheet
 
     private int CellY(int graphic) => (graphic - 1) / Columns * CellHeight;
 
-    private static (int Graphic, string FileName)[] Numbered(string?[] fileNames) =>
-        fileNames.Select((fileName, i) => (Graphic: i + 1, FileName: fileName))
-            .Where(g => g.FileName is not null)
-            .Select(g => (g.Graphic, g.FileName!))
-            .ToArray();
+    // A null file name is a blank cell. It stays in the manifest as a transparent graphic so the
+    // map editor palette, which lists graphics in order, keeps the sheet's grid like the originals.
+    private static (int Graphic, string? FileName)[] Numbered(string?[] fileNames) =>
+        fileNames.Select((fileName, i) => (i + 1, fileName)).ToArray();
 
     public static void WriteAll(string sourceDir, string outputDir)
     {
@@ -1707,8 +1678,13 @@ public sealed class CustomAssetSheet
         byte[] sheet = new byte[sheetWidth * sheetHeight * 4];
         int cellRowLength = CellWidth * 4;
         int sheetRowLength = sheetWidth * 4;
-        foreach ((int graphic, string fileName) in _graphics)
+        foreach ((int graphic, string? fileName) in _graphics)
         {
+            if (fileName is null)
+            {
+                continue;
+            }
+
             byte[] cell = LoadCell(sourceDir, fileName);
             int offset = CellY(graphic) * sheetRowLength + CellX(graphic) * 4;
             for (int y = 0; y < CellHeight; y++)
