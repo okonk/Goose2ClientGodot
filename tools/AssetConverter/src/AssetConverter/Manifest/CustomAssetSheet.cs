@@ -9,6 +9,8 @@ public sealed class CustomAssetSheet
     public const int QuestionGraphic = 2;
     public const int ExperienceGraphic = 3;
     public const int ArenaCoinGraphic = 4;
+    public const int CreditCoinGraphic = 5;
+    public const int SpiritCoinGraphic = 6;
 
     public const int GrandfatherClockGraphic = 1;
 
@@ -26,6 +28,8 @@ public sealed class CustomAssetSheet
         (QuestionGraphic, "question.png"),
         (ExperienceGraphic, "experience.png"),
         (ArenaCoinGraphic, "arena-coin.png"),
+        (CreditCoinGraphic, "credit-coin.png"),
+        (SpiritCoinGraphic, "spirit-coin.png"),
     ]);
 
     public static readonly CustomAssetSheet Tiles = new(30001, 32, 64, isTileSheet: true,
