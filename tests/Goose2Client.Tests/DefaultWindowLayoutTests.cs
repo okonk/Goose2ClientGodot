@@ -31,6 +31,7 @@ public class DefaultWindowLayoutTests
     [InlineData("Hairdye", true)]
     [InlineData("Custom", true)]
     [InlineData("Confirm", true)]
+    [InlineData("Stylist", true)]
     [InlineData("GridContainer", false)]
     public void IsDialog_OnlyTransientDialogFamily(string name, bool expected)
         => Assert.Equal(expected, DefaultWindowLayout.IsDialog(name));
