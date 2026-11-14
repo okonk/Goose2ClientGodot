@@ -16,6 +16,8 @@ public partial class CustomPreviewControl : Control
     private Direction _facing;
     private readonly HashSet<CharacterSlot> _hiddenSlots = new();
     private readonly Dictionary<CharacterSlot, Color> _slotTints = new();
+    private readonly Dictionary<CharacterSlot, int> _slotGraphics = new();
+    private Direction? _facingOverride;
 
     public override void _Ready()
     {
@@ -39,6 +41,7 @@ public partial class CustomPreviewControl : Control
     // CharacterUpdated fires only on appearance changes, so poll for facing changes.
     public override void _Process(double delta)
     {
+        if (_facingOverride is not null) return;
         var source = GameManager.Instance.CurrentMapManager?.LocalPlayer;
         if (source == null || source.Facing == _facing) return;
         _facing = source.Facing;
@@ -59,7 +62,7 @@ public partial class CustomPreviewControl : Control
             HideAll();
             return;
         }
-        var facing = source.Facing;
+        var facing = _facingOverride ?? source.Facing;
         _facing = facing;
 
         // Shield/weapon flip in front of/behind the body per facing (mirrors Character.ApplyDrawOrder).
@@ -84,6 +87,16 @@ public partial class CustomPreviewControl : Control
                 tint = TintColor();
                 state = _customPose;
             }
+            else if (_slotGraphics.TryGetValue(slot, out id))
+            {
+                state = source.BodyState;
+                if (source.TryGetSlotGraphic(slot, out _, out var sourceTint))
+                    tint = sourceTint;
+                else if (slot == CharacterSlot.Hair)
+                    tint = source.GetAppearance().HairColor;
+                else
+                    tint = new Color(0f, 0f, 0f, 0f);
+            }
             else if (!source.TryGetSlotGraphic(slot, out id, out tint))
             {
                 HideLayer(layer);
@@ -92,9 +105,9 @@ public partial class CustomPreviewControl : Control
             else
             {
                 state = source.BodyState;
-                if (_slotTints.TryGetValue(slot, out var tintOverride))
-                    tint = tintOverride;
             }
+            if (!replaced && _slotTints.TryGetValue(slot, out var tintOverride))
+                tint = tintOverride;
 
             if (id <= 0)
             {
@@ -150,6 +163,24 @@ public partial class CustomPreviewControl : Control
     }
 
     public void ClearCustomGraphic() => SetCustomGraphic(null, 0, 0);
+
+    public void SetSlotGraphic(CharacterSlot slot, int id)
+    {
+        _slotGraphics[slot] = id;
+        Refresh();
+    }
+
+    public void ClearSlotGraphics()
+    {
+        _slotGraphics.Clear();
+        Refresh();
+    }
+
+    public void SetFacing(Direction? facing)
+    {
+        _facingOverride = facing;
+        Refresh();
+    }
 
     public void HideSlot(CharacterSlot slot) => _hiddenSlots.Add(slot);
 
