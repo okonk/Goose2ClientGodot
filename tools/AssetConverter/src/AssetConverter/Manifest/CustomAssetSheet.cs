@@ -11,6 +11,7 @@ public sealed class CustomAssetSheet
     public const int ArenaCoinGraphic = 4;
     public const int CreditCoinGraphic = 5;
     public const int SpiritCoinGraphic = 6;
+    public const int GoldCoinGraphic = 7;
 
     public const int GrandfatherClockGraphic = 1;
 
@@ -30,6 +31,7 @@ public sealed class CustomAssetSheet
         (ArenaCoinGraphic, "arena-coin.png"),
         (CreditCoinGraphic, "credit-coin.png"),
         (SpiritCoinGraphic, "spirit-coin.png"),
+        (GoldCoinGraphic, "gold-coin.png"),
     ]);
 
     public static readonly CustomAssetSheet Tiles = new(30001, 32, 64, isTileSheet: true,
