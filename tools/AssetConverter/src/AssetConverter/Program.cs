@@ -78,6 +78,7 @@ if (args.Length >= 1 && args[0] == "aspereta")
         Paths.AsperetaMaps, Path.Combine(repoRoot, "Assets", "Maps"), mapping);
     var asp = AsperetaConversionPipeline.Convert(Paths.AsperetaData, Paths.AsperetaCompiledEnc, repoRoot);
     CustomBody.WriteAll(repoRoot);
+    CustomEffect.WriteAll(repoRoot);
     WriteAsperetaManifests(repoRoot, asp);
 
     Console.WriteLine($"Aspereta sheets: {sheets.Succeeded} ok, {sheets.Failed} failed");
@@ -113,6 +114,7 @@ if (args.Length >= 1 && args[0] == "animations")
     var result = AnimationBatchConverter.Convert(
         Paths.IllutiaData, Paths.CompiledEnc, outRoot, includeEffects: true);
     CustomBody.WriteAll(outRoot);
+    CustomEffect.WriteAll(outRoot);
 
     Console.WriteLine($"Wrote {result.ResourcesWritten} animation resources, {result.Failed} failures -> {outRoot}");
     Console.WriteLine($"Appearance manifest: {Path.Combine(outRoot, AppearanceManifestFileStore.RelativePath)}");
@@ -193,6 +195,7 @@ if (args.Length >= 1 && args[0] == "all")
 
     var asp = AsperetaConversionPipeline.Convert(Paths.AsperetaData, Paths.AsperetaCompiledEnc, repoRoot);
     int customBodies = CustomBody.WriteAll(repoRoot);
+    CustomEffect.WriteAll(repoRoot);
 
     // Illutia maps
     var maps = MapCopyConverter.Convert(Paths.IllutiaMaps, mapsDir);
@@ -299,6 +302,7 @@ if (args.Length >= 1 && args[0] == "custom-bodies")
 
     CustomAssetSheet.WriteAll(Paths.CustomAssetsDir, Path.Combine(repoRoot, "Assets", "Sprites", "sheets"));
     int written = CustomBody.WriteAll(repoRoot);
+    CustomEffect.WriteAll(repoRoot);
 
     var aspCatalog = AsperetaAnimationCatalog.Load(Paths.AsperetaData, Paths.AsperetaCompiledEnc);
     var aspBuild = AsperetaAnimationResourceBuilder.Build(aspCatalog);

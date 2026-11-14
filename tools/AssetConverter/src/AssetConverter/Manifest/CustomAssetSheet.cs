@@ -1623,7 +1623,23 @@ public sealed class CustomAssetSheet
         "cave-lava-lake-bottom-right.png",
     ]), columns: 8);
 
-    public static readonly IReadOnlyList<CustomAssetSheet> All = [Icons, Tiles, Portraits, Blood, WallLines, WallCaps, Banners, Arena, ArenaSand, BattleProps, ArenaWear, Corpses, ArenaStands, ArenaFacade, ArenaFacadeNorth, BattleGear, RuneTableBody, Backpacks, WantedPosters, Statues, CaveStone, CaveScenery];
+    public static readonly CustomAssetSheet BossTarget = new(30022, 64, 64, isTileSheet: false, Numbered(
+    [
+        "boss-target-01.png",
+        "boss-target-02.png",
+        "boss-target-03.png",
+        "boss-target-04.png",
+        "boss-target-05.png",
+        "boss-target-06.png",
+        "boss-target-07.png",
+        "boss-target-08.png",
+        "boss-target-09.png",
+        "boss-target-10.png",
+        "boss-target-11.png",
+        "boss-target-12.png",
+    ]));
+
+    public static readonly IReadOnlyList<CustomAssetSheet> All = [Icons, Tiles, Portraits, Blood, WallLines, WallCaps, Banners, Arena, ArenaSand, BattleProps, ArenaWear, Corpses, ArenaStands, ArenaFacade, ArenaFacadeNorth, BattleGear, RuneTableBody, Backpacks, WantedPosters, Statues, CaveStone, CaveScenery, BossTarget];
 
     private readonly (int Graphic, string? FileName)[] _graphics;
 
