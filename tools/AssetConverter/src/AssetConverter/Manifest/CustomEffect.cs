@@ -8,8 +8,9 @@ public sealed class CustomEffect
     public const int IdBase = 900000;
 
     public static readonly CustomEffect BossTarget = new(IdBase + 1, CustomAssetSheet.BossTarget, fps: 12);
+    public static readonly CustomEffect Shield = new(IdBase + 2, CustomAssetSheet.Shield, fps: 12);
 
-    public static readonly IReadOnlyList<CustomEffect> All = [BossTarget];
+    public static readonly IReadOnlyList<CustomEffect> All = [BossTarget, Shield];
 
     private CustomEffect(int id, CustomAssetSheet sheet, float fps)
     {

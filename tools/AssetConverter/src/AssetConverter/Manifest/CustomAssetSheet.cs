@@ -1641,7 +1641,27 @@ public sealed class CustomAssetSheet
         "boss-target-12.png",
     ]));
 
-    public static readonly IReadOnlyList<CustomAssetSheet> All = [Icons, Tiles, Portraits, Blood, WallLines, WallCaps, Banners, Arena, ArenaSand, BattleProps, ArenaWear, Corpses, ArenaStands, ArenaFacade, ArenaFacadeNorth, BattleGear, RuneTableBody, Backpacks, WantedPosters, Statues, CaveStone, CaveScenery, BossTarget];
+    public static readonly CustomAssetSheet Shield = new(30023, 64, 80, isTileSheet: false, Numbered(
+    [
+        "shield-01.png",
+        "shield-02.png",
+        "shield-03.png",
+        "shield-04.png",
+        "shield-05.png",
+        "shield-06.png",
+        "shield-07.png",
+        "shield-08.png",
+        "shield-09.png",
+        "shield-10.png",
+        "shield-11.png",
+        "shield-12.png",
+        "shield-13.png",
+        "shield-14.png",
+        "shield-15.png",
+        "shield-16.png",
+    ]));
+
+    public static readonly IReadOnlyList<CustomAssetSheet> All = [Icons, Tiles, Portraits, Blood, WallLines, WallCaps, Banners, Arena, ArenaSand, BattleProps, ArenaWear, Corpses, ArenaStands, ArenaFacade, ArenaFacadeNorth, BattleGear, RuneTableBody, Backpacks, WantedPosters, Statues, CaveStone, CaveScenery, BossTarget, Shield];
 
     private readonly (int Graphic, string? FileName)[] _graphics;
 
