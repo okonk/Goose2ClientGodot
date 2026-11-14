@@ -35,5 +35,6 @@ namespace Goose2Client
         Amount = 31,
         GridContainer = 32,
         Enchant = 33,
+        Stylist = 34,
     }
 }
