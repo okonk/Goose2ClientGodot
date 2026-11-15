@@ -33,6 +33,7 @@ namespace Goose2Client.Network.Packets
         public int MoveSpeed { get; set; }
         public bool IsGM { get; set; }
         public bool HideName { get; set; }
+        public int RespawnSeconds { get; set; }
 
         public override string Prefix { get; } = "MKC";
 
@@ -68,12 +69,7 @@ namespace Goose2Client.Network.Packets
                 packet.HairA = p.GetInt32();
                 packet.Invisible = p.GetInt32();
 
-                // Older servers omit hide_name, leaving face id, move speed, is_gm and the mount as the tail;
-                // the mount is either "id,*" or "id,r,g,b,a"
-                int mountTokens = p.GetWholePacket().EndsWith('*') ? 2 : 5;
-                if (p.TokensRemaining() > 3 + mountTokens)
-                    packet.HideName = p.GetInt32() != 0;
-
+                packet.HideName = p.GetInt32() != 0;
                 packet.FaceId = p.GetInt32();
                 packet.MoveSpeed = p.GetInt32();
                 packet.IsGM = p.GetBool();
@@ -94,16 +90,13 @@ namespace Goose2Client.Network.Packets
                 // hair b
                 // hair a
                 packet.Invisible = p.GetInt32();
-
-                // Servers without the hide_name field send 2 tokens here (move speed, is_gm), not 3+
-                if (p.TokensRemaining() > 2)
-                    packet.HideName = p.GetInt32() != 0;
-
-                // face id
+                packet.HideName = p.GetInt32() != 0;
                 packet.MoveSpeed = p.GetInt32();
-                packet.IsGM = p.TokensRemaining() > 0 && p.GetBool();
-                // mount stuff
+                packet.IsGM = p.GetBool();
             }
+
+            if (p.TokensRemaining() > 0)
+                packet.RespawnSeconds = p.GetInt32();
 
             return packet;
         }
@@ -127,7 +120,11 @@ namespace Goose2Client.Network.Packets
             int id = p.GetInt32();   // item graphic id
             equipped[i][j++] = id;
 
-            if (id == 0 && i == 6) return; // hack for mounts for npc characters, server used to send only 4 ints instead of 5
+            if (id == 0 && i == 6)
+            {
+                if (p.TokensRemaining() > 0 && p.Peek() == '*') p.GetString();
+                return;
+            }
 
             if (p.Peek() == '*')
             {

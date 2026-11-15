@@ -22,6 +22,7 @@ namespace Goose2Client.Network.Packets
         public int Invisible { get; set; }
         public int FaceId { get; set; }
         public int MoveSpeed { get; set; }
+        public int RespawnSeconds { get; set; }
 
         public override string Prefix { get; } = "CHP";
 
@@ -68,8 +69,10 @@ namespace Goose2Client.Network.Packets
                 packet.Invisible = p.GetInt32();
                 // face id
                 packet.MoveSpeed = p.GetInt32();
-                // mount stuff
             }
+
+            if (p.TokensRemaining() > 0)
+                packet.RespawnSeconds = p.GetInt32();
 
             return packet;
         }
@@ -93,7 +96,11 @@ namespace Goose2Client.Network.Packets
             int id = p.GetInt32();   // item graphic id
             equipped[i][j++] = id;
 
-            if (id == 0 && i == 6) return; // hack for mounts for npc characters, server used to send only 4 ints instead of 5
+            if (id == 0 && i == 6)
+            {
+                if (p.TokensRemaining() > 0 && p.Peek() == '*') p.GetString();
+                return;
+            }
 
             if (p.Peek() == '*')
             {
