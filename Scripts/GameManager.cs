@@ -64,8 +64,11 @@ namespace Goose2Client
 
         /// <summary>Map spell gate. False also emits the rejection message, so callers that must
         /// stay silent have to check CurrentMapFlags themselves.</summary>
+        public bool IsLocalPlayerDead => CurrentMapManager?.LocalPlayer?.IsDead == true;
+
         public bool CanCastSpellsHere()
         {
+            if (IsLocalPlayerDead) return false;
             var lp = CurrentMapManager?.LocalPlayer;
             if (CurrentMapFlags.Value.SpellsEnabled || lp?.IsGM == true) return true;
             Hud?.Chat?.AddChatLine("You can't cast spells in this map.", ChatType.Server);

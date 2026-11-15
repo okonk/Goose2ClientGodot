@@ -92,6 +92,7 @@ public partial class SpellTargetManager : Node
     /// </remarks>
     public void Cast(SpellInfo info)
     {
+        if (GameManager.Instance.IsLocalPlayerDead) return;
         _pendingSpell = info;
         IsTargeting = true;
         GetViewport().GuiReleaseFocus();
@@ -130,6 +131,7 @@ public partial class SpellTargetManager : Node
     /// </summary>
     public bool RepeatHoldCast(SpellInfo info)
     {
+        if (GameManager.Instance.IsLocalPlayerDead) return false;
         if (!IsHoldRepeating) return false;
 
         var mm = GameManager.Instance.CurrentMapManager;
@@ -350,7 +352,7 @@ public partial class SpellTargetManager : Node
         // re-send the spell the first one already cast.
         var spell = _pendingSpell;
         _pendingSpell = null;
-        if (_target != null && spell != null && !GameManager.Instance.IsLoadingMap)
+        if (_target != null && spell != null && !GameManager.Instance.IsLocalPlayerDead && !GameManager.Instance.IsLoadingMap)
         {
             LastTargetableSpell = spell;
             GameManager.Instance.SpellCooldownManager.Cast(spell.SlotNumber, spell.Cooldown);

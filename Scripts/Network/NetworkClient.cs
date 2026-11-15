@@ -20,6 +20,7 @@ namespace Goose2Client.Network
         public bool Pause { get; set; } = false;
         public bool LoadingMap { get; set; }
         public int PendingPacketCount => _packetInbox.Count;
+        private static bool LocalPlayerDead => GameManager.Instance?.IsLocalPlayerDead == true;
         internal MainThreadStallMonitor? StallMonitor { get; set; }
 
         private Socket? socket;
@@ -191,21 +192,25 @@ namespace Goose2Client.Network
 
         public void Move(Direction d)
         {
+            if (LocalPlayerDead) return;
             Send($"M{(int)d + 1}");
         }
 
         public void Face(Direction d)
         {
+            if (LocalPlayerDead) return;
             Send($"F{(int)d + 1}");
         }
 
         public void Attack()
         {
+            if (LocalPlayerDead) return;
             Send($"ATT");
         }
 
         public void UseItem(int slot)
         {
+            if (LocalPlayerDead) return;
             if (!CurrentMapFlags.Value.ItemsEnabled)
             {
                 GameManager.Instance.Hud?.Chat?.AddChatLine("You can't use items in this map.", ChatType.Server);
@@ -217,6 +222,7 @@ namespace Goose2Client.Network
 
         public void ToggleMount()
         {
+            if (LocalPlayerDead) return;
             Send("MNT");
         }
 
@@ -247,11 +253,13 @@ namespace Goose2Client.Network
 
         public void Drop(int fromSlot, int amount)
         {
+            if (LocalPlayerDead) return;
             Send($"DRP{fromSlot + 1},{amount}");
         }
 
         public void Pickup()
         {
+            if (LocalPlayerDead) return;
             Send($"GET");
         }
 
@@ -262,6 +270,7 @@ namespace Goose2Client.Network
 
         public void CastSpell(int slot, int targetId)
         {
+            if (LocalPlayerDead) return;
             Send($"CAST{slot + 1},{targetId}");
         }
 
@@ -365,6 +374,7 @@ namespace Goose2Client.Network
 
         public void Emote(int animationId, int graphicFile)
         {
+            if (LocalPlayerDead) return;
             Send($"EMOT{animationId},{graphicFile}");
         }
 
