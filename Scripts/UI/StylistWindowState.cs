@@ -5,46 +5,66 @@ namespace Goose2Client.UI
     public enum StylistTab
     {
         Hair,
-        Face
+        Face,
+        Gender
     }
 
     public sealed class StylistWindowState
     {
-        public const int ChangeCost = 2000;
+        public const int ChangeCost = 1000;
 
         public int CurrentHair { get; private set; }
         public int CurrentFace { get; private set; }
+        public int CurrentBody { get; private set; }
         public int SelectedHair { get; private set; }
         public int SelectedFace { get; private set; }
+        public int SelectedBody { get; private set; }
         public long Gold { get; set; }
         public StylistTab Tab { get; set; }
         public Direction Facing { get; private set; } = Direction.Down;
 
-        public void Open(int hair, int face)
+        public void Open(int hair, int face, int body)
         {
-            SetCurrent(hair, face);
-            SelectedHair = CurrentHair;
-            SelectedFace = CurrentFace;
+            SetCurrent(hair, face, body);
+            Reset();
         }
 
-        public void SetCurrent(int hair, int face)
+        public void SetCurrent(int hair, int face, int body)
         {
             CurrentHair = hair;
             CurrentFace = face;
+            CurrentBody = body;
         }
 
         public void Select(int id)
         {
-            if (Tab == StylistTab.Hair)
-                SelectedHair = id;
-            else
-                SelectedFace = id;
+            switch (Tab)
+            {
+                case StylistTab.Hair: SelectedHair = id; break;
+                case StylistTab.Face: SelectedFace = id; break;
+                case StylistTab.Gender: SelectedBody = id; break;
+            }
         }
+
+        public int Selected => Tab switch
+        {
+            StylistTab.Hair => SelectedHair,
+            StylistTab.Face => SelectedFace,
+            _ => SelectedBody
+        };
+
+        public int Current => Tab switch
+        {
+            StylistTab.Hair => CurrentHair,
+            StylistTab.Face => CurrentFace,
+            _ => CurrentBody
+        };
 
         public void Reset()
         {
             SelectedHair = CurrentHair;
             SelectedFace = CurrentFace;
+            SelectedBody = CurrentBody;
         }
 
         public int Cost
@@ -54,6 +74,7 @@ namespace Goose2Client.UI
                 int cost = 0;
                 if (SelectedHair != CurrentHair) cost += ChangeCost;
                 if (SelectedFace != CurrentFace) cost += ChangeCost;
+                if (SelectedBody != CurrentBody) cost += ChangeCost;
                 return cost;
             }
         }

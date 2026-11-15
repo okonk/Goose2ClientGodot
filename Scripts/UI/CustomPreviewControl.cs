@@ -170,6 +170,11 @@ public partial class CustomPreviewControl : Control
         Refresh();
     }
 
+    public void ClearSlotGraphic(CharacterSlot slot)
+    {
+        if (_slotGraphics.Remove(slot)) Refresh();
+    }
+
     public void ClearSlotGraphics()
     {
         _slotGraphics.Clear();

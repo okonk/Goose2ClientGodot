@@ -13,6 +13,9 @@ public partial class StylistWindow : BaseWindow, IWindow
     public int WindowId { get; private set; }
     public WindowFrames WindowFrame => WindowFrames.Stylist;
 
+    private const float CellSize = 56f;
+    private const float CellInset = 8f;
+
     private TabBar _tabs = null!;
     private GridContainer _grid = null!;
     private CustomPreviewControl _preview = null!;
@@ -36,8 +39,8 @@ public partial class StylistWindow : BaseWindow, IWindow
         _costLabel = GetNode<Label>("Content/CostLabel");
         _resetButton = GetNode<Button>("Content/ResetButton");
         _changeButton = GetNode<Button>("Content/ChangeButton");
-        GetNode<Button>("Content/RotateLeft").Pressed += () => Rotate(false);
-        GetNode<Button>("Content/RotateRight").Pressed += () => Rotate(true);
+        GetNode<Button>("Content/RotateLeft").Pressed += () => Rotate(true);
+        GetNode<Button>("Content/RotateRight").Pressed += () => Rotate(false);
         _tabs.TabChanged += _ =>
         {
             _state.Tab = (StylistTab)_tabs.CurrentTab;
@@ -76,6 +79,7 @@ public partial class StylistWindow : BaseWindow, IWindow
     public override void Relayout()
     {
         base.Relayout();
+        if (Visible) BuildGrid();
         _preview.Refresh();
     }
 
@@ -86,7 +90,7 @@ public partial class StylistWindow : BaseWindow, IWindow
         var player = GameManager.Instance.CurrentMapManager?.LocalPlayer;
         if (player == null) return;
         var appearance = player.GetAppearance();
-        _state.Open(appearance.HairId, appearance.FaceId);
+        _state.Open(appearance.HairId, appearance.FaceId, appearance.BodyId);
         _hairColor = appearance.HairColor;
         _preview.SetFacing(player.Facing);
         for (int i = 0; i < 3 && _state.Facing != player.Facing; i++)
@@ -122,9 +126,9 @@ public partial class StylistWindow : BaseWindow, IWindow
     {
         if (!Visible || c != GameManager.Instance.CurrentMapManager?.LocalPlayer) return;
         var appearance = c.GetAppearance();
-        _state.SetCurrent(appearance.HairId, appearance.FaceId);
+        _state.SetCurrent(appearance.HairId, appearance.FaceId, appearance.BodyId);
         _hairColor = appearance.HairColor;
-        if (_state.Tab == StylistTab.Hair)
+        if (_state.Tab != StylistTab.Face)
             BuildGrid();
         Sync();
     }
@@ -132,7 +136,7 @@ public partial class StylistWindow : BaseWindow, IWindow
     private void OnChangePressed()
     {
         if (!_state.CanChange) return;
-        GameManager.Instance.NetworkClient.StylistChange(_state.SelectedHair, _state.SelectedFace);
+        GameManager.Instance.NetworkClient.StylistChange(_state.SelectedHair, _state.SelectedFace, _state.SelectedBody);
     }
 
     private void Rotate(bool right)
@@ -162,9 +166,15 @@ public partial class StylistWindow : BaseWindow, IWindow
             child.QueueFree();
         _cells.Clear();
 
-        bool hair = _state.Tab == StylistTab.Hair;
-        var slot = hair ? CharacterSlot.Hair : CharacterSlot.Eyes;
-        var ids = hair ? StylistCatalog.HairIds : StylistCatalog.FaceIds;
+        var (slot, ids) = _state.Tab switch
+        {
+            StylistTab.Hair => (CharacterSlot.Hair, StylistCatalog.HairIds),
+            StylistTab.Face => (CharacterSlot.Eyes, StylistCatalog.FaceIds),
+            _ => (CharacterSlot.Body, StylistCatalog.BodyIds)
+        };
+        var applier = UiScaleApplier.Instance!;
+        float cell = applier.ScaleSize(CellSize);
+        float inset = applier.ScaleSize(CellInset);
         foreach (var id in ids)
         {
             var icon = new TextureRect
@@ -174,19 +184,20 @@ public partial class StylistWindow : BaseWindow, IWindow
                 StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered
             };
             icon.SetAnchorsPreset(LayoutPreset.FullRect);
-            icon.OffsetLeft = 8f;
-            icon.OffsetTop = 8f;
-            icon.OffsetRight = -8f;
-            icon.OffsetBottom = -8f;
-            var tex = StylistIcon.Build(slot, id);
+            icon.OffsetLeft = inset;
+            icon.OffsetTop = inset;
+            icon.OffsetRight = -inset;
+            icon.OffsetBottom = -inset;
+            var tex = slot == CharacterSlot.Body ? StylistIcon.BuildBody(id) : StylistIcon.Build(slot, id);
             icon.Texture = tex;
-            if (hair)
+            if (slot == CharacterSlot.Hair)
                 TintMaterial.Apply(icon, tex, _hairColor);
 
             var button = new Button
             {
                 FocusMode = FocusModeEnum.None,
-                CustomMinimumSize = new Vector2(64, 64)
+                CustomMinimumSize = new Vector2(cell, cell),
+                TooltipText = slot == CharacterSlot.Body ? GenderName(id) : ""
             };
             button.AddChild(icon);
             button.Pressed += () =>
@@ -202,9 +213,8 @@ public partial class StylistWindow : BaseWindow, IWindow
 
     private void RefreshHighlights()
     {
-        bool hair = _state.Tab == StylistTab.Hair;
-        var selected = hair ? _state.SelectedHair : _state.SelectedFace;
-        var current = hair ? _state.CurrentHair : _state.CurrentFace;
+        var selected = _state.Selected;
+        var current = _state.Current;
         foreach (var (id, button) in _cells)
         {
             button.Modulate = id == selected ? new Color(1f, 0.95f, 0.55f) : Colors.White;
@@ -232,10 +242,33 @@ public partial class StylistWindow : BaseWindow, IWindow
     {
         _preview.SetSlotGraphic(CharacterSlot.Hair, _state.SelectedHair);
         _preview.SetSlotGraphic(CharacterSlot.Eyes, _state.SelectedFace);
+        SyncBodyPreview();
         _costLabel.Text = $"Cost: {_state.Cost:N0}";
         _costLabel.Modulate = _state.CanAfford ? Colors.White : new Color(1f, 0.45f, 0.45f);
         _changeButton.Disabled = !_state.CanChange;
         _resetButton.Disabled = _state.Cost == 0;
         RefreshHighlights();
     }
+
+    private void SyncBodyPreview()
+    {
+        _preview.SetSlotGraphic(CharacterSlot.Body, _state.SelectedBody);
+        var player = GameManager.Instance.CurrentMapManager?.LocalPlayer;
+        if (player == null || _state.SelectedBody == _state.CurrentBody)
+        {
+            _preview.ClearSlotGraphic(CharacterSlot.Chest);
+            _preview.ClearSlotGraphic(CharacterSlot.Legs);
+            return;
+        }
+
+        player.TryGetSlotGraphic(CharacterSlot.Chest, out var chest, out _);
+        if (chest == CharacterLayout.UnderwearChest(_state.CurrentBody, 0))
+            _preview.SetSlotGraphic(CharacterSlot.Chest, CharacterLayout.UnderwearChest(_state.SelectedBody, 0));
+        player.TryGetSlotGraphic(CharacterSlot.Legs, out var legs, out _);
+        if (legs == CharacterLayout.UnderwearLegs(_state.CurrentBody, 0))
+            _preview.SetSlotGraphic(CharacterSlot.Legs, CharacterLayout.UnderwearLegs(_state.SelectedBody, 0));
+    }
+
+    private static string GenderName(int bodyId)
+        => bodyId == StylistCatalog.FemaleBodyId ? "Female" : "Male";
 }

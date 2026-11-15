@@ -19,6 +19,12 @@ public class StylistCatalogTests
     }
 
     [Fact]
+    public void BodyIds_AreMaleThenFemale()
+    {
+        Assert.Equal(new[] { 1, 11 }, StylistCatalog.BodyIds);
+    }
+
+    [Fact]
     public void EveryCatalogId_HasAnimationAsset()
     {
         var root = FindRepoRoot();
@@ -28,7 +34,10 @@ public class StylistCatalogTests
             .Select(id => $"Hair/{id}")
             .Concat(StylistCatalog.FaceIds
                 .Where(id => !File.Exists(Path.Combine(root, "Assets", "Sprites", "Eyes", id.ToString(), "animations.tres")))
-                .Select(id => $"Eyes/{id}"));
+                .Select(id => $"Eyes/{id}"))
+            .Concat(StylistCatalog.BodyIds
+                .Where(id => !File.Exists(Path.Combine(root, "Assets", "Sprites", "Bodies", id.ToString(), "animations.tres")))
+                .Select(id => $"Bodies/{id}"));
 
         Assert.Empty(missing);
     }

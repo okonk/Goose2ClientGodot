@@ -329,7 +329,7 @@ namespace Goose2Client.Network
             Send(EnchantPreviewPacket.FormatEwc(itemSlot, essenceSlot, protectionSlot));
         }
 
-        public void StylistChange(int hair, int face) => Send(StylistPackets.FormatStc(hair, face));
+        public void StylistChange(int hair, int face, int body) => Send(StylistPackets.FormatStc(hair, face, body));
 
         public void SubmitAmount(int windowId, long amount) => Send(AmountInfoPacket.FormatAmt(windowId, amount));
 
