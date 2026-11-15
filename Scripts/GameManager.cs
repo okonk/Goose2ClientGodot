@@ -62,11 +62,11 @@ namespace Goose2Client
 
         public bool IsLoadingMap => NetworkClient.LoadingMap;
 
+        public bool IsLocalPlayerDead => CurrentMapManager?.LocalPlayer?.IsDead == true;
+
         /// <summary>Map spell gate. False also emits the rejection message, so callers that must
         /// stay silent have to check CurrentMapFlags themselves. The dead-player gate returns
         /// false silently.</summary>
-        public bool IsLocalPlayerDead => CurrentMapManager?.LocalPlayer?.IsDead == true;
-
         public bool CanCastSpellsHere()
         {
             if (IsLocalPlayerDead) return false;
