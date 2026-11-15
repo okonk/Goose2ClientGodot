@@ -21,6 +21,11 @@ namespace Goose2Client.Character
         public bool IsInvisible { get; private set; }
         public bool IsHiddenFromViewer { get; private set; }
         public bool NameHiddenByServer { get; private set; }
+        public bool IsDead { get; private set; }
+        private ulong _respawnDeadlineMsec;
+        private int _shownCountdown = -1;
+        public int RespawnSecondsLeft => IsDead ? RespawnCountdown.SecondsLeft(_respawnDeadlineMsec, Time.GetTicksMsec()) : 0;
+        public ulong RespawnDeadlineMsec => _respawnDeadlineMsec;
         public bool ShouldShowNameOverhead => NameDisplayRule.ShouldRenderNameOverhead(
             GameManager.Instance?.NameDisplay ?? NameDisplayMode.PlayersOnly, CharacterType, NameHiddenByServer);
         public bool ShouldShowVitalsOverhead => _barsVisible;
@@ -183,6 +188,7 @@ namespace Goose2Client.Character
             X = p.MapX; Y = p.MapY; Facing = p.Facing;
 
             CharacterType = p.CharacterType;
+            ApplyDeadState(p.RespawnSeconds);
 
             ApplyAppearance(p.BodyId, p.BodyR, p.BodyG, p.BodyB, p.BodyA,
                             p.HairId, p.HairR, p.HairG, p.HairB, p.HairA,
@@ -196,7 +202,7 @@ namespace Goose2Client.Character
             IsGM = p.IsGM;
             IsInvisible = p.Invisible != 0;
             NameHiddenByServer = p.HideName;
-            if (EnsureNameLabel() && _nameLabel != null) { _nameLabel.Text = FullName; _nameLabel.Layout(this); }
+            if (EnsureNameLabel()) RefreshNameText();
             UpdateNameColor();
             SetVitals(p.HPPercent, 1f);
             ApplyInvisibility();
@@ -243,6 +249,7 @@ namespace Goose2Client.Character
             BodyState = p.BodyState;
 
             IsInvisible = p.Invisible != 0;
+            ApplyDeadState(p.RespawnSeconds);
             ApplyAppearance(p.BodyId, p.BodyR, p.BodyG, p.BodyB, p.BodyA,
                             p.HairId, p.HairR, p.HairG, p.HairB, p.HairA,
                             p.FaceId, p.DisplayedEquipment);
@@ -251,6 +258,28 @@ namespace Goose2Client.Character
             PlayState();
             RepositionOverlays();
             ApplyInvisibility();
+        }
+
+        private void ApplyDeadState(int respawnSeconds)
+        {
+            bool dead = respawnSeconds > 0;
+            if (dead)
+            {
+                _respawnDeadlineMsec = RespawnCountdown.Deadline(Time.GetTicksMsec(), respawnSeconds);
+                _lockedMotion = null;
+                if (_moving) TeleportTo(X, Y);
+            }
+            IsDead = dead;
+            RefreshNameText();
+        }
+
+        private void RefreshNameText()
+        {
+            if (_nameLabel == null) return;
+            int secs = RespawnSecondsLeft;
+            _nameLabel.Text = IsDead ? RespawnCountdown.NameLabel(FullName, secs) : FullName;
+            _shownCountdown = secs;
+            _nameLabel.Layout(this);
         }
 
         public void ApplyInvisibility()
@@ -472,6 +501,7 @@ namespace Goose2Client.Character
 
         private void BeginLock(string motion)
         {
+            if (IsDead) return;
             if (_slots.TryGetValue(CharacterSlot.Body, out var body) && body.Sprite.SpriteFrames != null &&
                 ResolveClip(body, motion, BodyState) == null)
                 return;
@@ -553,6 +583,7 @@ namespace Goose2Client.Character
             UpdateSortAnchor();
             TickAttackLock(delta);   // defined in Task 8
             ApplyBarVisibility();
+            if (IsDead && RespawnSecondsLeft != _shownCountdown) RefreshNameText();
             if (_battleTextManager != null)
                 foreach (var (_, line) in _battleTextManager.Tick(delta))
                     if (GodotObject.IsInstanceValid(line)) line.BeginRise();
@@ -640,6 +671,7 @@ namespace Goose2Client.Character
         private void ProcessLocalInput(double delta)
         {
             if (!IsLocalPlayer) return;
+            if (IsDead) return;
             if (GameManager.Instance.IsLoadingMap) return;
             if (GameManager.Instance.IsTargeting) return;   // spell targeting consumes movement/attack input
             // Root viewport explicitly: world nodes' own viewport is the map sub-viewport, whose
@@ -707,6 +739,7 @@ namespace Goose2Client.Character
         private bool TryChainLocalStep()
         {
             if (!IsLocalPlayer) return false;
+            if (IsDead) return false;
             if (GameManager.Instance.IsLoadingMap) return false;
             if (GameManager.Instance.IsTargeting) return false;
             if (GetTree().Root.GuiGetFocusOwner() is LineEdit) return false;   // root viewport — see ProcessLocalInput
@@ -783,7 +816,7 @@ namespace Goose2Client.Character
             foreach (var (slot, s) in _slots)
             {
                 bool slotMounted = IsMounted && slot != CharacterSlot.Mount;
-                string motion = CharacterMotion.State(IsMoving, _lockedMotion, slotMounted);
+                string motion = CharacterMotion.State(IsMoving, _lockedMotion, slotMounted, IsDead);
                 // The mount itself always animates as an unmounted walking body (Unity forces state 3).
                 int state = slot == CharacterSlot.Mount ? 3 : BodyState;
                 if (ResolveClip(s, motion, state) is not { } clip)
@@ -799,7 +832,13 @@ namespace Goose2Client.Character
                 // every step is what made high move-speed look jittery.
                 // Single-frame clips (every idle) are shown stopped: a playing one still loops at the
                 // clip fps, firing FrameChanged into managed code per slot, which dominates crowded maps.
-                if (s.Sprite.SpriteFrames.GetFrameCount(clip) <= 1)
+                if (IsDead)
+                {
+                    if (s.Sprite.IsPlaying()) s.Sprite.Stop();
+                    s.Sprite.Animation = clip;
+                    s.Sprite.Frame = s.Sprite.SpriteFrames.GetFrameCount(clip) - 1;
+                }
+                else if (s.Sprite.SpriteFrames.GetFrameCount(clip) <= 1)
                 {
                     if (s.Sprite.IsPlaying()) s.Sprite.Stop();
                     s.Sprite.Animation = clip;
