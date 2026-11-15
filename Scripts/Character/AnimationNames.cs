@@ -54,6 +54,8 @@ namespace Goose2Client.Character
                 _ => new List<string> { motion },
             };
 
+            // Corpse sheets only have art in death-left/right; the up/down frames are empty.
+            if (motion == "death") d = d is Direction.Down ? Direction.Left : d is Direction.Up ? Direction.Right : d;
             string dir = DirectionString(d);
             var result = new List<string>(bases.Count);
             foreach (var b in bases) result.Add($"{b}-{dir}");

@@ -24,6 +24,8 @@ public partial class RespawnWindow : BaseWindow
         GetNode<Button>("TitleBar/CloseButton").Visible = false;
 
         UiScaleApplier.Instance!.ApplyFontSize(GetNode<Label>("TitleBar/TitleLabel"), 9);
+        UiScaleApplier.Instance!.ApplyFontSize(_prompt, 9);
+        UiScaleApplier.Instance!.ApplyFontSize(_respawnButton, 9);
         ScaleRegister();
 
         GameManager.Instance.CharacterUpdated += OnCharacterUpdated;
@@ -62,7 +64,7 @@ public partial class RespawnWindow : BaseWindow
     {
         if (_player == null || !GodotObject.IsInstanceValid(_player)) return;
         int secs = _player.RespawnSecondsLeft;
-        _prompt.Text = $"You have died. Respawning in {RespawnCountdown.Format(secs)}...";
+        _prompt.Text = $"Respawning in {RespawnCountdown.Format(secs)}";
         if (secs == 0) _respawnButton.Disabled = true;
     }
 

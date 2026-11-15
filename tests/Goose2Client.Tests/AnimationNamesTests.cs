@@ -45,8 +45,10 @@ public class AnimationNamesTests
         => Assert.Equal(expectedFirst, AnimationNames.Candidates(motion, bodyState, d)[0]);
 
     [Theory]
-    [InlineData(Direction.Down, "death-down")]
+    [InlineData(Direction.Down, "death-left")]
+    [InlineData(Direction.Up, "death-right")]
     [InlineData(Direction.Left, "death-left")]
+    [InlineData(Direction.Right, "death-right")]
     public void Death_candidates_are_the_directional_death_clip(Direction d, string expected)
         => Assert.Equal(new[] { expected }, AnimationNames.Candidates("death", 4, d));
 
