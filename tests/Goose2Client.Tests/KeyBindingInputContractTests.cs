@@ -134,6 +134,24 @@ public class KeyBindingInputContractTests
     }
 
     [Fact]
+    public void SpellTargetManager_DeadLocalPlayer_TearsDownTargetingSession()
+    {
+        string stm = Read("Scripts/SpellTargetManager.cs");
+        Assert.Contains("GameManager.Instance.CharacterUpdated += OnCharacterUpdated;", stm);
+
+        int exit = stm.IndexOf("public override void _ExitTree()", StringComparison.Ordinal);
+        int next = stm.IndexOf("// Handle targeting input", exit, StringComparison.Ordinal);
+        Assert.True(exit >= 0 && next > exit, "_ExitTree must precede the _Input handler");
+        string exitBody = stm.Substring(exit, next - exit);
+        Assert.Contains("if (GameManager.Instance != null) GameManager.Instance.CharacterUpdated -= OnCharacterUpdated;", exitBody);
+
+        int handler = stm.IndexOf("private void OnCharacterUpdated(Character.Character c)", StringComparison.Ordinal);
+        Assert.True(handler >= 0, "SpellTargetManager must define OnCharacterUpdated");
+        string handlerBody = stm.Substring(handler, stm.IndexOf('}', handler) - handler);
+        Assert.Contains("if (c.IsLocalPlayer && c.IsDead && IsTargeting) CancelTarget();", handlerBody);
+    }
+
+    [Fact]
     public void Character_HeldMovementAndAttackStartExactAndLatchThroughModifiers()
     {
         string c = Read("Scripts/Character/Character.cs");

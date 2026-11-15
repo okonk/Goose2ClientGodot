@@ -30,6 +30,7 @@ public partial class SpellTargetManager : Node
     public override void _Ready()
     {
         ProcessMode = ProcessModeEnum.Always;
+        GameManager.Instance.CharacterUpdated += OnCharacterUpdated;
     }
 
     // Holding the cast hotkey auto-confirms after HoldCastGate's delay, so a single press-and-hold
@@ -47,7 +48,13 @@ public partial class SpellTargetManager : Node
 
     public override void _ExitTree()
     {
+        if (GameManager.Instance != null) GameManager.Instance.CharacterUpdated -= OnCharacterUpdated;
         ExitTargeting();
+    }
+
+    private void OnCharacterUpdated(Character.Character c)
+    {
+        if (c.IsLocalPlayer && c.IsDead && IsTargeting) CancelTarget();
     }
     
     // Handle targeting input in _Input (the earliest stage) rather than _UnhandledInput, so it
