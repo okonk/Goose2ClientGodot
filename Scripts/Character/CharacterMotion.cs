@@ -4,8 +4,9 @@ namespace Goose2Client.Character
 {
     public static class CharacterMotion
     {
-        public static string State(bool isMoving, string? lockedMotion, bool isMounted)
+        public static string State(bool isMoving, string? lockedMotion, bool isMounted, bool isDead = false)
         {
+            if (isDead) return "death";
             if (lockedMotion != null) return lockedMotion;
             if (isMounted) return isMoving ? "mounted-walk" : "mounted-idle";
             return isMoving ? "walk" : "idle";

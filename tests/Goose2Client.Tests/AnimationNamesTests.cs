@@ -44,6 +44,12 @@ public class AnimationNamesTests
     public void Candidates_prefers_specific_clip(string motion, int bodyState, Direction d, string expectedFirst)
         => Assert.Equal(expectedFirst, AnimationNames.Candidates(motion, bodyState, d)[0]);
 
+    [Theory]
+    [InlineData(Direction.Down, "death-down")]
+    [InlineData(Direction.Left, "death-left")]
+    public void Death_candidates_are_the_directional_death_clip(Direction d, string expected)
+        => Assert.Equal(new[] { expected }, AnimationNames.Candidates("death", 4, d));
+
     [Fact]
     public void Candidates_mounted_does_not_fall_back_to_foot_walk()
     {

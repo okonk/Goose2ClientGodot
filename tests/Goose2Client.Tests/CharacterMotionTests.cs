@@ -31,6 +31,13 @@ public class CharacterMotionTests
     public void State_attack_lock_overrides_mounted()
         => Assert.Equal("attack", CharacterMotion.State(isMoving: true, lockedMotion: "attack", isMounted: true));
 
+    [Theory]
+    [InlineData(false, null, false)]
+    [InlineData(true, "attack", false)]
+    [InlineData(true, null, true)]
+    public void Dead_is_always_death(bool moving, string? locked, bool mounted)
+        => Assert.Equal("death", CharacterMotion.State(moving, locked, mounted, isDead: true));
+
     [Fact]
     public void PixelsPerSecond_scales_inversely_with_moveSpeed()
     {
