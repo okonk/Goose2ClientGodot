@@ -7,9 +7,9 @@ using Xunit;
 public class StylistCatalogTests
 {
     [Fact]
-    public void HairIds_AreExactlyOneToFortySix()
+    public void HairIds_AreBaldThenOneToFortySix()
     {
-        Assert.Equal(Enumerable.Range(1, 46), StylistCatalog.HairIds);
+        Assert.Equal(Enumerable.Range(0, 47), StylistCatalog.HairIds);
     }
 
     [Fact]
@@ -30,6 +30,7 @@ public class StylistCatalogTests
         var root = FindRepoRoot();
 
         var missing = StylistCatalog.HairIds
+            .Where(id => id != StylistCatalog.BaldHairId)
             .Where(id => !File.Exists(Path.Combine(root, "Assets", "Sprites", "Hair", id.ToString(), "animations.tres")))
             .Select(id => $"Hair/{id}")
             .Concat(StylistCatalog.FaceIds

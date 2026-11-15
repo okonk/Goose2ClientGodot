@@ -188,7 +188,8 @@ public partial class StylistWindow : BaseWindow, IWindow
             icon.OffsetTop = inset;
             icon.OffsetRight = -inset;
             icon.OffsetBottom = -inset;
-            var tex = slot == CharacterSlot.Body ? StylistIcon.BuildBody(id) : StylistIcon.Build(slot, id);
+            bool bald = slot == CharacterSlot.Hair && id == StylistCatalog.BaldHairId;
+            var tex = bald ? null : slot == CharacterSlot.Body ? StylistIcon.BuildBody(id) : StylistIcon.Build(slot, id);
             icon.Texture = tex;
             if (slot == CharacterSlot.Hair)
                 TintMaterial.Apply(icon, tex, _hairColor);
@@ -197,7 +198,8 @@ public partial class StylistWindow : BaseWindow, IWindow
             {
                 FocusMode = FocusModeEnum.None,
                 CustomMinimumSize = new Vector2(cell, cell),
-                TooltipText = slot == CharacterSlot.Body ? GenderName(id) : ""
+                Text = bald ? "Bald" : "",
+                TooltipText = slot == CharacterSlot.Body ? GenderName(id) : bald ? "Bald" : ""
             };
             button.AddChild(icon);
             button.Pressed += () =>
