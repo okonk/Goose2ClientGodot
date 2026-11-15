@@ -340,6 +340,8 @@ namespace Goose2Client.Network
 
         public void StylistChange(int hair, int face, int body) => Send(StylistPackets.FormatStc(hair, face, body));
 
+        public void RequestRespawn() => Send("RSPN");
+
         public void SubmitAmount(int windowId, long amount) => Send(AmountInfoPacket.FormatAmt(windowId, amount));
 
         public void VendorPurchaseItem(int npcId, int slotId)
