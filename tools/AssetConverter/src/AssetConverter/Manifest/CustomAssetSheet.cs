@@ -1661,7 +1661,20 @@ public sealed class CustomAssetSheet
         "shield-16.png",
     ]));
 
-    public static readonly IReadOnlyList<CustomAssetSheet> All = [Icons, Tiles, Portraits, Blood, WallLines, WallCaps, Banners, Arena, ArenaSand, BattleProps, ArenaWear, Corpses, ArenaStands, ArenaFacade, ArenaFacadeNorth, BattleGear, RuneTableBody, Backpacks, WantedPosters, Statues, CaveStone, CaveScenery, BossTarget, Shield];
+    public static readonly CustomAssetSheet LavaVariants = new(30024, 32, 32, isTileSheet: true, Numbered(
+    [
+        "lava-dark-red-71.png", "lava-dark-red-72.png", "lava-dark-red-73.png", "lava-dark-red-74.png", "lava-dark-red-75.png", "lava-bright-red-71.png", "lava-bright-red-72.png", "lava-bright-red-73.png", "lava-bright-red-74.png", "lava-bright-red-75.png",
+        "lava-dark-red-81.png", "lava-dark-red-82.png", "lava-dark-red-83.png", "lava-dark-red-84.png", "lava-dark-red-85.png", "lava-bright-red-81.png", "lava-bright-red-82.png", "lava-bright-red-83.png", "lava-bright-red-84.png", "lava-bright-red-85.png",
+        "lava-dark-red-91.png", "lava-dark-red-92.png", "lava-dark-red-93.png", null, null, "lava-bright-red-91.png", "lava-bright-red-92.png", "lava-bright-red-93.png", null, null,
+        "lava-gold-71.png", "lava-gold-72.png", "lava-gold-73.png", "lava-gold-74.png", "lava-gold-75.png", "lava-lemon-71.png", "lava-lemon-72.png", "lava-lemon-73.png", "lava-lemon-74.png", "lava-lemon-75.png",
+        "lava-gold-81.png", "lava-gold-82.png", "lava-gold-83.png", "lava-gold-84.png", "lava-gold-85.png", "lava-lemon-81.png", "lava-lemon-82.png", "lava-lemon-83.png", "lava-lemon-84.png", "lava-lemon-85.png",
+        "lava-gold-91.png", "lava-gold-92.png", "lava-gold-93.png", null, null, "lava-lemon-91.png", "lava-lemon-92.png", "lava-lemon-93.png", null, null,
+        "lava-orange-71.png", "lava-orange-72.png", "lava-orange-73.png", "lava-orange-74.png", "lava-orange-75.png", "lava-tangerine-71.png", "lava-tangerine-72.png", "lava-tangerine-73.png", "lava-tangerine-74.png", "lava-tangerine-75.png",
+        "lava-orange-81.png", "lava-orange-82.png", "lava-orange-83.png", "lava-orange-84.png", "lava-orange-85.png", "lava-tangerine-81.png", "lava-tangerine-82.png", "lava-tangerine-83.png", "lava-tangerine-84.png", "lava-tangerine-85.png",
+        "lava-orange-91.png", "lava-orange-92.png", "lava-orange-93.png", null, null, "lava-tangerine-91.png", "lava-tangerine-92.png", "lava-tangerine-93.png", null, null,
+    ]), columns: 10);
+
+    public static readonly IReadOnlyList<CustomAssetSheet> All = [Icons, Tiles, Portraits, Blood, WallLines, WallCaps, Banners, Arena, ArenaSand, BattleProps, ArenaWear, Corpses, ArenaStands, ArenaFacade, ArenaFacadeNorth, BattleGear, RuneTableBody, Backpacks, WantedPosters, Statues, CaveStone, CaveScenery, BossTarget, Shield, LavaVariants];
 
     private readonly (int Graphic, string? FileName)[] _graphics;
 
