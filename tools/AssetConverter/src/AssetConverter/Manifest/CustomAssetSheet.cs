@@ -1587,6 +1587,22 @@ public sealed class CustomAssetSheet
         "cave-stone-31.png", "cave-stone-32.png", "cave-stone-33.png", "cave-stone-34.png", "cave-stone-35.png", null, null, null, null, null,
     ]), columns: 10);
 
+    public static readonly CustomAssetSheet SafeTarget = new(30025, 64, 64, isTileSheet: false, Numbered(
+    [
+        "safe-target-01.png",
+        "safe-target-02.png",
+        "safe-target-03.png",
+        "safe-target-04.png",
+        "safe-target-05.png",
+        "safe-target-06.png",
+        "safe-target-07.png",
+        "safe-target-08.png",
+        "safe-target-09.png",
+        "safe-target-10.png",
+        "safe-target-11.png",
+        "safe-target-12.png",
+    ]));
+
     public static readonly CustomAssetSheet CaveScenery = new(30021, 32, 32, isTileSheet: true, Numbered(
     [
         "cave-rock-small.png",
@@ -1674,7 +1690,7 @@ public sealed class CustomAssetSheet
         "lava-orange-91.png", "lava-orange-92.png", "lava-orange-93.png", null, null, "lava-tangerine-91.png", "lava-tangerine-92.png", "lava-tangerine-93.png", null, null,
     ]), columns: 10);
 
-    public static readonly IReadOnlyList<CustomAssetSheet> All = [Icons, Tiles, Portraits, Blood, WallLines, WallCaps, Banners, Arena, ArenaSand, BattleProps, ArenaWear, Corpses, ArenaStands, ArenaFacade, ArenaFacadeNorth, BattleGear, RuneTableBody, Backpacks, WantedPosters, Statues, CaveStone, CaveScenery, BossTarget, Shield, LavaVariants];
+    public static readonly IReadOnlyList<CustomAssetSheet> All = [Icons, Tiles, Portraits, Blood, WallLines, WallCaps, Banners, Arena, ArenaSand, BattleProps, ArenaWear, Corpses, ArenaStands, ArenaFacade, ArenaFacadeNorth, BattleGear, RuneTableBody, Backpacks, WantedPosters, Statues, CaveStone, CaveScenery, BossTarget, Shield, LavaVariants, SafeTarget];
 
     private readonly (int Graphic, string? FileName)[] _graphics;
 

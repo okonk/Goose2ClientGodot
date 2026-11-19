@@ -47,13 +47,29 @@ public class CustomEffectTests
     }
 
     [Fact]
+    public void SafeTarget_PlaysTheBossTargetFramesFromItsOwnSheet()
+    {
+        var anim = CustomEffect.SafeTarget.BuildAnimation();
+
+        Assert.Equal(900003, CustomEffect.SafeTarget.Id);
+        Assert.Equal("900003", anim.Name);
+        Assert.Equal(12f, anim.Speed);
+        Assert.Equal(Enumerable.Range(1, 12), anim.Frames.Select(f => f.Frame.Index));
+        Assert.All(anim.Frames, f =>
+        {
+            Assert.Equal("res://Assets/Sprites/sheets/30025.png", f.TexturePath);
+            Assert.Equal((0, 64, 64), (f.Frame.Y, f.Frame.W, f.Frame.H));
+        });
+    }
+
+    [Fact]
     public void WriteAll_WritesEffectSpriteFrames()
     {
         string root = Path.Combine(Path.GetTempPath(), $"custom-effect-{Guid.NewGuid():N}");
 
         try
         {
-            Assert.Equal(2, CustomEffect.WriteAll(root));
+            Assert.Equal(3, CustomEffect.WriteAll(root));
 
             string tres = File.ReadAllText(Path.Combine(root, "Assets", "Sprites", "Effects", "900001", "animations.tres"));
             Assert.Contains("path=\"res://Assets/Sprites/sheets/30022.png\"", tres);

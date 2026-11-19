@@ -9,8 +9,9 @@ public sealed class CustomEffect
 
     public static readonly CustomEffect BossTarget = new(IdBase + 1, CustomAssetSheet.BossTarget, fps: 12);
     public static readonly CustomEffect Shield = new(IdBase + 2, CustomAssetSheet.Shield, fps: 12);
+    public static readonly CustomEffect SafeTarget = new(IdBase + 3, CustomAssetSheet.SafeTarget, fps: 12);
 
-    public static readonly IReadOnlyList<CustomEffect> All = [BossTarget, Shield];
+    public static readonly IReadOnlyList<CustomEffect> All = [BossTarget, Shield, SafeTarget];
 
     private CustomEffect(int id, CustomAssetSheet sheet, float fps)
     {
