@@ -1,10 +1,12 @@
 using System;
 using System.ComponentModel;
 using System.IO;
+using System.Threading.Tasks;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Markup.Xaml;
+using Avalonia.Platform.Storage;
 using MapEditor.App.Controls;
 using MapEditor.App.Rendering;
 using MapEditor.App.ViewModels;
@@ -15,6 +17,13 @@ namespace MapEditor.App;
 internal partial class GraphicViewerWindow : Window
 {
     private static readonly double[] ZoomOptions = { 0.25, 0.5, 1.0, 2.0, 4.0, 8.0 };
+
+    private static readonly FilePickerFileType[] PngFileTypes =
+    {
+        new("PNG images") { Patterns = new[] { "*.png" } }
+    };
+
+    private static string? _lastExportFolder;
 
     private readonly AssetContextController _assets;
     private readonly ISpriteSheetLoader _loader;
@@ -63,6 +72,8 @@ internal partial class GraphicViewerWindow : Window
     internal AnimationPreviewControl PreviewControl => _previewControl;
 
     internal AvaloniaSpriteSheetImage? SheetImage => _sheetImage;
+
+    internal static string? LastExportFolder => _lastExportFolder;
 
     protected override void OnOpened(EventArgs e)
     {
@@ -167,6 +178,7 @@ internal partial class GraphicViewerWindow : Window
         _sheetControl.Image = null;
         _sheetImage?.Dispose();
         _sheetImage = null;
+        ExportButton.IsEnabled = false;
         LoadDiagnosticText.Text = "—";
 
         if (sheetId is not { } id || !_assets.Current.IsAvailable)
@@ -187,6 +199,7 @@ internal partial class GraphicViewerWindow : Window
 
         _sheetImage = image;
         _sheetControl.Image = image;
+        ExportButton.IsEnabled = true;
         InvalidateMeasure();
         InvalidateVisual();
         ApplyFitZoom();
@@ -287,6 +300,84 @@ internal partial class GraphicViewerWindow : Window
 
     private void OnPercent100(object? sender, RoutedEventArgs e)
         => _viewModel.ResetZoom();
+
+    private async void OnExportPng(object? sender, RoutedEventArgs e)
+    {
+        if (_sheetImage is not { } image)
+        {
+            return;
+        }
+
+        string sheetName = _viewModel.SelectedSheetId is int id ? id.ToString() : "sheet";
+        string suggested = $"{sheetName}.png";
+        IStorageFolder? startLocation = await ResolveLastExportFolderAsync();
+        string? path = await PickExportPathAsync(suggested, startLocation);
+        if (path is not null)
+        {
+            SaveSheetPng(image, path);
+        }
+    }
+
+    private async Task<IStorageFolder?> ResolveLastExportFolderAsync()
+    {
+        if (_lastExportFolder is not { } folder || !Directory.Exists(folder))
+        {
+            return null;
+        }
+
+        Uri uri = new Uri(folder);
+        if (!uri.IsFile)
+        {
+            return null;
+        }
+
+        return await StorageProvider.TryGetFolderFromPathAsync(uri);
+    }
+
+    private async Task<string?> PickExportPathAsync(string suggestedName, IStorageFolder? startLocation)
+    {
+        IStorageFile? file = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+        {
+            Title = "Export sheet as PNG",
+            SuggestedFileName = suggestedName,
+            FileTypeChoices = PngFileTypes,
+            DefaultExtension = "bytes",
+            ShowOverwritePrompt = true,
+            SuggestedStartLocation = startLocation
+        });
+
+        if (file is null)
+        {
+            return null;
+        }
+
+        Uri uri = file.Path;
+        string? path = uri.IsFile ? uri.LocalPath : null;
+        file.Dispose();
+        return path;
+    }
+
+    internal bool SaveSheetPng(AvaloniaSpriteSheetImage image, string path)
+    {
+        try
+        {
+            string? directory = Path.GetDirectoryName(path);
+            if (!string.IsNullOrEmpty(directory))
+            {
+                Directory.CreateDirectory(directory);
+            }
+
+            using var stream = File.Create(path);
+            image.Bitmap.Save(stream);
+            _lastExportFolder = Path.GetDirectoryName(path);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            LoadDiagnosticText.Text = $"Could not export PNG: {ex.Message}";
+            return false;
+        }
+    }
 
     private void OnPlayPause(object? sender, RoutedEventArgs e)
         => TogglePlayback();

@@ -427,6 +427,56 @@ public class GraphicViewerWindowTests
     }
 
     [AvaloniaFact]
+    public void ExportButton_TogglesWithTheLoadedSheetImage()
+    {
+        using var harness = GraphicViewerWindowHarness.Create();
+        Assert.False(Find<Button>(harness, "ExportButton").IsEnabled);
+
+        string directory = WriteAssetDirectory(harness, "assets-a", ManifestA, AnimationA);
+        WritePng(directory, 1);
+        Assert.True(harness.Assets.TryOpen(directory));
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.True(Find<Button>(harness, "ExportButton").IsEnabled);
+    }
+
+    [AvaloniaFact]
+    public void SaveSheetPng_WritesAPngWithTheSheetDimensions()
+    {
+        using var harness = OpenAssetsA(new SpySpriteSheetLoader(96, 48));
+        string target = Path.Combine(harness.TempDirectory, "export", "out.png");
+
+        Assert.True(harness.Window.SaveSheetPng(harness.Window.SheetImage!, target));
+        Assert.True(File.Exists(target));
+
+        using var loaded = new Bitmap(new FileStream(target, FileMode.Open, FileAccess.Read));
+        Assert.Equal(96, loaded.PixelSize.Width);
+        Assert.Equal(48, loaded.PixelSize.Height);
+    }
+
+    [AvaloniaFact]
+    public void SaveSheetPng_FailureSetsTheDiagnosticAndReturnsFalse()
+    {
+        using var harness = OpenAssetsA();
+        string blocker = Path.Combine(harness.TempDirectory, "blocker");
+        File.WriteAllText(blocker, "x");
+        string badTarget = Path.Combine(blocker, "sub", "out.png");
+
+        Assert.False(harness.Window.SaveSheetPng(harness.Window.SheetImage!, badTarget));
+        Assert.Contains("Could not export PNG", Find<TextBlock>(harness, "LoadDiagnosticText").Text);
+    }
+
+    [AvaloniaFact]
+    public void SaveSheetPng_RemembersTheExportFolderForTheNextDialog()
+    {
+        using var harness = OpenAssetsA();
+        string target = Path.Combine(harness.TempDirectory, "remembered", "out.png");
+
+        Assert.True(harness.Window.SaveSheetPng(harness.Window.SheetImage!, target));
+        Assert.Equal(Path.GetDirectoryName(target), GraphicViewerWindow.LastExportFolder);
+    }
+
+    [AvaloniaFact]
     public void AnimationSelectorAndPlaybackButtons_PropagateToTheViewModel()
     {
         using var harness = OpenAssetsA();

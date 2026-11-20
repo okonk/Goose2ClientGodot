@@ -16,6 +16,7 @@
         <ComboBox x:Name="ZoomCombo" Width="80" />
         <Button x:Name="FitButton" Content="Fit" Click="OnFit" />
         <Button x:Name="Percent100Button" Content="100%" Click="OnPercent100" />
+        <Button x:Name="ExportButton" Content="Export PNG" Click="OnExportPng" IsEnabled="False" />
       </StackPanel>
     </Border>
     <Border x:Name="Diagnostics" Classes="chrome" DockPanel.Dock="Bottom" Padding="10,6" BorderThickness="0,1,0,0">
