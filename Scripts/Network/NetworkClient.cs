@@ -344,6 +344,8 @@ namespace Goose2Client.Network
 
         public void SubmitAmount(int windowId, long amount) => Send(AmountInfoPacket.FormatAmt(windowId, amount));
 
+        public void SubmitText(int windowId, string text) => Send(TextInputInfoPacket.FormatTxt(windowId, text));
+
         public void VendorPurchaseItem(int npcId, int slotId)
         {
             Send($"VPI{npcId},{slotId + 1}");

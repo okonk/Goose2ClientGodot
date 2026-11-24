@@ -114,7 +114,8 @@ namespace Goose2Client.Tests
             Assert.Equal(32, (int)WindowFrames.GridContainer);
             Assert.Equal(33, (int)WindowFrames.Enchant);
             Assert.Equal(34, (int)WindowFrames.Stylist);
-            Assert.Equal(34, (int)Enum.GetValues<WindowFrames>().Max());
+            Assert.Equal(35, (int)WindowFrames.TextInput);
+            Assert.Equal(35, (int)Enum.GetValues<WindowFrames>().Max());
         }
 
         [Fact]
