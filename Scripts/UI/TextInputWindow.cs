@@ -17,6 +17,7 @@ public partial class TextInputWindow : BaseWindow, IWindow
     private Button _confirmButton = null!;
     private Button _cancelButton = null!;
     private bool _listenersRegistered;
+    private float _promptGrowth;
 
     public override void _Ready()
     {
@@ -41,6 +42,36 @@ public partial class TextInputWindow : BaseWindow, IWindow
 
         UiScaleApplier.Instance!.ApplyFontSize(GetNode<Label>("TitleBar/TitleLabel"), 9);
         ScaleRegister();
+    }
+
+    public override void Relayout()
+    {
+        base.Relayout();
+        // base.Relayout restores the scene's one-line geometry, discarding any earlier growth.
+        _promptGrowth = 0;
+        FitPrompt();
+    }
+
+    private void FitPrompt()
+    {
+        if (_prompt == null) return;
+
+        int lines = Mathf.Max(1, _prompt.GetLineCount());
+        float textHeight = lines * _prompt.GetLineHeight()
+            + (lines - 1) * _prompt.GetThemeConstant("line_spacing");
+        float baseHeight = _prompt.OffsetBottom - _promptGrowth - _prompt.OffsetTop;
+        float growth = Mathf.Max(0f, Mathf.Ceil(textHeight - baseHeight));
+        float shift = growth - _promptGrowth;
+        if (shift == 0) return;
+
+        _prompt.OffsetBottom += shift;
+        foreach (var c in new Control[] { _field, _confirmButton, _cancelButton })
+        {
+            c.OffsetTop += shift;
+            c.OffsetBottom += shift;
+        }
+        Size = Size with { Y = Size.Y + shift };
+        _promptGrowth = growth;
     }
 
     public override void _ExitTree()
@@ -75,6 +106,7 @@ public partial class TextInputWindow : BaseWindow, IWindow
         var p = (TextInputInfoPacket)o;
         if (p.WindowId != WindowId) return;
         _prompt.Text = p.Prompt;
+        FitPrompt();
         _field.MaxLength = p.MaxLength;
         _field.Text = p.DefaultText;
         _confirmButton.Text = p.ButtonText;
