@@ -344,6 +344,13 @@ public partial class MapManager : Node2D
                     _lastLcMsec = Time.GetTicksMsec();
                     GameManager.Instance.SpellTargetManager?.CastOnClickedTarget(hit);
                 }
+                else
+                {
+                    var (gx, gy) = MapCoords.WorldToTile(worldPos);
+                    _lastLcTile = new Vector2I(gx, gy);
+                    _lastLcMsec = Time.GetTicksMsec();
+                    GameManager.Instance.SpellTargetManager?.CastOnClickedTile(gx, gy);
+                }
             }
             return;
         }

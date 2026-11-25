@@ -274,6 +274,12 @@ namespace Goose2Client.Network
             Send($"CAST{slot + 1},{targetId}");
         }
 
+        public void CastSpellAt(int slot, int x, int y)
+        {
+            if (LocalPlayerDead) return;
+            Send($"CAST{slot + 1},0,{x + 1},{y + 1}");
+        }
+
         public void RequestSpellInfo(int slot)
         {
             Send($"SID{slot + 1}");

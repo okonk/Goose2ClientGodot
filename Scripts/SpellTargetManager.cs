@@ -131,6 +131,32 @@ public partial class SpellTargetManager : Node
         ConfirmTarget();
     }
 
+    public void CastOnClickedTile(int x, int y)
+    {
+        if (!IsTargeting || _pendingSpell is not { } spell) return;
+        if (!CanCastAt(spell, x, y)) return;
+
+        _holdGate.Spend();
+        _hotkeyConfirmFrame = Engine.GetProcessFrames();
+        _pendingSpell = null;
+        if (!GameManager.Instance.IsLocalPlayerDead && !GameManager.Instance.IsLoadingMap)
+        {
+            LastTargetableSpell = spell;
+            GameManager.Instance.SpellCooldownManager.Cast(spell.SlotNumber, spell.Cooldown);
+            GameManager.Instance.NetworkClient.CastSpellAt(spell.SlotNumber, x, y);
+        }
+        ExitTargeting();
+    }
+
+    private bool CanCastAt(SpellInfo spell, int x, int y)
+    {
+        var player = GameManager.Instance.CurrentMapManager?.LocalPlayer;
+        var map = GameManager.Instance.CurrentMap;
+        if (player == null || map == null) return false;
+        var view = GetViewRange();
+        return GroundTargetRule.CanCastAt(spell, (player.X, player.Y), (x, y), (view.X, view.Y), (map.Width, map.Height));
+    }
+
     /// <summary>
     /// Casts again on the remembered target for a hotkey still held down after its hold cast.
     /// Returns false when no such press is down, so the caller leaves targeting closed instead of
