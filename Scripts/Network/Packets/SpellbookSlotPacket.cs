@@ -25,6 +25,12 @@ namespace Goose2Client.Network.Packets
 
         public long CooldownRemainingMs { get; set; }
 
+        public bool GroundTargetable { get; set; }
+
+        public SpellShape Shape { get; set; }
+
+        public int ShapeSize { get; set; }
+
         public override string Prefix { get; } = "SSS";
 
         public override object Parse(PacketParser p)
@@ -46,6 +52,12 @@ namespace Goose2Client.Network.Packets
                 packet.Cooldown = p.GetInt64();
                 if (p.LengthRemaining() > 0)
                     packet.CooldownRemainingMs = p.GetInt64();
+                if (p.TokensRemaining() >= 3)
+                {
+                    packet.GroundTargetable = p.GetBool();
+                    packet.Shape = (SpellShape)p.GetInt32();
+                    packet.ShapeSize = p.GetInt32();
+                }
             }
 
             return packet;

@@ -75,4 +75,20 @@ public class SpellInfoTests
         Assert.Equal(3, spellInfo.GraphicFile);
         Assert.Equal(TimeSpan.FromMilliseconds(1500), spellInfo.Cooldown);
     }
+
+    [Fact]
+    public void FromPacket_CopiesGroundTargetingAndShape()
+    {
+        var packet = new SpellbookSlotPacket
+        {
+            SlotNumber = 0, Name = "Fire Patch", TargetType = SpellTargetType.NPC,
+            GroundTargetable = true, Shape = SpellShape.Plus, ShapeSize = 3,
+        };
+
+        var info = SpellInfo.FromPacket(packet);
+
+        Assert.True(info.GroundTargetable);
+        Assert.Equal(SpellShape.Plus, info.Shape);
+        Assert.Equal(3, info.ShapeSize);
+    }
 }

@@ -12,6 +12,9 @@ namespace Goose2Client
         public int GraphicId { get; set; }
         public int GraphicFile { get; set; }
         public TimeSpan Cooldown { get; set; }
+        public bool GroundTargetable { get; set; }
+        public SpellShape Shape { get; set; }
+        public int ShapeSize { get; set; }
 
         public static SpellInfo FromPacket(SpellbookSlotPacket packet)
         {
@@ -23,6 +26,9 @@ namespace Goose2Client
                 GraphicId = packet.GraphicId,
                 GraphicFile = packet.GraphicFile,
                 Cooldown = TimeSpan.FromMilliseconds(packet.Cooldown),
+                GroundTargetable = packet.GroundTargetable,
+                Shape = packet.Shape,
+                ShapeSize = packet.ShapeSize,
             };
         }
     }
