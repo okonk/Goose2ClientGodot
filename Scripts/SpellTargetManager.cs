@@ -12,6 +12,7 @@ public partial class SpellTargetManager : Node
     private SpellTarget? _reticle;
     private ulong _hotkeyConfirmFrame = ulong.MaxValue;
     private readonly HoldCastGate _holdGate = new();
+    private (int X, int Y)? _hoverTile;
 
     /// <summary>Whether the player is currently in targeting mode.</summary>
     public bool IsTargeting { get; private set; }
@@ -42,6 +43,7 @@ public partial class SpellTargetManager : Node
     // targeting session on its first frame and pin that hotkey to its previous target for good.
     public override void _Process(double delta)
     {
+        UpdatePreview();
         if (!_holdGate.Update(HeldHotkeyAction(), delta)) return;
         if (IsTargeting) CastOnTarget();
     }
@@ -146,6 +148,30 @@ public partial class SpellTargetManager : Node
             GameManager.Instance.NetworkClient.CastSpellAt(spell.SlotNumber, x, y);
         }
         ExitTargeting();
+    }
+
+    public void OnWorldHover(int x, int y) => _hoverTile = (x, y);
+
+    public void ClearWorldHover() => _hoverTile = null;
+
+    private void UpdatePreview()
+    {
+        var mm = GameManager.Instance.CurrentMapManager;
+        if (mm == null || !GodotObject.IsInstanceValid(mm)) return;
+
+        var player = mm.LocalPlayer;
+        var map = GameManager.Instance.CurrentMap;
+        if (!IsTargeting || _pendingSpell is not { } spell || _target == null || player == null || map == null)
+        {
+            mm.GroundZones.HidePreview();
+            return;
+        }
+
+        var anchor = SpellPreview.Anchor(spell, _hoverTile, (_target.X, _target.Y));
+        var tiles = SpellPreview.Tiles(spell, anchor, player.Facing, (map.Width, map.Height));
+        bool usable = !spell.GroundTargetable || _hoverTile == null || CanCastAt(spell, anchor.X, anchor.Y);
+        var color = usable ? TargetBoxColor.CurrentColor() with { A = 0.35f } : new Color(0.5f, 0.5f, 0.5f, 0.35f);
+        mm.GroundZones.ShowPreview(tiles, color);
     }
 
     private bool CanCastAt(SpellInfo spell, int x, int y)
@@ -411,5 +437,6 @@ public partial class SpellTargetManager : Node
             _reticle.QueueFree();
             _reticle = null;
         }
+        UpdatePreview();
     }
 }

@@ -387,10 +387,17 @@ public partial class MapManager : Node2D
     // Hidden characters are hit too (skipHidden stays false): the name tooltip's own rule
     // decides visibility via IsHiddenFromViewer, so the hit test must not pre-filter.
     public void HandleWorldHover(Vector2 worldPos)
-        => Goose2Client.UI.TooltipManager.Instance?.ShowNameTooltip(CharacterAt(worldPos));
+    {
+        Goose2Client.UI.TooltipManager.Instance?.ShowNameTooltip(CharacterAt(worldPos));
+        var (tx, ty) = MapCoords.WorldToTile(worldPos);
+        GameManager.Instance.SpellTargetManager?.OnWorldHover(tx, ty);
+    }
 
     public void ClearWorldHover()
-        => Goose2Client.UI.TooltipManager.Instance?.HideNameTooltip();
+    {
+        Goose2Client.UI.TooltipManager.Instance?.HideNameTooltip();
+        GameManager.Instance.SpellTargetManager?.ClearWorldHover();
+    }
 
     // Topmost character whose body sprite covers the point: later children draw on top, so the last
     // match wins. Hit-testing does not consult the spell's target-type filter — see CastOnClickedTarget.

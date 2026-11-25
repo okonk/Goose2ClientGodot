@@ -9,6 +9,33 @@ namespace Goose2Client.Map
     {
         private readonly ZoneBook _book = new();
         private readonly Dictionary<int, List<Node2D>> _sprites = new();
+        private readonly PreviewNode _preview = new() { Name = "Preview" };
+
+        public override void _Ready() => AddChild(_preview);
+
+        public void ShowPreview(List<(int X, int Y)> tiles, Color color) => _preview.Set(tiles, color);
+
+        public void HidePreview() => _preview.Set(new(), default);
+
+        private sealed partial class PreviewNode : Node2D
+        {
+            private List<(int X, int Y)> _tiles = new();
+            private Color _color;
+
+            public void Set(List<(int X, int Y)> tiles, Color color)
+            {
+                _tiles = tiles;
+                _color = color;
+                QueueRedraw();
+            }
+
+            public override void _Draw()
+            {
+                var size = new Vector2(MapCoords.TileSize, MapCoords.TileSize);
+                foreach (var (x, y) in _tiles)
+                    DrawRect(new Rect2(MapCoords.TileCenter(x, y) - size / 2f, size), _color);
+            }
+        }
 
         public void Add(ZoneAddPacket p)
         {
