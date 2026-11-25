@@ -51,6 +51,8 @@ public partial class MapManager : Node2D
     /// <summary>The local player's character node (if alive).</summary>
     public Character.Character? LocalPlayer => GetCharacter(_myLoginId);
 
+    public Goose2Client.Map.GroundZoneLayer GroundZones { get; private set; } = null!;
+
     public System.Collections.Generic.IEnumerable<Character.Character> Characters => _characters.Values;
 
     /// <summary>Camera follow must run AFTER every Character has moved this frame. MapManager
@@ -101,6 +103,9 @@ public partial class MapManager : Node2D
         MoveChild(_objectLayer, _characterRoot.GetIndex());
         _objectLayer.Setup(_map, 2, _cache);
 
+        GroundZones = new Goose2Client.Map.GroundZoneLayer { Name = "GroundZones", ZIndex = 12 };
+        AddChild(GroundZones);
+
         var pm = GameManager.Instance.PacketManager;
         pm.Listen<TileUpdatePacket>(OnTileUpdate);
         pm.Listen<MapWarpPacket>(OnMapWarp);
@@ -123,6 +128,8 @@ public partial class MapManager : Node2D
         pm.Listen<EmotePacket>(OnEmote);
         pm.Listen<SpellCharacterPacket>(OnSpellCharacter);
         pm.Listen<SpellTilePacket>(OnSpellTile);
+        pm.Listen<ZoneAddPacket>(OnZoneAdd);
+        pm.Listen<ZoneDeletePacket>(OnZoneDelete);
         pm.Listen<CastPacket>(OnCast);
         pm.Listen<SeeInvisiblePacket>(OnSeeInvisible);
         _listenersRegistered = true;
@@ -164,6 +171,8 @@ public partial class MapManager : Node2D
         pm.Remove<EmotePacket>(OnEmote);
         pm.Remove<SpellCharacterPacket>(OnSpellCharacter);
         pm.Remove<SpellTilePacket>(OnSpellTile);
+        pm.Remove<ZoneAddPacket>(OnZoneAdd);
+        pm.Remove<ZoneDeletePacket>(OnZoneDelete);
         pm.Remove<CastPacket>(OnCast);
         pm.Remove<SeeInvisiblePacket>(OnSeeInvisible);
     }
@@ -448,6 +457,10 @@ public partial class MapManager : Node2D
         if (!s.Setup(p.AnimationId, new Vector2(0, -MapCoords.TileSize / 2f))) { s.QueueFree(); return; }
         s.Position = MapCoords.TileBottomCenter(p.TileX, p.TileY);
     }
+
+    private void OnZoneAdd(object packetObj) => GroundZones.Add((ZoneAddPacket)packetObj);
+
+    private void OnZoneDelete(object packetObj) => GroundZones.Remove(((ZoneDeletePacket)packetObj).Id);
 
     private void OnCast(object packetObj)
     {

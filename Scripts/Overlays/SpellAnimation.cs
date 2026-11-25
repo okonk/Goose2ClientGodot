@@ -6,7 +6,7 @@ namespace Goose2Client.Overlays
     /// Spells stack (no replacement) and are positioned by the caller.</summary>
     public partial class SpellAnimation : WorldOverlay
     {
-        public bool Setup(int animationId, Vector2 spriteOffset = default)
+        public bool Setup(int animationId, Vector2 spriteOffset = default, bool loop = false)
         {
             var path = $"res://Assets/Sprites/Effects/{animationId}/animations.tres";
             if (!ResourceLoader.Exists(path)) return false;
@@ -33,7 +33,10 @@ namespace Goose2Client.Overlays
                 total += sprite.SpriteFrames.GetFrameDuration(clip, i);
             double lengthSeconds = speed > 0 ? total / speed : 0.5;
 
-            Lifetime = new OverlayLifetime(lengthSeconds);
+            if (loop)
+                sprite.AnimationFinished += () => sprite.Play(clip);
+            else
+                Lifetime = new OverlayLifetime(lengthSeconds);
 
             // AnimatedSprite2D is Centered, so the texture is already centered on this node's
             // origin. The caller anchors the node on the target's center (tile cell / character),
