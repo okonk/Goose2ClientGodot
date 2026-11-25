@@ -2,7 +2,8 @@ using Godot;
 
 namespace Goose2Client.Overlays
 {
-    /// <summary>Looping spell impact effect. Self-frees when clip length elapses.
+    /// <summary>Spell impact effect. Self-frees when the clip length elapses, unless set up
+    /// with loop: true, in which case it replays forever until the caller frees it.
     /// Spells stack (no replacement) and are positioned by the caller.</summary>
     public partial class SpellAnimation : WorldOverlay
     {
