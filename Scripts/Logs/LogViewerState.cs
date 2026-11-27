@@ -466,7 +466,7 @@ namespace Goose2Client.Logs
                 case LogQuickActionTarget.Primary:
                     if (!EntityQuickFilterAvailable(row.Primary))
                         return;
-                    ApplyEntityKind(row.Primary);
+                    ApplyEntityKind(row.Primary!);
                     break;
                 case LogQuickActionTarget.Related:
                     if (!EntityQuickFilterAvailable(row.Related))

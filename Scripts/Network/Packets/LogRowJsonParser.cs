@@ -51,7 +51,6 @@ namespace Goose2Client.Network.Packets
                 if (!TryParseOtherIdKind(otherKindName, out LogOtherIdKind otherIdKind)) return false;
                 if (!ReadProperty(ref reader, "primary")) return false;
                 if (!TryReadEntity(ref reader, out primary)) return false;
-                if (primary == null) return false;
                 if (!ReadProperty(ref reader, "related")) return false;
                 if (!TryReadEntity(ref reader, out related)) return false;
                 if (!ReadProperty(ref reader, "map")) return false;
@@ -127,6 +126,19 @@ namespace Goose2Client.Network.Packets
             return value != null;
         }
 
+        private static bool ReadNullableString(ref Utf8JsonReader r, out string? value)
+        {
+            value = null;
+            if (!r.Read())
+                return false;
+            if (r.TokenType == JsonTokenType.Null)
+                return true;
+            if (r.TokenType != JsonTokenType.String)
+                return false;
+            value = r.GetString();
+            return value != null;
+        }
+
         private static bool TryReadEntity(ref Utf8JsonReader r, out LogRowEntity? entity)
         {
             entity = null;
@@ -154,7 +166,7 @@ namespace Goose2Client.Network.Packets
             else
                 return false;
             if (!ReadProperty(ref r, "name")) return false;
-            if (!ReadString(ref r, out name)) return false;
+            if (!ReadNullableString(ref r, out name)) return false;
             if (!ReadProperty(ref r, "canQuickFilter")) return false;
             if (!ReadBool(ref r, out bool canQuickFilter)) return false;
             if (!r.Read() || r.TokenType != JsonTokenType.EndObject)
@@ -175,7 +187,7 @@ namespace Goose2Client.Network.Packets
             if (!ReadProperty(ref r, "id")) return false;
             if (!ReadInt64(ref r, out long id)) return false;
             if (!ReadProperty(ref r, "name")) return false;
-            if (!ReadString(ref r, out string? name)) return false;
+            if (!ReadNullableString(ref r, out string? name)) return false;
             if (!ReadProperty(ref r, "canQuickFilter")) return false;
             if (!ReadBool(ref r, out bool canQuickFilter)) return false;
             if (!r.Read() || r.TokenType != JsonTokenType.EndObject)
@@ -234,6 +246,7 @@ namespace Goose2Client.Network.Packets
                 case "Guild": kind = LogOtherIdKind.Guild; return true;
                 case "Item": kind = LogOtherIdKind.Item; return true;
                 case "NpcTemplate": kind = LogOtherIdKind.NpcTemplate; return true;
+                case "Map": kind = LogOtherIdKind.Map; return true;
                 default: kind = LogOtherIdKind.Unused; return false;
             }
         }
@@ -248,6 +261,7 @@ namespace Goose2Client.Network.Packets
                 case "NpcTemplate": kind = LogEntityKind.NpcTemplate; return true;
                 case "Map": kind = LogEntityKind.Map; return true;
                 case "StoredValue": kind = LogEntityKind.StoredValue; return true;
+                case "Gold": kind = LogEntityKind.Gold; return true;
                 default: kind = LogEntityKind.Player; return false;
             }
         }

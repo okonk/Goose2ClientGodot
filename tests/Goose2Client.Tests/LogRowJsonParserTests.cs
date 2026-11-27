@@ -152,7 +152,7 @@ namespace Goose2Client.Network.Packets.Tests
             var row = Parse(Row(typeIsInteger: "false", otherIdKind: Js("NpcTemplate"), primary: primary, related: related, map: map, raw: raw));
             Assert.False(row.TypeIsInteger);
             Assert.Equal(LogOtherIdKind.NpcTemplate, row.OtherIdKind);
-            Assert.Equal(LogEntityKind.StoredValue, row.Primary.Kind);
+            Assert.Equal(LogEntityKind.StoredValue, row.Primary!.Kind);
             Assert.Null(row.Primary.Id);
             Assert.True(row.Primary.CanQuickFilter);
             Assert.Equal("P", row.Primary.Label);
@@ -195,7 +195,7 @@ namespace Goose2Client.Network.Packets.Tests
         {
             string primary = string.Format(EntityTemplate, EmptyJson, Js(name), "0", EmptyJson, "false");
             var row = Parse(Row(primary: primary));
-            Assert.Equal(name, row.Primary.Kind.ToString());
+            Assert.Equal(name, row.Primary!.Kind.ToString());
         }
 
         [Fact]
@@ -211,6 +211,50 @@ namespace Goose2Client.Network.Packets.Tests
             Assert.NotNull(row2.Related);
             Assert.Null(row2.Map);
             Assert.Null(row2.Related.Id);
+        }
+
+        [Fact]
+        public void OtherIdKind_AcceptsMap()
+        {
+            var row = Parse(Row(otherIdKind: Js("Map")));
+            Assert.Equal(LogOtherIdKind.Map, row.OtherIdKind);
+        }
+
+        [Fact]
+        public void AcceptsGoldRelatedWithNullIdAndName()
+        {
+            string related = string.Format(EntityTemplate, Js("Gold"), Js("Gold"), "null", "null", "false");
+            var row = Parse(Row(related: related));
+            Assert.NotNull(row.Related);
+            Assert.Equal(LogEntityKind.Gold, row.Related.Kind);
+            Assert.Null(row.Related.Id);
+            Assert.Null(row.Related.Name);
+        }
+
+        [Fact]
+        public void AcceptsNullEntityName()
+        {
+            string primary = string.Format(EntityTemplate, Js("Player"), Js("Player"), "5", "null", "true");
+            var row = Parse(Row(primary: primary));
+            Assert.NotNull(row.Primary);
+            Assert.Null(row.Primary.Name);
+        }
+
+        [Fact]
+        public void AcceptsNullPrimary()
+        {
+            var row = Parse(Row(primary: "null"));
+            Assert.Null(row.Primary);
+        }
+
+        [Fact]
+        public void AcceptsNullMapName()
+        {
+            string map = "{" + Js("id") + ":9," + Js("name") + ":null," + Js("canQuickFilter") + ":true}";
+            var row = Parse(Row(map: map));
+            Assert.NotNull(row.Map);
+            Assert.Equal(9, row.Map.Id);
+            Assert.Null(row.Map.Name);
         }
 
         [Fact]
@@ -241,7 +285,7 @@ namespace Goose2Client.Network.Packets.Tests
             var row = Parse(Row(eventLabel: jsonText, eventGroup: jsonText, primary: primary, summary: jsonText, originalText: jsonText));
             Assert.Equal(text, row.EventLabel);
             Assert.Equal(text, row.EventGroup);
-            Assert.Equal(text, row.Primary.Label);
+            Assert.Equal(text, row.Primary!.Label);
             Assert.Equal(text, row.Primary.Name);
             Assert.Equal(text, row.Summary);
             Assert.Equal(text, row.OriginalText);

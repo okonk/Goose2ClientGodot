@@ -9,7 +9,8 @@ namespace Goose2Client.Logs
         Player,
         Guild,
         Item,
-        NpcTemplate
+        NpcTemplate,
+        Map
     }
 
     public enum LogEntityKind
@@ -19,7 +20,8 @@ namespace Goose2Client.Logs
         Guild,
         NpcTemplate,
         Map,
-        StoredValue
+        StoredValue,
+        Gold
     }
 
     public enum LogNavigationIntent
@@ -50,9 +52,9 @@ namespace Goose2Client.Logs
 
     public sealed record LogResultError(bool IsValid, int WindowId, int RequestId, int WireLength, string SafeMessage) : LogPacketData;
 
-    public sealed record LogRowEntity(string Label, LogEntityKind Kind, long? Id, string Name, bool CanQuickFilter);
+    public sealed record LogRowEntity(string Label, LogEntityKind Kind, long? Id, string? Name, bool CanQuickFilter);
 
-    public sealed record LogRowMap(long Id, string Name, bool CanQuickFilter);
+    public sealed record LogRowMap(long Id, string? Name, bool CanQuickFilter);
 
     public sealed record LogRowRaw(
         long PlayerId,
@@ -74,7 +76,7 @@ namespace Goose2Client.Logs
         string EventLabel,
         string EventGroup,
         LogOtherIdKind OtherIdKind,
-        LogRowEntity Primary,
+        LogRowEntity? Primary,
         LogRowEntity? Related,
         LogRowMap? Map,
         LogRowRaw Raw,

@@ -42,7 +42,7 @@ namespace Goose2Client.Logs
             {
                 FormatTableUtc(row.UtcMilliseconds),
                 row.EventLabel,
-                row.Primary.Label,
+                row.Primary?.Label ?? "",
                 row.Related?.Label ?? "",
                 row.Map?.Name ?? "",
                 row.Summary
@@ -78,11 +78,11 @@ namespace Goose2Client.Logs
                 case 5: return Bool(row.TypeIsInteger);
                 case 6: return row.EventGroup;
                 case 7: return row.OtherIdKind.ToString();
-                case 8: return row.Primary.Label;
-                case 9: return row.Primary.Kind.ToString();
-                case 10: return row.Primary.Id?.ToString(CultureInfo.InvariantCulture) ?? "";
-                case 11: return row.Primary.Name;
-                case 12: return Bool(row.Primary.CanQuickFilter);
+                case 8: return row.Primary?.Label ?? "";
+                case 9: return row.Primary?.Kind.ToString() ?? "";
+                case 10: return row.Primary?.Id?.ToString(CultureInfo.InvariantCulture) ?? "";
+                case 11: return row.Primary?.Name ?? "";
+                case 12: return row.Primary != null ? Bool(row.Primary.CanQuickFilter) : "";
                 case 13: return row.Related?.Label ?? "";
                 case 14: return row.Related?.Kind.ToString() ?? "";
                 case 15: return row.Related?.Id?.ToString(CultureInfo.InvariantCulture) ?? "";
