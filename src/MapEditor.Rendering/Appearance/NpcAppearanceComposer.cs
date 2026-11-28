@@ -7,7 +7,6 @@ namespace MapEditor.Rendering;
 public sealed class NpcAppearanceComposer
 {
     public const int TileSize = 32;
-    public const int MonsterBodyId = 100;
     public const int UnderwearMaleBodyId = 1;
     public const int UnderwearFemaleBodyId = 11;
     public const int UnderwearMaleLegsId = 3;
@@ -27,7 +26,7 @@ public sealed class NpcAppearanceComposer
     {
         int anchorX = tileX * TileSize + 16;
         int anchorY = (tileY + 1) * TileSize;
-        bool humanoid = appearance.BodyId < MonsterBodyId;
+        bool humanoid = IsLayered(appearance.BodyId);
 
         NpcEquipment equipment = default;
         string? equipmentDiagnostic = null;
@@ -147,4 +146,7 @@ public sealed class NpcAppearanceComposer
         int offsetY = Math.Max((height - 48) / 2, 0) - height / 2;
         return new NpcPartDestination(anchorX - width / 2, anchorY + offsetY - height / 2, width, height);
     }
+
+    // Must match BodyClassification.IsLayered in the client and server.
+    public static bool IsLayered(int bodyId) => bodyId < 100 || bodyId == 221 || (bodyId >= 10000 && bodyId <= 10099);
 }

@@ -406,4 +406,15 @@ public class NpcAppearanceComposerTests
             Directory.Delete(AssetRoot, recursive: true);
         }
     }
+
+    [Theory]
+    [InlineData(1, true)]
+    [InlineData(99, true)]
+    [InlineData(100, false)]
+    [InlineData(221, true)]
+    [InlineData(222, false)]
+    [InlineData(10001, true)]
+    [InlineData(10100, false)]
+    public void IsLayered_MatchesClientBodyRule(int bodyId, bool expected)
+        => Assert.Equal(expected, NpcAppearanceComposer.IsLayered(bodyId));
 }
